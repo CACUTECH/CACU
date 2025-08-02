@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Smartphone, Banknote, PosTerminal, Mail, FileSpreadsheet } from 'lucide-react';
+import { Smartphone, Banknote, Terminal, Mail, FileSpreadsheet } from 'lucide-react';
 
 function FeatureCard({ icon: Icon, title, description }: { icon: React.ElementType, title: string, description: string }) {
     return (
@@ -35,7 +35,7 @@ export default function AppsPage() {
                     description="Connect your local bank and microfinance institution accounts for a unified financial view."
                 />
                 <FeatureCard
-                    icon={PosTerminal}
+                    icon={Terminal}
                     title="POS System Integration"
                     description="Sync your Point-of-Sale system to automatically record sales and inventory data."
                 />
