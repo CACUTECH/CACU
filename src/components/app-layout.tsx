@@ -14,16 +14,19 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LayoutDashboard, ArrowRightLeft, Package, Library, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, PieChart, Banknote, Users, AppWindow, Briefcase, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
 import Link from 'next/link';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/transactions', label: 'Transactions', icon: ArrowRightLeft },
-  { href: '/inventory', label: 'Inventory', icon: Package },
-  { href: '/reports', label: 'Reports', icon: Library },
+  { href: '/community', label: 'Community', icon: MessageSquare },
+  { href: '/analytics', label: 'Analytics', icon: PieChart },
+  { href: '/credit', label: 'Credit', icon: Banknote },
+  { href: '/hr', label: 'HR', icon: Users },
+  { href: '/apps', label: 'Apps', icon: AppWindow },
+  { href: '/setup', label: 'Setup', icon: Briefcase },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -63,7 +66,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 strokeLinejoin="round"
               />
             </svg>
-            <span className="font-headline text-xl font-semibold text-primary">Finsight</span>
+            <span className="font-headline text-xl font-semibold text-primary">CACU</span>
           </div>
         </SidebarHeader>
         <SidebarContent>

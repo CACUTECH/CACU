@@ -14,6 +14,12 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/inventory': 'Inventory',
   '/reports': 'Reports',
   '/settings': 'Settings',
+  '/community': 'Community',
+  '/analytics': 'Analytics',
+  '/credit': 'Credit',
+  '/hr': 'HR',
+  '/apps': 'Apps',
+  '/setup': 'Setup',
 };
 
 export function Header() {

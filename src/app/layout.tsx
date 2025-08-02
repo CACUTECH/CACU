@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import AppLayout from '@/components/app-layout';
 
 export const metadata: Metadata = {
-  title: 'Finsight',
+  title: 'CACU',
   description: 'Small business financial management',
 };
 
