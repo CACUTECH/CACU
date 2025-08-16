@@ -14,58 +14,64 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LayoutDashboard, MessageSquare, PieChart, Banknote, Users, AppWindow, Briefcase, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Banknote, Users2, LifeBuoy, AppWindow, Settings, LogOut, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/community', label: 'Community', icon: MessageSquare },
+  { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { href: '/inventory', label: 'Inventory', icon: Package },
+  { href: '/reports', label: 'Reports', icon: FileText },
+  { href: '/customers', label: 'Customers', icon: Users },
   { href: '/analytics', label: 'Analytics', icon: PieChart },
   { href: '/credit', label: 'Credit', icon: Banknote },
-  { href: '/hr', label: 'HR', icon: Users },
-  { href: '/apps', label: 'Apps', icon: AppWindow },
-  { href: '/setup', label: 'Setup', icon: Briefcase },
+  { href: '/hr', label: 'HR', icon: Users2 },
+  { href: '/support', label: 'Support', icon: LifeBuoy },
+  { href: '/apps', label: 'Integrations', icon: AppWindow },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { theme } = useTheme();
+
+  // A simple logo component. You can replace this with your own logo.
+  const Logo = ({ className }: { className?: string }) => (
+    <svg
+      className={className}
+      viewBox="0 0 100 100"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M50 2.5a47.5 47.5 0 1 1-33.6 13.9A47.5 47.5 0 0 1 50 2.5zm0 8A39.5 39.5 0 1 0 89.5 50 39.5 39.5 0 0 0 50 10.5z"
+        className="fill-primary"
+      />
+      <path
+        d="M50 25a7.5 7.5 0 0 1 7.5 7.5v15H42.5V32.5A7.5 7.5 0 0 1 50 25z"
+        className="fill-secondary"
+      />
+      <path
+        d="M50 52.5a7.5 7.5 0 0 1-7.5-7.5v-15h15v15a7.5 7.5 0 0 1-7.5 7.5z"
+        transform="rotate(180 50 50)"
+        className="fill-secondary"
+      />
+    </svg>
+  );
+
+  // Hide sidebar and header for setup page
+  if (pathname === '/setup' || pathname === '/login') {
+    return <main>{children}</main>;
+  }
 
   return (
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-          <div className="flex items-center gap-3 p-2">
-            <svg
-              className="size-8 shrink-0 text-primary"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <path
-                d="M12 2L2 7V17L12 22L22 17V7L12 2Z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M2 7L12 12L22 7"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M12 22V12"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+          <div className="flex items-center gap-2 p-2">
+            <Logo className="size-8 shrink-0" />
             <span className="font-headline text-xl font-semibold text-primary">CACU</span>
           </div>
         </SidebarHeader>
@@ -86,10 +92,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarFooter className="flex flex-col gap-2">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/settings'} tooltip="Settings">
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')} tooltip="Settings">
                 <Link href="/settings">
                   <Settings />
                   <span>Settings</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === '/setup'} tooltip="Initial Setup">
+                <Link href="/setup">
+                  <Briefcase />
+                  <span>Business Setup</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

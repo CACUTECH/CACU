@@ -40,7 +40,7 @@ export default function InventoryPage() {
                 <div className="flex items-center justify-between gap-4">
                     <div>
                         <CardTitle className="font-headline">Inventory</CardTitle>
-                        <CardDescription>Manage your product inventory.</CardDescription>
+                        <CardDescription>Manage your product inventory and stock levels.</CardDescription>
                     </div>
                     <Button>
                         <PlusCircle className="mr-2 h-4 w-4" />
@@ -55,9 +55,9 @@ export default function InventoryPage() {
                             <TableRow>
                                 <TableHead>Product Name</TableHead>
                                 <TableHead>SKU</TableHead>
-                                <TableHead>Quantity</TableHead>
-                                <TableHead>Price</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead className="text-center">Quantity</TableHead>
+                                <TableHead className="text-right">Price</TableHead>
+                                <TableHead className="text-center">Status</TableHead>
                                 <TableHead><span className="sr-only">Actions</span></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -66,9 +66,9 @@ export default function InventoryPage() {
                                 <TableRow key={item.id}>
                                     <TableCell className="font-medium">{item.name}</TableCell>
                                     <TableCell>{item.sku}</TableCell>
-                                    <TableCell>{item.quantity}</TableCell>
-                                    <TableCell>${item.price.toLocaleString()}</TableCell>
-                                    <TableCell>
+                                    <TableCell className="text-center">{item.quantity}</TableCell>
+                                    <TableCell className="text-right">${item.price.toLocaleString()}</TableCell>
+                                    <TableCell className="text-center">
                                         <Badge variant={getStatusBadgeVariant(item.status)}>{item.status}</Badge>
                                     </TableCell>
                                     <TableCell>
@@ -84,6 +84,7 @@ export default function InventoryPage() {
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                 <DropdownMenuItem>Edit</DropdownMenuItem>
                                                 <DropdownMenuItem>Record Sale</DropdownMenuItem>
+                                                <DropdownMenuItem>Reorder</DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">Delete</DropdownMenuItem>
                                             </DropdownMenuContent>

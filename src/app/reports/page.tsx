@@ -1,13 +1,21 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 
 function ProfitAndLossStatement() {
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Profit & Loss Statement</CardTitle>
-                <CardDescription>For the period ending July 31, 2024</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Profit & Loss Statement</CardTitle>
+                    <CardDescription>For the period ending July 31, 2024</CardDescription>
+                </div>
+                 <Button variant="outline" size="sm">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export PDF
+                </Button>
             </CardHeader>
             <CardContent>
                 <div className="rounded-md border">
@@ -57,7 +65,7 @@ function ProfitAndLossStatement() {
                             </TableRow>
                             <TableRow className="font-bold bg-card border-t-2">
                                 <TableCell>Net Profit</TableCell>
-                                <TableCell className="text-right text-primary">$10,805.00</TableCell>
+                                <TableCell className="text-right text-green-500">$10,805.00</TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>
@@ -76,7 +84,7 @@ function PlaceholderReport({ title }: { title: string }) {
             </CardHeader>
             <CardContent>
                 <div className="flex h-64 items-center justify-center rounded-lg border-2 border-dashed">
-                    <p className="text-muted-foreground">Coming Soon</p>
+                    <p className="text-muted-foreground">Report Coming Soon</p>
                 </div>
             </CardContent>
         </Card>
@@ -91,16 +99,16 @@ export default function ReportsPage() {
                 <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:inline-flex">
                     <TabsTrigger value="pnl">Profit & Loss</TabsTrigger>
                     <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
-                    <TabsTrigger value="customer">Customer Summary</TabsTrigger>
+                    <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
                 </TabsList>
                 <TabsContent value="pnl" className="mt-4">
                     <ProfitAndLossStatement />
                 </TabsContent>
                 <TabsContent value="cashflow" className="mt-4">
-                    <PlaceholderReport title="Cash Flow Analysis" />
+                    <PlaceholderReport title="Cash Flow Statement" />
                 </TabsContent>
-                <TabsContent value="customer" className="mt-4">
-                    <PlaceholderReport title="Customer Summary Report" />
+                <TabsContent value="balance-sheet" className="mt-4">
+                    <PlaceholderReport title="Balance Sheet" />
                 </TabsContent>
             </Tabs>
         </div>

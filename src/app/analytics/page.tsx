@@ -6,7 +6,9 @@ function FeatureCard({ icon: Icon, title, description }: { icon: React.ElementTy
         <Card>
             <CardHeader>
                 <div className="flex items-center gap-3">
-                    <Icon className="h-8 w-8 text-primary" />
+                     <div className="bg-primary/10 p-3 rounded-full">
+                        <Icon className="h-6 w-6 text-primary" />
+                    </div>
                     <CardTitle>{title}</CardTitle>
                 </div>
             </CardHeader>
@@ -21,7 +23,7 @@ export default function AnalyticsPage() {
     return (
         <div className="flex flex-col gap-6">
             <h1 className="font-headline text-3xl font-bold">Analytics & Reporting</h1>
-            <p className="text-muted-foreground">Gain deep insights into your business performance.</p>
+            <p className="text-muted-foreground">Gain deep insights into your business performance with powerful analytics.</p>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <FeatureCard

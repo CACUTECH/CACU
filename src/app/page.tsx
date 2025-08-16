@@ -1,11 +1,13 @@
-import { AreaChart, BarChart3, DollarSign, Package } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AreaChart, BarChart3, DollarSign, Package, Users, Activity } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { transactions, incomeVsExpenseData, expensesByCategoryData } from '@/lib/data';
 import { DataChart } from '@/components/data-chart';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
-export default function Home() {
+export default function DashboardPage() {
   const totalRevenue = transactions
     .filter((t) => t.type === 'Income')
     .reduce((acc, t) => acc + t.amount, 0);
@@ -13,6 +15,7 @@ export default function Home() {
     .filter((t) => t.type === 'Expense')
     .reduce((acc, t) => acc + t.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
+  const totalCustomers = 54; // Placeholder
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,12 +52,12 @@ export default function Home() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline">$12,450</div>
-            <p className="text-xs text-muted-foreground">Total value of items in stock</p>
+            <div className="text-2xl font-bold font-headline">+{totalCustomers}</div>
+            <p className="text-xs text-muted-foreground">+10 since last month</p>
           </CardContent>
         </Card>
       </div>
@@ -69,8 +72,8 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <DataChart type="area" data={incomeVsExpenseData} config={{
-              income: { label: "Income", color: "hsl(var(--primary))" },
-              expense: { label: "Expense", color: "hsl(var(--accent))" },
+              income: { label: "Income", color: "hsl(var(--chart-1))" },
+              expense: { label: "Expense", color: "hsl(var(--chart-2))" },
             }} dataKeys={['income', 'expense']} index="month" />
           </CardContent>
         </Card>
@@ -83,15 +86,21 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <DataChart type="bar" data={expensesByCategoryData} config={{
-              value: { label: "Amount", color: "hsl(var(--primary))" },
+              value: { label: "Amount", color: "hsl(var(--chart-1))" },
             }} dataKeys={['value']} index="category" layout="vertical" />
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="font-headline">Recent Transactions</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+                <CardTitle className="font-headline">Recent Transactions</CardTitle>
+                <CardDescription>A log of the most recent financial activities.</CardDescription>
+            </div>
+            <Button asChild size="sm">
+                <Link href="/transactions">View All</Link>
+            </Button>
         </CardHeader>
         <CardContent>
           <Table>
@@ -110,7 +119,7 @@ export default function Home() {
                   <TableCell>{transaction.category}</TableCell>
                   <TableCell>{transaction.date}</TableCell>
                   <TableCell className="text-right">
-                    <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'}>
+                    <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={transaction.type === 'Income' ? 'bg-green-500/20 text-green-700' : 'bg-red-500/20 text-red-700'}>
                       {transaction.type === 'Income' ? '+' : '-'}${transaction.amount.toLocaleString()}
                     </Badge>
                   </TableCell>

@@ -1,13 +1,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Upload, Handshake } from 'lucide-react';
+import { CheckCircle, Upload, Handshake, ExternalLink } from 'lucide-react';
 
 export default function CreditPage() {
     return (
         <div className="flex flex-col gap-8">
             <div className="text-center">
                 <h1 className="font-headline text-4xl font-bold tracking-tight">Credit Access & Offers</h1>
-                <p className="mt-2 text-lg text-muted-foreground">Explore financing options tailored for your business.</p>
+                <p className="mt-2 text-lg text-muted-foreground">Explore financing options tailored for your business growth.</p>
             </div>
 
             <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-3">
@@ -24,7 +24,10 @@ export default function CreditPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow flex flex-col justify-end">
-                        <Button className="w-full">View My Offers</Button>
+                        <Button className="w-full">
+                            View My Offers
+                            <ExternalLink className="ml-2 h-4 w-4" />
+                        </Button>
                     </CardContent>
                 </Card>
 
@@ -37,7 +40,7 @@ export default function CreditPage() {
                         </div>
                         <CardTitle className="text-center">Loan Application Portal</CardTitle>
                         <CardDescription className="text-center">
-                            Apply for new loans directly through our secure portal. Upload required documents with ease.
+                            Apply for new loans directly through our secure portal. Upload required documents with ease and track status.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow flex flex-col justify-end">

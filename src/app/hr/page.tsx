@@ -23,7 +23,7 @@ export default function HRPage() {
     return (
         <div className="flex flex-col gap-6">
             <h1 className="font-headline text-3xl font-bold">Human Resources</h1>
-            <p className="text-muted-foreground">Manage your team and payroll efficiently.</p>
+            <p className="text-muted-foreground">Manage your team, payroll, and HR processes efficiently.</p>
             
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <FeatureCard
@@ -39,7 +39,7 @@ export default function HRPage() {
                 <FeatureCard
                     icon={CalendarDays}
                     title="Daily Check-in/Check-out"
-                    description="Log daily attendance for your team members to monitor presence."
+                    description="Log daily attendance for your team members to monitor presence and automate timesheets."
                 />
                 <FeatureCard
                     icon={ClipboardCheck}
@@ -54,7 +54,7 @@ export default function HRPage() {
                 <FeatureCard
                     icon={FileDown}
                     title="Payroll & Payslips"
-                    description="Generate payroll and allow employees to download their payslips directly."
+                    description="Generate payroll and allow employees to download their payslips directly from their profile."
                 />
             </div>
         </div>

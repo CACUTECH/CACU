@@ -7,8 +7,8 @@ export default function SetupPage() {
     return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
             <div className="text-center mb-12">
-                <h1 className="font-headline text-4xl font-bold tracking-tight">Business Setup</h1>
-                <p className="mt-2 text-lg text-muted-foreground">Let's get your business configured correctly.</p>
+                <h1 className="font-headline text-4xl font-bold tracking-tight">Welcome to CACU!</h1>
+                <p className="mt-2 text-lg text-muted-foreground">Let's get your business configured for success.</p>
             </div>
 
             <div className="grid gap-8 md:grid-cols-2 max-w-4xl w-full">
@@ -19,7 +19,7 @@ export default function SetupPage() {
                         </div>
                         <CardTitle>Business Profile</CardTitle>
                         <CardDescription>
-                            Define your company's core information, including name, address, industry, and registration details.
+                            Define your company's core information, including name, address, industry, and registration details. This is key for reports and credit offers.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow flex flex-col justify-end">
@@ -38,7 +38,7 @@ export default function SetupPage() {
                         </div>
                         <CardTitle>Chart of Accounts</CardTitle>
                         <CardDescription>
-                            Set up your financial backbone by defining categories for your income, expenses, assets, and liabilities.
+                            Set up your financial backbone by defining categories for your income, expenses, assets, and liabilities. We provide a helpful wizard.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow flex flex-col justify-end">
@@ -49,6 +49,11 @@ export default function SetupPage() {
                         </Button>
                     </CardContent>
                 </Card>
+            </div>
+             <div className="mt-8">
+                <Button variant="link" asChild>
+                    <Link href="/">Skip for now, I'll do this later</Link>
+                </Button>
             </div>
         </div>
     );
