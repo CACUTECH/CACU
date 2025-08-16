@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
+import { Logo } from '@/components/logo';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -36,19 +37,6 @@ const navItems = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { theme } = useTheme();
-
-  // A simple logo component. You can replace this with your own logo.
-  const Logo = ({ className }: { className?: string }) => (
-    <svg
-      className={className}
-      viewBox="0 0 50 50"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-        <path d="M9.6,20.5c0,-5.8 4.7,-10.5 10.5,-10.5h10.8c5.8,0 10.5,4.7 10.5,10.5v0c0,0 -20.8,0 -31.8,0z" style={{fill: 'rgb(88, 88, 255)'}} />
-        <path d="M2.1,27.6c0,-5.8 4.7,-10.5 10.5,-10.5h25.7c5.8,0 10.5,4.7 10.5,10.5v12.2c0,5.8 -4.7,10.5 -10.5,10.5h-25.7c-5.8,0 -10.5,-4.7 -10.5,-10.5z" style={{fill: 'rgb(24, 24, 133)'}} />
-    </svg>
-  );
 
   // Hide sidebar and header for setup page
   if (pathname === '/setup' || pathname === '/login') {
