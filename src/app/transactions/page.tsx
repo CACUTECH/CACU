@@ -198,7 +198,7 @@ export default function TransactionsPage() {
                                 <TableCell>{transaction.date}</TableCell>
                                 <TableCell className="text-right">
                                     <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={cn("font-medium", transaction.type === 'Income' ? 'bg-green-500/20 text-green-700 hover:bg-green-500/30' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30')}>
-                                        {transaction.type === 'Income' ? '+' : '-'}${transaction.amount.toLocaleString()}
+                                        {transaction.type === 'Income' ? '+' : '-'}₦{transaction.amount.toLocaleString()}
                                     </Badge>
                                 </TableCell>
                             </TableRow>

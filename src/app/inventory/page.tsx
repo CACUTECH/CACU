@@ -67,7 +67,7 @@ export default function InventoryPage() {
                                     <TableCell className="font-medium">{item.name}</TableCell>
                                     <TableCell>{item.sku}</TableCell>
                                     <TableCell className="text-center">{item.quantity}</TableCell>
-                                    <TableCell className="text-right">${item.price.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">₦{item.price.toLocaleString()}</TableCell>
                                     <TableCell className="text-center">
                                         <Badge variant={getStatusBadgeVariant(item.status)}>{item.status}</Badge>
                                     </TableCell>

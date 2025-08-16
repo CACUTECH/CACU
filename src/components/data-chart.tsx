@@ -23,7 +23,7 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
                 {layout === 'horizontal' ? (
                     <>
                         <XAxis dataKey={index} tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} tickFormatter={(value) => `$${Number(value)/1000}k`} />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} tickFormatter={(value) => `₦${Number(value)/1000}k`} />
                     </>
                 ) : (
                     <>

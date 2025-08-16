@@ -33,11 +33,11 @@ function ProfitAndLossStatement() {
                             </TableRow>
                             <TableRow>
                                 <TableCell className="pl-8">Client Revenue</TableCell>
-                                <TableCell className="text-right">$12,500.00</TableCell>
+                                <TableCell className="text-right">₦12,500.00</TableCell>
                             </TableRow>
                             <TableRow className="font-bold border-t bg-muted/20">
                                 <TableCell>Total Revenue</TableCell>
-                                <TableCell className="text-right">$12,500.00</TableCell>
+                                <TableCell className="text-right">₦12,500.00</TableCell>
                             </TableRow>
                             <TableRow className="font-bold pt-4">
                                 <TableCell>Expenses</TableCell>
@@ -45,27 +45,27 @@ function ProfitAndLossStatement() {
                             </TableRow>
                             <TableRow>
                                 <TableCell className="pl-8">Office Supplies</TableCell>
-                                <TableCell className="text-right">$150.00</TableCell>
+                                <TableCell className="text-right">₦150.00</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell className="pl-8">Contractors</TableCell>
-                                <TableCell className="text-right">$1,200.00</TableCell>
+                                <TableCell className="text-right">₦1,200.00</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell className="pl-8">Software</TableCell>
-                                <TableCell className="text-right">$45.00</TableCell>
+                                <TableCell className="text-right">₦45.00</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell className="pl-8">Marketing</TableCell>
-                                <TableCell className="text-right">$300.00</TableCell>
+                                <TableCell className="text-right">₦300.00</TableCell>
                             </TableRow>
                             <TableRow className="font-bold border-t bg-muted/20">
                                 <TableCell>Total Expenses</TableCell>
-                                <TableCell className="text-right">$1,695.00</TableCell>
+                                <TableCell className="text-right">₦1,695.00</TableCell>
                             </TableRow>
                             <TableRow className="font-bold bg-card border-t-2">
                                 <TableCell>Net Profit</TableCell>
-                                <TableCell className="text-right text-green-500">$10,805.00</TableCell>
+                                <TableCell className="text-right text-green-500">₦10,805.00</TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>

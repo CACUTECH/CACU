@@ -26,7 +26,7 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline">${totalRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold font-headline">₦{totalRevenue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">+20.1% from last month</p>
           </CardContent>
         </Card>
@@ -36,7 +36,7 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline">${totalExpenses.toLocaleString()}</div>
+            <div className="text-2xl font-bold font-headline">₦{totalExpenses.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">+18.3% from last month</p>
           </CardContent>
         </Card>
@@ -46,7 +46,7 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline">${netProfit.toLocaleString()}</div>
+            <div className="text-2xl font-bold font-headline">₦{netProfit.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">+19% from last month</p>
           </CardContent>
         </Card>
@@ -120,7 +120,7 @@ export default function DashboardPage() {
                   <TableCell>{transaction.date}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={transaction.type === 'Income' ? 'bg-green-500/20 text-green-700' : 'bg-red-500/20 text-red-700'}>
-                      {transaction.type === 'Income' ? '+' : '-'}${transaction.amount.toLocaleString()}
+                      {transaction.type === 'Income' ? '+' : '-'}₦{transaction.amount.toLocaleString()}
                     </Badge>
                   </TableCell>
                 </TableRow>

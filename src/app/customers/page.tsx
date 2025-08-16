@@ -79,7 +79,7 @@ export default function CustomersPage() {
                                             {customer.loyalty}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-right">${customer.spend.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">₦{customer.spend.toLocaleString()}</TableCell>
                                     <TableCell>
                                         <div className="flex justify-end">
                                             <DropdownMenu>
