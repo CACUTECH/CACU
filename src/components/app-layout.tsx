@@ -41,23 +41,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const Logo = ({ className }: { className?: string }) => (
     <svg
       className={className}
-      viewBox="0 0 100 100"
+      viewBox="0 0 50 50"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      <path
-        d="M50 2.5a47.5 47.5 0 1 1-33.6 13.9A47.5 47.5 0 0 1 50 2.5zm0 8A39.5 39.5 0 1 0 89.5 50 39.5 39.5 0 0 0 50 10.5z"
-        className="fill-primary"
-      />
-      <path
-        d="M50 25a7.5 7.5 0 0 1 7.5 7.5v15H42.5V32.5A7.5 7.5 0 0 1 50 25z"
-        className="fill-secondary"
-      />
-      <path
-        d="M50 52.5a7.5 7.5 0 0 1-7.5-7.5v-15h15v15a7.5 7.5 0 0 1-7.5 7.5z"
-        transform="rotate(180 50 50)"
-        className="fill-secondary"
-      />
+        <path d="M9.6,20.5c0,-5.8 4.7,-10.5 10.5,-10.5h10.8c5.8,0 10.5,4.7 10.5,10.5v0c0,0 -20.8,0 -31.8,0z" style={{fill: 'rgb(88, 88, 255)'}} />
+        <path d="M2.1,27.6c0,-5.8 4.7,-10.5 10.5,-10.5h25.7c5.8,0 10.5,4.7 10.5,10.5v12.2c0,5.8 -4.7,10.5 -10.5,10.5h-25.7c-5.8,0 -10.5,-4.7 -10.5,-10.5z" style={{fill: 'rgb(24, 24, 133)'}} />
     </svg>
   );
 
