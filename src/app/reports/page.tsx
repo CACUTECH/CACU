@@ -7,12 +7,12 @@ import { Download } from 'lucide-react';
 function ProfitAndLossStatement() {
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <CardTitle>Profit & Loss Statement</CardTitle>
                     <CardDescription>For the period ending July 31, 2024</CardDescription>
                 </div>
-                 <Button variant="outline" size="sm">
+                 <Button variant="outline" size="sm" className="w-full sm:w-auto">
                     <Download className="mr-2 h-4 w-4" />
                     Export PDF
                 </Button>
@@ -22,7 +22,7 @@ function ProfitAndLossStatement() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[300px]"></TableHead>
+                                <TableHead className="w-full sm:w-[300px]">Description</TableHead>
                                 <TableHead className="text-right">Amount</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -96,7 +96,7 @@ export default function ReportsPage() {
         <div className="flex flex-col gap-6">
             <h1 className="font-headline text-2xl font-bold">Financial Reports</h1>
             <Tabs defaultValue="pnl">
-                <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:inline-flex">
+                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 sm:w-auto">
                     <TabsTrigger value="pnl">Profit & Loss</TabsTrigger>
                     <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
                     <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>

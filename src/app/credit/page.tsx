@@ -6,7 +6,7 @@ export default function CreditPage() {
     return (
         <div className="flex flex-col gap-8">
             <div className="text-center">
-                <h1 className="font-headline text-4xl font-bold tracking-tight">Credit Access & Offers</h1>
+                <h1 className="font-headline text-3xl sm:text-4xl font-bold tracking-tight">Credit Access & Offers</h1>
                 <p className="mt-2 text-lg text-muted-foreground">Explore financing options tailored for your business growth.</p>
             </div>
 
@@ -23,7 +23,7 @@ export default function CreditPage() {
                             View loan offers you are already pre-qualified for based on your business profile and financial data.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="flex-grow flex flex-col justify-end">
+                    <CardContent className="flex-grow flex flex-col justify-end mt-4">
                         <Button className="w-full">
                             View My Offers
                             <ExternalLink className="ml-2 h-4 w-4" />
@@ -43,7 +43,7 @@ export default function CreditPage() {
                             Apply for new loans directly through our secure portal. Upload required documents with ease and track status.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="flex-grow flex flex-col justify-end">
+                    <CardContent className="flex-grow flex flex-col justify-end mt-4">
                         <Button className="w-full">Start New Application</Button>
                     </CardContent>
                 </Card>
@@ -60,7 +60,7 @@ export default function CreditPage() {
                             Discover a curated list of trusted lenders and financial partners that match your business needs.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="flex-grow flex flex-col justify-end">
+                    <CardContent className="flex-grow flex flex-col justify-end mt-4">
                         <Button className="w-full">Browse Lenders</Button>
                     </CardContent>
                 </Card>

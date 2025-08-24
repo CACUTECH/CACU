@@ -37,7 +37,7 @@ export default function SettingsPage() {
                 <p className="text-muted-foreground">Manage your entire business ecosystem from one central place.</p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 <SettingCard icon={User} title="Profile" description="Update your personal account information and preferences." href="/settings/profile" />
                 <SettingCard icon={Briefcase} title="Business" description="Configure your core business details, products, and services." href="/settings/business" />
                 <SettingCard icon={Users} title="User Management" description="Invite and manage team members and their permissions." href="/settings/users" />

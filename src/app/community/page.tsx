@@ -26,7 +26,7 @@ export default function CommunityPage() {
     return (
         <div className="flex flex-col gap-8">
             <div className="text-center">
-                <h1 className="font-headline text-4xl font-bold tracking-tight">Community Hub</h1>
+                <h1 className="font-headline text-3xl sm:text-4xl font-bold tracking-tight">Community Hub</h1>
                 <p className="mt-2 text-lg text-muted-foreground">Connect, learn, and grow with fellow business owners.</p>
             </div>
 
@@ -35,7 +35,7 @@ export default function CommunityPage() {
                 <Input placeholder="Search discussions, members, or topics..." className="pl-10 text-base" />
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2">
                 <FeatureCard
                     icon={MessageSquare}
                     title="Discussion Forums"

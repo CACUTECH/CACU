@@ -45,12 +45,12 @@ function AddTransactionDialog() {
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button>
+                <Button className="w-full sm:w-auto">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add Transaction
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                 <DialogTitle>Add Transaction</DialogTitle>
                 <DialogDescription>
@@ -108,7 +108,7 @@ function AddTransactionDialog() {
                                 <Button
                                 variant={"outline"}
                                 className={cn(
-                                    "w-[240px] justify-start text-left font-normal col-span-3",
+                                    "w-full justify-start text-left font-normal col-span-3",
                                     !date && "text-muted-foreground"
                                 )}
                                 >
@@ -128,7 +128,7 @@ function AddTransactionDialog() {
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button type="submit">Save changes</Button>
+                    <Button type="submit" className="w-full">Save changes</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -141,13 +141,13 @@ export default function TransactionsPage() {
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                         <CardTitle className="font-headline">Transactions</CardTitle>
                         <CardDescription>View and manage all your financial transactions.</CardDescription>
                     </div>
-                     <div className="flex items-center gap-2">
-                        <Button variant="outline">
+                     <div className="flex flex-col sm:flex-row items-center gap-2">
+                        <Button variant="outline" className="w-full sm:w-auto">
                             <Upload className="mr-2 h-4 w-4" />
                             Import
                         </Button>
@@ -163,7 +163,7 @@ export default function TransactionsPage() {
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" className="gap-2 shrink-0">
                                 <ListFilter className="h-4 w-4" />
-                                Filter
+                                <span className="hidden sm:inline">Filter</span>
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -181,23 +181,29 @@ export default function TransactionsPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Description</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Account</TableHead>
-                            <TableHead>Date</TableHead>
+                            <TableHead className="hidden sm:table-cell">Category</TableHead>
+                            <TableHead className="hidden md:table-cell">Account</TableHead>
+                            <TableHead className="hidden lg:table-cell">Date</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {transactions.map((transaction) => (
                             <TableRow key={transaction.id}>
-                                <TableCell className="font-medium">{transaction.description}</TableCell>
-                                <TableCell>
+                                <TableCell className="font-medium">
+                                    <div className="truncate">{transaction.description}</div>
+                                    <div className="text-xs text-muted-foreground lg:hidden">
+                                        <span>{transaction.date}</span>
+                                        <span className="md:hidden"> - {transaction.account}</span>
+                                    </div>
+                                </TableCell>
+                                <TableCell className="hidden sm:table-cell">
                                     <Badge variant="outline">{transaction.category}</Badge>
                                 </TableCell>
-                                <TableCell>{transaction.account}</TableCell>
-                                <TableCell>{transaction.date}</TableCell>
+                                <TableCell className="hidden md:table-cell">{transaction.account}</TableCell>
+                                <TableCell className="hidden lg:table-cell">{transaction.date}</TableCell>
                                 <TableCell className="text-right">
-                                    <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={cn("font-medium", transaction.type === 'Income' ? 'bg-green-500/20 text-green-700 hover:bg-green-500/30' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30')}>
+                                    <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={cn("font-medium whitespace-nowrap", transaction.type === 'Income' ? 'bg-green-500/20 text-green-700 hover:bg-green-500/30' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30')}>
                                         {transaction.type === 'Income' ? '+' : '-'}₦{transaction.amount.toLocaleString()}
                                     </Badge>
                                 </TableCell>
