@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, Calendar as CalendarIcon } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -15,6 +15,11 @@ import type jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import React from 'react';
+import { DateRange } from "react-day-picker"
+import { addDays, format } from "date-fns"
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 interface ReportExportDropdownProps {
     reportId: string;
@@ -59,13 +64,16 @@ function ReportExportDropdown({ reportId, reportTitle }: ReportExportDropdownPro
     )
 }
 
-function ProfitAndLossStatement() {
+function ProfitAndLossStatement({ dateRange }: { dateRange?: DateRange }) {
+    const fromDate = dateRange?.from ? format(dateRange.from, "LLL dd, y") : "the start";
+    const toDate = dateRange?.to ? format(dateRange.to, "LLL dd, y") : "today";
+
     return (
         <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <CardTitle>Profit & Loss Statement</CardTitle>
-                    <CardDescription>For the period ending July 31, 2024</CardDescription>
+                    <CardDescription>For the period from {fromDate} to {toDate}</CardDescription>
                 </div>
                  <ReportExportDropdown reportId="pnl-table" reportTitle="Profit and Loss Statement" />
             </CardHeader>
@@ -127,13 +135,16 @@ function ProfitAndLossStatement() {
     )
 }
 
-function CashFlowStatement() {
+function CashFlowStatement({ dateRange }: { dateRange?: DateRange }) {
+    const fromDate = dateRange?.from ? format(dateRange.from, "LLL dd, y") : "the start";
+    const toDate = dateRange?.to ? format(dateRange.to, "LLL dd, y") : "today";
+
     return (
         <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <CardTitle>Cash Flow Statement</CardTitle>
-                    <CardDescription>For the period ending July 31, 2024</CardDescription>
+                    <CardDescription>For the period from {fromDate} to {toDate}</CardDescription>
                 </div>
                 <ReportExportDropdown reportId="cashflow-table" reportTitle="Cash Flow Statement" />
             </CardHeader>
@@ -218,13 +229,14 @@ function CashFlowStatement() {
     );
 }
 
-function BalanceSheetStatement() {
+function BalanceSheetStatement({ date }: { date?: Date }) {
+    const asOfDate = date ? format(date, "LLL dd, y") : "today";
     return (
         <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <CardTitle>Balance Sheet</CardTitle>
-                    <CardDescription>As at July 31, 2024</CardDescription>
+                    <CardDescription>As at {asOfDate}</CardDescription>
                 </div>
                 <ReportExportDropdown reportId="balancesheet-table" reportTitle="Balance Sheet" />
             </CardHeader>
@@ -343,10 +355,103 @@ function BalanceSheetStatement() {
     );
 }
 
+function DatePickerWithRange({ className }: React.HTMLAttributes<HTMLDivElement>) {
+    const [date, setDate] = React.useState<DateRange | undefined>({
+      from: new Date(2024, 0, 20),
+      to: addDays(new Date(2024, 0, 20), 20),
+    })
+
+    return (
+        <div className={cn("grid gap-2", className)}>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                            "w-[300px] justify-start text-left font-normal",
+                            !date && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date?.from ? (
+                            date.to ? (
+                                <>
+                                    {format(date.from, "LLL dd, y")} -{" "}
+                                    {format(date.to, "LLL dd, y")}
+                                </>
+                            ) : (
+                                format(date.from, "LLL dd, y")
+                            )
+                        ) : (
+                            <span>Pick a date</span>
+                        )}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={setDate}
+                        numberOfMonths={2}
+                    />
+                </PopoverContent>
+            </Popover>
+        </div>
+    )
+}
+
 export default function ReportsPage() {
+    const [date, setDate] = React.useState<DateRange | undefined>({
+        from: new Date(),
+        to: addDays(new Date(), 7),
+    });
+
     return (
         <div className="flex flex-col gap-6">
-            <h1 className="font-headline text-2xl font-bold">Financial Reports</h1>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h1 className="font-headline text-2xl font-bold">Financial Reports</h1>
+                <div className="flex items-center gap-2">
+                     <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                id="date"
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full sm:w-[260px] justify-start text-left font-normal",
+                                    !date && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {date?.from ? (
+                                    date.to ? (
+                                        <>
+                                            {format(date.from, "LLL dd, y")} -{" "}
+                                            {format(date.to, "LLL dd, y")}
+                                        </>
+                                    ) : (
+                                        format(date.from, "LLL dd, y")
+                                    )
+                                ) : (
+                                    <span>Pick a date range</span>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={date?.from}
+                                selected={date}
+                                onSelect={setDate}
+                                numberOfMonths={2}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+            </div>
             <Tabs defaultValue="pnl">
                 <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 sm:w-auto">
                     <TabsTrigger value="pnl">Profit & Loss</TabsTrigger>
@@ -354,13 +459,13 @@ export default function ReportsPage() {
                     <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
                 </TabsList>
                 <TabsContent value="pnl" className="mt-4">
-                    <ProfitAndLossStatement />
+                    <ProfitAndLossStatement dateRange={date} />
                 </TabsContent>
                 <TabsContent value="cashflow" className="mt-4">
-                    <CashFlowStatement />
+                    <CashFlowStatement dateRange={date} />
                 </TabsContent>
                 <TabsContent value="balance-sheet" className="mt-4">
-                    <BalanceSheetStatement />
+                    <BalanceSheetStatement date={date?.to} />
                 </TabsContent>
             </Tabs>
         </div>
