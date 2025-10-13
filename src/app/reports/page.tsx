@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -169,20 +170,132 @@ function CashFlowStatement() {
     );
 }
 
-function PlaceholderReport({ title }: { title: string }) {
+function BalanceSheetStatement() {
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>Report data will be displayed here.</CardDescription>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <CardTitle>Balance Sheet</CardTitle>
+                    <CardDescription>As at July 31, 2024</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export PDF
+                </Button>
             </CardHeader>
             <CardContent>
-                <div className="flex h-64 items-center justify-center rounded-lg border-2 border-dashed">
-                    <p className="text-muted-foreground">Report Coming Soon</p>
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-full sm:w-[300px]">Description</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {/* Assets */}
+                            <TableRow className="font-bold text-lg bg-muted/50">
+                                <TableCell>Assets</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold">
+                                <TableCell className="pl-4">Current Assets</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="pl-8">Cash and cash equivalents</TableCell>
+                                <TableCell className="text-right">₦16,225.00</TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell className="pl-8">Accounts receivable</TableCell>
+                                <TableCell className="text-right">₦5,000.00</TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell className="pl-8">Inventory</TableCell>
+                                <TableCell className="text-right">₦8,500.00</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold border-t bg-muted/20">
+                                <TableCell className="pl-4">Total Current Assets</TableCell>
+                                <TableCell className="text-right">₦29,725.00</TableCell>
+                            </TableRow>
+                             <TableRow className="font-bold">
+                                <TableCell className="pl-4">Non-Current Assets</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="pl-8">Property, Plant, and Equipment</TableCell>
+                                <TableCell className="text-right">₦22,000.00</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold border-t bg-muted/20">
+                                <TableCell className="pl-4">Total Non-Current Assets</TableCell>
+                                <TableCell className="text-right">₦22,000.00</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold bg-card border-t-2 text-base">
+                                <TableCell>Total Assets</TableCell>
+                                <TableCell className="text-right">₦51,725.00</TableCell>
+                            </TableRow>
+                            
+                            {/* Equity and Liabilities */}
+                            <TableRow className="font-bold text-lg bg-muted/50 mt-4">
+                                <TableCell>Equity and Liabilities</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                             <TableRow className="font-bold">
+                                <TableCell className="pl-4">Current Liabilities</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell className="pl-8">Accounts payable</TableCell>
+                                <TableCell className="text-right">₦3,500.00</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold border-t bg-muted/20">
+                                <TableCell className="pl-4">Total Current Liabilities</TableCell>
+                                <TableCell className="text-right">₦3,500.00</TableCell>
+                            </TableRow>
+                             <TableRow className="font-bold">
+                                <TableCell className="pl-4">Non-Current Liabilities</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="pl-8">Long-term debt</TableCell>
+                                <TableCell className="text-right">₦5,000.00</TableCell>
+                            </TableRow>
+                             <TableRow className="font-bold border-t bg-muted/20">
+                                <TableCell className="pl-4">Total Non-Current Liabilities</TableCell>
+                                <TableCell className="text-right">₦5,000.00</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold border-t-2 text-base">
+                                <TableCell>Total Liabilities</TableCell>
+                                <TableCell className="text-right">₦8,500.00</TableCell>
+                            </TableRow>
+                            
+                             <TableRow className="font-bold">
+                                <TableCell className="pl-4">Equity</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell className="pl-8">Share Capital</TableCell>
+                                <TableCell className="text-right">₦30,000.00</TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell className="pl-8">Retained Earnings</TableCell>
+                                <TableCell className="text-right">₦13,225.00</TableCell>
+_                            </TableRow>
+                             <TableRow className="font-bold border-t bg-muted/20">
+                                <TableCell className="pl-4">Total Equity</TableCell>
+                                <TableCell className="text-right">₦43,225.00</TableCell>
+                            </TableRow>
+
+                             <TableRow className="font-bold bg-card border-t-2 text-base">
+                                <TableCell>Total Equity and Liabilities</TableCell>
+                                <TableCell className="text-right">₦51,725.00</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
                 </div>
             </CardContent>
         </Card>
-    )
+    );
 }
 
 export default function ReportsPage() {
@@ -202,7 +315,7 @@ export default function ReportsPage() {
                     <CashFlowStatement />
                 </TabsContent>
                 <TabsContent value="balance-sheet" className="mt-4">
-                    <PlaceholderReport title="Balance Sheet" />
+                    <BalanceSheetStatement />
                 </TabsContent>
             </Tabs>
         </div>
