@@ -39,6 +39,8 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
+import * as XLSX from 'xlsx';
+import { useToast } from '@/hooks/use-toast';
 
 function AddTransactionDialog() {
     const [date, setDate] = React.useState<Date>()
@@ -137,6 +139,47 @@ function AddTransactionDialog() {
 
 export default function TransactionsPage() {
     const [transactions, setTransactions] = React.useState<Transaction[]>(allTransactions);
+    const { toast } = useToast();
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+                
+                // Assuming the excel file has columns that match the Transaction type
+                console.log(json);
+
+                // Here you would typically validate and transform the data
+                // and then update the state
+                // For now, we'll just show a success toast
+                toast({
+                    title: "File Uploaded",
+                    description: `${file.name} has been processed. Check the console for the data.`,
+                });
+            } catch (error) {
+                 toast({
+                    variant: "destructive",
+                    title: "Upload Failed",
+                    description: `Could not parse the file ${file.name}.`,
+                });
+                console.error("Error parsing file:", error);
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
 
     return (
         <Card>
@@ -147,7 +190,14 @@ export default function TransactionsPage() {
                         <CardDescription>View and manage all your financial transactions.</CardDescription>
                     </div>
                      <div className="flex flex-col sm:flex-row items-center gap-2">
-                        <Button variant="outline" className="w-full sm:w-auto">
+                        <Input
+                            type="file"
+                            className="hidden"
+                            ref={fileInputRef}
+                            onChange={handleFileUpload}
+                            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                        />
+                        <Button variant="outline" className="w-full sm:w-auto" onClick={handleImportClick}>
                             <Upload className="mr-2 h-4 w-4" />
                             Import
                         </Button>
