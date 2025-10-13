@@ -11,7 +11,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import jsPDF from 'jspdf';
+import type jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import React from 'react';
@@ -22,14 +22,15 @@ interface ReportExportDropdownProps {
 }
 
 function ReportExportDropdown({ reportId, reportTitle }: ReportExportDropdownProps) {
-    const handleExport = (format: 'pdf' | 'excel') => {
+    const handleExport = async (format: 'pdf' | 'excel') => {
         const table = document.getElementById(reportId);
         if (!table) return;
 
-        const doc = new jsPDF();
         const title = `${reportTitle} - ${new Date().toLocaleDateString()}`;
 
         if (format === 'pdf') {
+            const { default: jsPDF } = await import('jspdf');
+            const doc = new jsPDF();
             doc.text(title, 14, 15);
             (doc as any).autoTable({
                 html: `#${reportId}`,
