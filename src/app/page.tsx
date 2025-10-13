@@ -73,8 +73,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <DataChart type="area" data={incomeVsExpenseData} config={{
-              income: { label: "Income", color: "hsl(var(--chart-1))" },
-              expense: { label: "Expense", color: "hsl(var(--chart-2))" },
+              income: { label: "Income", color: "hsl(140 80% 60%)" },
+              expense: { label: "Expense", color: "hsl(0 80% 60%)" },
             }} dataKeys={['income', 'expense']} index="month" />
           </CardContent>
         </Card>
