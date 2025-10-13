@@ -1,60 +1,191 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { User, Book, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
+
+const formSchema = z.object({
+  businessName: z.string().min(1, "Business name is required"),
+  businessSector: z.string().min(1, "Business sector is required"),
+  businessAddress: z.string().min(1, "Business address is required"),
+  businessEmail: z.string().email(),
+  phoneNumber: z.string().min(1, "Phone number is required"),
+  website: z.string().url().optional().or(z.literal("")),
+});
 
 export default function SetupPage() {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)]">
-            <div className="text-center mb-12">
-                <h1 className="font-headline text-4xl font-bold tracking-tight">Welcome to CACU!</h1>
-                <p className="mt-2 text-lg text-muted-foreground">Let's get your business configured for success.</p>
-            </div>
+  const { toast } = useToast();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
 
-            <div className="grid gap-8 md:grid-cols-2 max-w-4xl w-full">
-                <Card className="flex flex-col text-center">
-                    <CardHeader>
-                        <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
-                            <User className="h-10 w-10 text-primary" />
-                        </div>
-                        <CardTitle>Business Profile</CardTitle>
-                        <CardDescription>
-                            Define your company's core information, including name, address, industry, and registration details. This is key for reports and credit offers.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow flex flex-col justify-end">
-                        <Button asChild>
-                            <Link href="/settings/business">
-                                Configure Profile <ArrowRight className="ml-2 h-4 w-4" />
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      businessName: "",
+      businessSector: "",
+      businessAddress: "",
+      businessEmail: "",
+      phoneNumber: "",
+      website: "",
+    },
+  });
 
-                <Card className="flex flex-col text-center">
-                    <CardHeader>
-                        <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
-                            <Book className="h-10 w-10 text-primary" />
-                        </div>
-                        <CardTitle>Chart of Accounts</CardTitle>
-                        <CardDescription>
-                            Set up your financial backbone by defining categories for your income, expenses, assets, and liabilities. We provide a helpful wizard.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow flex flex-col justify-end">
-                        <Button asChild>
-                            <Link href="/settings/accounts">
-                                Setup Accounts <ArrowRight className="ml-2 h-4 w-4" />
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-             <div className="mt-8">
-                <Button variant="link" asChild>
-                    <Link href="/">Skip for now, I'll do this later</Link>
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
+    // Placeholder for saving data
+    console.log(values);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsLoading(false);
+    toast({
+      title: "Business Profile Saved",
+      description: "Your business profile has been successfully created.",
+    });
+    router.push("/");
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-12">
+      <div className="w-full max-w-2xl mx-auto">
+        <Card className="shadow-lg rounded-xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl font-headline">Welcome to CACU</CardTitle>
+            <CardDescription>Let’s set up your business profile</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="businessName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your Company LLC" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="businessSector"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Sector</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a sector" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="retail">Retail</SelectItem>
+                          <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                          <SelectItem value="technology">Technology</SelectItem>
+                          <SelectItem value="services">Services</SelectItem>
+                          <SelectItem value="agriculture">Agriculture</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="businessAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="123 Main St, Anytown" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="businessEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="contact@yourcompany.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="+234 800 000 0000" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="website"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Website <span className="text-muted-foreground">(Optional)</span></FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://yourcompany.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button 
+                  type="submit" 
+                  className="w-full bg-[#6C63FF] hover:bg-[#5b52e8]"
+                  disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Continue"}
                 </Button>
-            </div>
-        </div>
-    );
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 }
