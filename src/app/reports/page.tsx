@@ -1,9 +1,33 @@
 
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+function ReportExportDropdown() {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem>Export as PDF</DropdownMenuItem>
+                <DropdownMenuItem>Export as Excel</DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    )
+}
 
 function ProfitAndLossStatement() {
     return (
@@ -13,10 +37,7 @@ function ProfitAndLossStatement() {
                     <CardTitle>Profit & Loss Statement</CardTitle>
                     <CardDescription>For the period ending July 31, 2024</CardDescription>
                 </div>
-                 <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                    <Download className="mr-2 h-4 w-4" />
-                    Export PDF
-                </Button>
+                 <ReportExportDropdown />
             </CardHeader>
             <CardContent>
                 <div className="rounded-md border">
@@ -84,10 +105,7 @@ function CashFlowStatement() {
                     <CardTitle>Cash Flow Statement</CardTitle>
                     <CardDescription>For the period ending July 31, 2024</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                    <Download className="mr-2 h-4 w-4" />
-                    Export PDF
-                </Button>
+                <ReportExportDropdown />
             </CardHeader>
             <CardContent>
                 <div className="rounded-md border">
@@ -178,10 +196,7 @@ function BalanceSheetStatement() {
                     <CardTitle>Balance Sheet</CardTitle>
                     <CardDescription>As at July 31, 2024</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                    <Download className="mr-2 h-4 w-4" />
-                    Export PDF
-                </Button>
+                <ReportExportDropdown />
             </CardHeader>
             <CardContent>
                 <div className="rounded-md border">
