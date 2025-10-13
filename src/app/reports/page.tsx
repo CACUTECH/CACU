@@ -1,4 +1,4 @@
-
+"use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,8 +11,37 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import React from 'react';
 
-function ReportExportDropdown() {
+interface ReportExportDropdownProps {
+    reportId: string;
+    reportTitle: string;
+}
+
+function ReportExportDropdown({ reportId, reportTitle }: ReportExportDropdownProps) {
+    const handleExport = (format: 'pdf' | 'excel') => {
+        const table = document.getElementById(reportId);
+        if (!table) return;
+
+        const doc = new jsPDF();
+        const title = `${reportTitle} - ${new Date().toLocaleDateString()}`;
+
+        if (format === 'pdf') {
+            doc.text(title, 14, 15);
+            (doc as any).autoTable({
+                html: `#${reportId}`,
+                startY: 20,
+            });
+            doc.save(`${reportTitle}.pdf`);
+        } else if (format === 'excel') {
+            const workbook = XLSX.utils.table_to_book(table);
+            XLSX.writeFile(workbook, `${reportTitle}.xlsx`);
+        }
+    };
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -22,8 +51,8 @@ function ReportExportDropdown() {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem>Export as PDF</DropdownMenuItem>
-                <DropdownMenuItem>Export as Excel</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('pdf')}>Export as PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('excel')}>Export as Excel</DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     )
@@ -37,11 +66,11 @@ function ProfitAndLossStatement() {
                     <CardTitle>Profit & Loss Statement</CardTitle>
                     <CardDescription>For the period ending July 31, 2024</CardDescription>
                 </div>
-                 <ReportExportDropdown />
+                 <ReportExportDropdown reportId="pnl-table" reportTitle="Profit and Loss Statement" />
             </CardHeader>
             <CardContent>
                 <div className="rounded-md border">
-                    <Table>
+                    <Table id="pnl-table">
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-full sm:w-[300px]">Description</TableHead>
@@ -105,11 +134,11 @@ function CashFlowStatement() {
                     <CardTitle>Cash Flow Statement</CardTitle>
                     <CardDescription>For the period ending July 31, 2024</CardDescription>
                 </div>
-                <ReportExportDropdown />
+                <ReportExportDropdown reportId="cashflow-table" reportTitle="Cash Flow Statement" />
             </CardHeader>
             <CardContent>
                 <div className="rounded-md border">
-                    <Table>
+                    <Table id="cashflow-table">
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-full sm:w-[300px]">Description</TableHead>
@@ -196,11 +225,11 @@ function BalanceSheetStatement() {
                     <CardTitle>Balance Sheet</CardTitle>
                     <CardDescription>As at July 31, 2024</CardDescription>
                 </div>
-                <ReportExportDropdown />
+                <ReportExportDropdown reportId="balancesheet-table" reportTitle="Balance Sheet" />
             </CardHeader>
             <CardContent>
                 <div className="rounded-md border">
-                    <Table>
+                    <Table id="balancesheet-table">
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-full sm:w-[300px]">Description</TableHead>
@@ -295,7 +324,7 @@ function BalanceSheetStatement() {
                              <TableRow>
                                 <TableCell className="pl-8">Retained Earnings</TableCell>
                                 <TableCell className="text-right">₦13,225.00</TableCell>
-_                            </TableRow>
+                            </TableRow>
                              <TableRow className="font-bold border-t bg-muted/20">
                                 <TableCell className="pl-4">Total Equity</TableCell>
                                 <TableCell className="text-right">₦43,225.00</TableCell>
