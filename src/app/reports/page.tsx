@@ -75,6 +75,100 @@ function ProfitAndLossStatement() {
     )
 }
 
+function CashFlowStatement() {
+    return (
+        <Card>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <CardTitle>Cash Flow Statement</CardTitle>
+                    <CardDescription>For the period ending July 31, 2024</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export PDF
+                </Button>
+            </CardHeader>
+            <CardContent>
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-full sm:w-[300px]">Description</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {/* Operating Activities */}
+                            <TableRow className="font-bold">
+                                <TableCell>Cash flow from operating activities</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="pl-8">Receipts from customers</TableCell>
+                                <TableCell className="text-right">₦12,500.00</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="pl-8">Payments to suppliers and employees</TableCell>
+                                <TableCell className="text-right">(₦1,350.00)</TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell className="pl-8">Payments for other operating expenses</TableCell>
+                                <TableCell className="text-right">(₦425.00)</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold border-t bg-muted/20">
+                                <TableCell>Net cash from operating activities</TableCell>
+                                <TableCell className="text-right">₦10,725.00</TableCell>
+                            </TableRow>
+
+                            {/* Investing Activities */}
+                             <TableRow className="font-bold pt-4">
+                                <TableCell>Cash flow from investing activities</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="pl-8">Purchase of equipment</TableCell>
+                                <TableCell className="text-right">(₦2,000.00)</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold border-t bg-muted/20">
+                                <TableCell>Net cash used in investing activities</TableCell>
+                                <TableCell className="text-right">(₦2,000.00)</TableCell>
+                            </TableRow>
+
+                            {/* Financing Activities */}
+                             <TableRow className="font-bold pt-4">
+                                <TableCell>Cash flow from financing activities</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="pl-8">Proceeds from bank loan</TableCell>
+                                <TableCell className="text-right">₦5,000.00</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold border-t bg-muted/20">
+                                <TableCell>Net cash from financing activities</TableCell>
+                                <TableCell className="text-right">₦5,000.00</TableCell>
+                            </TableRow>
+
+                            {/* Summary */}
+                             <TableRow className="font-bold bg-card border-t-2">
+                                <TableCell>Net increase in cash and cash equivalents</TableCell>
+                                <TableCell className="text-right text-green-500">₦13,725.00</TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell>Cash and cash equivalents at beginning of period</TableCell>
+                                <TableCell className="text-right">₦2,500.00</TableCell>
+                            </TableRow>
+                            <TableRow className="font-bold bg-card border-t">
+                                <TableCell>Cash and cash equivalents at end of period</TableCell>
+                                <TableCell className="text-right">₦16,225.00</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 function PlaceholderReport({ title }: { title: string }) {
     return (
         <Card>
@@ -105,7 +199,7 @@ export default function ReportsPage() {
                     <ProfitAndLossStatement />
                 </TabsContent>
                 <TabsContent value="cashflow" className="mt-4">
-                    <PlaceholderReport title="Cash Flow Statement" />
+                    <CashFlowStatement />
                 </TabsContent>
                 <TabsContent value="balance-sheet" className="mt-4">
                     <PlaceholderReport title="Balance Sheet" />
