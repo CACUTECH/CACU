@@ -72,9 +72,9 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-12">
+    <div className="flex items-center justify-center min-h-screen bg-muted/40 px-4 py-12">
       <div className="w-full max-w-2xl mx-auto">
-        <Card className="shadow-lg rounded-xl">
+        <Card className="shadow-lg">
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-headline">Welcome to CACU</CardTitle>
             <CardDescription>Let’s set up your business profile</CardDescription>
@@ -176,7 +176,7 @@ export default function SetupPage() {
                 />
                 <Button 
                   type="submit" 
-                  className="w-full bg-[#6C63FF] hover:bg-[#5b52e8]"
+                  className="w-full"
                   disabled={isLoading}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Continue"}
