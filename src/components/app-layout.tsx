@@ -39,7 +39,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { theme } = useTheme();
 
   // Hide sidebar and header for setup page
-  if (pathname === '/setup' || pathname === '/login') {
+  if (pathname === '/setup' || pathname === '/login' || pathname === '/signup' || pathname === '/verify-email') {
     return <main>{children}</main>;
   }
 
@@ -49,7 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarHeader>
           <div className="flex items-center gap-2 p-2">
             <Logo className="size-8 shrink-0" />
-            <span className="font-headline text-xl font-semibold text-primary">CACU</span>
+            <span className="font-headline text-xl font-semibold" style={{color: "hsl(var(--primary))"}}>CACU</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
