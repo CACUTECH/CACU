@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
   businessName: z.string().min(1, "Business name is required"),
@@ -39,6 +40,9 @@ const formSchema = z.object({
   businessEmail: z.string().email(),
   phoneNumber: z.string().min(1, "Phone number is required"),
   website: z.string().url().optional().or(z.literal("")),
+  bankName: z.string().min(1, "Bank name is required"),
+  accountNumber: z.string().min(1, "Account number is required"),
+  accountName: z.string().min(1, "Account name is required"),
 });
 
 export default function SetupPage() {
@@ -55,6 +59,9 @@ export default function SetupPage() {
       businessEmail: "",
       phoneNumber: "",
       website: "",
+      bankName: "",
+      accountNumber: "",
+      accountName: "",
     },
   });
 
@@ -62,6 +69,16 @@ export default function SetupPage() {
     setIsLoading(true);
     // Placeholder for saving data
     console.log(values);
+    
+    // For this demo, we'll use localStorage to persist the bank details
+    // so they can be accessed on the invoice page.
+    const bankDetails = {
+      bankName: values.bankName,
+      accountNumber: values.accountNumber,
+      accountName: values.accountName,
+    };
+    localStorage.setItem('business-profile-bank', JSON.stringify(bankDetails));
+
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsLoading(false);
     toast({
@@ -174,9 +191,59 @@ export default function SetupPage() {
                     </FormItem>
                   )}
                 />
+
+                <Separator className="my-8" />
+                
+                <div>
+                    <h3 className="text-lg font-medium">Bank Details</h3>
+                    <p className="text-sm text-muted-foreground">This will be shown on invoices for payments.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <FormField
+                        control={form.control}
+                        name="bankName"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Bank Name</FormLabel>
+                            <FormControl>
+                            <Input placeholder="e.g. Sterling Bank" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="accountNumber"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Account Number</FormLabel>
+                            <FormControl>
+                            <Input placeholder="0123456789" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                </div>
+                <FormField
+                    control={form.control}
+                    name="accountName"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Account Name</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Your Company LLC" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+
                 <Button 
                   type="submit" 
-                  className="w-full"
+                  className="w-full !mt-8"
                   disabled={isLoading}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Continue"}

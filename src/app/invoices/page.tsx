@@ -203,7 +203,7 @@ const downloadPdf = async (invoice: Invoice) => {
     }
 
     // Totals
-    const finalY = (doc as any).lastAutoTable.finalY || 80;
+    let finalY = (doc as any).lastAutoTable.finalY || 80;
     let yPos = finalY + 10;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
@@ -220,6 +220,26 @@ const downloadPdf = async (invoice: Invoice) => {
     doc.setFontSize(14);
     doc.text('Total:', 140, yPos);
     doc.text(`₦${invoice.total.toFixed(2)}`, 200, yPos, { align: 'right' });
+
+    // Bank Details
+    const bankDetailsStr = localStorage.getItem('business-profile-bank');
+    if (bankDetailsStr) {
+        const bankDetails = JSON.parse(bankDetailsStr);
+        if (bankDetails.bankName && bankDetails.accountNumber && bankDetails.accountName) {
+            yPos += 15;
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Payment Details:', 14, yPos);
+            doc.setFont('helvetica', 'normal');
+            yPos += 5;
+            doc.text(`Bank: ${bankDetails.bankName}`, 14, yPos);
+            yPos += 5;
+            doc.text(`Account Number: ${bankDetails.accountNumber}`, 14, yPos);
+            yPos += 5;
+            doc.text(`Account Name: ${bankDetails.accountName}`, 14, yPos);
+        }
+    }
+
 
     // Notes
     if (invoice.notes) {
@@ -967,5 +987,3 @@ export default function InvoicesPage() {
     </>
   )
 }
-
-    
