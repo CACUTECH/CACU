@@ -156,6 +156,8 @@ function InvoiceTable({ data }: { data: typeof invoices }) {
 }
 
 export default function InvoicesPage() {
+  const [activeTab, setActiveTab] = React.useState("invoices");
+  
   return (
     <Card>
       <CardHeader>
@@ -173,13 +175,13 @@ export default function InvoicesPage() {
                 </Button>
                 <Button size="sm">
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Invoice
+                    {activeTab === "invoices" ? "Add Invoice" : "Add Receipt"}
                 </Button>
             </div>
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="invoices">
+        <Tabs defaultValue="invoices" onValueChange={setActiveTab}>
             <TabsList>
                 <TabsTrigger value="invoices">Invoices</TabsTrigger>
                 <TabsTrigger value="receipts">Receipts</TabsTrigger>
