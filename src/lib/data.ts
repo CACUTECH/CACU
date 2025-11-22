@@ -1,3 +1,4 @@
+
 export type Transaction = {
   id: string;
   date: string;
@@ -89,3 +90,41 @@ export const employees: Employee[] = [
   { id: 'emp-004', name: 'David Bello', email: 'david@example.com', role: 'Accountant', status: 'Active', checkInTime: '09:00 AM', checkOutTime: '05:00 PM' },
   { id: 'emp-005', name: 'Fatima Aliyu', email: 'fatima@example.com', role: 'HR Specialist', status: 'Terminated' },
 ];
+
+export type PayrollRun = {
+    id: string;
+    month: string;
+    totalPaid: number;
+    employeesPaid: number;
+    payslips: {
+        employeeName: string;
+        netPay: number;
+    }[];
+}
+
+export const payrollHistory: PayrollRun[] = [
+    {
+        id: 'run-001',
+        month: 'June 2024',
+        totalPaid: 1317500,
+        employeesPaid: 4,
+        payslips: [
+            { employeeName: "Grace Adebayo", netPay: 425000 },
+            { employeeName: "Samuel Okoro", netPay: 340000 },
+            { employeeName: "Chioma Nwosu", netPay: 297500 },
+            { employeeName: "David Bello", netPay: 255000 },
+        ]
+    },
+    {
+        id: 'run-002',
+        month: 'May 2024',
+        totalPaid: 1295000,
+        employeesPaid: 4,
+        payslips: [
+             { employeeName: "Grace Adebayo", netPay: 425000 },
+            { employeeName: "Samuel Okoro", netPay: 340000 },
+            { employeeName: "Chioma Nwosu", netPay: 297500 },
+            { employeeName: "David Bello", netPay: 232500 },
+        ]
+    }
+]

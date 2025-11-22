@@ -4,9 +4,12 @@
 import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileDown, Loader2 } from "lucide-react";
+import { FileDown, Loader2, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { payrollHistory as initialPayrollHistory } from "@/lib/data";
+import type { PayrollRun } from "@/lib/data";
 
 function RunPayrollDialog({ onConfirm }: { onConfirm: () => void }) {
     const [isOpen, setIsOpen] = React.useState(false);
@@ -58,10 +61,56 @@ function RunPayrollDialog({ onConfirm }: { onConfirm: () => void }) {
     );
 }
 
+function PayrollDetailsDialog({ run, open, onOpenChange }: { run: PayrollRun | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+    if (!run) return null;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Payroll Details - {run.month}</DialogTitle>
+                     <DialogDescription>
+                        Details of all employees paid during this payroll run.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Employee</TableHead>
+                                <TableHead className="text-right">Net Pay</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {run.payslips.map(p => (
+                                <TableRow key={p.employeeName}>
+                                    <TableCell>{p.employeeName}</TableCell>
+                                    <TableCell className="text-right font-mono">₦{p.netPay.toLocaleString()}</TableCell>
+                                </TableRow>
+                            ))}
+                             <TableRow className="font-bold bg-muted/50">
+                                <TableCell>Total Paid</TableCell>
+                                <TableCell className="text-right font-mono">₦{run.totalPaid.toLocaleString()}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+                 <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="outline">Close</Button>
+                    </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 export default function PayrollPage() {
     const { toast } = useToast();
     const [isLoading, setIsLoading] = React.useState(false);
+    const [payrollHistory, setPayrollHistory] = React.useState(initialPayrollHistory);
+    const [selectedRun, setSelectedRun] = React.useState<PayrollRun | null>(null);
+    const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
 
     const handleRunPayroll = () => {
         setIsLoading(true);
@@ -72,11 +121,29 @@ export default function PayrollPage() {
 
         setTimeout(() => {
             setIsLoading(false);
+            const newRun: PayrollRun = {
+                id: `run-${Date.now()}`,
+                month: 'July 2024',
+                totalPaid: 1317500,
+                employeesPaid: 4,
+                payslips: [
+                    { employeeName: "Grace Adebayo", netPay: 425000 },
+                    { employeeName: "Samuel Okoro", netPay: 340000 },
+                    { employeeName: "Chioma Nwosu", netPay: 297500 },
+                    { employeeName: "David Bello", netPay: 255000 },
+                ]
+            };
+            setPayrollHistory(prev => [newRun, ...prev]);
             toast({
                 title: "Payroll Complete!",
                 description: "July 2024 payroll has been processed successfully.",
             });
         }, 2000);
+    }
+    
+    const handleViewDetails = (run: PayrollRun) => {
+        setSelectedRun(run);
+        setIsDetailsOpen(true);
     }
 
     return (
@@ -125,10 +192,37 @@ export default function PayrollPage() {
                             <span>Processing payroll...</span>
                         </div>
                     ) : (
-                        <p className="text-muted-foreground">A list of past payroll runs will be displayed here.</p>
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Month</TableHead>
+                                        <TableHead>Employees Paid</TableHead>
+                                        <TableHead className="text-right">Total Amount</TableHead>
+                                        <TableHead><span className="sr-only">Actions</span></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {payrollHistory.map(run => (
+                                        <TableRow key={run.id}>
+                                            <TableCell className="font-medium">{run.month}</TableCell>
+                                            <TableCell>{run.employeesPaid}</TableCell>
+                                            <TableCell className="text-right font-mono">₦{run.totalPaid.toLocaleString()}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="sm" onClick={() => handleViewDetails(run)}>
+                                                    <Eye className="mr-2 h-4 w-4" />
+                                                    View Details
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     )}
                 </CardContent>
             </Card>
+            <PayrollDetailsDialog run={selectedRun} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} />
         </div>
     );
 }
