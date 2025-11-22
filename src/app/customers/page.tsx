@@ -36,21 +36,27 @@ type Customer = {
     id: string;
     name: string;
     email: string;
+    phone?: string;
+    company?: string;
+    address?: string;
     spend: number;
     loyalty: "Gold" | "Silver" | "Bronze" | "New";
 }
 
 const initialCustomers: Customer[] = [
-    { id: "cust-001", name: "Alice Johnson", email: "alice@example.com", spend: 2540.50, loyalty: "Gold" },
-    { id: "cust-002", name: "Bob Williams", email: "bob@example.com", spend: 1820.00, loyalty: "Silver" },
+    { id: "cust-001", name: "Alice Johnson", email: "alice@example.com", phone: "+234 801 234 5678", company: "Johnson Innovations", address: "123 Tech Road, Lagos", spend: 2540.50, loyalty: "Gold" },
+    { id: "cust-002", name: "Bob Williams", email: "bob@example.com", company: "Williams Solutions", spend: 1820.00, loyalty: "Silver" },
     { id: "cust-003", name: "Charlie Brown", email: "charlie@example.com", spend: 850.75, loyalty: "Bronze" },
-    { id: "cust-004", name: "Diana Miller", email: "diana@example.com", spend: 3200.00, loyalty: "Gold" },
+    { id: "cust-004", name: "Diana Miller", email: "diana@example.com", phone: "+234 802 345 6789", address: "456 Business Ave, Abuja", spend: 3200.00, loyalty: "Gold" },
     { id: "cust-005", name: "Ethan Davis", email: "ethan@example.com", spend: 450.25, loyalty: "New" },
 ]
 
 function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Customer) => void }) {
     const [name, setName] = React.useState('');
     const [email, setEmail] = React.useState('');
+    const [phone, setPhone] = React.useState('');
+    const [company, setCompany] = React.useState('');
+    const [address, setAddress] = React.useState('');
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
     const handleSave = () => {
@@ -59,6 +65,9 @@ function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Customer) => void
                 id: `cust-${Date.now()}`,
                 name,
                 email,
+                phone: phone || undefined,
+                company: company || undefined,
+                address: address || undefined,
                 spend: 0,
                 loyalty: 'New',
             };
@@ -66,6 +75,9 @@ function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Customer) => void
             setIsDialogOpen(false);
             setName('');
             setEmail('');
+            setPhone('');
+            setCompany('');
+            setAddress('');
         }
     };
 
@@ -104,6 +116,37 @@ function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Customer) => void
                             placeholder="e.g. john@example.com"
                         />
                     </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="customer-phone" className="text-right">Phone <span className="text-muted-foreground/80">(Opt)</span></Label>
+                        <Input
+                            id="customer-phone"
+                            type="tel"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            className="col-span-3"
+                            placeholder="+234..."
+                        />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="customer-company" className="text-right">Company <span className="text-muted-foreground/80">(Opt)</span></Label>
+                        <Input
+                            id="customer-company"
+                            value={company}
+                            onChange={(e) => setCompany(e.target.value)}
+                            className="col-span-3"
+                            placeholder="e.g. ACME Inc."
+                        />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="customer-address" className="text-right">Address <span className="text-muted-foreground/80">(Opt)</span></Label>
+                        <Input
+                            id="customer-address"
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            className="col-span-3"
+                            placeholder="123 Main St, City"
+                        />
+                    </div>
                 </div>
                 <DialogFooter>
                     <DialogClose asChild>
@@ -140,7 +183,8 @@ export default function CustomersPage() {
                         <TableHeader>
                         <TableRow>
                             <TableHead>Customer</TableHead>
-                            <TableHead>Loyalty Level</TableHead>
+                            <TableHead className="hidden sm:table-cell">Contact</TableHead>
+                            <TableHead className="hidden md:table-cell">Loyalty Level</TableHead>
                             <TableHead className="text-right">Total Spend</TableHead>
                             <TableHead>
                             <span className="sr-only">Actions</span>
@@ -152,9 +196,13 @@ export default function CustomersPage() {
                                 <TableRow key={customer.id}>
                                     <TableCell>
                                         <div className="font-medium">{customer.name}</div>
-                                        <div className="text-sm text-muted-foreground">{customer.email}</div>
+                                        <div className="text-sm text-muted-foreground md:hidden">{customer.email}</div>
                                     </TableCell>
-                                    <TableCell>
+                                     <TableCell className="hidden sm:table-cell">
+                                        <div className="font-medium">{customer.email}</div>
+                                        {customer.phone && <div className="text-sm text-muted-foreground">{customer.phone}</div>}
+                                     </TableCell>
+                                    <TableCell className="hidden md:table-cell">
                                         <Badge 
                                             variant={customer.loyalty === "Gold" ? "default" : customer.loyalty === "Silver" ? "secondary" : "outline"}
                                             className={customer.loyalty === "Gold" ? "bg-yellow-400/20 text-yellow-600" : customer.loyalty === "Silver" ? "bg-gray-400/20 text-gray-600" : ""}
