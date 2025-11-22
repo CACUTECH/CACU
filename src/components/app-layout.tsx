@@ -24,6 +24,7 @@ import { useTheme } from 'next-themes';
 import { Logo } from '@/components/logo';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -109,6 +110,28 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { theme } = useTheme();
+  const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
+  const [businessName, setBusinessName] = React.useState('CACU');
+
+  React.useEffect(() => {
+    // This code runs only on the client, after the component has mounted.
+    const savedLogo = localStorage.getItem('business-logo');
+    const savedDetails = localStorage.getItem('business-details');
+    if (savedLogo) {
+      setLogoUrl(savedLogo);
+    }
+    if (savedDetails) {
+        try {
+            const details = JSON.parse(savedDetails);
+            if(details.name) {
+                setBusinessName(details.name);
+            }
+        } catch (e) {
+            // Did not parse, fallback to default
+            setBusinessName('CACU');
+        }
+    }
+  }, []);
 
   // Hide sidebar and header for setup page
   if (pathname === '/setup' || pathname === '/login' || pathname === '/signup' || pathname === '/verify-email') {
@@ -120,8 +143,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <SidebarHeader>
           <div className="flex items-center gap-2 p-2">
-            <Logo className="size-8 shrink-0" />
-            <span className="font-headline text-xl font-semibold" style={{color: "hsl(var(--primary))"}}>CACU</span>
+            {logoUrl ? (
+                <Image src={logoUrl} alt="Business Logo" width={32} height={32} className="size-8 shrink-0 rounded-sm object-contain" />
+            ) : (
+                <Logo className="size-8 shrink-0" />
+            )}
+            <span className="font-headline text-xl font-semibold truncate" style={{color: "hsl(var(--primary))"}}>{businessName}</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
