@@ -148,7 +148,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ) : (
                 <Logo className="size-8 shrink-0" />
             )}
-            <span className="font-headline text-xl font-semibold truncate" style={{color: "hsl(var(--primary))"}}>{businessName}</span>
+            <span className="font-headline text-2xl font-semibold truncate" style={{color: "hsl(var(--primary))"}}>{businessName}</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
