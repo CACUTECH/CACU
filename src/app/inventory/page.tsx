@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { inventoryItems as allInventoryItems } from '@/lib/data';
 import type { InventoryItem } from '@/lib/data';
-import { PlusCircle, MoreHorizontal, Upload } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Upload, X } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -32,6 +32,17 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from '@/hooks/use-toast';
@@ -125,10 +136,144 @@ function AddProductDialog({ onSave }: { onSave: (newProduct: InventoryItem) => v
     )
 }
 
+function EditProductDialog({ item, onSave, onOpenChange, open }: { item: InventoryItem | null; onSave: (updatedProduct: InventoryItem) => void; onOpenChange: (open: boolean) => void, open: boolean }) {
+    const [name, setName] = React.useState('');
+    const [sku, setSku] = React.useState('');
+    const [quantity, setQuantity] = React.useState('0');
+    const [price, setPrice] = React.useState('0');
+    const [reorderLevel, setReorderLevel] = React.useState('10');
+
+    React.useEffect(() => {
+        if(item) {
+            setName(item.name);
+            setSku(item.sku);
+            setQuantity(String(item.quantity));
+            setPrice(String(item.price));
+            setReorderLevel(String(item.reorderLevel));
+        }
+    }, [item]);
+
+    const handleSave = () => {
+        if (!item) return;
+
+        const numQuantity = parseInt(quantity, 10);
+        const numPrice = parseFloat(price);
+        const numReorderLevel = parseInt(reorderLevel, 10);
+
+        if (name && sku && !isNaN(numQuantity) && !isNaN(numPrice) && !isNaN(numReorderLevel)) {
+            const updatedProduct: InventoryItem = {
+                ...item,
+                name,
+                sku,
+                quantity: numQuantity,
+                price: numPrice,
+                reorderLevel: numReorderLevel,
+                status: getStatus(numQuantity, numReorderLevel),
+            };
+            onSave(updatedProduct);
+            onOpenChange(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Edit Product</DialogTitle>
+                    <DialogDescription>
+                        Update the details of {item?.name}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-name" className="text-right">Name</Label>
+                        <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-sku" className="text-right">SKU</Label>
+                        <Input id="edit-sku" value={sku} onChange={(e) => setSku(e.target.value)} className="col-span-3" />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-quantity" className="text-right">Quantity</Label>
+                        <Input id="edit-quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="col-span-3" />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-price" className="text-right">Price (₦)</Label>
+                        <Input id="edit-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-reorderLevel" className="text-right">Reorder Level</Label>
+                        <Input id="edit-reorderLevel" type="number" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} className="col-span-3" />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button type="button" variant="secondary">Cancel</Button>
+                    </DialogClose>
+                    <Button type="submit" onClick={handleSave}>Save Changes</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+function RecordSaleDialog({ item, onRecordSale, open, onOpenChange }: { item: InventoryItem | null; onRecordSale: (itemId: string, quantitySold: number) => void; open: boolean; onOpenChange: (open: boolean) => void }) {
+    const [quantity, setQuantity] = React.useState('1');
+    const { toast } = useToast();
+
+    const handleRecord = () => {
+        if (!item) return;
+
+        const soldQuantity = parseInt(quantity, 10);
+        if (isNaN(soldQuantity) || soldQuantity <= 0) {
+            toast({ variant: 'destructive', title: "Invalid Quantity", description: "Please enter a valid quantity." });
+            return;
+        }
+        if (soldQuantity > item.quantity) {
+            toast({ variant: 'destructive', title: "Insufficient Stock", description: `Only ${item.quantity} units available.` });
+            return;
+        }
+
+        onRecordSale(item.id, soldQuantity);
+        toast({ title: "Sale Recorded", description: `${soldQuantity} units of ${item.name} sold.` });
+        onOpenChange(false);
+        setQuantity('1');
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Record Sale</DialogTitle>
+                    <DialogDescription>Record a sale for {item?.name}. Current stock: {item?.quantity}</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="sale-quantity" className="text-right">Quantity Sold</Label>
+                        <Input id="sale-quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="col-span-3" min="1" max={item?.quantity} />
+                    </div>
+                </div>
+                <DialogFooter>
+                     <DialogClose asChild>
+                        <Button type="button" variant="secondary">Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleRecord}>Record Sale</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export default function InventoryPage() {
     const [inventoryItems, setInventoryItems] = React.useState<InventoryItem[]>(allInventoryItems);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const { toast } = useToast();
+    
+    const [editingItem, setEditingItem] = React.useState<InventoryItem | null>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+    
+    const [sellingItem, setSellingItem] = React.useState<InventoryItem | null>(null);
+    const [isSaleDialogOpen, setIsSaleDialogOpen] = React.useState(false);
 
     const getStatusBadgeVariant = (status: InventoryItem['status']) => {
         switch (status) {
@@ -141,6 +286,46 @@ export default function InventoryPage() {
     const handleAddProduct = (newProduct: InventoryItem) => {
         setInventoryItems(prev => [newProduct, ...prev]);
     };
+
+    const handleEditProduct = (updatedProduct: InventoryItem) => {
+        setInventoryItems(prev => prev.map(item => item.id === updatedProduct.id ? updatedProduct : item));
+    }
+    
+    const openEditDialog = (item: InventoryItem) => {
+        setEditingItem(item);
+        setIsEditDialogOpen(true);
+    };
+
+    const openSaleDialog = (item: InventoryItem) => {
+        setSellingItem(item);
+        setIsSaleDialogOpen(true);
+    }
+    
+    const handleRecordSale = (itemId: string, quantitySold: number) => {
+        setInventoryItems(prev => prev.map(item => {
+            if (item.id === itemId) {
+                const newQuantity = item.quantity - quantitySold;
+                return { ...item, quantity: newQuantity, status: getStatus(newQuantity, item.reorderLevel) };
+            }
+            return item;
+        }));
+    };
+
+    const handleReorder = (item: InventoryItem) => {
+        toast({
+            title: "Reorder Initiated",
+            description: `A reorder request for ${item.name} has been created.`,
+        })
+    }
+
+    const handleDelete = (itemId: string) => {
+        setInventoryItems(prev => prev.filter(item => item.id !== itemId));
+        toast({
+            title: "Product Deleted",
+            description: "The product has been removed from your inventory.",
+        })
+    };
+
 
     const handleBulkUploadClick = () => {
         fileInputRef.current?.click();
@@ -162,6 +347,7 @@ export default function InventoryPage() {
     };
 
     return (
+        <>
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between gap-4">
@@ -219,11 +405,33 @@ export default function InventoryPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem>Edit</DropdownMenuItem>
-                                                <DropdownMenuItem>Record Sale</DropdownMenuItem>
-                                                <DropdownMenuItem>Reorder</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => openEditDialog(item)}>Edit</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => openSaleDialog(item)}>Record Sale</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleReorder(item)}>Reorder</DropdownMenuItem>
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">Delete</DropdownMenuItem>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <DropdownMenuItem 
+                                                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                                            onSelect={(e) => e.preventDefault()}
+                                                        >
+                                                            Delete
+                                                        </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            This action cannot be undone. This will permanently delete the product
+                                                            and remove its data from our servers.
+                                                        </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDelete(item.id)}>Continue</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                         </div>
@@ -235,5 +443,8 @@ export default function InventoryPage() {
                 </div>
             </CardContent>
         </Card>
+        <EditProductDialog item={editingItem} onSave={handleEditProduct} open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} />
+        <RecordSaleDialog item={sellingItem} onRecordSale={handleRecordSale} open={isSaleDialogOpen} onOpenChange={setIsSaleDialogOpen} />
+        </>
     );
 }
