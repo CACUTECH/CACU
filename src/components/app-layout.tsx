@@ -12,14 +12,18 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   SidebarInset,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Banknote, Users2, LifeBuoy, AppWindow, Settings, LogOut, Briefcase, Receipt } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Banknote, Users2, LifeBuoy, AppWindow, Settings, LogOut, Briefcase, Receipt, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { Logo } from '@/components/logo';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -28,12 +32,70 @@ const navItems = [
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/analytics', label: 'Analytics', icon: PieChart },
+  { 
+    href: '/analytics', 
+    label: 'Analytics', 
+    icon: PieChart,
+    children: [
+        { href: '/analytics/kpi', label: 'KPIs' },
+        { href: '/analytics/planning', label: 'Planning & Budgeting' },
+        { href: '/analytics/budget-vs-actual', label: 'Budget vs. Actual' },
+        { href: '/analytics/reconciliation', label: 'Reconciliation' },
+        { href: '/analytics/top-selling', label: 'Top-Selling' },
+        { href: '/analytics/aging-reports', label: 'Aging Reports' },
+    ]
+  },
   { href: '/credit', label: 'Credit', icon: Banknote },
   { href: '/hr', label: 'HR', icon: Users2 },
   { href: '/support', label: 'Support', icon: LifeBuoy },
   { href: '/apps', label: 'Integrations', icon: AppWindow },
 ];
+
+function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: string }) {
+    const isActive = item.children ? pathname.startsWith(item.href) : pathname === item.href;
+
+    if (item.children) {
+        return (
+             <Collapsible defaultOpen={pathname.startsWith(item.href)}>
+                <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                         <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className="justify-between">
+                            <Link href={item.href}>
+                                <div className="flex items-center gap-2">
+                                    <item.icon />
+                                    <span>{item.label}</span>
+                                </div>
+                                <ChevronDown className={cn("transition-transform duration-200", "[&[data-state=open]]:-rotate-180")} />
+                            </Link>
+                        </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                </SidebarMenuItem>
+                <CollapsibleContent>
+                    <SidebarMenuSub>
+                        {item.children.map(child => (
+                             <SidebarMenuItem key={child.href}>
+                                <SidebarMenuSubButton asChild isActive={pathname === child.href}>
+                                    <Link href={child.href}>{child.label}</Link>
+                                </SidebarMenuSubButton>
+                            </SidebarMenuItem>
+                        ))}
+                    </SidebarMenuSub>
+                </CollapsibleContent>
+            </Collapsible>
+        )
+    }
+
+    return (
+        <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
+              <Link href={item.href}>
+                <item.icon />
+                <span>{item.label}</span>
+              </Link>
+            </SidebarMenuButton>
+        </SidebarMenuItem>
+    )
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -56,14 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarContent>
           <SidebarMenu>
             {navItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.label}>
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <NavItem key={item.href} item={item} pathname={pathname} />
             ))}
           </SidebarMenu>
         </SidebarContent>

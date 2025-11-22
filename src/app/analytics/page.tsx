@@ -1,21 +1,29 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, FileText, Scale, Coins, ShoppingCart, BookUser, ArrowDown, ArrowUp } from 'lucide-react';
+import { Target, FileText, Scale, Coins, ShoppingCart, BookUser, ArrowDown, ArrowUp, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
-function FeatureCard({ icon: Icon, title, description }: { icon: React.ElementType, title: string, description: string }) {
+function FeatureCard({ icon: Icon, title, description, href }: { icon: React.ElementType, title: string, description: string, href: string }) {
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center gap-3">
-                     <div className="bg-primary/10 p-3 rounded-full">
-                        <Icon className="h-6 w-6 text-primary" />
+        <Link href={href} className="block hover:shadow-lg transition-shadow rounded-xl">
+            <Card className="h-full">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                         <div className="bg-primary/10 p-3 rounded-full">
+                            <Icon className="h-6 w-6 text-primary" />
+                        </div>
+                        <CardTitle>{title}</CardTitle>
                     </div>
-                    <CardTitle>{title}</CardTitle>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <p className="text-muted-foreground">{description}</p>
-            </CardContent>
-        </Card>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">{description}</p>
+                </CardContent>
+                <CardContent>
+                    <div className="text-sm font-medium text-primary flex items-center">
+                        View Report <ArrowRight className="ml-2 h-4 w-4" />
+                    </div>
+                </CardContent>
+            </Card>
+        </Link>
     );
 }
 
@@ -30,41 +38,37 @@ export default function AnalyticsPage() {
                     icon={Target}
                     title="Key Performance Indicators (KPIs)"
                     description="Track your most important business metrics at a glance with a customizable dashboard."
+                    href="/analytics/kpi"
                 />
                 <FeatureCard
                     icon={FileText}
                     title="Planning & Budgeting"
                     description="Create detailed budgets and financial plans to guide your business strategy."
+                    href="/analytics/planning"
                 />
                 <FeatureCard
                     icon={Scale}
                     title="Budget vs. Actual Analysis"
                     description="Compare your actual financial performance against your budget to identify variances."
+                    href="/analytics/budget-vs-actual"
                 />
                 <FeatureCard
                     icon={Coins}
                     title="Accounts Reconciliation"
                     description="Easily reconcile your linked bank accounts to ensure financial accuracy."
+                    href="/analytics/reconciliation"
                 />
                 <FeatureCard
                     icon={ShoppingCart}
                     title="Top-Selling Products/Services"
                     description="Identify your most popular offerings to optimize your sales and marketing efforts."
+                    href="/analytics/top-selling"
                 />
                 <FeatureCard
                     icon={BookUser}
                     title="Receivables & Payables Aging"
                     description="Monitor outstanding invoices and bills to manage your cash flow effectively."
-                />
-                 <FeatureCard
-                    icon={ArrowDown}
-                    title="Receivables Aging Reports"
-                    description="Track overdue customer payments and manage your collections process."
-                />
-                <FeatureCard
-                    icon={ArrowUp}
-                    title="Payables Aging Reports"
-                    description="Keep an eye on upcoming bill payments to manage your expenses."
+                    href="/analytics/aging-reports"
                 />
             </div>
         </div>
