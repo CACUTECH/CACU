@@ -180,8 +180,25 @@ const downloadPdf = async (invoice: Invoice) => {
 
     // Add logo if available
     const logoDataUrl = localStorage.getItem('business-logo');
+    let logoY = 15;
     if (logoDataUrl) {
-        doc.addImage(logoDataUrl, 'PNG', 14, 15, 30, 30);
+        doc.addImage(logoDataUrl, 'PNG', 14, logoY, 30, 30);
+    }
+
+    const businessDetailsStr = localStorage.getItem('business-details');
+    if (businessDetailsStr) {
+        const details = JSON.parse(businessDetailsStr);
+        let yPos = logoDataUrl ? 50 : 20;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        if (details.name) {
+            doc.text(details.name, 14, yPos);
+            yPos += 5;
+        }
+        doc.setFont('helvetica', 'normal');
+        if (details.address) {
+            doc.text(details.address, 14, yPos, { maxWidth: 80 });
+        }
     }
 
 
@@ -996,3 +1013,5 @@ export default function InvoicesPage() {
     </>
   )
 }
+
+    

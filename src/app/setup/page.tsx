@@ -96,6 +96,13 @@ export default function SetupPage() {
     };
     localStorage.setItem('business-profile-bank', JSON.stringify(bankDetails));
 
+    const businessDetails = {
+      name: values.businessName,
+      address: values.businessAddress,
+    };
+    localStorage.setItem('business-details', JSON.stringify(businessDetails));
+
+
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsLoading(false);
     toast({
@@ -293,3 +300,5 @@ export default function SetupPage() {
     </div>
   );
 }
+
+    
