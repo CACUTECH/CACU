@@ -49,6 +49,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
+import { Switch } from "@/components/ui/switch"
 
 import { inventoryItems } from "@/lib/data"
 import type { InventoryItem } from "@/lib/data"
@@ -67,9 +68,10 @@ type Invoice = {
     subtotal: number;
     tax: number;
     total: number;
+    vatIncluded: boolean;
 }
 
-const invoicesData: Omit<Invoice, 'subtotal' | 'tax' | 'total'>[] = [
+const invoicesData: Omit<Invoice, 'subtotal' | 'tax' | 'total' | 'vatIncluded'>[] = [
   {
     invoice: "INV001",
     paymentStatus: "Paid",
@@ -134,9 +136,10 @@ const customers = [
     { id: "cust-003", name: "Charlie Brown" },
 ]
 
-const processInvoices = (data: Omit<Invoice, 'subtotal' | 'tax' | 'total'>[]): Invoice[] => {
+const processInvoices = (data: Omit<Invoice, 'subtotal' | 'tax' | 'total' | 'vatIncluded'>[]): Invoice[] => {
     return data.map(i => {
         const total = parseFloat(i.totalAmount.replace('₦', ''));
+        // Assume VAT was included for existing data
         const tax = total * 0.075 / 1.075;
         const subtotal = total - tax;
         return {
@@ -144,6 +147,7 @@ const processInvoices = (data: Omit<Invoice, 'subtotal' | 'tax' | 'total'>[]): I
             total,
             subtotal,
             tax,
+            vatIncluded: true,
         }
     })
 }
@@ -194,22 +198,30 @@ const downloadPdf = async (invoice: Invoice) => {
 
     // Totals
     const finalY = (doc as any).lastAutoTable.finalY || 80;
+    let yPos = finalY + 10;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('Subtotal:', 140, finalY + 10);
-    doc.text(`₦${invoice.subtotal.toFixed(2)}`, 200, finalY + 10, { align: 'right' });
-    doc.text('VAT (7.5%):', 140, finalY + 17);
-    doc.text(`₦${invoice.tax.toFixed(2)}`, 200, finalY + 17, { align: 'right' });
+    doc.text('Subtotal:', 140, yPos);
+    doc.text(`₦${invoice.subtotal.toFixed(2)}`, 200, yPos, { align: 'right' });
+    
+    if (invoice.vatIncluded) {
+        yPos += 7;
+        doc.text('VAT (7.5%):', 140, yPos);
+        doc.text(`₦${invoice.tax.toFixed(2)}`, 200, yPos, { align: 'right' });
+    }
+
+    yPos += 8;
     doc.setFontSize(14);
-    doc.text('Total:', 140, finalY + 25);
-    doc.text(`₦${invoice.total.toFixed(2)}`, 200, finalY + 25, { align: 'right' });
+    doc.text('Total:', 140, yPos);
+    doc.text(`₦${invoice.total.toFixed(2)}`, 200, yPos, { align: 'right' });
 
     // Notes
     if (invoice.notes) {
+        yPos += 15;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text('Notes:', 14, finalY + 40);
-        doc.text(invoice.notes, 14, finalY + 45, { maxWidth: 180 });
+        doc.text('Notes:', 14, yPos);
+        doc.text(invoice.notes, 14, yPos + 5, { maxWidth: 180 });
     }
 
     // Footer
@@ -295,10 +307,12 @@ function InvoiceDetailsDialog({ invoice, onOpenChange }: { invoice: Invoice | nu
                                 <span className="text-muted-foreground">Subtotal</span>
                                 <span>₦{invoice.subtotal.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">VAT (7.5%)</span>
-                                <span>₦{invoice.tax.toLocaleString()}</span>
-                            </div>
+                            {invoice.vatIncluded && (
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">VAT (7.5%)</span>
+                                    <span>₦{invoice.tax.toLocaleString()}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between font-bold text-lg">
                                 <span>Total</span>
                                 <span>₦{invoice.total.toLocaleString()}</span>
@@ -330,6 +344,7 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void })
     ]);
      const [paymentMethod, setPaymentMethod] = React.useState('');
      const [notes, setNotes] = React.useState('');
+     const [includeVat, setIncludeVat] = React.useState(true);
 
     const handleItemChange = (id: string, selectedItemId: string) => {
         const selectedItem = inventoryItems.find(i => i.id === selectedItemId);
@@ -361,7 +376,7 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void })
     };
 
     const subtotal = React.useMemo(() => lineItems.reduce((acc, item) => acc + item.total, 0), [lineItems]);
-    const tax = subtotal * 0.075; // Assuming 7.5% VAT
+    const tax = includeVat ? subtotal * 0.075 : 0;
     const total = subtotal + tax;
 
     const handleSave = () => {
@@ -377,6 +392,7 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void })
             subtotal,
             tax,
             total,
+            vatIncluded: includeVat,
         };
         onSave(newReceipt);
     }
@@ -491,15 +507,23 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void })
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center space-x-2">
+                                <Switch id="vat-switch" checked={includeVat} onCheckedChange={setIncludeVat} />
+                                <Label htmlFor="vat-switch">Include VAT (7.5%)</Label>
+                            </div>
+                        </div>
                         <div className="md:col-start-3 space-y-2">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Subtotal</span>
                                 <span>₦{subtotal.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">VAT (7.5%)</span>
-                                <span>₦{tax.toLocaleString()}</span>
-                            </div>
+                            {includeVat && (
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">VAT (7.5%)</span>
+                                    <span>₦{tax.toLocaleString()}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between font-bold text-lg">
                                 <span>Total</span>
                                 <span>₦{total.toLocaleString()}</span>
@@ -529,6 +553,7 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void })
         { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }
     ]);
     const [notes, setNotes] = React.useState('');
+    const [includeVat, setIncludeVat] = React.useState(true);
 
     const handleItemChange = (id: string, selectedItemId: string) => {
         const selectedItem = inventoryItems.find(i => i.id === selectedItemId);
@@ -560,7 +585,7 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void })
     };
 
     const subtotal = React.useMemo(() => lineItems.reduce((acc, item) => acc + item.total, 0), [lineItems]);
-    const tax = subtotal * 0.075; // Assuming 7.5% VAT
+    const tax = includeVat ? subtotal * 0.075 : 0;
     const total = subtotal + tax;
 
     const handleSave = () => {
@@ -577,6 +602,7 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void })
             subtotal,
             tax,
             total,
+            vatIncluded: includeVat,
         };
         onSave(newInvoice);
     }
@@ -691,15 +717,23 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void })
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center space-x-2">
+                                <Switch id="vat-switch-invoice" checked={includeVat} onCheckedChange={setIncludeVat} />
+                                <Label htmlFor="vat-switch-invoice">Include VAT (7.5%)</Label>
+                            </div>
+                        </div>
                         <div className="md:col-start-3 space-y-2">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Subtotal</span>
                                 <span>₦{subtotal.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">VAT (7.5%)</span>
-                                <span>₦{tax.toLocaleString()}</span>
-                            </div>
+                            {includeVat && (
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">VAT (7.5%)</span>
+                                    <span>₦{tax.toLocaleString()}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between font-bold text-lg">
                                 <span>Total</span>
                                 <span>₦{total.toLocaleString()}</span>
@@ -857,3 +891,5 @@ export default function InvoicesPage() {
     </>
   )
 }
+
+    
