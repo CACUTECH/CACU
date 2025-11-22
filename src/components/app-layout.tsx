@@ -24,7 +24,7 @@ import { Logo } from '@/components/logo';
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { href: '/invoices', label: 'Invoices', icon: Receipt },
+  { href: '/invoices', label: 'Invoices & Receipts', icon: Receipt },
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/customers', label: 'Customers', icon: Users },
