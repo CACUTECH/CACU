@@ -56,7 +56,7 @@ const navItems = [
       { href: '/hr/payroll', label: 'Payroll' },
     ],
   },
-  { href: '/support', label: 'Support', icon: LifeBuoy },
+  { href: '/community', label: 'Community', icon: LifeBuoy },
   { href: '/apps', label: 'Integrations', icon: AppWindow },
 ];
 
