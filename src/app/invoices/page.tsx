@@ -10,6 +10,7 @@ import {
   Calendar as CalendarIcon,
   Download,
   Printer,
+  UserPlus,
 } from "lucide-react"
 import type jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -40,7 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -54,6 +55,11 @@ import { Switch } from "@/components/ui/switch"
 import { inventoryItems } from "@/lib/data"
 import type { InventoryItem } from "@/lib/data"
 
+
+type Customer = {
+    id: string;
+    name: string;
+}
 
 type Invoice = {
     invoice: string;
@@ -130,7 +136,7 @@ const invoicesData: Omit<Invoice, 'subtotal' | 'tax' | 'total' | 'vatIncluded'>[
   },
 ]
 
-const customers = [
+const initialCustomers: Customer[] = [
     { id: "cust-001", name: "Alice Johnson" },
     { id: "cust-002", name: "Bob Williams" },
     { id: "cust-003", name: "Charlie Brown" },
@@ -336,7 +342,58 @@ function InvoiceDetailsDialog({ invoice, onOpenChange }: { invoice: Invoice | nu
     )
 }
 
-function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void }) {
+function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Customer) => void }) {
+    const [name, setName] = React.useState('');
+
+    const handleSave = () => {
+        if (name) {
+            const newCustomer: Customer = {
+                id: `cust-${Date.now()}`,
+                name,
+            };
+            onSave(newCustomer);
+        }
+    };
+
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                 <Button variant="ghost" className="justify-start w-full h-auto py-2 px-2 text-primary hover:text-primary">
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Add new customer
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Add New Customer</DialogTitle>
+                    <DialogDescription>Enter the new customer's name below.</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="customer-name" className="text-right">Name</Label>
+                        <Input
+                            id="customer-name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="col-span-3"
+                            placeholder="e.g. John Doe"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button type="button" variant="secondary">Cancel</Button>
+                    </DialogClose>
+                    <DialogClose asChild>
+                         <Button type="submit" onClick={handleSave} disabled={!name}>Save Customer</Button>
+                    </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function AddReceiptDialog({ onSave, customers, onCustomerAdd }: { onSave: (newReceipt: Invoice) => void; customers: Customer[]; onCustomerAdd: (customer: Customer) => void; }) {
     const [customer, setCustomer] = React.useState('');
     const [receiptDate, setReceiptDate] = React.useState<Date | undefined>(new Date());
     const [lineItems, setLineItems] = React.useState<LineItem[]>([
@@ -345,6 +402,7 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void })
      const [paymentMethod, setPaymentMethod] = React.useState('');
      const [notes, setNotes] = React.useState('');
      const [includeVat, setIncludeVat] = React.useState(true);
+     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
     const handleItemChange = (id: string, selectedItemId: string) => {
         const selectedItem = inventoryItems.find(i => i.id === selectedItemId);
@@ -395,10 +453,16 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void })
             vatIncluded: includeVat,
         };
         onSave(newReceipt);
+        setIsDialogOpen(false);
+    }
+    
+    const handleNewCustomerSave = (newCustomer: Customer) => {
+        onCustomerAdd(newCustomer);
+        setCustomer(newCustomer.id);
     }
 
     return (
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
                 <Button size="sm">
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -414,7 +478,7 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void })
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label>Customer</Label>
-                            <Select onValueChange={setCustomer}>
+                            <Select value={customer} onValueChange={setCustomer}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a customer" />
                                 </SelectTrigger>
@@ -422,6 +486,7 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void })
                                     {customers.map(c => (
                                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                     ))}
+                                    <AddCustomerDialog onSave={handleNewCustomerSave} />
                                 </SelectContent>
                             </Select>
                         </div>
@@ -545,7 +610,7 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void })
 }
 
 
-function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void }) {
+function AddInvoiceDialog({ onSave, customers, onCustomerAdd }: { onSave: (newInvoice: Invoice) => void; customers: Customer[]; onCustomerAdd: (customer: Customer) => void; }) {
     const [customer, setCustomer] = React.useState('');
     const [invoiceDate, setInvoiceDate] = React.useState<Date | undefined>(new Date());
     const [dueDate, setDueDate] = React.useState<Date | undefined>();
@@ -554,6 +619,7 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void })
     ]);
     const [notes, setNotes] = React.useState('');
     const [includeVat, setIncludeVat] = React.useState(true);
+    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
     const handleItemChange = (id: string, selectedItemId: string) => {
         const selectedItem = inventoryItems.find(i => i.id === selectedItemId);
@@ -605,10 +671,16 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void })
             vatIncluded: includeVat,
         };
         onSave(newInvoice);
+        setIsDialogOpen(false);
+    }
+    
+    const handleNewCustomerSave = (newCustomer: Customer) => {
+        onCustomerAdd(newCustomer);
+        setCustomer(newCustomer.id);
     }
 
     return (
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
                 <Button size="sm">
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -624,7 +696,7 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void })
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label>Customer</Label>
-                            <Select onValueChange={setCustomer}>
+                            <Select value={customer} onValueChange={setCustomer}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a customer" />
                                 </SelectTrigger>
@@ -632,6 +704,7 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void })
                                     {customers.map(c => (
                                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                     ))}
+                                    <AddCustomerDialog onSave={handleNewCustomerSave} />
                                 </SelectContent>
                             </Select>
                         </div>
@@ -819,6 +892,7 @@ export default function InvoicesPage() {
   const [allInvoicesState, setAllInvoicesState] = React.useState(allInvoices);
   const [receiptsState, setReceiptsState] = React.useState(receipts);
   const [selectedInvoice, setSelectedInvoice] = React.useState<Invoice | null>(null);
+  const [customersState, setCustomersState] = React.useState<Customer[]>(initialCustomers);
 
   const handleSave = (newItem: Invoice) => {
     if (newItem.paymentStatus === 'Paid') {
@@ -839,8 +913,10 @@ export default function InvoicesPage() {
   const handleViewDetails = (invoice: Invoice) => {
       setSelectedInvoice(invoice);
   }
-
-  const allData = [...allInvoicesState, ...receiptsState];
+  
+  const handleAddCustomer = (customer: Customer) => {
+      setCustomersState(prev => [customer, ...prev]);
+  }
 
   return (
     <>
@@ -858,7 +934,7 @@ export default function InvoicesPage() {
                     <File className="mr-2 h-4 w-4" />
                     Export
                 </Button>
-                {activeTab === 'invoices' ? <AddInvoiceDialog onSave={handleSave} /> : <AddReceiptDialog onSave={handleSave} />}
+                {activeTab === 'invoices' ? <AddInvoiceDialog onSave={handleSave} customers={customersState} onCustomerAdd={handleAddCustomer} /> : <AddReceiptDialog onSave={handleSave} customers={customersState} onCustomerAdd={handleAddCustomer} />}
             </div>
         </div>
       </CardHeader>
