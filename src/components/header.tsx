@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 const breadcrumbNameMap: { [key: string]: string } = {
   '/': 'Dashboard',
   '/transactions': 'Transactions',
+  '/invoices': 'Invoices',
   '/inventory': 'Inventory',
   '/reports': 'Reports',
   '/customers': 'Customers',
