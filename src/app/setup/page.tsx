@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -30,8 +31,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, UploadCloud } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import Image from "next/image";
 
 const formSchema = z.object({
   businessName: z.string().min(1, "Business name is required"),
@@ -49,6 +51,7 @@ export default function SetupPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -64,6 +67,20 @@ export default function SetupPage() {
       accountName: "",
     },
   });
+
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setLogoPreview(result);
+        localStorage.setItem('business-logo', result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
@@ -99,6 +116,26 @@ export default function SetupPage() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                 <div className="space-y-2">
+                  <FormLabel>Business Logo</FormLabel>
+                  <div className="flex items-center gap-4">
+                    <div className="w-24 h-24 rounded-lg border border-dashed flex items-center justify-center bg-muted/50">
+                      {logoPreview ? (
+                        <Image src={logoPreview} alt="Logo Preview" width={96} height={96} className="object-contain rounded-lg" />
+                      ) : (
+                        <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <Input id="logo-upload" type="file" onChange={handleLogoChange} accept="image/*" className="hidden" />
+                      <Button type="button" variant="outline" onClick={() => document.getElementById('logo-upload')?.click()}>
+                        Upload Logo
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2">Recommended size: 200x200px. PNG or JPG.</p>
+                    </div>
+                  </div>
+                </div>
+
                 <FormField
                   control={form.control}
                   name="businessName"

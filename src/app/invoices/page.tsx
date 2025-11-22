@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -177,24 +178,32 @@ const downloadPdf = async (invoice: Invoice) => {
     const doc = new jsPDF();
     const type = invoice.paymentStatus === 'Paid' ? 'Receipt' : 'Invoice';
 
+    // Add logo if available
+    const logoDataUrl = localStorage.getItem('business-logo');
+    if (logoDataUrl) {
+        doc.addImage(logoDataUrl, 'PNG', 14, 15, 30, 30);
+    }
+
+
     // Header
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text(`${type} #${invoice.invoice}`, 14, 22);
+    doc.text(`${type} #${invoice.invoice}`, doc.internal.pageSize.getWidth() - 14, 22, { align: 'right' });
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Date: ${format(new Date(invoice.date), "PPP")}`, 14, 32);
+    const rightAlignX = doc.internal.pageSize.getWidth() - 14;
+    doc.text(`Date: ${format(new Date(invoice.date), "PPP")}`, rightAlignX, 32, { align: 'right' });
     if(invoice.dueDate) {
-         doc.text(`Due Date: ${format(new Date(invoice.dueDate), "PPP")}`, 14, 38);
+         doc.text(`Due Date: ${format(new Date(invoice.dueDate), "PPP")}`, rightAlignX, 38, { align: 'right' });
     }
    
-    doc.text(`Customer: ${invoice.customerName}`, 14, 48);
+    doc.text(`Customer: ${invoice.customerName}`, 14, 60);
 
     // Items table
     if (invoice.items && invoice.items.length > 0) {
         (doc as any).autoTable({
-            startY: 60,
+            startY: 70,
             head: [['Item', 'Quantity', 'Price', 'Total']],
             body: invoice.items.map(item => [item.item, item.quantity, `₦${item.price.toFixed(2)}`, `₦${item.total.toFixed(2)}`]),
             theme: 'striped',
