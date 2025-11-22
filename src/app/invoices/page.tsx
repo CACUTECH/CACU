@@ -514,7 +514,7 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: any) => void }) {
 }
 
 
-function InvoiceTable({ data }: { data: typeof invoices }) {
+function InvoiceTable({ data, onMarkAsPaid }: { data: typeof invoices, onMarkAsPaid: (invoiceId: string) => void }) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -559,7 +559,7 @@ function InvoiceTable({ data }: { data: typeof invoices }) {
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuItem>View Details</DropdownMenuItem>
-                                {invoice.paymentStatus !== 'Paid' && <DropdownMenuItem>Mark as Paid</DropdownMenuItem>}
+                                {invoice.paymentStatus !== 'Paid' && <DropdownMenuItem onClick={() => onMarkAsPaid(invoice.invoice)}>Mark as Paid</DropdownMenuItem>}
                                 <DropdownMenuItem>Download PDF</DropdownMenuItem>
                             </DropdownMenuContent>
                             </DropdownMenu>
@@ -585,6 +585,14 @@ export default function InvoicesPage() {
         setAllInvoicesState([newItem, ...allInvoicesState]);
     }
   }
+
+  const handleMarkAsPaid = (invoiceId: string) => {
+    const itemToMove = allInvoicesState.find(inv => inv.invoice === invoiceId);
+    if (itemToMove) {
+        setAllInvoicesState(allInvoicesState.filter(inv => inv.invoice !== invoiceId));
+        setReceiptsState([{ ...itemToMove, paymentStatus: 'Paid' }, ...receiptsState]);
+    }
+  };
   
   return (
     <Card>
@@ -612,7 +620,7 @@ export default function InvoicesPage() {
                 <TabsTrigger value="receipts">Receipts</TabsTrigger>
             </TabsList>
             <TabsContent value="invoices" className="mt-4">
-                <InvoiceTable data={allInvoicesState} />
+                <InvoiceTable data={allInvoicesState} onMarkAsPaid={handleMarkAsPaid} />
                  <CardFooter className="pt-6">
                     <div className="text-xs text-muted-foreground">
                     Showing <strong>1-{allInvoicesState.length}</strong> of <strong>{allInvoicesState.length}</strong> invoices
@@ -620,7 +628,7 @@ export default function InvoicesPage() {
                 </CardFooter>
             </TabsContent>
              <TabsContent value="receipts" className="mt-4">
-                <InvoiceTable data={receiptsState} />
+                <InvoiceTable data={receiptsState} onMarkAsPaid={() => {}} />
                  <CardFooter className="pt-6">
                     <div className="text-xs text-muted-foreground">
                     Showing <strong>1-{receiptsState.length}</strong> of <strong>{receiptsState.length}</strong> receipts
