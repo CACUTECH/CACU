@@ -8,7 +8,11 @@ import {
   X,
   Plus,
   Calendar as CalendarIcon,
+  Download,
+  Printer,
 } from "lucide-react"
+import type jsPDF from "jspdf"
+import "jspdf-autotable"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -50,7 +54,22 @@ import { inventoryItems } from "@/lib/data"
 import type { InventoryItem } from "@/lib/data"
 
 
-const invoices = [
+type Invoice = {
+    invoice: string;
+    paymentStatus: "Paid" | "Pending" | "Unpaid";
+    totalAmount: string;
+    paymentMethod: string;
+    customerName: string;
+    date: string;
+    items?: LineItem[];
+    notes?: string;
+    dueDate?: string;
+    subtotal: number;
+    tax: number;
+    total: number;
+}
+
+const invoicesData: Omit<Invoice, 'subtotal' | 'tax' | 'total'>[] = [
   {
     invoice: "INV001",
     paymentStatus: "Paid",
@@ -115,8 +134,25 @@ const customers = [
     { id: "cust-003", name: "Charlie Brown" },
 ]
 
-const allInvoices = invoices.filter(invoice => invoice.paymentStatus !== "Paid");
-const receipts = invoices.filter(invoice => invoice.paymentStatus === "Paid");
+const processInvoices = (data: Omit<Invoice, 'subtotal' | 'tax' | 'total'>[]): Invoice[] => {
+    return data.map(i => {
+        const total = parseFloat(i.totalAmount.replace('₦', ''));
+        const tax = total * 0.075 / 1.075;
+        const subtotal = total - tax;
+        return {
+            ...i,
+            total,
+            subtotal,
+            tax,
+        }
+    })
+}
+
+const initialInvoices = processInvoices(invoicesData);
+
+
+const allInvoices = initialInvoices.filter(invoice => invoice.paymentStatus !== "Paid");
+const receipts = initialInvoices.filter(invoice => invoice.paymentStatus === "Paid");
 
 type LineItem = {
     id: string;
@@ -126,13 +162,174 @@ type LineItem = {
     total: number;
 }
 
-function AddReceiptDialog({ onSave }: { onSave: (newReceipt: any) => void }) {
+const downloadPdf = async (invoice: Invoice) => {
+    const { default: jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    const type = invoice.paymentStatus === 'Paid' ? 'Receipt' : 'Invoice';
+
+    // Header
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${type} #${invoice.invoice}`, 14, 22);
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Date: ${format(new Date(invoice.date), "PPP")}`, 14, 32);
+    if(invoice.dueDate) {
+         doc.text(`Due Date: ${format(new Date(invoice.dueDate), "PPP")}`, 14, 38);
+    }
+   
+    doc.text(`Customer: ${invoice.customerName}`, 14, 48);
+
+    // Items table
+    if (invoice.items && invoice.items.length > 0) {
+        (doc as any).autoTable({
+            startY: 60,
+            head: [['Item', 'Quantity', 'Price', 'Total']],
+            body: invoice.items.map(item => [item.item, item.quantity, `₦${item.price.toFixed(2)}`, `₦${item.total.toFixed(2)}`]),
+            theme: 'striped',
+            headStyles: { fillColor: [50, 153, 50] } // Dark green
+        });
+    }
+
+    // Totals
+    const finalY = (doc as any).lastAutoTable.finalY || 80;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Subtotal:', 140, finalY + 10);
+    doc.text(`₦${invoice.subtotal.toFixed(2)}`, 200, finalY + 10, { align: 'right' });
+    doc.text('VAT (7.5%):', 140, finalY + 17);
+    doc.text(`₦${invoice.tax.toFixed(2)}`, 200, finalY + 17, { align: 'right' });
+    doc.setFontSize(14);
+    doc.text('Total:', 140, finalY + 25);
+    doc.text(`₦${invoice.total.toFixed(2)}`, 200, finalY + 25, { align: 'right' });
+
+    // Notes
+    if (invoice.notes) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Notes:', 14, finalY + 40);
+        doc.text(invoice.notes, 14, finalY + 45, { maxWidth: 180 });
+    }
+
+    // Footer
+    doc.setFontSize(10);
+    doc.text('Thank you for your business!', 105, 285, { align: 'center' });
+
+    doc.save(`${type}_${invoice.invoice}.pdf`);
+};
+
+function InvoiceDetailsDialog({ invoice, onOpenChange }: { invoice: Invoice | null; onOpenChange: (open: boolean) => void; }) {
+    if (!invoice) return null;
+
+    const type = invoice.paymentStatus === 'Paid' ? 'Receipt' : 'Invoice';
+
+    return (
+        <Dialog open={!!invoice} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle>{type} #{invoice.invoice}</DialogTitle>
+                    <DialogDescription>
+                        Details for {type.toLowerCase()} to {invoice.customerName} on {format(new Date(invoice.date), "PPP")}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-6 py-4" id={`details-${invoice.invoice}`}>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <p className="font-semibold">Customer</p>
+                            <p>{invoice.customerName}</p>
+                        </div>
+                         <div>
+                            <p className="font-semibold">{type} Date</p>
+                            <p>{format(new Date(invoice.date), "PPP")}</p>
+                        </div>
+                        {invoice.dueDate && (
+                             <div>
+                                <p className="font-semibold">Due Date</p>
+                                <p>{format(new Date(invoice.dueDate), "PPP")}</p>
+                            </div>
+                        )}
+                        <div>
+                            <p className="font-semibold">Status</p>
+                            <Badge variant={
+                                invoice.paymentStatus === "Paid" ? "default" :
+                                invoice.paymentStatus === "Pending" ? "secondary" :
+                                "destructive"
+                            }>
+                                {invoice.paymentStatus}
+                            </Badge>
+                        </div>
+                    </div>
+                    
+                    {invoice.items && invoice.items.length > 0 && (
+                        <div className="space-y-2">
+                            <h4 className="font-semibold">Items</h4>
+                            <div className="rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Item</TableHead>
+                                            <TableHead className="w-[100px]">Quantity</TableHead>
+                                            <TableHead className="w-[120px]">Price</TableHead>
+                                            <TableHead className="w-[120px] text-right">Total</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {invoice.items.map(line => (
+                                            <TableRow key={line.id}>
+                                                <TableCell>{line.item}</TableCell>
+                                                <TableCell>{line.quantity}</TableCell>
+                                                <TableCell>₦{line.price.toLocaleString()}</TableCell>
+                                                <TableCell className="text-right">₦{line.total.toLocaleString()}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                        <div className="md:col-start-3 space-y-2">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Subtotal</span>
+                                <span>₦{invoice.subtotal.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">VAT (7.5%)</span>
+                                <span>₦{invoice.tax.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-lg">
+                                <span>Total</span>
+                                <span>₦{invoice.total.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {invoice.notes && (
+                        <div className="space-y-2">
+                            <h4 className="font-semibold">Notes</h4>
+                            <p className="text-sm text-muted-foreground">{invoice.notes}</p>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print</Button>
+                    <Button onClick={() => downloadPdf(invoice)}><Download className="mr-2 h-4 w-4" />Download PDF</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+function AddReceiptDialog({ onSave }: { onSave: (newReceipt: Invoice) => void }) {
     const [customer, setCustomer] = React.useState('');
     const [receiptDate, setReceiptDate] = React.useState<Date | undefined>(new Date());
     const [lineItems, setLineItems] = React.useState<LineItem[]>([
         { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }
     ]);
      const [paymentMethod, setPaymentMethod] = React.useState('');
+     const [notes, setNotes] = React.useState('');
 
     const handleItemChange = (id: string, selectedItemId: string) => {
         const selectedItem = inventoryItems.find(i => i.id === selectedItemId);
@@ -168,14 +365,18 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: any) => void }) {
     const total = subtotal + tax;
 
     const handleSave = () => {
-        const newReceipt = {
+        const newReceipt: Invoice = {
             invoice: `RCPT${(Math.random() * 1000).toFixed(0).padStart(3, '0')}`,
             paymentStatus: "Paid",
             totalAmount: `₦${total.toLocaleString()}`,
             paymentMethod: paymentMethod || "Cash",
             customerName: customers.find(c => c.id === customer)?.name || 'Unknown',
             date: format(receiptDate || new Date(), "yyyy-MM-dd"),
-            items: lineItems
+            items: lineItems,
+            notes,
+            subtotal,
+            tax,
+            total,
         };
         onSave(newReceipt);
     }
@@ -308,7 +509,7 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: any) => void }) {
 
                     <div className="space-y-2">
                         <Label>Notes</Label>
-                        <Textarea placeholder="Add any notes for the customer..." />
+                        <Textarea placeholder="Add any notes for the customer..." value={notes} onChange={(e) => setNotes(e.target.value)} />
                     </div>
                 </div>
                 <DialogFooter>
@@ -320,13 +521,14 @@ function AddReceiptDialog({ onSave }: { onSave: (newReceipt: any) => void }) {
 }
 
 
-function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: any) => void }) {
+function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: Invoice) => void }) {
     const [customer, setCustomer] = React.useState('');
     const [invoiceDate, setInvoiceDate] = React.useState<Date | undefined>(new Date());
     const [dueDate, setDueDate] = React.useState<Date | undefined>();
     const [lineItems, setLineItems] = React.useState<LineItem[]>([
         { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }
     ]);
+    const [notes, setNotes] = React.useState('');
 
     const handleItemChange = (id: string, selectedItemId: string) => {
         const selectedItem = inventoryItems.find(i => i.id === selectedItemId);
@@ -362,14 +564,19 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: any) => void }) {
     const total = subtotal + tax;
 
     const handleSave = () => {
-        const newInvoice = {
+        const newInvoice: Invoice = {
             invoice: `INV${(Math.random() * 1000).toFixed(0).padStart(3, '0')}`,
             paymentStatus: "Pending",
             totalAmount: `₦${total.toLocaleString()}`,
             paymentMethod: "N/A",
             customerName: customers.find(c => c.id === customer)?.name || 'Unknown',
             date: format(invoiceDate || new Date(), "yyyy-MM-dd"),
-            items: lineItems
+            dueDate: dueDate ? format(dueDate, "yyyy-MM-dd") : undefined,
+            items: lineItems,
+            notes,
+            subtotal,
+            tax,
+            total,
         };
         onSave(newInvoice);
     }
@@ -502,7 +709,7 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: any) => void }) {
 
                     <div className="space-y-2">
                         <Label>Notes</Label>
-                        <Textarea placeholder="Add any notes for the customer..." />
+                        <Textarea placeholder="Add any notes for the customer..." value={notes} onChange={(e) => setNotes(e.target.value)} />
                     </div>
                 </div>
                 <DialogFooter>
@@ -514,7 +721,7 @@ function AddInvoiceDialog({ onSave }: { onSave: (newInvoice: any) => void }) {
 }
 
 
-function InvoiceTable({ data, onMarkAsPaid }: { data: typeof invoices, onMarkAsPaid: (invoiceId: string) => void }) {
+function InvoiceTable({ data, onMarkAsPaid, onViewDetails }: { data: Invoice[], onMarkAsPaid: (invoiceId: string) => void, onViewDetails: (invoice: Invoice) => void }) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -546,7 +753,7 @@ function InvoiceTable({ data, onMarkAsPaid }: { data: typeof invoices, onMarkAsP
                         </Badge>
                     </TableCell>
                     <TableCell>{invoice.date}</TableCell>
-                    <TableCell className="text-right">{invoice.totalAmount}</TableCell>
+                    <TableCell className="text-right">₦{invoice.total.toLocaleString()}</TableCell>
                     <TableCell>
                         <div className="flex justify-end">
                             <DropdownMenu>
@@ -558,9 +765,9 @@ function InvoiceTable({ data, onMarkAsPaid }: { data: typeof invoices, onMarkAsP
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem>View Details</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onViewDetails(invoice)}>View Details</DropdownMenuItem>
                                 {invoice.paymentStatus !== 'Paid' && <DropdownMenuItem onClick={() => onMarkAsPaid(invoice.invoice)}>Mark as Paid</DropdownMenuItem>}
-                                <DropdownMenuItem>Download PDF</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => downloadPdf(invoice)}>Download PDF</DropdownMenuItem>
                             </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -577,8 +784,9 @@ export default function InvoicesPage() {
   const [activeTab, setActiveTab] = React.useState("invoices");
   const [allInvoicesState, setAllInvoicesState] = React.useState(allInvoices);
   const [receiptsState, setReceiptsState] = React.useState(receipts);
+  const [selectedInvoice, setSelectedInvoice] = React.useState<Invoice | null>(null);
 
-  const handleSave = (newItem: any) => {
+  const handleSave = (newItem: Invoice) => {
     if (newItem.paymentStatus === 'Paid') {
         setReceiptsState([newItem, ...receiptsState]);
     } else {
@@ -590,11 +798,18 @@ export default function InvoicesPage() {
     const itemToMove = allInvoicesState.find(inv => inv.invoice === invoiceId);
     if (itemToMove) {
         setAllInvoicesState(allInvoicesState.filter(inv => inv.invoice !== invoiceId));
-        setReceiptsState([{ ...itemToMove, paymentStatus: 'Paid' }, ...receiptsState]);
+        setReceiptsState([{ ...itemToMove, paymentStatus: 'Paid', paymentMethod: itemToMove.paymentMethod === 'N/A' ? 'Cash' : itemToMove.paymentMethod }, ...receiptsState]);
     }
   };
   
+  const handleViewDetails = (invoice: Invoice) => {
+      setSelectedInvoice(invoice);
+  }
+
+  const allData = [...allInvoicesState, ...receiptsState];
+
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -620,7 +835,7 @@ export default function InvoicesPage() {
                 <TabsTrigger value="receipts">Receipts</TabsTrigger>
             </TabsList>
             <TabsContent value="invoices" className="mt-4">
-                <InvoiceTable data={allInvoicesState} onMarkAsPaid={handleMarkAsPaid} />
+                <InvoiceTable data={allInvoicesState} onMarkAsPaid={handleMarkAsPaid} onViewDetails={handleViewDetails} />
                  <CardFooter className="pt-6">
                     <div className="text-xs text-muted-foreground">
                     Showing <strong>1-{allInvoicesState.length}</strong> of <strong>{allInvoicesState.length}</strong> invoices
@@ -628,7 +843,7 @@ export default function InvoicesPage() {
                 </CardFooter>
             </TabsContent>
              <TabsContent value="receipts" className="mt-4">
-                <InvoiceTable data={receiptsState} onMarkAsPaid={() => {}} />
+                <InvoiceTable data={receiptsState} onMarkAsPaid={() => {}} onViewDetails={handleViewDetails} />
                  <CardFooter className="pt-6">
                     <div className="text-xs text-muted-foreground">
                     Showing <strong>1-{receiptsState.length}</strong> of <strong>{receiptsState.length}</strong> receipts
@@ -638,5 +853,7 @@ export default function InvoicesPage() {
         </Tabs>
       </CardContent>
     </Card>
+    <InvoiceDetailsDialog invoice={selectedInvoice} onOpenChange={(open) => !open && setSelectedInvoice(null)} />
+    </>
   )
 }
