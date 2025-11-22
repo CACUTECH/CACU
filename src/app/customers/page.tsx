@@ -30,7 +30,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 
 type Customer = {
     id: string;
@@ -161,9 +161,14 @@ function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Customer) => void
 
 export default function CustomersPage() {
     const [customers, setCustomers] = React.useState(initialCustomers);
+    const { toast } = useToast();
     
     const handleAddCustomer = (newCustomer: Customer) => {
         setCustomers(prev => [newCustomer, ...prev]);
+    }
+
+    const createToast = (title: string, description: string) => {
+        toast({ title, description });
     }
 
     return (
@@ -222,9 +227,9 @@ export default function CustomersPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem>View Profile</DropdownMenuItem>
-                                                <DropdownMenuItem>Send Message</DropdownMenuItem>
-                                                <DropdownMenuItem>View Purchase History</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => createToast('Viewing Profile', `Displaying profile for ${customer.name}.`)}>View Profile</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => createToast('Sending Message', `Opening message composer for ${customer.name}.`)}>Send Message</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => createToast('Viewing History', `Fetching purchase history for ${customer.name}.`)}>View Purchase History</DropdownMenuItem>
                                             </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>
