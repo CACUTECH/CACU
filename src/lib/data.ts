@@ -71,3 +71,21 @@ export const expensesByCategoryData = [
     { category: 'Marketing', value: 300 },
     { category: 'Utilities', value: 20 },
 ];
+
+export type Employee = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: 'Active' | 'On Probation' | 'Terminated';
+  checkInTime?: string;
+  checkOutTime?: string;
+};
+
+export const employees: Employee[] = [
+  { id: 'emp-001', name: 'Grace Adebayo', email: 'grace@example.com', role: 'Lead Developer', status: 'Active', checkInTime: '09:05 AM', checkOutTime: '05:30 PM' },
+  { id: 'emp-002', name: 'Samuel Okoro', email: 'samuel@example.com', role: 'Marketing Manager', status: 'Active', checkInTime: '08:58 AM', checkOutTime: '06:00 PM' },
+  { id: 'emp-003', name: 'Chioma Nwosu', email: 'chioma@example.com', role: 'UX Designer', status: 'On Probation', checkInTime: '09:15 AM' },
+  { id: 'emp-004', name: 'David Bello', email: 'david@example.com', role: 'Accountant', status: 'Active', checkInTime: '09:00 AM', checkOutTime: '05:00 PM' },
+  { id: 'emp-005', name: 'Fatima Aliyu', email: 'fatima@example.com', role: 'HR Specialist', status: 'Terminated' },
+];

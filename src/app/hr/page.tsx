@@ -1,21 +1,31 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Database, UserCheck, CalendarDays, ClipboardCheck, Calculator, FileDown } from 'lucide-react';
+import { Database, UserCheck, CalendarDays, ClipboardCheck, Calculator, FileDown, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
-function FeatureCard({ icon: Icon, title, description }: { icon: React.ElementType, title: string, description: string }) {
+function FeatureCard({ icon: Icon, title, description, href }: { icon: React.ElementType, title: string, description: string, href: string }) {
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center gap-4">
-                <div className="bg-primary/10 p-3 rounded-full">
-                    <Icon className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                    <CardTitle>{title}</CardTitle>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <p className="text-muted-foreground">{description}</p>
-            </CardContent>
-        </Card>
+        <Link href={href} className="block hover:shadow-lg transition-shadow rounded-xl">
+            <Card className="h-full flex flex-col">
+                <CardHeader>
+                    <div className="flex items-center gap-4">
+                        <div className="bg-primary/10 p-3 rounded-full">
+                            <Icon className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                            <CardTitle>{title}</CardTitle>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                    <p className="text-muted-foreground">{description}</p>
+                </CardContent>
+                <CardContent>
+                    <div className="text-sm font-medium text-primary flex items-center">
+                        Go to page <ArrowRight className="ml-2 h-4 w-4" />
+                    </div>
+                </CardContent>
+            </Card>
+        </Link>
     );
 }
 
@@ -30,31 +40,19 @@ export default function HRPage() {
                     icon={Database}
                     title="Employee Database"
                     description="Maintain detailed employee profiles, including roles, contact information, and documents."
-                />
-                <FeatureCard
-                    icon={UserCheck}
-                    title="Employment Status Tracker"
-                    description="Track employee statuses such as active, on probation, or terminated."
+                    href="/hr/employees"
                 />
                 <FeatureCard
                     icon={CalendarDays}
-                    title="Daily Check-in/Check-out"
+                    title="Attendance"
                     description="Log daily attendance for your team members to monitor presence and automate timesheets."
-                />
-                <FeatureCard
-                    icon={ClipboardCheck}
-                    title="Timesheet Approval System"
-                    description="Manage and approve employee timesheets for accurate payroll processing."
-                />
-                <FeatureCard
-                    icon={Calculator}
-                    title="Salary Calculator"
-                    description="Calculate salaries with automatic tax and pension deductions based on local regulations."
+                    href="/hr/attendance"
                 />
                 <FeatureCard
                     icon={FileDown}
-                    title="Payroll & Payslips"
+                    title="Payroll"
                     description="Generate payroll and allow employees to download their payslips directly from their profile."
+                    href="/hr/payroll"
                 />
             </div>
         </div>

@@ -46,7 +46,16 @@ const navItems = [
     ]
   },
   { href: '/credit', label: 'Credit', icon: Banknote },
-  { href: '/hr', label: 'HR', icon: Users2 },
+  {
+    href: '/hr',
+    label: 'HR',
+    icon: Users2,
+    children: [
+      { href: '/hr/employees', label: 'Employees' },
+      { href: '/hr/attendance', label: 'Attendance' },
+      { href: '/hr/payroll', label: 'Payroll' },
+    ],
+  },
   { href: '/support', label: 'Support', icon: LifeBuoy },
   { href: '/apps', label: 'Integrations', icon: AppWindow },
 ];
