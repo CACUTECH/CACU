@@ -150,21 +150,23 @@ export default function TransactionsPage() {
         reader.onload = (e) => {
             try {
                 const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'binary' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet);
-                
-                // Assuming the excel file has columns that match the Transaction type
-                console.log(json);
+                if (data instanceof ArrayBuffer) {
+                    const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    // Assuming the excel file has columns that match the Transaction type
+                    console.log(json);
 
-                // Here you would typically validate and transform the data
-                // and then update the state
-                // For now, we'll just show a success toast
-                toast({
-                    title: "File Uploaded",
-                    description: `${file.name} has been processed. Check the console for the data.`,
-                });
+                    // Here you would typically validate and transform the data
+                    // and then update the state
+                    // For now, we'll just show a success toast
+                    toast({
+                        title: "File Uploaded",
+                        description: `${file.name} has been processed. Check the console for the data.`,
+                    });
+                }
             } catch (error) {
                  toast({
                     variant: "destructive",
@@ -174,7 +176,7 @@ export default function TransactionsPage() {
                 console.error("Error parsing file:", error);
             }
         };
-        reader.readAsBinaryString(file);
+        reader.readAsArrayBuffer(file);
     };
 
     const handleImportClick = () => {
