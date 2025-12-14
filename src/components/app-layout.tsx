@@ -20,7 +20,7 @@ import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Ba
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
 import Link from 'next/link';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/components/theme-provider';
 import { Logo } from '@/components/logo';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { cn } from '@/lib/utils';

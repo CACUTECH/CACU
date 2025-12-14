@@ -9,7 +9,7 @@ import { Button } from './ui/button';
 import { PlusCircle, Search, Bell, Sun, Moon } from 'lucide-react';
 import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 
@@ -31,8 +31,13 @@ const breadcrumbNameMap: { [key: string]: string } = {
 
 function ThemeToggle() {
     const { setTheme, theme } = useTheme()
+    
+    const toggleTheme = () => {
+      setTheme(theme === 'light' ? 'dark' : 'light');
+    }
+
     return (
-        <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
+        <Button variant="ghost" size="icon" onClick={toggleTheme}>
             <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
             <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             <span className="sr-only">Toggle theme</span>
@@ -91,11 +96,12 @@ export function Header() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search..." className="pl-8 w-full" />
         </div>
-         <ThemeToggle />
+         
          <Button variant="ghost" size="icon">
             <Bell className="h-5 w-5" />
             <span className="sr-only">Notifications</span>
         </Button>
+        <ThemeToggle />
       </div>
     </header>
   );
