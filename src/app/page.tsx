@@ -1,4 +1,4 @@
-import { AreaChart, BarChart3, DollarSign, Package, Users, Activity } from 'lucide-react';
+import { AreaChart, BarChart3, DollarSign, Package, Users, Activity, PieChart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,17 @@ import { DataChart } from '@/components/data-chart';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { ChartConfig } from '@/components/ui/chart';
+
+const chartConfig = {
+  "Office Supplies": { color: "hsl(var(--chart-1))" },
+  "Software": { color: "hsl(var(--chart-2))" },
+  "Meals & Ent.": { color: "hsl(var(--chart-3))" },
+  "Contractors": { color: "hsl(var(--chart-4))" },
+  "Marketing": { color: "hsl(var(--chart-5))" },
+  "Utilities": { color: "hsl(var(--chart-1))" },
+} satisfies ChartConfig;
+
 
 export default function DashboardPage() {
   const totalRevenue = transactions
@@ -81,14 +92,19 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-headline">
-              <BarChart3 className="h-5 w-5" />
+              <PieChart className="h-5 w-5" />
               Expenses by Category
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <DataChart type="bar" data={expensesByCategoryData} config={{
-              value: { label: "Amount", color: "hsl(var(--chart-1))" },
-            }} dataKeys={['value']} index="category" layout="vertical" />
+            <DataChart 
+              type="pie" 
+              data={expensesByCategoryData} 
+              config={chartConfig} 
+              dataKeys={['value']} 
+              index="category" 
+              variant="donut"
+            />
           </CardContent>
         </Card>
       </div>

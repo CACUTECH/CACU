@@ -1,20 +1,60 @@
 "use client"
 
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip } from "recharts"
+import * as React from "react"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Pie, PieChart, Cell } from "recharts"
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 
 interface DataChartProps {
-    type: 'bar' | 'area';
+    type: 'bar' | 'area' | 'pie';
     data: any[];
     config: ChartConfig;
     dataKeys: string[];
     index: string;
     layout?: 'horizontal' | 'vertical';
+    variant?: 'donut';
 }
 
-export function DataChart({ type, data, config, dataKeys, index, layout = 'horizontal' }: DataChartProps) {
-    const ChartComponent = type === 'bar' ? BarChart : AreaChart;
-    const ChartElement = type === 'bar' ? Bar : Area;
+export function DataChart({ type, data, config, dataKeys, index, layout = 'horizontal', variant }: DataChartProps) {
+    const ChartComponent = type === 'bar' ? BarChart : type === 'area' ? AreaChart : PieChart;
+    const ChartElement = type === 'bar' ? Bar : type === 'area' ? Area : Pie;
+
+    if (type === 'pie' && variant === 'donut') {
+         const chartConfig = Object.keys(config).reduce((acc, key) => {
+            const item = data.find(d => d[index] === key);
+            if (item) {
+                acc[key] = {
+                    label: item[index],
+                    color: config[key].color,
+                };
+            }
+            return acc;
+        }, {} as ChartConfig);
+
+        return (
+            <ChartContainer
+              config={chartConfig}
+              className="mx-auto aspect-square h-full"
+            >
+              <PieChart>
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent hideLabel />}
+                />
+                <Pie
+                  data={data}
+                  dataKey={dataKeys[0]}
+                  nameKey={index}
+                  innerRadius="50%"
+                  strokeWidth={5}
+                >
+                   {data.map((entry, i) => (
+                    <Cell key={`cell-${i}`} fill={chartConfig[entry[index]]?.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ChartContainer>
+        )
+    }
 
     return (
         <ChartContainer config={config} className="min-h-[200px] w-full">
