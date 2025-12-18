@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Pie, PieChart, Cell } from "recharts"
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import type { CurveType } from "recharts/types/shape/Curve"
 
 interface DataChartProps {
     type: 'bar' | 'area' | 'pie';
@@ -12,9 +13,10 @@ interface DataChartProps {
     index: string;
     layout?: 'horizontal' | 'vertical';
     variant?: 'donut';
+    curveType?: CurveType;
 }
 
-export function DataChart({ type, data, config, dataKeys, index, layout = 'horizontal', variant }: DataChartProps) {
+export function DataChart({ type, data, config, dataKeys, index, layout = 'horizontal', variant, curveType }: DataChartProps) {
     const ChartComponent = type === 'bar' ? BarChart : type === 'area' ? AreaChart : PieChart;
     const ChartElement = type === 'bar' ? Bar : type === 'area' ? Area : Pie;
 
@@ -81,6 +83,7 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
                         stroke={`var(--color-${key})`} 
                         radius={type === 'bar' && layout === 'horizontal' ? 4 : 0}
                         radius={[0, 4, 4, 0]}
+                        {...(type === 'area' && { type: curveType })}
                      />
                 ))}
             </ChartComponent>
