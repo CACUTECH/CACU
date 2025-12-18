@@ -84,8 +84,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <DataChart type="area" data={incomeVsExpenseData} curveType="monotone" config={{
-              income: { label: "Income", color: "hsl(140 80% 60%)" },
-              expense: { label: "Expense", color: "hsl(0 80% 60%)" },
+              income: { label: "Income", color: "hsl(120 70% 50%)" },
+              expense: { label: "Expense", color: "hsl(0 70% 50%)" },
             }} dataKeys={['income', 'expense']} index="month" />
           </CardContent>
         </Card>
