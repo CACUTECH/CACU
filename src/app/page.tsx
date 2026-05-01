@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from 'react';
-import { AreaChart, BarChart3, DollarSign, Package, Users, Activity, PieChart, Calendar as CalendarIcon, TrendingUp } from 'lucide-react';
+import { DollarSign, Users, Calendar as CalendarIcon, TrendingUp, PieChart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +37,7 @@ const chartConfig = {
 export default function DashboardPage() {
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: new Date(2024, 6, 1),
-    to: new Date(2024, 6, 31),
+    to: new Date(2024, 7, 1),
   });
   
   const [granularity, setGranularity] = React.useState("Month");
@@ -77,7 +77,7 @@ export default function DashboardPage() {
                 id="date"
                 variant={"outline"}
                 className={cn(
-                  "w-full sm:w-[300px] justify-start text-left font-normal",
+                  "w-full sm:w-[300px] justify-start text-left font-normal shadow-sm",
                   !date && "text-muted-foreground"
                 )}
               >
@@ -111,7 +111,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="shadow-lg shadow-primary/5 border-primary/10 transition-all hover:shadow-primary/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -121,7 +121,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground text-green-500 font-medium">+20.1% from last month</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-lg shadow-primary/5 border-primary/10 transition-all hover:shadow-primary/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -131,7 +131,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground text-red-500 font-medium">+18.3% from last month</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-lg shadow-primary/5 border-primary/10 transition-all hover:shadow-primary/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -141,7 +141,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground text-green-500 font-medium">+19% from last month</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-lg shadow-primary/5 border-primary/10 transition-all hover:shadow-primary/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
@@ -154,7 +154,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3 shadow-xl shadow-primary/5 border-primary/10">
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 font-headline text-xl">
@@ -164,7 +164,7 @@ export default function DashboardPage() {
               <CardDescription>Income vs Expenses over time</CardDescription>
             </div>
             <Select value={granularity} onValueChange={setGranularity}>
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-[120px] shadow-sm">
                 <SelectValue placeholder="Period" />
               </SelectTrigger>
               <SelectContent>
@@ -188,7 +188,7 @@ export default function DashboardPage() {
             />
           </CardContent>
         </Card>
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 shadow-xl shadow-primary/5 border-primary/10">
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 font-headline text-xl">
@@ -198,7 +198,7 @@ export default function DashboardPage() {
               <CardDescription>Major cost drivers for this period</CardDescription>
             </div>
             <Select value={granularity} onValueChange={setGranularity}>
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-[120px] shadow-sm">
                 <SelectValue placeholder="Period" />
               </SelectTrigger>
               <SelectContent>
@@ -221,13 +221,13 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="shadow-lg shadow-primary/5 border-primary/10">
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <CardTitle className="font-headline">Recent Transactions</CardTitle>
                 <CardDescription>A log of the most recent financial activities.</CardDescription>
             </div>
-            <Button asChild size="sm" className="w-full sm:w-auto">
+            <Button asChild size="sm" className="w-full sm:w-auto shadow-sm">
                 <Link href="/transactions">View All</Link>
             </Button>
         </CardHeader>
@@ -243,7 +243,7 @@ export default function DashboardPage() {
             </TableHeader>
             <TableBody>
               {filteredTransactions.slice(0, 5).map((transaction) => (
-                <TableRow key={transaction.id}>
+                <TableRow key={transaction.id} className="hover:bg-primary/5 transition-colors">
                   <TableCell className="font-medium">
                     <div>{transaction.description}</div>
                     <div className="text-xs text-muted-foreground sm:hidden">{transaction.category} - {transaction.date}</div>
@@ -251,7 +251,7 @@ export default function DashboardPage() {
                   <TableCell className="hidden sm:table-cell">{transaction.category}</TableCell>
                   <TableCell className="hidden md:table-cell">{transaction.date}</TableCell>
                   <TableCell className="text-right">
-                    <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={cn("font-medium whitespace-nowrap", transaction.type === 'Income' ? 'bg-green-500/20 text-green-700 hover:bg-green-500/30' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30')}>
+                    <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={cn("font-medium whitespace-nowrap shadow-sm", transaction.type === 'Income' ? 'bg-green-500/20 text-green-700 hover:bg-green-500/30 border-green-500/20' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30 border-red-500/20')}>
                       {transaction.type === 'Income' ? '+' : '-'}₦{transaction.amount.toLocaleString()}
                     </Badge>
                   </TableCell>
