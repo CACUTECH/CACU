@@ -177,12 +177,24 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-headline text-xl">
-              <PieChart className="h-5 w-5 text-primary" />
-              Expenses by Category
-            </CardTitle>
-            <CardDescription>Major cost drivers for this period</CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 font-headline text-xl">
+                <PieChart className="h-5 w-5 text-primary" />
+                Expenses by Category
+              </CardTitle>
+              <CardDescription>Major cost drivers for this period</CardDescription>
+            </div>
+            <Select value={granularity} onValueChange={setGranularity}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Day">Daily</SelectItem>
+                <SelectItem value="Week">Weekly</SelectItem>
+                <SelectItem value="Month">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
             <DataChart 
