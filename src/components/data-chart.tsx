@@ -2,8 +2,8 @@
 "use client"
 
 import * as React from "react"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Pie, PieChart, Cell, ResponsiveContainer } from "recharts"
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Pie, PieChart, Cell, ResponsiveContainer, Label, Legend } from "recharts"
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
 import type { CurveType } from "recharts/types/shape/Curve"
 
 interface DataChartProps {
@@ -30,6 +30,10 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
             return acc;
         }, {} as ChartConfig);
 
+        const totalValue = React.useMemo(() => {
+            return data.reduce((acc, curr) => acc + curr[dataKeys[0]], 0)
+        }, [data, dataKeys])
+
         return (
             <ChartContainer
               config={chartConfig}
@@ -44,13 +48,43 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
                   data={data}
                   dataKey={dataKeys[0]}
                   nameKey={index}
-                  innerRadius="50%"
+                  innerRadius="65%"
                   strokeWidth={5}
                 >
                    {data.map((entry, i) => (
                     <Cell key={`cell-${i}`} fill={chartConfig[entry[index]]?.color} />
                   ))}
+                  <Label
+                    content={({ viewBox }) => {
+                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                        return (
+                          <text
+                            x={viewBox.cx}
+                            y={viewBox.cy}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                          >
+                            <tspan
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                              className="fill-foreground text-2xl font-bold font-headline"
+                            >
+                              ₦{totalValue.toLocaleString()}
+                            </tspan>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) + 24}
+                              className="fill-muted-foreground text-xs"
+                            >
+                              Total
+                            </tspan>
+                          </text>
+                        )
+                      }
+                    }}
+                  />
                 </Pie>
+                <ChartLegend content={<ChartLegendContent nameKey={index} />} className="-translate-y-2 flex-wrap" />
               </PieChart>
             </ChartContainer>
         )
@@ -87,6 +121,7 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
                     tickFormatter={(value) => `₦${Number(value).toLocaleString()}`} 
                 />
                 <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                <ChartLegend content={<ChartLegendContent />} />
                 {dataKeys.map(key => (
                      type === 'area' ? (
                         <Area

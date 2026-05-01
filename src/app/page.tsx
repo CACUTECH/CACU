@@ -25,12 +25,12 @@ import {
 } from "@/components/ui/select"
 
 const chartConfig = {
-  "Office Supplies": { color: "hsl(var(--chart-1))" },
-  "Software": { color: "hsl(var(--chart-2))" },
-  "Meals & Ent.": { color: "hsl(var(--chart-3))" },
-  "Contractors": { color: "hsl(var(--chart-4))" },
-  "Marketing": { color: "hsl(var(--chart-5))" },
-  "Utilities": { color: "hsl(var(--chart-1))" },
+  "Office Supplies": { label: "Office Supplies", color: "hsl(var(--chart-1))" },
+  "Software": { label: "Software", color: "hsl(var(--chart-2))" },
+  "Meals & Ent.": { label: "Meals & Ent.", color: "hsl(var(--chart-3))" },
+  "Contractors": { label: "Contractors", color: "hsl(var(--chart-4))" },
+  "Marketing": { label: "Marketing", color: "hsl(var(--chart-5))" },
+  "Utilities": { label: "Utilities", color: "hsl(var(--chart-1))" },
 } satisfies ChartConfig;
 
 
@@ -141,8 +141,8 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="col-span-1">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 font-headline text-xl">
@@ -168,21 +168,21 @@ export default function DashboardPage() {
               data={incomeVsExpenseData} 
               curveType="monotone" 
               config={{
-                income: { label: "Income", color: "#22c55e" },
-                expense: { label: "Expense", color: "#ef4444" },
+                income: { label: "Total Income", color: "#22c55e" },
+                expense: { label: "Total Expense", color: "#ef4444" },
               }} 
               dataKeys={['income', 'expense']} 
               index="month" 
             />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-headline text-xl">
               <PieChart className="h-5 w-5 text-primary" />
               Expenses by Category
             </CardTitle>
-            <CardDescription>Major cost drivers</CardDescription>
+            <CardDescription>Major cost drivers for this period</CardDescription>
           </CardHeader>
           <CardContent>
             <DataChart 
