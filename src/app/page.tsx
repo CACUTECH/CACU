@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from 'react';
@@ -15,6 +16,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format, addDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const chartConfig = {
   "Office Supplies": { color: "hsl(var(--chart-1))" },
@@ -31,6 +39,8 @@ export default function DashboardPage() {
     from: new Date(2024, 6, 1),
     to: new Date(2024, 6, 31),
   });
+  
+  const [granularity, setGranularity] = React.useState("Month");
 
   const totalRevenue = transactions
     .filter((t) => t.type === 'Income')
@@ -133,16 +143,29 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-headline">
-              <AreaChart className="h-5 w-5" />
-              Income vs. Expense
-            </CardTitle>
+          <CardHeader className="flex flex-row items-start justify-between space-y-0">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 font-headline">
+                <AreaChart className="h-5 w-5" />
+                Income vs. Expense
+              </CardTitle>
+              <CardDescription>Performance trends</CardDescription>
+            </div>
+            <Select value={granularity} onValueChange={setGranularity}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Day">Daily</SelectItem>
+                <SelectItem value="Week">Weekly</SelectItem>
+                <SelectItem value="Month">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
             <DataChart type="area" data={incomeVsExpenseData} curveType="monotone" config={{
-              income: { label: "Income", color: "hsl(120 70% 50%)" },
-              expense: { label: "Expense", color: "hsl(0 70% 50%)" },
+              income: { label: "Income", color: "hsl(142 76% 36%)" },
+              expense: { label: "Expense", color: "hsl(0 84% 60%)" },
             }} dataKeys={['income', 'expense']} index="month" />
           </CardContent>
         </Card>
@@ -152,6 +175,7 @@ export default function DashboardPage() {
               <PieChart className="h-5 w-5" />
               Expenses by Category
             </CardTitle>
+            <CardDescription>Top spending categories</CardDescription>
           </CardHeader>
           <CardContent>
             <DataChart 

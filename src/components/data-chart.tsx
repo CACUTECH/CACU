@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -61,7 +62,7 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
     return (
         <ChartContainer config={config} className="min-h-[200px] w-full">
             <ChartComponent data={data} margin={{ left: 12, right: 12, top: 12, bottom: 12 }} accessibilityLayer>
-                <CartesianGrid vertical={layout === 'horizontal'} horizontal={layout === 'vertical'} strokeDasharray="3 3" />
+                <CartesianGrid vertical={layout === 'horizontal'} horizontal={layout === 'vertical'} strokeDasharray="3 3" vertical={false} />
                 {layout === 'horizontal' ? (
                     <>
                         <XAxis dataKey={index} tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
@@ -73,7 +74,7 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
                         <YAxis dataKey={index} type="category" tickLine={false} axisLine={false} tickMargin={8} width={80} fontSize={12} />
                     </>
                 )}
-                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator={type === 'area' ? 'dot' : 'line'} />} />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
                 <RechartsTooltip />
                 {dataKeys.map(key => (
                      <ChartElement 
@@ -83,7 +84,11 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
                         stroke={`var(--color-${key})`} 
                         radius={type === 'bar' && layout === 'horizontal' ? 4 : 0}
                         radius={[0, 4, 4, 0]}
-                        {...(type === 'area' && { type: curveType })}
+                        strokeWidth={type === 'area' ? 2 : 0}
+                        dot={type === 'area' ? { r: 4, fill: `var(--color-${key})`, strokeWidth: 2, stroke: 'white' } : false}
+                        activeDot={type === 'area' ? { r: 6, strokeWidth: 0 } : false}
+                        fillOpacity={type === 'area' ? 0.3 : 1}
+                        {...(type === 'area' && { type: curveType || 'monotone' })}
                      />
                 ))}
             </ChartComponent>
