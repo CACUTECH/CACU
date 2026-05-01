@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from 'react';
-import { DollarSign, Users, Calendar as CalendarIcon, TrendingUp, PieChart } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, TrendingUp, PieChart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,24 @@ const chartConfig = {
   "Utilities": { label: "Utilities", color: "hsl(var(--chart-1))" },
 } satisfies ChartConfig;
 
+const NairaIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M6 3v18" />
+    <path d="M6 3l12 18" />
+    <path d="M18 3v18" />
+    <path d="M4 10h16" />
+    <path d="M4 14h16" />
+  </svg>
+);
 
 export default function DashboardPage() {
   const [date, setDate] = React.useState<DateRange | undefined>({
@@ -114,7 +132,7 @@ export default function DashboardPage() {
         <Card className="shadow-lg shadow-green-500/10 border-green-500/20 transition-all hover:shadow-green-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-600" />
+            <NairaIcon className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-headline text-green-700 dark:text-green-400">₦{totalRevenue.toLocaleString()}</div>
@@ -124,7 +142,7 @@ export default function DashboardPage() {
         <Card className="shadow-lg shadow-red-500/10 border-red-500/20 transition-all hover:shadow-red-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-            <DollarSign className="h-4 w-4 text-red-600" />
+            <NairaIcon className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-headline text-red-700 dark:text-red-400">₦{totalExpenses.toLocaleString()}</div>
