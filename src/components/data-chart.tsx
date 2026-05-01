@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Pie, PieChart, Cell } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Pie, PieChart, Cell, ResponsiveContainer } from "recharts"
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import type { CurveType } from "recharts/types/shape/Curve"
 
@@ -17,10 +17,7 @@ interface DataChartProps {
     curveType?: CurveType;
 }
 
-export function DataChart({ type, data, config, dataKeys, index, layout = 'horizontal', variant, curveType }: DataChartProps) {
-    const ChartComponent = type === 'bar' ? BarChart : type === 'area' ? AreaChart : PieChart;
-    const ChartElement = type === 'bar' ? Bar : type === 'area' ? Area : Pie;
-
+export function DataChart({ type, data, config, dataKeys, index, layout = 'horizontal', variant, curveType = 'monotone' }: DataChartProps) {
     if (type === 'pie' && variant === 'donut') {
          const chartConfig = Object.keys(config).reduce((acc, key) => {
             const item = data.find(d => d[index] === key);
@@ -59,37 +56,57 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
         )
     }
 
+    const ChartComponent = type === 'bar' ? BarChart : AreaChart;
+
     return (
-        <ChartContainer config={config} className="min-h-[200px] w-full">
-            <ChartComponent data={data} margin={{ left: 12, right: 12, top: 12, bottom: 12 }} accessibilityLayer>
-                <CartesianGrid vertical={layout === 'horizontal'} horizontal={layout === 'vertical'} strokeDasharray="3 3" vertical={false} />
-                {layout === 'horizontal' ? (
-                    <>
-                        <XAxis dataKey={index} tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} tickFormatter={(value) => `₦${Number(value)/1000}k`} />
-                    </>
-                ) : (
-                    <>
-                        <XAxis type="number" hide />
-                        <YAxis dataKey={index} type="category" tickLine={false} axisLine={false} tickMargin={8} width={80} fontSize={12} />
-                    </>
-                )}
+        <ChartContainer config={config} className="min-h-[250px] w-full">
+            <ChartComponent data={data} margin={{ left: 0, right: 0, top: 10, bottom: 0 }} accessibilityLayer>
+                <defs>
+                    {dataKeys.map(key => (
+                        <linearGradient key={`gradient-${key}`} id={`fill-${key}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={`var(--color-${key})`} stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor={`var(--color-${key})`} stopOpacity={0}/>
+                        </linearGradient>
+                    ))}
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.1)" />
+                <XAxis 
+                    dataKey={index} 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tickMargin={12} 
+                    fontSize={12}
+                    className="fill-muted-foreground font-medium"
+                />
+                <YAxis 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tickMargin={8} 
+                    fontSize={12} 
+                    className="fill-muted-foreground font-medium"
+                    tickFormatter={(value) => `₦${Number(value).toLocaleString()}`} 
+                />
                 <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                <RechartsTooltip />
                 {dataKeys.map(key => (
-                     <ChartElement 
-                        key={key} 
-                        dataKey={key} 
-                        fill={`var(--color-${key})`} 
-                        stroke={`var(--color-${key})`} 
-                        radius={type === 'bar' && layout === 'horizontal' ? 4 : 0}
-                        radius={[0, 4, 4, 0]}
-                        strokeWidth={type === 'area' ? 2 : 0}
-                        dot={type === 'area' ? { r: 4, fill: `var(--color-${key})`, strokeWidth: 2, stroke: 'white' } : false}
-                        activeDot={type === 'area' ? { r: 6, strokeWidth: 0 } : false}
-                        fillOpacity={type === 'area' ? 0.3 : 1}
-                        {...(type === 'area' && { type: curveType || 'monotone' })}
-                     />
+                     type === 'area' ? (
+                        <Area
+                            key={key}
+                            type={curveType}
+                            dataKey={key}
+                            stroke={`var(--color-${key})`}
+                            fill={`url(#fill-${key})`}
+                            strokeWidth={3}
+                            dot={{ r: 4, fill: `var(--color-${key})`, strokeWidth: 2, stroke: 'white' }}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
+                        />
+                     ) : (
+                        <Bar 
+                            key={key} 
+                            dataKey={key} 
+                            fill={`var(--color-${key})`} 
+                            radius={[4, 4, 0, 0]}
+                        />
+                     )
                 ))}
             </ChartComponent>
         </ChartContainer>

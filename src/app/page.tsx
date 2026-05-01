@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from 'react';
-import { AreaChart, BarChart3, DollarSign, Package, Users, Activity, PieChart, Calendar as CalendarIcon } from 'lucide-react';
+import { AreaChart, BarChart3, DollarSign, Package, Users, Activity, PieChart, Calendar as CalendarIcon, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { ChartConfig } from '@/components/ui/chart';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import {
   Select,
@@ -49,7 +49,7 @@ export default function DashboardPage() {
     .filter((t) => t.type === 'Expense')
     .reduce((acc, t) => acc + t.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
-  const totalCustomers = 54; // Placeholder
+  const totalCustomers = 54;
 
   return (
     <div className="flex flex-col gap-6">
@@ -106,7 +106,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-headline">₦{totalRevenue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+            <p className="text-xs text-muted-foreground text-green-500 font-medium">+20.1% from last month</p>
           </CardContent>
         </Card>
         <Card>
@@ -116,7 +116,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-headline">₦{totalExpenses.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+18.3% from last month</p>
+            <p className="text-xs text-muted-foreground text-red-500 font-medium">+18.3% from last month</p>
           </CardContent>
         </Card>
         <Card>
@@ -126,7 +126,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-headline">₦{netProfit.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+19% from last month</p>
+            <p className="text-xs text-muted-foreground text-green-500 font-medium">+19% from last month</p>
           </CardContent>
         </Card>
         <Card>
@@ -136,20 +136,20 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-headline">+{totalCustomers}</div>
-            <p className="text-xs text-muted-foreground">+10 since last month</p>
+            <p className="text-xs text-muted-foreground text-green-500 font-medium">+10 since last month</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between space-y-0">
+        <Card className="col-span-1">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2 font-headline">
-                <AreaChart className="h-5 w-5" />
-                Income vs. Expense
+              <CardTitle className="flex items-center gap-2 font-headline text-xl">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Performance Trend
               </CardTitle>
-              <CardDescription>Performance trends</CardDescription>
+              <CardDescription>Income vs Expenses over time</CardDescription>
             </div>
             <Select value={granularity} onValueChange={setGranularity}>
               <SelectTrigger className="w-[120px]">
@@ -162,20 +162,27 @@ export default function DashboardPage() {
               </SelectContent>
             </Select>
           </CardHeader>
-          <CardContent>
-            <DataChart type="area" data={incomeVsExpenseData} curveType="monotone" config={{
-              income: { label: "Income", color: "hsl(142 76% 36%)" },
-              expense: { label: "Expense", color: "hsl(0 84% 60%)" },
-            }} dataKeys={['income', 'expense']} index="month" />
+          <CardContent className="pt-4">
+            <DataChart 
+              type="area" 
+              data={incomeVsExpenseData} 
+              curveType="monotone" 
+              config={{
+                income: { label: "Income", color: "#22c55e" },
+                expense: { label: "Expense", color: "#ef4444" },
+              }} 
+              dataKeys={['income', 'expense']} 
+              index="month" 
+            />
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-headline">
-              <PieChart className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 font-headline text-xl">
+              <PieChart className="h-5 w-5 text-primary" />
               Expenses by Category
             </CardTitle>
-            <CardDescription>Top spending categories</CardDescription>
+            <CardDescription>Major cost drivers</CardDescription>
           </CardHeader>
           <CardContent>
             <DataChart 
