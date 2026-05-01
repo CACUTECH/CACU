@@ -67,7 +67,7 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-headline text-3xl font-bold">Dashboard</h1>
+          <h1 className="font-headline text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back, Jane. Here's what's happening with your business.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -111,43 +111,43 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-lg shadow-primary/5 border-primary/10 transition-all hover:shadow-primary/10">
+        <Card className="shadow-lg shadow-green-500/10 border-green-500/20 transition-all hover:shadow-green-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline">₦{totalRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold font-headline text-green-700 dark:text-green-400">₦{totalRevenue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground text-green-500 font-medium">+20.1% from last month</p>
           </CardContent>
         </Card>
-        <Card className="shadow-lg shadow-primary/5 border-primary/10 transition-all hover:shadow-primary/10">
+        <Card className="shadow-lg shadow-red-500/10 border-red-500/20 transition-all hover:shadow-red-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline">₦{totalExpenses.toLocaleString()}</div>
+            <div className="text-2xl font-bold font-headline text-red-700 dark:text-red-400">₦{totalExpenses.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground text-red-500 font-medium">+18.3% from last month</p>
           </CardContent>
         </Card>
-        <Card className="shadow-lg shadow-primary/5 border-primary/10 transition-all hover:shadow-primary/10">
+        <Card className="shadow-lg shadow-green-500/10 border-green-500/20 transition-all hover:shadow-green-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline">₦{netProfit.toLocaleString()}</div>
+            <div className="text-2xl font-bold font-headline text-green-700 dark:text-green-400">₦{netProfit.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground text-green-500 font-medium">+19% from last month</p>
           </CardContent>
         </Card>
         <Card className="shadow-lg shadow-primary/5 border-primary/10 transition-all hover:shadow-primary/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline">+{totalCustomers}</div>
+            <div className="text-2xl font-bold font-headline text-primary">+{totalCustomers}</div>
             <p className="text-xs text-muted-foreground text-green-500 font-medium">+10 since last month</p>
           </CardContent>
         </Card>
