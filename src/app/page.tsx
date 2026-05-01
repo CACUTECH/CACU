@@ -1,4 +1,7 @@
-import { AreaChart, BarChart3, DollarSign, Package, Users, Activity, PieChart } from 'lucide-react';
+"use client"
+
+import * as React from 'react';
+import { AreaChart, BarChart3, DollarSign, Package, Users, Activity, PieChart, Calendar as CalendarIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +11,10 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ChartConfig } from '@/components/ui/chart';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format, addDays } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 
 const chartConfig = {
   "Office Supplies": { color: "hsl(var(--chart-1))" },
@@ -20,6 +27,11 @@ const chartConfig = {
 
 
 export default function DashboardPage() {
+  const [date, setDate] = React.useState<DateRange | undefined>({
+    from: new Date(2024, 6, 1),
+    to: new Date(2024, 6, 31),
+  });
+
   const totalRevenue = transactions
     .filter((t) => t.type === 'Income')
     .reduce((acc, t) => acc + t.amount, 0);
@@ -31,6 +43,51 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-headline text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back, Jane. Here's what's happening with your business.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date"
+                variant={"outline"}
+                className={cn(
+                  "w-full sm:w-[300px] justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date?.from ? (
+                  date.to ? (
+                    <>
+                      {format(date.from, "LLL dd, y")} -{" "}
+                      {format(date.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(date.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={setDate}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
