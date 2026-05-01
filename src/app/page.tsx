@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { ChartConfig } from '@/components/ui/chart';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import {
   Select,
@@ -42,12 +42,24 @@ export default function DashboardPage() {
   
   const [granularity, setGranularity] = React.useState("Month");
 
-  const totalRevenue = transactions
+  const filteredTransactions = React.useMemo(() => {
+    if (!date?.from) return transactions;
+    const start = startOfDay(date.from);
+    const end = endOfDay(date.to || date.from);
+    return transactions.filter(t => {
+      const tDate = new Date(t.date);
+      return isWithinInterval(tDate, { start, end });
+    });
+  }, [date]);
+
+  const totalRevenue = React.useMemo(() => filteredTransactions
     .filter((t) => t.type === 'Income')
-    .reduce((acc, t) => acc + t.amount, 0);
-  const totalExpenses = transactions
+    .reduce((acc, t) => acc + t.amount, 0), [filteredTransactions]);
+
+  const totalExpenses = React.useMemo(() => filteredTransactions
     .filter((t) => t.type === 'Expense')
-    .reduce((acc, t) => acc + t.amount, 0);
+    .reduce((acc, t) => acc + t.amount, 0), [filteredTransactions]);
+
   const netProfit = totalRevenue - totalExpenses;
   const totalCustomers = 54;
 
@@ -230,7 +242,7 @@ export default function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.slice(0, 5).map((transaction) => (
+              {filteredTransactions.slice(0, 5).map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell className="font-medium">
                     <div>{transaction.description}</div>
