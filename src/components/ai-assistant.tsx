@@ -29,6 +29,15 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const pathname = usePathname();
 
+  const getPageData = () => {
+    if (typeof document === 'undefined') return '';
+    const mainContent = document.querySelector('main');
+    if (!mainContent) return '';
+    
+    // Get visible text content, limited to prevent token overflow
+    return mainContent.innerText.slice(0, 2000).replace(/\s+/g, ' ');
+  };
+
   const handleSend = async (customQuery?: string) => {
     const activeQuery = customQuery || query;
     if (!activeQuery.trim()) return;
@@ -40,8 +49,10 @@ export function AIAssistant() {
 
     try {
       const pageName = pathname === '/' ? 'Dashboard' : pathname.split('/').pop() || 'General';
+      const visibleData = getPageData();
+      
       const result = await getBusinessInsight({
-        context: `User is viewing the ${pageName} page.`,
+        context: `User is on the ${pageName} page. Visible data on page: ${visibleData}`,
         userQuery: activeQuery,
       });
 
@@ -71,7 +82,7 @@ export function AIAssistant() {
       </Button>
 
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetContent className="sm:max-w-md flex flex-col h-full border-l shadow-2xl">
+        <SheetContent className="sm:max-w-md flex flex-col h-full border-l shadow-2xl border-primary/10">
           <SheetHeader className="border-b pb-4">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2.5 rounded-xl">
@@ -79,7 +90,7 @@ export function AIAssistant() {
               </div>
               <div className="text-left">
                 <SheetTitle className="font-headline text-xl">CACU AI Assistant</SheetTitle>
-                <SheetDescription>Get instant business insights and advice.</SheetDescription>
+                <SheetDescription>Context-aware business insights.</SheetDescription>
               </div>
             </div>
           </SheetHeader>
@@ -88,28 +99,28 @@ export function AIAssistant() {
             <div className="space-y-6">
               {messages.length === 0 && (
                 <div className="space-y-4">
-                  <div className="bg-muted/50 rounded-2xl p-4 text-sm text-muted-foreground border border-border/50">
+                  <div className="bg-muted/50 rounded-2xl p-4 text-sm text-muted-foreground border border-border/50 shadow-inner">
                     <p className="font-medium text-foreground mb-1">Hello! 👋</p>
-                    I can help you analyze your data on this page or answer general business questions. What's on your mind?
+                    I've analyzed the data on your current page. How can I help you grow your business today?
                   </div>
                   <div className="grid gap-2">
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="justify-start text-xs font-normal h-auto py-2 px-3 rounded-full bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
-                      onClick={() => handleSend("Give me a quick insight for this page")}
+                      className="justify-start text-xs font-normal h-auto py-2 px-3 rounded-full bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 shadow-sm"
+                      onClick={() => handleSend("Analyze the data on this page for me")}
                     >
                       <Sparkles className="mr-2 h-3 w-3" />
-                      Get current page insights
+                      Analyze current page
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="justify-start text-xs font-normal h-auto py-2 px-3 rounded-full"
-                      onClick={() => handleSend("How can I improve my cash flow?")}
+                      className="justify-start text-xs font-normal h-auto py-2 px-3 rounded-full shadow-sm"
+                      onClick={() => handleSend("How can I improve my current numbers?")}
                     >
                       <MessageSquare className="mr-2 h-3 w-3" />
-                      Tips to improve cash flow
+                      Tips to improve performance
                     </Button>
                   </div>
                 </div>
@@ -118,10 +129,10 @@ export function AIAssistant() {
               {messages.map((m, i) => (
                 <div key={i} className={cn("flex flex-col gap-2", m.role === 'user' ? 'items-end' : 'items-start')}>
                   <div className={cn(
-                    "max-w-[85%] rounded-2xl p-4 text-sm shadow-sm",
+                    "max-w-[85%] rounded-2xl p-4 text-sm shadow-md",
                     m.role === 'user' 
                       ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                      : 'bg-muted border border-border/50 rounded-tl-none'
+                      : 'bg-card border border-border/50 rounded-tl-none'
                   )}>
                     {m.content}
                   </div>
@@ -131,7 +142,7 @@ export function AIAssistant() {
                         <button
                           key={si}
                           onClick={() => handleSend(s)}
-                          className="text-[10px] uppercase tracking-wider font-bold bg-secondary hover:bg-secondary/80 text-secondary-foreground px-3 py-1.5 rounded-full transition-colors border"
+                          className="text-[10px] uppercase tracking-wider font-bold bg-secondary hover:bg-primary/10 hover:text-primary text-secondary-foreground px-3 py-1.5 rounded-full transition-all border shadow-sm"
                         >
                           {s}
                         </button>
@@ -143,11 +154,11 @@ export function AIAssistant() {
               
               {isLoading && (
                 <div className="flex items-center gap-3 text-muted-foreground">
-                  <div className="bg-muted p-2 rounded-full animate-pulse">
-                    <Bot className="h-4 w-4" />
+                  <div className="bg-primary/5 p-2 rounded-full animate-pulse">
+                    <Bot className="h-4 w-4 text-primary" />
                   </div>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-xs font-medium">Analyzing business data...</span>
+                  <span className="text-xs font-medium">Analyzing business context...</span>
                 </div>
               )}
             </div>
@@ -159,17 +170,17 @@ export function AIAssistant() {
               className="flex items-center gap-2"
             >
               <Input
-                placeholder="Type your question..."
+                placeholder="Ask about this page..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 disabled={isLoading}
-                className="flex-grow rounded-xl border-muted focus-visible:ring-primary h-11"
+                className="flex-grow rounded-xl border-muted focus-visible:ring-primary h-11 shadow-sm"
               />
               <Button 
                 type="submit" 
                 size="icon" 
                 disabled={isLoading || !query.trim()}
-                className="h-11 w-11 rounded-xl shadow-lg"
+                className="h-11 w-11 rounded-xl shadow-lg hover:shadow-primary/20 transition-all"
               >
                 <Send className="h-4 w-4" />
               </Button>
