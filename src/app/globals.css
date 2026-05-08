@@ -30,6 +30,13 @@
     --chart-3: 250 100% 80%;
     --chart-4: 265 89% 55%;
     --chart-5: 250 100% 40%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 10% 3.9%;
+    --sidebar-border: 240 5.9% 90%;
+    --sidebar-accent: 240 4.8% 93.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-ring: 250 100% 60%;
   }
 
   .dark {
@@ -58,6 +65,13 @@
     --chart-3: 250 100% 80%;
     --chart-4: 265 89% 55%;
     --chart-5: 250 100% 40%;
+
+    --sidebar-background: 240 50% 4%; /* Even darker for depth */
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-border: 240 15% 12%;
+    --sidebar-accent: 240 20% 18%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-ring: 250 100% 60%;
   }
 }
 
@@ -67,26 +81,5 @@
   }
   body {
     @apply bg-background text-foreground;
-  }
-}
-
-@layer components {
-  /* Specific override for sidebar to use a darker theme */
-  .dark {
-    --sidebar-background: 240 50% 4%; /* Even darker for depth */
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-border: 240 15% 12%;
-    --sidebar-accent: 240 20% 18%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-ring: 250 100% 60%;
-  }
-
-  :root {
-     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 10% 3.9%;
-    --sidebar-border: 240 5.9% 90%;
-    --sidebar-accent: 240 4.8% 93.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-ring: 250 100% 60%;
   }
 }
