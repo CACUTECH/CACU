@@ -25,6 +25,7 @@ import { Logo } from '@/components/logo';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { AIAssistant } from './ai-assistant';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -194,7 +195,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Sidebar>
       <SidebarInset>
         <Header />
-        <main className="p-4 lg:p-6">{children}</main>
+        <main className="p-4 lg:p-6">
+          {children}
+        </main>
+        <AIAssistant />
       </SidebarInset>
     </SidebarProvider>
   );
