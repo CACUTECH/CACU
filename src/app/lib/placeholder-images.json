@@ -1,0 +1,14 @@
+{
+  "ama-host-1": {
+    "url": "https://picsum.photos/seed/ama1/200/200",
+    "width": 200,
+    "height": 200,
+    "hint": "businessman portrait"
+  },
+  "ama-host-2": {
+    "url": "https://picsum.photos/seed/ama2/200/200",
+    "width": 200,
+    "height": 200,
+    "hint": "businesswoman portrait"
+  }
+}

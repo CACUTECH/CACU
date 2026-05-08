@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Search, MessageSquare, Award, Users, Mic, Calendar, ArrowRight, Star, TrendingUp } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
+import placeholders from "@/app/lib/placeholder-images.json";
 
 const forumTopics = [
     { id: 1, title: "Adapting to new FX regulations in Nigeria", category: "Finance", replies: 24, views: "1.2k", lastPost: "2h ago" },
@@ -23,8 +25,8 @@ const grantAlerts = [
 ];
 
 const upcomingAMAs = [
-    { id: 1, host: "Segun Agbaje", role: "MD, GTBank", topic: "The Future of Digital Banking", date: "Aug 15, 2:00 PM" },
-    { id: 2, host: "Funke Opeke", role: "CEO, MainOne", topic: "Scaling Tech Infrastructure", date: "Aug 22, 11:00 AM" },
+    { id: 1, host: "Segun Agbaje", role: "MD, GTBank", topic: "The Future of Digital Banking", date: "Aug 15, 2:00 PM", imageKey: "ama-host-1" },
+    { id: 2, host: "Funke Opeke", role: "CEO, MainOne", topic: "Scaling Tech Infrastructure", date: "Aug 22, 11:00 AM", imageKey: "ama-host-2" },
 ];
 
 export default function CommunityPage() {
@@ -117,31 +119,44 @@ export default function CommunityPage() {
                 <TabsContent value="ama" className="mt-6 space-y-4">
                     <h2 className="text-xl font-bold font-headline">Upcoming AMA Sessions</h2>
                     <div className="grid gap-4 md:grid-cols-2">
-                        {upcomingAMAs.map(ama => (
-                            <Card key={ama.id}>
-                                <CardHeader>
-                                    <div className="flex items-center gap-4">
-                                        <div className="bg-primary/10 p-3 rounded-full">
-                                            <Mic className="h-6 w-6 text-primary" />
+                        {upcomingAMAs.map(ama => {
+                            const image = (placeholders as any)[ama.imageKey];
+                            return (
+                                <Card key={ama.id}>
+                                    <CardHeader>
+                                        <div className="flex items-center gap-4">
+                                            <div className="relative w-12 h-12 shrink-0">
+                                                <Image
+                                                    src={image.url}
+                                                    alt={ama.host}
+                                                    width={image.width}
+                                                    height={image.height}
+                                                    className="rounded-full object-cover border-2 border-primary/20 shadow-sm"
+                                                    data-ai-hint={image.hint}
+                                                />
+                                                <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-1 border-2 border-background shadow-sm">
+                                                    <Mic className="h-3 w-3" />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-base">{ama.host}</CardTitle>
+                                                <CardDescription>{ama.role}</CardDescription>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <CardTitle className="text-base">{ama.host}</CardTitle>
-                                            <CardDescription>{ama.role}</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="font-medium text-sm mb-4">{ama.topic}</p>
+                                        <div className="flex items-center text-xs text-muted-foreground gap-2">
+                                            <Calendar className="w-3 h-3" />
+                                            {ama.date}
                                         </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="font-medium text-sm mb-4">{ama.topic}</p>
-                                    <div className="flex items-center text-xs text-muted-foreground gap-2">
-                                        <Calendar className="w-3 h-3" />
-                                        {ama.date}
-                                    </div>
-                                </CardContent>
-                                <CardFooter>
-                                    <Button className="w-full" variant="outline" onClick={() => toast({ title: "Reminder Set!", description: `We'll notify you when ${ama.host} goes live.` })}>Set Reminder</Button>
-                                </CardFooter>
-                            </Card>
-                        ))}
+                                    </CardContent>
+                                    <CardFooter>
+                                        <Button className="w-full" variant="outline" onClick={() => toast({ title: "Reminder Set!", description: `We'll notify you when ${ama.host} goes live.` })}>Set Reminder</Button>
+                                    </CardFooter>
+                                </Card>
+                            );
+                        })}
                     </div>
                 </TabsContent>
 
