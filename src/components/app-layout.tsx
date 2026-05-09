@@ -18,7 +18,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Banknote, Users2, LifeBuoy, AppWindow, Settings, LogOut, Briefcase, Receipt, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Banknote, Users2, LifeBuoy, AppWindow, Settings, LogOut, Briefcase, Receipt, ChevronDown, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
 import Link from 'next/link';
@@ -33,6 +33,7 @@ const navItems = [
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { href: '/invoices', label: 'Invoices & Receipts', icon: Receipt },
   { href: '/inventory', label: 'Inventory', icon: Package },
+  { href: '/storefront', label: 'Storefront', icon: Store },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/customers', label: 'Customers', icon: Users },
   { 

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -16,6 +17,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/transactions': 'Transactions',
   '/invoices': 'Invoices',
   '/inventory': 'Inventory',
+  '/storefront': 'Storefront',
   '/reports': 'Reports',
   '/customers': 'Customers',
   '/settings': 'Settings',
