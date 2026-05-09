@@ -131,7 +131,7 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
     )
 }
 
-function SidebarBrand({ logoUrl, businessName }: { logoUrl: string | null, businessName: string }) {
+function SidebarBrand({ logoUrl, businessName, mounted }: { logoUrl: string | null, businessName: string, mounted: boolean }) {
     return (
         <div className="flex items-center gap-2 p-2">
             {logoUrl ? (
@@ -139,32 +139,38 @@ function SidebarBrand({ logoUrl, businessName }: { logoUrl: string | null, busin
             ) : (
                 <Logo className="size-8 shrink-0" />
             )}
-            <span 
-              className="font-headline text-2xl font-semibold truncate group-data-[state=collapsed]:hidden" 
-              style={{color: "hsl(var(--primary))"}}
-            >
-              {businessName}
-            </span>
+            {mounted && (
+                <span 
+                  className="font-headline text-2xl font-semibold truncate group-data-[state=collapsed]:hidden" 
+                  style={{color: "hsl(var(--primary))"}}
+                >
+                  {businessName}
+                </span>
+            )}
         </div>
     )
 }
 
-function SidebarUser() {
+function SidebarUser({ mounted }: { mounted: boolean }) {
     return (
         <div className="flex items-center gap-3 p-2">
             <Avatar className="size-8">
               <AvatarImage src="https://placehold.co/40x40" alt="User" data-ai-hint="person portrait" />
               <AvatarFallback>U</AvatarFallback>
             </Avatar>
-            <div className="flex flex-col overflow-hidden group-data-[state=collapsed]:hidden">
-                <span className="truncate text-sm font-medium">Jane Doe</span>
-                <span className="truncate text-xs text-muted-foreground">jane.doe@example.com</span>
-            </div>
-            <div className="ml-auto group-data-[state=collapsed]:hidden">
-                <Button variant="ghost" size="icon" className="shrink-0">
-                    <LogOut className="size-4" />
-                </Button>
-            </div>
+            {mounted && (
+                <>
+                    <div className="flex flex-col overflow-hidden group-data-[state=collapsed]:hidden">
+                        <span className="truncate text-sm font-medium">Jane Doe</span>
+                        <span className="truncate text-xs text-muted-foreground">jane.doe@example.com</span>
+                    </div>
+                    <div className="ml-auto group-data-[state=collapsed]:hidden">
+                        <Button variant="ghost" size="icon" className="shrink-0">
+                            <LogOut className="size-4" />
+                        </Button>
+                    </div>
+                </>
+            )}
         </div>
     )
 }
@@ -190,8 +196,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState('CACU');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const savedLogo = localStorage.getItem('business-logo');
     const savedDetails = localStorage.getItem('business-details');
     if (savedLogo) {
@@ -217,7 +225,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <SidebarBrand logoUrl={logoUrl} businessName={businessName} />
+          <SidebarBrand logoUrl={logoUrl} businessName={businessName} mounted={mounted} />
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
@@ -235,7 +243,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarMenuButtonWrapper href="/setup" icon={Briefcase} label="Business Setup" isActive={pathname === '/setup'} />
             </SidebarMenuItem>
           </SidebarMenu>
-          <SidebarUser />
+          <SidebarUser mounted={mounted} />
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
