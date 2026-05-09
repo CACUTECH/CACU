@@ -986,9 +986,19 @@ export default function InvoicesPage() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="invoices" onValueChange={setActiveTab}>
-            <TabsList>
-                <TabsTrigger value="invoices">Invoices</TabsTrigger>
-                <TabsTrigger value="receipts">Receipts</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 sm:w-auto h-auto p-1 bg-primary/5 border border-primary/10 shadow-lg shadow-primary/5 rounded-xl">
+                <TabsTrigger 
+                    value="invoices"
+                    className="py-2.5 rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all shadow-sm"
+                >
+                    Invoices
+                </TabsTrigger>
+                <TabsTrigger 
+                    value="receipts"
+                    className="py-2.5 rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all shadow-sm"
+                >
+                    Receipts
+                </TabsTrigger>
             </TabsList>
             <TabsContent value="invoices" className="mt-4">
                 <InvoiceTable data={allInvoicesState} onMarkAsPaid={handleMarkAsPaid} onViewDetails={handleViewDetails} />
@@ -1013,5 +1023,3 @@ export default function InvoicesPage() {
     </>
   )
 }
-
-    
