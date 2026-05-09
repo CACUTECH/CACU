@@ -45,11 +45,31 @@ export default function CommunityPage() {
             </div>
 
             <Tabs defaultValue="forums" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 h-auto p-1 bg-muted/50 rounded-xl">
-                    <TabsTrigger value="forums" className="py-2.5 rounded-lg"><MessageSquare className="w-4 h-4 mr-2" /> Forums</TabsTrigger>
-                    <TabsTrigger value="support" className="py-2.5 rounded-lg"><Users className="w-4 h-4 mr-2" /> Support</TabsTrigger>
-                    <TabsTrigger value="ama" className="py-2.5 rounded-lg"><Mic className="w-4 h-4 mr-2" /> AMAs</TabsTrigger>
-                    <TabsTrigger value="grants" className="py-2.5 rounded-lg"><Award className="w-4 h-4 mr-2" /> Grants</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 h-auto p-1 bg-primary/5 border border-primary/10 shadow-lg shadow-primary/5 rounded-xl">
+                    <TabsTrigger 
+                        value="forums" 
+                        className="py-2.5 rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all shadow-sm"
+                    >
+                        <MessageSquare className="w-4 h-4 mr-2" /> Forums
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="support" 
+                        className="py-2.5 rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all shadow-sm"
+                    >
+                        <Users className="w-4 h-4 mr-2" /> Support
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="ama" 
+                        className="py-2.5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all shadow-sm"
+                    >
+                        <Mic className="w-4 h-4 mr-2" /> AMAs
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="grants" 
+                        className="py-2.5 rounded-lg data-[state=active]:bg-amber-600 data-[state=active]:text-white transition-all shadow-sm"
+                    >
+                        <Award className="w-4 h-4 mr-2" /> Grants
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="forums" className="mt-6 space-y-4">
