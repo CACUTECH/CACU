@@ -14,6 +14,7 @@ import {
   SidebarInset,
   SidebarMenuSub,
   SidebarMenuSubButton,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Banknote, Users2, LifeBuoy, AppWindow, Settings, LogOut, Briefcase, Receipt, ChevronDown } from 'lucide-react';
@@ -63,14 +64,21 @@ const navItems = [
 ];
 
 function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: string }) {
+    const { setOpenMobile, isMobile } = useSidebar();
     const isActive = item.children ? pathname.startsWith(item.href) : pathname === item.href;
+
+    const handleLinkClick = () => {
+        if (isMobile) {
+            setOpenMobile(false);
+        }
+    };
 
     if (item.children) {
         return (
              <Collapsible defaultOpen={pathname.startsWith(item.href)}>
                 <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                         <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className="justify-between">
+                         <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className="justify-between" onClick={handleLinkClick}>
                             <Link href={item.href}>
                                 <div className="flex items-center gap-2">
                                     <item.icon />
@@ -85,7 +93,7 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
                     <SidebarMenuSub>
                         {item.children.map(child => (
                              <SidebarMenuItem key={child.href}>
-                                <SidebarMenuSubButton asChild isActive={pathname === child.href}>
+                                <SidebarMenuSubButton asChild isActive={pathname === child.href} onClick={handleLinkClick}>
                                     <Link href={child.href}>{child.label}</Link>
                                 </SidebarMenuSubButton>
                             </SidebarMenuItem>
@@ -98,7 +106,7 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
 
     return (
         <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
+            <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} onClick={handleLinkClick}>
               <Link href={item.href}>
                 <item.icon />
                 <span>{item.label}</span>
@@ -108,14 +116,63 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
     )
 }
 
+function SidebarBrand({ logoUrl, businessName }: { logoUrl: string | null, businessName: string }) {
+    const { state } = useSidebar();
+    return (
+        <div className="flex items-center gap-2 p-2">
+            {logoUrl ? (
+                <Image src={logoUrl} alt="Business Logo" width={32} height={32} className="size-8 shrink-0 rounded-sm object-contain" />
+            ) : (
+                <Logo className="size-8 shrink-0" />
+            )}
+            {state === "expanded" && (
+                <span className="font-headline text-2xl font-semibold truncate" style={{color: "hsl(var(--primary))"}}>{businessName}</span>
+            )}
+        </div>
+    )
+}
+
+function SidebarUser() {
+    const { state } = useSidebar();
+    return (
+        <div className="flex items-center gap-3 p-2">
+            <Avatar className="size-8">
+              <AvatarImage src="https://placehold.co/40x40" alt="User" data-ai-hint="person portrait" />
+              <AvatarFallback>U</AvatarFallback>
+            </Avatar>
+            {state === "expanded" && (
+                <div className="flex flex-col overflow-hidden">
+                    <span className="truncate text-sm font-medium">Jane Doe</span>
+                    <span className="truncate text-xs text-muted-foreground">jane.doe@example.com</span>
+                </div>
+            )}
+            {state === "expanded" && (
+                <Button variant="ghost" size="icon" className="ml-auto shrink-0">
+                    <LogOut className="size-4" />
+                </Button>
+            )}
+        </div>
+    )
+}
+
+function SidebarMenuButtonWrapper({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive: boolean }) {
+    const { setOpenMobile, isMobile } = useSidebar();
+    return (
+        <SidebarMenuButton asChild isActive={isActive} tooltip={label} onClick={() => isMobile && setOpenMobile(false)}>
+            <Link href={href}>
+                <Icon />
+                <span>{label}</span>
+            </Link>
+        </SidebarMenuButton>
+    )
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { theme } = useTheme();
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
   const [businessName, setBusinessName] = React.useState('CACU');
 
   React.useEffect(() => {
-    // This code runs only on the client, after the component has mounted.
     const savedLogo = localStorage.getItem('business-logo');
     const savedDetails = localStorage.getItem('business-details');
     if (savedLogo) {
@@ -128,29 +185,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 setBusinessName(details.name);
             }
         } catch (e) {
-            // Did not parse, fallback to default
             setBusinessName('CACU');
         }
     }
   }, []);
 
-  // Hide sidebar and header for setup page
   if (pathname === '/setup' || pathname === '/login' || pathname === '/signup' || pathname === '/verify-email') {
     return <main>{children}</main>;
   }
 
   return (
     <SidebarProvider>
-      <Sidebar>
+      <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2 p-2">
-            {logoUrl ? (
-                <Image src={logoUrl} alt="Business Logo" width={32} height={32} className="size-8 shrink-0 rounded-sm object-contain" />
-            ) : (
-                <Logo className="size-8 shrink-0" />
-            )}
-            <span className="font-headline text-2xl font-semibold truncate" style={{color: "hsl(var(--primary))"}}>{businessName}</span>
-          </div>
+          <SidebarBrand logoUrl={logoUrl} businessName={businessName} />
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
@@ -162,35 +210,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarFooter className="flex flex-col gap-2">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')} tooltip="Settings">
-                <Link href="/settings">
-                  <Settings />
-                  <span>Settings</span>
-                </Link>
-              </SidebarMenuButton>
+                <SidebarMenuButtonWrapper href="/settings" icon={Settings} label="Settings" isActive={pathname.startsWith('/settings')} />
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/setup'} tooltip="Initial Setup">
-                <Link href="/setup">
-                  <Briefcase />
-                  <span>Business Setup</span>
-                </Link>
-              </SidebarMenuButton>
+                <SidebarMenuButtonWrapper href="/setup" icon={Briefcase} label="Business Setup" isActive={pathname === '/setup'} />
             </SidebarMenuItem>
           </SidebarMenu>
-          <div className="flex items-center gap-3 p-2">
-            <Avatar className="size-8">
-              <AvatarImage src="https://placehold.co/40x40" alt="User" data-ai-hint="person portrait" />
-              <AvatarFallback>U</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col overflow-hidden">
-              <span className="truncate text-sm font-medium">Jane Doe</span>
-              <span className="truncate text-xs text-muted-foreground">jane.doe@example.com</span>
-            </div>
-            <Button variant="ghost" size="icon" className="ml-auto shrink-0">
-              <LogOut className="size-4" />
-            </Button>
-          </div>
+          <SidebarUser />
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>

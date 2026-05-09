@@ -6,11 +6,9 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import Link from 'next/link';
 import { Button } from './ui/button';
-import { PlusCircle, Search, Bell, Sun, Moon } from 'lucide-react';
+import { Search, Bell, Sun, Moon } from 'lucide-react';
 import { Input } from './ui/input';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
 import { useTheme } from "@/components/theme-provider";
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 
 const breadcrumbNameMap: { [key: string]: string } = {
@@ -39,7 +37,7 @@ function ThemeToggle() {
     return (
         <Button variant="ghost" size="icon" onClick={toggleTheme}>
             <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            < Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             <span className="sr-only">Toggle theme</span>
         </Button>
     )
@@ -55,7 +53,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6">
-      <div className="flex items-center gap-2 md:hidden">
+      <div className="flex items-center gap-2">
         <SidebarTrigger />
       </div>
 
