@@ -1,3 +1,4 @@
+
 "use client"
 import * as React from "react"
 import { 
@@ -11,7 +12,7 @@ import {
     User, 
     MapPin, 
     Building2,
-    Calendar,
+    Calendar as CalendarIcon,
     ArrowUpRight,
     AlertCircle,
     CheckCircle2,
@@ -330,7 +331,7 @@ function CustomerDetailsSheet({ customer, onSendReminder }: { customer: Customer
                                     <div className="space-y-1">
                                         <p className="font-bold text-sm">{tx.description}</p>
                                         <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <Calendar className="h-3 w-3" /> {tx.date}
+                                            <CalendarIcon className="h-3 w-3" /> {tx.date}
                                         </p>
                                     </div>
                                     <div className="text-right space-y-1">
