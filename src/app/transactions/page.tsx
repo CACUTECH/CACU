@@ -138,9 +138,31 @@ function AddTransactionDialog() {
 }
 
 export default function TransactionsPage() {
-    const [transactions, setTransactions] = React.useState<Transaction[]>(allTransactions);
+    const [searchTerm, setSearchTerm] = React.useState("");
+    const [selectedTypes, setSelectedTypes] = React.useState<string[]>(["Income", "Expense"]);
     const { toast } = useToast();
     const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const filteredTransactions = React.useMemo(() => {
+        return allTransactions.filter((t) => {
+            const matchesSearch = 
+                t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                t.account.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            const matchesType = selectedTypes.includes(t.type);
+            
+            return matchesSearch && matchesType;
+        });
+    }, [searchTerm, selectedTypes]);
+
+    const toggleType = (type: string) => {
+        setSelectedTypes(prev => 
+            prev.includes(type) 
+                ? prev.filter(t => t !== type) 
+                : [...prev, type]
+        );
+    }
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -156,12 +178,8 @@ export default function TransactionsPage() {
                     const worksheet = workbook.Sheets[sheetName];
                     const json = XLSX.utils.sheet_to_json(worksheet);
                     
-                    // Assuming the excel file has columns that match the Transaction type
                     console.log(json);
 
-                    // Here you would typically validate and transform the data
-                    // and then update the state
-                    // For now, we'll just show a success toast
                     toast({
                         title: "File Uploaded",
                         description: `${file.name} has been processed. Check the console for the data.`,
@@ -209,7 +227,12 @@ export default function TransactionsPage() {
                 <div className="mt-4 flex items-center gap-2">
                     <div className="relative w-full">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Search transactions..." className="pl-8 w-full" />
+                        <Input 
+                            placeholder="Search transactions..." 
+                            className="pl-8 w-full" 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -221,8 +244,18 @@ export default function TransactionsPage() {
                         <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Filter by Type</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuCheckboxItem checked>Income</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem>Expense</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem 
+                                checked={selectedTypes.includes("Income")}
+                                onCheckedChange={() => toggleType("Income")}
+                            >
+                                Income
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem 
+                                checked={selectedTypes.includes("Expense")}
+                                onCheckedChange={() => toggleType("Expense")}
+                            >
+                                Expense
+                            </DropdownMenuCheckboxItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -240,7 +273,7 @@ export default function TransactionsPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {transactions.map((transaction) => (
+                        {filteredTransactions.map((transaction) => (
                             <TableRow key={transaction.id}>
                                 <TableCell className="font-medium">
                                     <div className="truncate">{transaction.description}</div>
@@ -261,6 +294,13 @@ export default function TransactionsPage() {
                                 </TableCell>
                             </TableRow>
                         ))}
+                        {filteredTransactions.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                    No transactions found.
+                                </TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                 </Table>
                 </div>
