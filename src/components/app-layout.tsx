@@ -73,12 +73,20 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
         }
     };
 
+    const activeClasses = "bg-primary/10 text-primary font-semibold hover:bg-primary/15 hover:text-primary transition-colors";
+
     if (item.children) {
         return (
              <Collapsible defaultOpen={pathname.startsWith(item.href)}>
                 <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                         <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className="justify-between" onClick={handleLinkClick}>
+                         <SidebarMenuButton 
+                            asChild 
+                            isActive={isActive} 
+                            tooltip={item.label} 
+                            className={cn("justify-between", isActive && activeClasses)} 
+                            onClick={handleLinkClick}
+                        >
                             <Link href={item.href}>
                                 <div className="flex items-center gap-2">
                                     <item.icon />
@@ -93,7 +101,12 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
                     <SidebarMenuSub>
                         {item.children.map(child => (
                              <SidebarMenuItem key={child.href}>
-                                <SidebarMenuSubButton asChild isActive={pathname === child.href} onClick={handleLinkClick}>
+                                <SidebarMenuSubButton 
+                                    asChild 
+                                    isActive={pathname === child.href} 
+                                    className={cn(pathname === child.href && activeClasses)}
+                                    onClick={handleLinkClick}
+                                >
                                     <Link href={child.href}>{child.label}</Link>
                                 </SidebarMenuSubButton>
                             </SidebarMenuItem>
@@ -106,7 +119,13 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
 
     return (
         <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} onClick={handleLinkClick}>
+            <SidebarMenuButton 
+                asChild 
+                isActive={isActive} 
+                tooltip={item.label} 
+                className={cn(isActive && activeClasses)}
+                onClick={handleLinkClick}
+            >
               <Link href={item.href}>
                 <item.icon />
                 <span>{item.label}</span>
@@ -157,8 +176,15 @@ function SidebarUser() {
 
 function SidebarMenuButtonWrapper({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive: boolean }) {
     const { setOpenMobile, isMobile } = useSidebar();
+    const activeClasses = "bg-primary/10 text-primary font-semibold hover:bg-primary/15 hover:text-primary transition-colors";
     return (
-        <SidebarMenuButton asChild isActive={isActive} tooltip={label} onClick={() => isMobile && setOpenMobile(false)}>
+        <SidebarMenuButton 
+            asChild 
+            isActive={isActive} 
+            tooltip={label} 
+            className={cn(isActive && activeClasses)}
+            onClick={() => isMobile && setOpenMobile(false)}
+        >
             <Link href={href}>
                 <Icon />
                 <span>{label}</span>
