@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   SidebarProvider,
@@ -21,7 +21,6 @@ import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Ba
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
 import Link from 'next/link';
-import { useTheme } from '@/components/theme-provider';
 import { Logo } from '@/components/logo';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -73,8 +72,6 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
         }
     };
 
-    const activeClasses = "bg-primary/10 text-primary font-semibold hover:bg-primary/15 hover:text-primary transition-colors";
-
     if (item.children) {
         return (
              <Collapsible defaultOpen={pathname.startsWith(item.href)}>
@@ -84,8 +81,8 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
                             asChild 
                             isActive={isActive} 
                             tooltip={item.label} 
-                            className={cn("justify-between", isActive && activeClasses)} 
                             onClick={handleLinkClick}
+                            className="justify-between"
                         >
                             <Link href={item.href}>
                                 <div className="flex items-center gap-2">
@@ -104,7 +101,6 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
                                 <SidebarMenuSubButton 
                                     asChild 
                                     isActive={pathname === child.href} 
-                                    className={cn(pathname === child.href && activeClasses)}
                                     onClick={handleLinkClick}
                                 >
                                     <Link href={child.href}>{child.label}</Link>
@@ -123,7 +119,6 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
                 asChild 
                 isActive={isActive} 
                 tooltip={item.label} 
-                className={cn(isActive && activeClasses)}
                 onClick={handleLinkClick}
             >
               <Link href={item.href}>
@@ -137,6 +132,12 @@ function NavItem({ item, pathname }: { item: typeof navItems[number], pathname: 
 
 function SidebarBrand({ logoUrl, businessName }: { logoUrl: string | null, businessName: string }) {
     const { state } = useSidebar();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     return (
         <div className="flex items-center gap-2 p-2">
             {logoUrl ? (
@@ -144,7 +145,7 @@ function SidebarBrand({ logoUrl, businessName }: { logoUrl: string | null, busin
             ) : (
                 <Logo className="size-8 shrink-0" />
             )}
-            {state === "expanded" && (
+            {mounted && state === "expanded" && (
                 <span className="font-headline text-2xl font-semibold truncate" style={{color: "hsl(var(--primary))"}}>{businessName}</span>
             )}
         </div>
@@ -153,19 +154,25 @@ function SidebarBrand({ logoUrl, businessName }: { logoUrl: string | null, busin
 
 function SidebarUser() {
     const { state } = useSidebar();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     return (
         <div className="flex items-center gap-3 p-2">
             <Avatar className="size-8">
               <AvatarImage src="https://placehold.co/40x40" alt="User" data-ai-hint="person portrait" />
               <AvatarFallback>U</AvatarFallback>
             </Avatar>
-            {state === "expanded" && (
+            {mounted && state === "expanded" && (
                 <div className="flex flex-col overflow-hidden">
                     <span className="truncate text-sm font-medium">Jane Doe</span>
                     <span className="truncate text-xs text-muted-foreground">jane.doe@example.com</span>
                 </div>
             )}
-            {state === "expanded" && (
+            {mounted && state === "expanded" && (
                 <Button variant="ghost" size="icon" className="ml-auto shrink-0">
                     <LogOut className="size-4" />
                 </Button>
@@ -176,13 +183,11 @@ function SidebarUser() {
 
 function SidebarMenuButtonWrapper({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive: boolean }) {
     const { setOpenMobile, isMobile } = useSidebar();
-    const activeClasses = "bg-primary/10 text-primary font-semibold hover:bg-primary/15 hover:text-primary transition-colors";
     return (
         <SidebarMenuButton 
             asChild 
             isActive={isActive} 
             tooltip={label} 
-            className={cn(isActive && activeClasses)}
             onClick={() => isMobile && setOpenMobile(false)}
         >
             <Link href={href}>
@@ -195,10 +200,12 @@ function SidebarMenuButtonWrapper({ href, icon: Icon, label, isActive }: { href:
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
-  const [businessName, setBusinessName] = React.useState('CACU');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [businessName, setBusinessName] = useState('CACU');
+  const [mounted, setMounted] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    setMounted(true);
     const savedLogo = localStorage.getItem('business-logo');
     const savedDetails = localStorage.getItem('business-details');
     if (savedLogo) {
