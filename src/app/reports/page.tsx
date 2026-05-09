@@ -453,7 +453,7 @@ export default function ReportsPage() {
                 </div>
             </div>
             <Tabs defaultValue="pnl">
-                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 sm:w-auto h-auto p-1 bg-muted/50 rounded-xl">
+                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 sm:w-auto h-auto p-1 bg-primary/5 border border-primary/10 shadow-xl shadow-primary/5 rounded-xl">
                     <TabsTrigger value="pnl" className="py-2.5 rounded-lg">Profit & Loss</TabsTrigger>
                     <TabsTrigger value="cashflow" className="py-2.5 rounded-lg">Cash Flow</TabsTrigger>
                     <TabsTrigger value="balance-sheet" className="py-2.5 rounded-lg">Balance Sheet</TabsTrigger>
