@@ -18,12 +18,14 @@ import {
     CircleCheck,
     Settings,
     Copy,
-    Share2
+    Share2,
+    Package
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 export default function StorefrontPage() {
     const { toast } = useToast();
@@ -265,8 +267,4 @@ export default function StorefrontPage() {
             </Card>
         </div>
     );
-}
-
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(" ");
 }
