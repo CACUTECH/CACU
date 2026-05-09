@@ -454,9 +454,24 @@ export default function ReportsPage() {
             </div>
             <Tabs defaultValue="pnl">
                 <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 sm:w-auto h-auto p-1 bg-primary/5 border border-primary/10 shadow-xl shadow-primary/5 rounded-xl">
-                    <TabsTrigger value="pnl" className="py-2.5 rounded-lg">Profit & Loss</TabsTrigger>
-                    <TabsTrigger value="cashflow" className="py-2.5 rounded-lg">Cash Flow</TabsTrigger>
-                    <TabsTrigger value="balance-sheet" className="py-2.5 rounded-lg">Balance Sheet</TabsTrigger>
+                    <TabsTrigger 
+                        value="pnl" 
+                        className="py-2.5 rounded-lg data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all"
+                    >
+                        Profit & Loss
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="cashflow" 
+                        className="py-2.5 rounded-lg data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all"
+                    >
+                        Cash Flow
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="balance-sheet" 
+                        className="py-2.5 rounded-lg data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all"
+                    >
+                        Balance Sheet
+                    </TabsTrigger>
                 </TabsList>
                 <TabsContent value="pnl" className="mt-4">
                     <ProfitAndLossStatement dateRange={date} />
