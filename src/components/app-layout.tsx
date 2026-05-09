@@ -191,7 +191,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (pathname === '/setup' || pathname === '/login' || pathname === '/signup' || pathname === '/verify-email') {
-    return <main>{children}</main>;
+    return <div className="min-h-screen bg-background">{children}</div>;
   }
 
   return (
@@ -221,9 +221,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Sidebar>
       <SidebarInset>
         <Header />
-        <main className="p-4 lg:p-6">
+        <div className="p-4 lg:p-6 flex-1 overflow-auto">
           {children}
-        </main>
+        </div>
         <AIAssistant />
       </SidebarInset>
     </SidebarProvider>
