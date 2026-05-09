@@ -453,10 +453,10 @@ export default function ReportsPage() {
                 </div>
             </div>
             <Tabs defaultValue="pnl">
-                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 sm:w-auto">
-                    <TabsTrigger value="pnl">Profit & Loss</TabsTrigger>
-                    <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
-                    <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 sm:w-auto h-auto p-1 bg-muted/50 rounded-xl">
+                    <TabsTrigger value="pnl" className="py-2.5 rounded-lg">Profit & Loss</TabsTrigger>
+                    <TabsTrigger value="cashflow" className="py-2.5 rounded-lg">Cash Flow</TabsTrigger>
+                    <TabsTrigger value="balance-sheet" className="py-2.5 rounded-lg">Balance Sheet</TabsTrigger>
                 </TabsList>
                 <TabsContent value="pnl" className="mt-4">
                     <ProfitAndLossStatement dateRange={date} />
