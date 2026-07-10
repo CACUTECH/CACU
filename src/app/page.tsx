@@ -468,7 +468,7 @@ export default function DashboardPage() {
                         <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-8">
                             Upgrade Plan
                         </Button>
-                        <Button asChild variant="outline" className="border-white/20 text-white hover:text-white hover:bg-white/10">
+                        <Button asChild variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white">
                             <Link href="/settings/business">Switch Model</Link>
                         </Button>
                     </div>
