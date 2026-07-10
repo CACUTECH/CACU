@@ -81,7 +81,16 @@ export default function POSPage() {
         }))
     }
 
+    const handleQuantityInputChange = (id: string, val: string, max: number) => {
+        const num = parseInt(val, 10);
+        if (isNaN(num)) return;
+        const safeQty = Math.max(1, Math.min(num, max));
+        setCart(prev => prev.map(item => item.id === id ? { ...item, cartQuantity: safeQty } : item));
+    }
+
     const removeFromCart = (id: string) => {
+        setCart(prev => prev.filter(item => id === id ? item.id !== id : true))
+        // Fixed logic for filtering
         setCart(prev => prev.filter(item => item.id !== id))
     }
 
@@ -211,7 +220,12 @@ export default function POSPage() {
                                             <div className="flex items-center gap-3">
                                                 <div className="flex items-center gap-1 bg-background border rounded-lg p-1">
                                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateCartQuantity(item.id, -1)}><Minus className="h-3 w-3" /></Button>
-                                                    <span className="w-8 text-center text-xs font-bold">{item.cartQuantity}</span>
+                                                    <Input 
+                                                        type="number"
+                                                        value={item.cartQuantity}
+                                                        onChange={(e) => handleQuantityInputChange(item.id, e.target.value, item.quantity)}
+                                                        className="w-10 h-6 text-center text-xs font-bold border-none shadow-none focus-visible:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-transparent"
+                                                    />
                                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateCartQuantity(item.id, 1)}><Plus className="h-3 w-3" /></Button>
                                                 </div>
                                                 <p className="w-20 text-right font-bold font-headline">₦{(item.price * item.cartQuantity).toLocaleString()}</p>
