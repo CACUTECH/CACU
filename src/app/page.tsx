@@ -21,15 +21,19 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { transactions, incomeVsExpenseData, expensesByCategoryData, jobs, appointments } from '@/lib/data';
-import type { BusinessType } from '@/lib/data';
+import { transactions as allTransactions, incomeVsExpenseData, expensesByCategoryData, jobs, appointments } from '@/lib/data';
+import type { BusinessType, Transaction } from '@/lib/data';
 import { DataChart } from '@/components/data-chart';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ChartConfig } from '@/components/ui/chart';
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from 'date-fns';
+import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useMemo, useState, useEffect } from 'react';
+import { DateRange } from "react-day-picker";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 const chartConfig = {
   "Services": { label: "Services", color: "hsl(var(--chart-1))" },
@@ -65,7 +69,7 @@ function StatCard({ title, value, subtext, icon: Icon, trend, variant = 'default
             variant === 'primary' && "bg-primary text-primary-foreground border-none"
         )}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className={cn("text-xs font-bold uppercase tracking-widest", variant === 'primary' ? "opacity-80" : "text-muted-foreground")}>
+                <CardTitle className={cn("text-xs font-bold uppercase tracking-widest", variant === 'primary' ? "text-white/80" : "text-muted-foreground")}>
                     {title}
                 </CardTitle>
                 <div className={cn("p-2 rounded-lg", variant === 'primary' ? "bg-white/20" : "bg-primary/10")}>
@@ -77,7 +81,7 @@ function StatCard({ title, value, subtext, icon: Icon, trend, variant = 'default
                 {subtext && (
                     <div className="flex items-center gap-1 mt-1">
                         {trend === 'up' ? <TrendingUp className="h-3 w-3 text-emerald-500" /> : trend === 'down' ? <TrendingDown className="h-3 w-3 text-red-500" /> : null}
-                        <p className={cn("text-[10px] font-medium", variant === 'primary' ? "opacity-80" : "text-muted-foreground")}>{subtext}</p>
+                        <p className={cn("text-[10px] font-medium", variant === 'primary' ? "text-white/70" : "text-muted-foreground")}>{subtext}</p>
                     </div>
                 )}
             </CardContent>
@@ -86,17 +90,45 @@ function StatCard({ title, value, subtext, icon: Icon, trend, variant = 'default
 }
 
 export default function DashboardPage() {
-  const [businessType, setBusinessType] = React.useState<BusinessType>('HYBRID');
-  const [granularity, setGranularity] = React.useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
-  const [mounted, setMounted] = React.useState(false);
+  const [businessType, setBusinessType] = useState<BusinessType>('HYBRID');
+  const [granularity, setGranularity] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(2024, 5, 1), // June 1st
+    to: new Date(2024, 7, 31),  // August 31st
+  });
+  const [mounted, setMounted] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setMounted(true);
     const savedType = localStorage.getItem('business-type') as BusinessType;
     if (savedType) setBusinessType(savedType);
   }, []);
 
-  const performanceData = React.useMemo(() => {
+  const filteredTransactions = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) return allTransactions;
+    return allTransactions.filter(tx => {
+      const txDate = new Date(tx.date);
+      return isWithinInterval(txDate, { start: startOfDay(dateRange.from!), end: endOfDay(dateRange.to!) });
+    });
+  }, [dateRange]);
+
+  const stats = useMemo(() => {
+    const income = filteredTransactions
+      .filter(tx => tx.type === 'Income')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+    const expense = filteredTransactions
+      .filter(tx => tx.type === 'Expense')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+    
+    return {
+      income: `₦${income.toLocaleString()}`,
+      expense: `₦${expense.toLocaleString()}`,
+      profit: `₦${(income - expense).toLocaleString()}`,
+      count: filteredTransactions.length
+    }
+  }, [filteredTransactions]);
+
+  const performanceData = useMemo(() => {
     switch (granularity) {
       case 'daily':
         return [
@@ -141,27 +173,58 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                            "w-full sm:w-[300px] justify-start text-left font-normal shadow-sm",
+                            !dateRange && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRange?.from ? (
+                            dateRange.to ? (
+                                <>
+                                    {format(dateRange.from, "LLL dd, y")} -{" "}
+                                    {format(dateRange.to, "LLL dd, y")}
+                                </>
+                            ) : (
+                                format(dateRange.from, "LLL dd, y")
+                            )
+                        ) : (
+                            <span>Pick a date range</span>
+                        )}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
+                    />
+                </PopoverContent>
+            </Popover>
             <Badge variant="outline" className="px-3 py-1 bg-primary/5 text-primary border-primary/10 font-bold uppercase tracking-tighter">
                 {businessType} Mode
             </Badge>
-            <Button asChild size="sm" variant="outline" className="rounded-xl">
-                <Link href="/reports">Full Reports</Link>
-            </Button>
         </div>
       </div>
 
-      {/* Dynamic Stat Cards Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard 
-            title="Revenue MTD" 
-            value="₦1,240,500" 
-            subtext="+14.2% vs last month" 
+            title="Revenue" 
+            value={stats.income} 
+            subtext={`${stats.count} transactions in range`} 
             trend="up" 
             icon={NairaIcon} 
             variant="primary" 
         />
         
-        {/* Metric 2: Contextual based on business type */}
         {businessType === 'HYBRID' ? (
              <StatCard 
                 title="Jobs Completion" 
@@ -188,7 +251,6 @@ export default function DashboardPage() {
             />
         )}
 
-        {/* Metric 3: Contextual based on business type */}
         {businessType === 'HYBRID' ? (
             <StatCard 
                 title="Sales Volume" 
@@ -215,11 +277,11 @@ export default function DashboardPage() {
         )}
 
         <StatCard 
-            title="Customer Base" 
-            value="148" 
-            subtext="12 new additions" 
-            trend="up" 
-            icon={Users} 
+            title="Expenses" 
+            value={stats.expense} 
+            subtext="Net operating costs" 
+            trend="down" 
+            icon={TrendingDown} 
         />
       </div>
 
@@ -242,7 +304,6 @@ export default function DashboardPage() {
                   <SelectItem value="quarterly">Quarterly</SelectItem>
                 </SelectContent>
               </Select>
-              <Target className="h-5 w-5 text-primary/20" />
             </div>
           </CardHeader>
           <CardContent className="pt-6">
@@ -278,7 +339,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Hybrid & Service: Active Jobs Section */}
         {(businessType === 'SERVICE' || businessType === 'HYBRID') && (
             <Card className="shadow-lg border-primary/5">
                 <CardHeader>
@@ -320,7 +380,6 @@ export default function DashboardPage() {
             </Card>
         )}
 
-        {/* Hybrid & Product: Inventory Intelligence Section */}
         {(businessType === 'PRODUCT' || businessType === 'HYBRID') && (
             <Card className="shadow-lg border-primary/5">
                 <CardHeader>
@@ -344,7 +403,6 @@ export default function DashboardPage() {
             </Card>
         )}
 
-        {/* Global Recent Activity (shows for everyone) */}
         <Card className={cn(
             "shadow-lg border-primary/5",
             businessType === 'HYBRID' ? "lg:col-span-2" : ""
@@ -353,7 +411,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <CardTitle className="font-headline">Recent Activity</CardTitle>
-                    <CardDescription>Latest financial and operational events.</CardDescription>
+                    <CardDescription>Latest financial and operational events in selected range.</CardDescription>
                 </div>
                 <div className="bg-emerald-500/10 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold border border-emerald-500/20 flex items-center gap-2">
                     <Activity className="h-3 w-3" /> System Synchronized
@@ -365,7 +423,7 @@ export default function DashboardPage() {
                 "space-y-4",
                 businessType === 'HYBRID' ? "grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4" : ""
             )}>
-                {transactions.slice(0, 6).map((tx) => (
+                {filteredTransactions.slice(0, 10).map((tx) => (
                     <div key={tx.id} className="flex items-center justify-between p-3 rounded-xl border border-dashed hover:bg-muted/20 transition-all cursor-pointer">
                         <div className="flex items-center gap-3">
                             <div className={cn(
@@ -387,6 +445,11 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 ))}
+                {filteredTransactions.length === 0 && (
+                  <div className="col-span-full py-12 text-center text-muted-foreground italic text-sm">
+                    No activity found for the selected date range.
+                  </div>
+                )}
             </div>
           </CardContent>
         </Card>
@@ -405,7 +468,7 @@ export default function DashboardPage() {
                         <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-8">
                             Upgrade Plan
                         </Button>
-                        <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                        <Button asChild variant="outline" className="border-white/20 text-white hover:text-white hover:bg-white/10">
                             <Link href="/settings/business">Switch Model</Link>
                         </Button>
                     </div>
