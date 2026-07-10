@@ -144,7 +144,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/pos', label: 'POS Checkout', icon: MonitorSpeaker },
+    // Show POS for Hybrid and Product
+    ...(businessType !== 'SERVICE' ? [
+        { href: '/pos', label: 'POS Checkout', icon: MonitorSpeaker },
+    ] : []),
     // Conditionally show Appointments & Jobs for Service/Hybrid
     ...(businessType !== 'PRODUCT' ? [
         { href: '/appointments', label: 'Appointments', icon: CalendarClock },
