@@ -5,27 +5,49 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Search, MoreHorizontal, Package, Briefcase, Filter, Box, Clock } from "lucide-react"
+import { PlusCircle, Search, MoreHorizontal, Package, Briefcase, Filter, Box, Clock, Loader2, Trash2, Edit2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { catalogItems as initialItems } from "@/lib/data"
-import type { CatalogItem, BusinessType } from "@/lib/data"
+import type { CatalogItem, BusinessType, PricingModel, CatalogItemType } from "@/lib/data"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/hooks/use-toast"
 
 export default function CatalogPage() {
+    const { toast } = useToast()
     const [searchTerm, setSearchTerm] = React.useState("")
     const [filter, setFilter] = React.useState<'All' | 'Product' | 'Service'>('All')
-    const [items] = React.useState<CatalogItem[]>(initialItems)
+    const [items, setItems] = React.useState<CatalogItem[]>(initialItems)
     const [businessType, setBusinessType] = React.useState<BusinessType>('HYBRID')
+    const [isAddOpen, setIsAddOpen] = React.useState(false)
+    const [isEditOpen, setIsEditOpen] = React.useState(false)
+    const [selectedItem, setSelectedItem] = React.useState<CatalogItem | null>(null)
     const [mounted, setMounted] = React.useState(false)
+
+    // Form State for Add/Edit
+    const [formData, setFormData] = React.useState<Partial<CatalogItem>>({
+        type: 'Product',
+        name: '',
+        category: '',
+        price: 0,
+        description: '',
+        sku: '',
+        quantity: 0,
+        reorderLevel: 5,
+        duration: 30,
+        pricingModel: 'Fixed'
+    })
 
     React.useEffect(() => {
         setMounted(true)
         const savedType = localStorage.getItem('business-type') as BusinessType
         if (savedType) {
             setBusinessType(savedType)
-            // Set sensible default filter based on business type
             if (savedType === 'PRODUCT') setFilter('Product')
             else if (savedType === 'SERVICE') setFilter('Service')
             else setFilter('All')
@@ -36,9 +58,86 @@ export default function CatalogPage() {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                              item.category.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter = filter === 'All' || item.type === filter;
-        
         return matchesSearch && matchesFilter;
     })
+
+    const handleAddItem = () => {
+        if (!formData.name || !formData.category) {
+            toast({ variant: "destructive", title: "Missing Fields", description: "Name and Category are required." })
+            return
+        }
+
+        const newItem: CatalogItem = {
+            id: `cat-${Date.now()}`,
+            type: formData.type as CatalogItemType,
+            name: formData.name!,
+            category: formData.category!,
+            description: formData.description || '',
+            price: formData.price || 0,
+            status: formData.type === 'Product' 
+                ? ((formData.quantity || 0) > (formData.reorderLevel || 0) ? 'In Stock' : 'Low Stock') 
+                : 'Active',
+            sku: formData.sku,
+            quantity: formData.quantity,
+            reorderLevel: formData.reorderLevel,
+            duration: formData.duration,
+            pricingModel: formData.pricingModel as PricingModel
+        }
+
+        setItems([newItem, ...items])
+        setIsAddOpen(false)
+        resetForm()
+        toast({ title: "Item Added", description: `${newItem.name} has been added to your catalog.` })
+    }
+
+    const handleUpdateItem = () => {
+        if (!selectedItem || !formData.name) return
+
+        const updatedItems = items.map(item => {
+            if (item.id === selectedItem.id) {
+                return {
+                    ...item,
+                    ...formData,
+                    status: formData.type === 'Product' 
+                        ? ((formData.quantity || 0) > (formData.reorderLevel || 0) ? 'In Stock' : 'Low Stock') 
+                        : 'Active',
+                } as CatalogItem
+            }
+            return item
+        })
+
+        setItems(updatedItems)
+        setIsEditOpen(false)
+        setSelectedItem(null)
+        resetForm()
+        toast({ title: "Item Updated", description: "The catalog entry has been successfully updated." })
+    }
+
+    const handleDeleteItem = (id: string) => {
+        setItems(items.filter(item => item.id !== id))
+        toast({ title: "Item Removed", description: "The item has been deleted from your catalog." })
+    }
+
+    const resetForm = () => {
+        setFormData({
+            type: businessType === 'SERVICE' ? 'Service' : 'Product',
+            name: '',
+            category: '',
+            price: 0,
+            description: '',
+            sku: '',
+            quantity: 0,
+            reorderLevel: 5,
+            duration: 30,
+            pricingModel: 'Fixed'
+        })
+    }
+
+    const openEdit = (item: CatalogItem) => {
+        setSelectedItem(item)
+        setFormData(item)
+        setIsEditOpen(true)
+    }
 
     if (!mounted) return null
 
@@ -53,14 +152,32 @@ export default function CatalogPage() {
                     <p className="text-muted-foreground mt-1">{pageDesc}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => toast({ title: "Bulk Actions", description: "This feature will allow exporting and mass updates soon." })}>
                         <Filter className="mr-2 h-4 w-4" />
                         Bulk Actions
                     </Button>
-                    <Button size="sm">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add New {businessType === 'SERVICE' ? 'Service' : 'Item'}
-                    </Button>
+                    
+                    <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if(open) resetForm(); }}>
+                        <DialogTrigger asChild>
+                            <Button size="sm">
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Add New {businessType === 'SERVICE' ? 'Service' : 'Item'}
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-xl">
+                            <DialogHeader>
+                                <DialogTitle className="font-headline">Add Catalog Entry</DialogTitle>
+                                <DialogDescription>Create a new product or service record.</DialogDescription>
+                            </DialogHeader>
+                            <CatalogItemForm data={formData} setData={setFormData} businessType={businessType} />
+                            <DialogFooter>
+                                <DialogClose asChild>
+                                    <Button variant="outline">Cancel</Button>
+                                </DialogClose>
+                                <Button onClick={handleAddItem}>Create Entry</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </div>
 
@@ -70,17 +187,11 @@ export default function CatalogPage() {
                         <Tabs value={filter} onValueChange={(v: any) => setFilter(v)} className="w-full md:w-auto">
                             <TabsList className="bg-background border">
                                 <TabsTrigger value="All" className="data-[state=active]:bg-primary data-[state=active]:text-white">All Items</TabsTrigger>
-                                
                                 {(businessType === 'HYBRID' || businessType === 'PRODUCT') && (
-                                    <TabsTrigger value="Product" className="flex gap-2">
-                                        <Box className="h-4 w-4" /> Products
-                                    </TabsTrigger>
+                                    <TabsTrigger value="Product" className="flex gap-2"><Box className="h-4 w-4" /> Products</TabsTrigger>
                                 )}
-                                
                                 {(businessType === 'HYBRID' || businessType === 'SERVICE') && (
-                                    <TabsTrigger value="Service" className="flex gap-2">
-                                        <Clock className="h-4 w-4" /> Services
-                                    </TabsTrigger>
+                                    <TabsTrigger value="Service" className="flex gap-2"><Clock className="h-4 w-4" /> Services</TabsTrigger>
                                 )}
                             </TabsList>
                         </Tabs>
@@ -104,7 +215,7 @@ export default function CatalogPage() {
                                 <TableHead>Category</TableHead>
                                 <TableHead className="text-right">Price</TableHead>
                                 <TableHead className="text-center">
-                                    {filter === 'Service' ? 'Duration' : filter === 'Product' ? 'Stock' : 'Quantity / Time'}
+                                    {filter === 'Service' ? 'Duration' : filter === 'Product' ? 'Stock' : 'Qty / Time'}
                                 </TableHead>
                                 <TableHead className="text-center">Status</TableHead>
                                 <TableHead className="w-[50px]"></TableHead>
@@ -116,7 +227,7 @@ export default function CatalogPage() {
                                     <TableCell className="pl-6">
                                         <div className="flex items-center gap-3">
                                             <div className="bg-primary/5 p-2 rounded-lg group-hover:bg-primary/10 transition-colors">
-                                                {item.type === 'Product' ? <Package className="h-4 w-4 text-primary" /> : <Briefcase className="h-4 w-4 text-primary" />}
+                                                {item.type === 'Product' ? <Box className="h-4 w-4 text-primary" /> : <Clock className="h-4 w-4 text-primary" />}
                                             </div>
                                             <div>
                                                 <div className="font-bold text-sm">{item.name}</div>
@@ -134,7 +245,7 @@ export default function CatalogPage() {
                                     </TableCell>
                                     <TableCell className="text-center font-mono text-sm">
                                         {item.type === 'Product' ? (
-                                            <span className={cn(item.quantity! <= (item.reorderLevel || 0) ? "text-red-500 font-bold" : "")}>
+                                            <span className={cn((item.quantity || 0) <= (item.reorderLevel || 0) ? "text-red-500 font-bold" : "")}>
                                                 {item.quantity} units
                                             </span>
                                         ) : (
@@ -161,12 +272,11 @@ export default function CatalogPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" className="rounded-xl w-48">
                                                 <DropdownMenuLabel>Catalog Options</DropdownMenuLabel>
-                                                <DropdownMenuItem>Edit Item</DropdownMenuItem>
-                                                <DropdownMenuItem>Manage Pricing</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => openEdit(item)}><Edit2 className="h-4 w-4 mr-2" /> Edit Item</DropdownMenuItem>
                                                 <DropdownMenuItem>View Analytics</DropdownMenuItem>
                                                 {item.type === 'Product' && <DropdownMenuItem>Update Stock</DropdownMenuItem>}
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-destructive">Deactivate</DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteItem(item.id)}><Trash2 className="h-4 w-4 mr-2" /> Delete</DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
@@ -183,6 +293,123 @@ export default function CatalogPage() {
                     </Table>
                 </CardContent>
             </Card>
+
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-headline">Edit Catalog Entry</DialogTitle>
+                        <DialogDescription>Modify details for {selectedItem?.name}.</DialogDescription>
+                    </DialogHeader>
+                    <CatalogItemForm data={formData} setData={setFormData} businessType={businessType} />
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button onClick={handleUpdateItem}>Save Changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    )
+}
+
+function CatalogItemForm({ data, setData, businessType }: { data: Partial<CatalogItem>, setData: (d: any) => void, businessType: BusinessType }) {
+    return (
+        <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>Item Type</Label>
+                    <Select 
+                        value={data.type} 
+                        onValueChange={(val: any) => setData({...data, type: val})}
+                        disabled={businessType !== 'HYBRID'}
+                    >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Product">Product</SelectItem>
+                            <SelectItem value="Service">Service</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Input 
+                        placeholder="e.g. Maintenance" 
+                        value={data.category} 
+                        onChange={(e) => setData({...data, category: e.target.value})} 
+                    />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label>Item Name</Label>
+                <Input 
+                    placeholder="e.g. Premium Engine Oil" 
+                    value={data.name} 
+                    onChange={(e) => setData({...data, name: e.target.value})} 
+                />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>Selling Price (₦)</Label>
+                    <Input 
+                        type="number" 
+                        value={data.price} 
+                        onChange={(e) => setData({...data, price: parseFloat(e.target.value)})} 
+                    />
+                </div>
+                {data.type === 'Service' && (
+                    <div className="space-y-2">
+                        <Label>Pricing Model</Label>
+                        <Select 
+                            value={data.pricingModel} 
+                            onValueChange={(val: any) => setData({...data, pricingModel: val})}
+                        >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Fixed">Fixed Price</SelectItem>
+                                <SelectItem value="Hourly">Hourly Rate</SelectItem>
+                                <SelectItem value="Project">Per Project</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
+
+            {data.type === 'Product' ? (
+                <div className="grid grid-cols-3 gap-4 p-4 rounded-xl bg-muted/30 border border-dashed">
+                    <div className="space-y-2">
+                        <Label>SKU</Label>
+                        <Input value={data.sku} onChange={(e) => setData({...data, sku: e.target.value})} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Stock Qty</Label>
+                        <Input type="number" value={data.quantity} onChange={(e) => setData({...data, quantity: parseInt(e.target.value)})} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Reorder Level</Label>
+                        <Input type="number" value={data.reorderLevel} onChange={(e) => setData({...data, reorderLevel: parseInt(e.target.value)})} />
+                    </div>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 p-4 rounded-xl bg-muted/30 border border-dashed">
+                    <div className="space-y-2">
+                        <Label>Average Duration (minutes)</Label>
+                        <Input type="number" value={data.duration} onChange={(e) => setData({...data, duration: parseInt(e.target.value)})} />
+                    </div>
+                </div>
+            )}
+
+            <div className="space-y-2">
+                <Label>Internal Description</Label>
+                <Textarea 
+                    placeholder="Short description for internal records..." 
+                    className="h-20"
+                    value={data.description}
+                    onChange={(e) => setData({...data, description: e.target.value})}
+                />
+            </div>
         </div>
     )
 }
