@@ -168,6 +168,32 @@ export const employees: Employee[] = [
   { id: 'emp-004', name: 'David Bello', email: 'david@example.com', role: 'Mechanic', status: 'Active', checkInTime: '09:00 AM', checkOutTime: '05:00 PM' },
 ];
 
+export type PayrollRun = {
+  id: string;
+  month: string;
+  totalPaid: number;
+  employeesPaid: number;
+  payslips: {
+    employeeName: string;
+    netPay: number;
+  }[];
+};
+
+export const payrollHistory: PayrollRun[] = [
+  {
+    id: 'run-1',
+    month: 'June 2024',
+    totalPaid: 1317500,
+    employeesPaid: 4,
+    payslips: [
+      { employeeName: "Grace Adebayo", netPay: 425000 },
+      { employeeName: "Samuel Okoro", netPay: 340000 },
+      { employeeName: "Chioma Nwosu", netPay: 297500 },
+      { employeeName: "David Bello", netPay: 255000 },
+    ]
+  }
+];
+
 export const incomeVsExpenseData = [
     { month: 'Jan', income: 4000, expense: 2400 },
     { month: 'Feb', income: 3000, expense: 1398 },
