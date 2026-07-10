@@ -186,7 +186,11 @@ export default function AccountingPoliciesPage() {
                             </div>
                         </CardContent>
                         <CardFooter>
-                            <Button variant="link" className="p-0 text-primary h-auto text-xs">View Reporting Guide →</Button>
+                            <Button variant="link" className="p-0 text-primary h-auto text-xs" asChild>
+                                <a href="https://www.ifrs.org/issued-standards/ifrs-for-smes/" target="_blank" rel="noopener noreferrer">
+                                    View Reporting Guide →
+                                </a>
+                            </Button>
                         </CardFooter>
                     </Card>
 
