@@ -11,27 +11,48 @@ import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { catalogItems as initialItems } from "@/lib/data"
-import type { CatalogItem } from "@/lib/data"
+import type { CatalogItem, BusinessType } from "@/lib/data"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function CatalogPage() {
     const [searchTerm, setSearchTerm] = React.useState("")
     const [filter, setFilter] = React.useState<'All' | 'Product' | 'Service'>('All')
     const [items] = React.useState<CatalogItem[]>(initialItems)
+    const [businessType, setBusinessType] = React.useState<BusinessType>('HYBRID')
+    const [mounted, setMounted] = React.useState(false)
+
+    React.useEffect(() => {
+        setMounted(true)
+        const savedType = localStorage.getItem('business-type') as BusinessType
+        if (savedType) {
+            setBusinessType(savedType)
+            // Set sensible default filter based on business type
+            if (savedType === 'PRODUCT') setFilter('Product')
+            if (savedType === 'SERVICE') setFilter('Service')
+        }
+    }, [])
 
     const filteredItems = items.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                              item.category.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter = filter === 'All' || item.type === filter;
+        
+        // Final sanity check: if biz is service-only, don't show products in "All" unless intended
+        // But usually "All" is fine as it respects the filter state
         return matchesSearch && matchesFilter;
     })
+
+    if (!mounted) return null
+
+    const pageTitle = businessType === 'SERVICE' ? 'Service Menu' : businessType === 'PRODUCT' ? 'Product Catalog' : 'Business Catalog';
+    const pageDesc = businessType === 'SERVICE' ? 'Manage your professional services and billable hours.' : businessType === 'PRODUCT' ? 'Manage your inventory and retail goods.' : 'Manage your unified list of goods and billable services.';
 
     return (
         <div className="flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="font-headline text-3xl font-bold tracking-tight text-foreground">Business Catalog</h1>
-                    <p className="text-muted-foreground mt-1">Manage your unified list of goods and billable services.</p>
+                    <h1 className="font-headline text-3xl font-bold tracking-tight text-foreground">{pageTitle}</h1>
+                    <p className="text-muted-foreground mt-1">{pageDesc}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm">
@@ -40,7 +61,7 @@ export default function CatalogPage() {
                     </Button>
                     <Button size="sm">
                         <PlusCircle className="mr-2 h-4 w-4" />
-                        Add New Item
+                        Add New {businessType === 'SERVICE' ? 'Service' : 'Item'}
                     </Button>
                 </div>
             </div>
@@ -51,8 +72,18 @@ export default function CatalogPage() {
                         <Tabs value={filter} onValueChange={(v: any) => setFilter(v)} className="w-full md:w-auto">
                             <TabsList className="bg-background border">
                                 <TabsTrigger value="All" className="data-[state=active]:bg-primary data-[state=active]:text-white">All Items</TabsTrigger>
-                                <TabsTrigger value="Product" className="flex gap-2"><Box className="h-4 w-4" /> Products</TabsTrigger>
-                                <TabsTrigger value="Service" className="flex gap-2"><Clock className="h-4 w-4" /> Services</TabsTrigger>
+                                
+                                {(businessType === 'HYBRID' || businessType === 'PRODUCT') && (
+                                    <TabsTrigger value="Product" className="flex gap-2">
+                                        <Box className="h-4 w-4" /> Products
+                                    </TabsTrigger>
+                                )}
+                                
+                                {(businessType === 'HYBRID' || businessType === 'SERVICE') && (
+                                    <TabsTrigger value="Service" className="flex gap-2">
+                                        <Clock className="h-4 w-4" /> Services
+                                    </TabsTrigger>
+                                )}
                             </TabsList>
                         </Tabs>
                         <div className="relative w-full md:w-[300px]">
@@ -74,7 +105,9 @@ export default function CatalogPage() {
                                 <TableHead>Type</TableHead>
                                 <TableHead>Category</TableHead>
                                 <TableHead className="text-right">Price</TableHead>
-                                <TableHead className="text-center">Stock / Duration</TableHead>
+                                <TableHead className="text-center">
+                                    {filter === 'Service' ? 'Duration' : filter === 'Product' ? 'Stock' : 'Quantity / Time'}
+                                </TableHead>
                                 <TableHead className="text-center">Status</TableHead>
                                 <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
@@ -134,12 +167,20 @@ export default function CatalogPage() {
                                                 <DropdownMenuItem>Manage Pricing</DropdownMenuItem>
                                                 <DropdownMenuItem>View Analytics</DropdownMenuItem>
                                                 {item.type === 'Product' && <DropdownMenuItem>Update Stock</DropdownMenuItem>}
+                                                <DropdownMenuSeparator />
                                                 <DropdownMenuItem className="text-destructive">Deactivate</DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
                             ))}
+                            {filteredItems.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                                        No items found matching your criteria.
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
