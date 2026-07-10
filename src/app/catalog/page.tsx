@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -8,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PlusCircle, Search, MoreHorizontal, Package, Briefcase, Filter, Box, Clock } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { catalogItems as initialItems } from "@/lib/data"
 import type { CatalogItem, BusinessType } from "@/lib/data"
@@ -28,7 +27,8 @@ export default function CatalogPage() {
             setBusinessType(savedType)
             // Set sensible default filter based on business type
             if (savedType === 'PRODUCT') setFilter('Product')
-            if (savedType === 'SERVICE') setFilter('Service')
+            else if (savedType === 'SERVICE') setFilter('Service')
+            else setFilter('All')
         }
     }, [])
 
@@ -37,8 +37,6 @@ export default function CatalogPage() {
                              item.category.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter = filter === 'All' || item.type === filter;
         
-        // Final sanity check: if biz is service-only, don't show products in "All" unless intended
-        // But usually "All" is fine as it respects the filter state
         return matchesSearch && matchesFilter;
     })
 
