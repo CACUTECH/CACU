@@ -4,11 +4,13 @@ import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Download, Calendar as CalendarIcon, Printer, Filter } from "lucide-react"
+import { Download, Calendar as CalendarIcon, Printer, FileArchive } from "lucide-react"
 import { format } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
+import * as XLSX from 'xlsx'
 
 const trialBalanceData = [
     { code: '1000', name: 'Cash and Bank', debit: 1240000, credit: 0 },
@@ -26,9 +28,104 @@ const trialBalanceData = [
 
 export default function TrialBalancePage() {
     const [date, setDate] = React.useState<Date | undefined>(new Date())
+    const { toast } = useToast()
 
     const totalDebit = trialBalanceData.reduce((acc, curr) => acc + curr.debit, 0)
     const totalCredit = trialBalanceData.reduce((acc, curr) => acc + curr.credit, 0)
+
+    const handlePrint = () => {
+        window.print()
+    }
+
+    const exportToExcel = () => {
+        const dataForExport = trialBalanceData.map(item => ({
+            'Account Code': item.code,
+            'Account Description': item.name,
+            'Debit (₦)': item.debit,
+            'Credit (₦)': item.credit
+        }))
+        
+        // Add totals row
+        dataForExport.push({
+            'Account Code': '',
+            'Account Description': 'TOTALS',
+            'Debit (₦)': totalDebit,
+            'Credit (₦)': totalCredit
+        })
+
+        const worksheet = XLSX.utils.json_to_sheet(dataForExport)
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Trial Balance")
+        XLSX.writeFile(workbook, `Trial_Balance_${format(date || new Date(), 'yyyy-MM-dd')}.xlsx`)
+        
+        toast({
+            title: "Export Successful",
+            description: "Trial Balance has been exported to Excel format.",
+        })
+    }
+
+    const exportToPdf = async () => {
+        const { default: jsPDF } = await import('jspdf')
+        require('jspdf-autotable')
+        const doc = new jsPDF()
+
+        doc.setFontSize(18)
+        doc.text("Trial Balance Report", 14, 20)
+        
+        doc.setFontSize(10)
+        doc.text(`As at: ${format(date || new Date(), 'PPP')}`, 14, 28)
+        doc.text("Business: CACU Technologies Limited", 14, 33)
+
+        const tableRows = trialBalanceData.map(item => [
+            item.code,
+            item.name,
+            item.debit > 0 ? `₦${item.debit.toLocaleString()}` : "-",
+            item.credit > 0 ? `₦${item.credit.toLocaleString()}` : "-"
+        ])
+
+        // Add footer for totals
+        tableRows.push([
+            "",
+            "TOTALS",
+            `₦${totalDebit.toLocaleString()}`,
+            `₦${totalCredit.toLocaleString()}`
+        ])
+
+        ;(doc as any).autoTable({
+            startY: 40,
+            head: [['Account Code', 'Account Description', 'Debit (₦)', 'Credit (₦)']],
+            body: tableRows,
+            theme: 'grid',
+            headStyles: { fillColor: [82, 51, 255] },
+            columnStyles: {
+                2: { halign: 'right' },
+                3: { halign: 'right' }
+            },
+            didParseCell: (data: any) => {
+                if (data.row.index === tableRows.length - 1) {
+                    data.cell.styles.fontStyle = 'bold'
+                }
+            }
+        })
+
+        doc.save(`Trial_Balance_${format(date || new Date(), 'yyyy-MM-dd')}.pdf`)
+        
+        toast({
+            title: "Export Successful",
+            description: "Trial Balance has been exported to PDF format.",
+        })
+    }
+
+    const handleDownloadAuditPack = () => {
+        toast({
+            title: "Generating Audit Pack",
+            description: "Compiling financial statements and ledger reports...",
+        })
+        // For simulation, we just download the PDF Trial Balance
+        setTimeout(() => {
+            exportToPdf()
+        }, 1000)
+    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -49,11 +146,11 @@ export default function TrialBalancePage() {
                             <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
                         </PopoverContent>
                     </Popover>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={handlePrint}>
                         <Printer className="mr-2 h-4 w-4" />
                         Print Report
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={exportToExcel}>
                         <Download className="mr-2 h-4 w-4" />
                         Export
                     </Button>
@@ -120,14 +217,19 @@ export default function TrialBalancePage() {
                         <p className="text-muted-foreground">Always perform a bank reconciliation and inventory count to verify physical values against these balances.</p>
                     </CardContent>
                 </Card>
-                <div className="flex flex-col justify-center gap-4">
-                    <h3 className="font-headline text-xl font-bold">Audit Ready Reports</h3>
-                    <p className="text-muted-foreground text-sm">Download your Trial Balance, General Ledger, and sub-ledgers for your tax accountant or external auditors.</p>
+                <Card className="p-6 flex flex-col justify-center gap-4">
+                    <div className="space-y-1">
+                        <h3 className="font-headline text-xl font-bold">Audit Ready Reports</h3>
+                        <p className="text-muted-foreground text-sm">Download your Trial Balance, General Ledger, and sub-ledgers for your tax accountant or external auditors.</p>
+                    </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm">Download Audit Pack</Button>
+                        <Button variant="outline" size="sm" onClick={handleDownloadAuditPack}>
+                            <FileArchive className="mr-2 h-4 w-4" />
+                            Download Audit Pack
+                        </Button>
                         <Button variant="link" size="sm">How to read this report?</Button>
                     </div>
-                </div>
+                </Card>
             </div>
         </div>
     )
