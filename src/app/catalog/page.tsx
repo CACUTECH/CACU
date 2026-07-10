@@ -1,0 +1,149 @@
+
+"use client"
+
+import * as React from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { PlusCircle, Search, MoreHorizontal, Package, Briefcase, Filter, Box, Clock } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
+import { catalogItems as initialItems } from "@/lib/data"
+import type { CatalogItem } from "@/lib/data"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+export default function CatalogPage() {
+    const [searchTerm, setSearchTerm] = React.useState("")
+    const [filter, setFilter] = React.useState<'All' | 'Product' | 'Service'>('All')
+    const [items] = React.useState<CatalogItem[]>(initialItems)
+
+    const filteredItems = items.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             item.category.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesFilter = filter === 'All' || item.type === filter;
+        return matchesSearch && matchesFilter;
+    })
+
+    return (
+        <div className="flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="font-headline text-3xl font-bold tracking-tight text-foreground">Business Catalog</h1>
+                    <p className="text-muted-foreground mt-1">Manage your unified list of goods and billable services.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm">
+                        <Filter className="mr-2 h-4 w-4" />
+                        Bulk Actions
+                    </Button>
+                    <Button size="sm">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add New Item
+                    </Button>
+                </div>
+            </div>
+
+            <Card className="shadow-xl shadow-primary/5 border-primary/10">
+                <CardHeader className="border-b bg-muted/20">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <Tabs value={filter} onValueChange={(v: any) => setFilter(v)} className="w-full md:w-auto">
+                            <TabsList className="bg-background border">
+                                <TabsTrigger value="All" className="data-[state=active]:bg-primary data-[state=active]:text-white">All Items</TabsTrigger>
+                                <TabsTrigger value="Product" className="flex gap-2"><Box className="h-4 w-4" /> Products</TabsTrigger>
+                                <TabsTrigger value="Service" className="flex gap-2"><Clock className="h-4 w-4" /> Services</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                        <div className="relative w-full md:w-[300px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                                placeholder="Search name or category..." 
+                                className="pl-9 rounded-xl" 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-muted/30">
+                                <TableHead className="pl-6">Item</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead className="text-right">Price</TableHead>
+                                <TableHead className="text-center">Stock / Duration</TableHead>
+                                <TableHead className="text-center">Status</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredItems.map((item) => (
+                                <TableRow key={item.id} className="hover:bg-primary/5 transition-colors group">
+                                    <TableCell className="pl-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-primary/5 p-2 rounded-lg group-hover:bg-primary/10 transition-colors">
+                                                {item.type === 'Product' ? <Package className="h-4 w-4 text-primary" /> : <Briefcase className="h-4 w-4 text-primary" />}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-sm">{item.name}</div>
+                                                <div className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">{item.sku || 'N/A'}</div>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className="text-[10px] uppercase">{item.type}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium">{item.category}</TableCell>
+                                    <TableCell className="text-right font-bold font-mono">
+                                        ₦{item.price.toLocaleString()}
+                                        {item.pricingModel && <span className="text-[10px] text-muted-foreground ml-1">/{item.pricingModel.toLowerCase()}</span>}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono text-sm">
+                                        {item.type === 'Product' ? (
+                                            <span className={cn(item.quantity! <= (item.reorderLevel || 0) ? "text-red-500 font-bold" : "")}>
+                                                {item.quantity} units
+                                            </span>
+                                        ) : (
+                                            <span className="text-muted-foreground">{item.duration} mins</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge 
+                                            variant={item.status === 'In Stock' || item.status === 'Active' ? 'default' : 'destructive'}
+                                            className={cn(
+                                                "text-[10px]",
+                                                (item.status === 'In Stock' || item.status === 'Active') && "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border-emerald-500/20"
+                                            )}
+                                        >
+                                            {item.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="rounded-full">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="rounded-xl w-48">
+                                                <DropdownMenuLabel>Catalog Options</DropdownMenuLabel>
+                                                <DropdownMenuItem>Edit Item</DropdownMenuItem>
+                                                <DropdownMenuItem>Manage Pricing</DropdownMenuItem>
+                                                <DropdownMenuItem>View Analytics</DropdownMenuItem>
+                                                {item.type === 'Product' && <DropdownMenuItem>Update Stock</DropdownMenuItem>}
+                                                <DropdownMenuItem className="text-destructive">Deactivate</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </div>
+    )
+}

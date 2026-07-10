@@ -24,6 +24,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -31,17 +32,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, UploadCloud } from "lucide-react";
+import { Loader2, UploadCloud, Briefcase, Package, Sparkles } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   businessName: z.string().min(1, "Business name is required"),
+  businessType: z.enum(['PRODUCT', 'SERVICE', 'HYBRID'], {
+    required_error: "Please select a business type",
+  }),
   businessSector: z.string().min(1, "Business sector is required"),
   businessAddress: z.string().min(1, "Business address is required"),
   businessEmail: z.string().email(),
   phoneNumber: z.string().min(1, "Phone number is required"),
-  website: z.string().url().optional().or(z.literal("")),
   bankName: z.string().min(1, "Bank name is required"),
   accountNumber: z.string().min(1, "Account number is required"),
   accountName: z.string().min(1, "Account name is required"),
@@ -57,11 +61,11 @@ export default function SetupPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       businessName: "",
+      businessType: 'HYBRID',
       businessSector: "",
       businessAddress: "",
       businessEmail: "",
       phoneNumber: "",
-      website: "",
       bankName: "",
       accountNumber: "",
       accountName: "",
@@ -81,33 +85,29 @@ export default function SetupPage() {
     }
   };
 
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
-    // Placeholder for saving data
-    console.log(values);
     
-    // For this demo, we'll use localStorage to persist the bank details
-    // so they can be accessed on the invoice page.
-    const bankDetails = {
+    // Save configuration to localStorage for persistence in this demo
+    localStorage.setItem('business-type', values.businessType);
+    localStorage.setItem('business-details', JSON.stringify({
+      name: values.businessName,
+      address: values.businessAddress,
+      type: values.businessType,
+      sector: values.businessSector
+    }));
+    
+    localStorage.setItem('business-profile-bank', JSON.stringify({
       bankName: values.bankName,
       accountNumber: values.accountNumber,
       accountName: values.accountName,
-    };
-    localStorage.setItem('business-profile-bank', JSON.stringify(bankDetails));
+    }));
 
-    const businessDetails = {
-      name: values.businessName,
-      address: values.businessAddress,
-    };
-    localStorage.setItem('business-details', JSON.stringify(businessDetails));
-
-
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
     setIsLoading(false);
     toast({
       title: "Business Profile Saved",
-      description: "Your business profile has been successfully created.",
+      description: `Your ${values.businessType.toLowerCase()} business is ready.`,
     });
     router.push("/");
   };
@@ -115,20 +115,20 @@ export default function SetupPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-muted/40 px-4 py-12">
       <div className="w-full max-w-2xl mx-auto">
-        <Card className="shadow-lg">
+        <Card className="shadow-2xl border-primary/5">
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-headline">Welcome to CACU</CardTitle>
-            <CardDescription>Let’s set up your business profile</CardDescription>
+            <CardDescription>Let’s configure your business ecosystem</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                  <div className="space-y-2">
                   <FormLabel>Business Logo</FormLabel>
-                  <div className="flex items-center gap-4">
-                    <div className="w-24 h-24 rounded-lg border border-dashed flex items-center justify-center bg-muted/50">
+                  <div className="flex items-center gap-6">
+                    <div className="w-24 h-24 rounded-2xl border-2 border-dashed flex items-center justify-center bg-muted/50 overflow-hidden">
                       {logoPreview ? (
-                        <Image src={logoPreview} alt="Logo Preview" width={96} height={96} className="object-contain rounded-lg" />
+                        <Image src={logoPreview} alt="Logo Preview" width={96} height={96} className="object-contain" />
                       ) : (
                         <UploadCloud className="h-8 w-8 text-muted-foreground" />
                       )}
@@ -136,161 +136,177 @@ export default function SetupPage() {
                     <div className="flex-1">
                       <Input id="logo-upload" type="file" onChange={handleLogoChange} accept="image/*" className="hidden" />
                       <Button type="button" variant="outline" onClick={() => document.getElementById('logo-upload')?.click()}>
-                        Upload Logo
+                        Upload Brand Identity
                       </Button>
-                      <p className="text-xs text-muted-foreground mt-2">Recommended size: 200x200px. PNG or JPG.</p>
+                      <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold tracking-widest">PNG or JPG. Max 2MB.</p>
                     </div>
                   </div>
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="businessName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Business Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your Company LLC" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="businessSector"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Business Sector</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a sector" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="retail">Retail</SelectItem>
-                          <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                          <SelectItem value="technology">Technology</SelectItem>
-                          <SelectItem value="services">Services</SelectItem>
-                          <SelectItem value="agriculture">Agriculture</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="businessAddress"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Business Address</FormLabel>
-                      <FormControl>
-                        <Input placeholder="123 Main St, Anytown" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="businessEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Business Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="contact@yourcompany.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phoneNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input type="tel" placeholder="+234 800 000 0000" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="website"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Website <span className="text-muted-foreground">(Optional)</span></FormLabel>
-                      <FormControl>
-                        <Input placeholder="https://yourcompany.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Separator className="my-8" />
-                
-                <div>
-                    <h3 className="text-lg font-medium">Bank Details</h3>
-                    <p className="text-sm text-muted-foreground">This will be shown on invoices for payments.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <FormField
+                <div className="grid gap-6">
+                    <FormField
                         control={form.control}
-                        name="bankName"
+                        name="businessName"
                         render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Bank Name</FormLabel>
-                            <FormControl>
-                            <Input placeholder="e.g. Sterling Bank" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
+                            <FormItem>
+                                <FormLabel>Legal Business Name</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="e.g. Acme Services Ltd" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="businessType"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>What do you sell?</FormLabel>
+                                <div className="grid grid-cols-3 gap-4 mt-2">
+                                    {[
+                                        { val: 'PRODUCT', label: 'Products', icon: Package, desc: 'Retail, Wholesale' },
+                                        { val: 'SERVICE', label: 'Services', icon: Briefcase, desc: 'Consulting, Repairs' },
+                                        { val: 'HYBRID', label: 'Hybrid', icon: Sparkles, desc: 'Both goods & work' },
+                                    ].map((type) => (
+                                        <button
+                                            key={type.val}
+                                            type="button"
+                                            onClick={() => field.onChange(type.val)}
+                                            className={cn(
+                                                "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center",
+                                                field.value === type.val 
+                                                    ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" 
+                                                    : "border-muted bg-card hover:border-primary/50"
+                                            )}
+                                        >
+                                            <type.icon className={cn("h-6 w-6", field.value === type.val ? "text-primary" : "text-muted-foreground")} />
+                                            <div>
+                                                <p className="text-sm font-bold">{type.label}</p>
+                                                <p className="text-[10px] text-muted-foreground">{type.desc}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                        control={form.control}
+                        name="businessSector"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Industry Sector</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select industry" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="it">Technology & IT</SelectItem>
+                                        <SelectItem value="legal">Legal & Professional</SelectItem>
+                                        <SelectItem value="beauty">Salon & Beauty</SelectItem>
+                                        <SelectItem value="auto">Automotive & Repair</SelectItem>
+                                        <SelectItem value="retail">Retail & Shop</SelectItem>
+                                        <SelectItem value="other">Other Services</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
                         )}
                     />
                     <FormField
                         control={form.control}
-                        name="accountNumber"
+                        name="phoneNumber"
                         render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Account Number</FormLabel>
-                            <FormControl>
-                            <Input placeholder="0123456789" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
+                            <FormItem>
+                                <FormLabel>Business Phone</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="+234..." {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )}
                     />
                 </div>
+
                 <FormField
                     control={form.control}
-                    name="accountName"
+                    name="businessAddress"
                     render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Account Name</FormLabel>
-                        <FormControl>
-                        <Input placeholder="Your Company LLC" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
+                        <FormItem>
+                            <FormLabel>Physical Address</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Headquarters location" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
                     )}
                 />
 
+                <Separator />
+                
+                <div className="space-y-4">
+                    <div>
+                        <h3 className="text-lg font-bold font-headline">Settlement Details</h3>
+                        <p className="text-xs text-muted-foreground">Bank info for invoices and online payouts.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField
+                            control={form.control}
+                            name="bankName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Bank Name</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g. Sterling Bank" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="accountNumber"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Account Number</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="0123456789" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                    <FormField
+                        control={form.control}
+                        name="accountName"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Beneficiary Name</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Registered business name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
                 <Button 
                   type="submit" 
-                  className="w-full !mt-8"
+                  className="w-full h-12 text-lg rounded-xl shadow-xl shadow-primary/20"
                   disabled={isLoading}
                 >
-                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Continue"}
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Launch Business"}
                 </Button>
               </form>
             </Form>
@@ -300,5 +316,3 @@ export default function SetupPage() {
     </div>
   );
 }
-
-    
