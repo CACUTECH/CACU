@@ -81,6 +81,38 @@ export default function DashboardPage() {
   const netProfit = totalRevenue - totalExpenses;
   const totalCustomers = 54;
 
+  const performanceData = React.useMemo(() => {
+    switch (granularity) {
+      case "Day":
+        return [
+          { period: "Mon", income: 1200, expense: 800 },
+          { period: "Tue", income: 1500, expense: 900 },
+          { period: "Wed", income: 1100, expense: 1200 },
+          { period: "Thu", income: 1800, expense: 1000 },
+          { period: "Fri", income: 2200, expense: 1100 },
+          { period: "Sat", income: 900, expense: 400 },
+          { period: "Sun", income: 1300, expense: 500 },
+        ];
+      case "Week":
+        return [
+          { period: "Week 1", income: 4500, expense: 3200 },
+          { period: "Week 2", income: 5200, expense: 3800 },
+          { period: "Week 3", income: 4800, expense: 4100 },
+          { period: "Week 4", income: 6100, expense: 3900 },
+        ];
+      case "Quarter":
+        return [
+          { period: "Q1", income: 15000, expense: 11000 },
+          { period: "Q2", income: 18500, expense: 13000 },
+          { period: "Q3", income: 22000, expense: 15500 },
+          { period: "Q4", income: 26000, expense: 18000 },
+        ];
+      case "Month":
+      default:
+        return incomeVsExpenseData.map(d => ({ period: d.month, income: d.income, expense: d.expense }));
+    }
+  }, [granularity]);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -189,20 +221,21 @@ export default function DashboardPage() {
                 <SelectItem value="Day">Daily</SelectItem>
                 <SelectItem value="Week">Weekly</SelectItem>
                 <SelectItem value="Month">Monthly</SelectItem>
+                <SelectItem value="Quarter">Quarterly</SelectItem>
               </SelectContent>
             </Select>
           </CardHeader>
           <CardContent className="pt-4">
             <DataChart 
               type="area" 
-              data={incomeVsExpenseData} 
+              data={performanceData} 
               curveType="monotone" 
               config={{
                 income: { label: "Total Income", color: "#22c55e" },
                 expense: { label: "Total Expense", color: "#ef4444" },
               }} 
               dataKeys={['income', 'expense']} 
-              index="month" 
+              index="period" 
             />
           </CardContent>
         </Card>
@@ -215,16 +248,6 @@ export default function DashboardPage() {
               </CardTitle>
               <CardDescription>Major cost drivers for this period</CardDescription>
             </div>
-            <Select value={granularity} onValueChange={setGranularity}>
-              <SelectTrigger className="w-[120px] shadow-sm">
-                <SelectValue placeholder="Period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Day">Daily</SelectItem>
-                <SelectItem value="Week">Weekly</SelectItem>
-                <SelectItem value="Month">Monthly</SelectItem>
-              </SelectContent>
-            </Select>
           </CardHeader>
           <CardContent>
             <DataChart 
@@ -269,7 +292,7 @@ export default function DashboardPage() {
                   <TableCell className="hidden sm:table-cell">{transaction.category}</TableCell>
                   <TableCell className="hidden md:table-cell">{transaction.date}</TableCell>
                   <TableCell className="text-right">
-                    <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={cn("font-medium whitespace-nowrap shadow-sm", transaction.type === 'Income' ? 'bg-green-500/20 text-green-700 hover:bg-green-500/30 border-green-500/20' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30 border-red-500/20')}>
+                    <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={cn("font-medium whitespace-nowrap shadow-sm", transaction.type === 'Income' ? 'bg-green-500/20 text-green-700 hover:bg-green-500/30' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30 border-red-500/20')}>
                       {transaction.type === 'Income' ? '+' : '-'}₦{transaction.amount.toLocaleString()}
                     </Badge>
                   </TableCell>
