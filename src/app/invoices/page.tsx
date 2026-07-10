@@ -12,6 +12,11 @@ import {
   Download,
   Printer,
   UserPlus,
+  ArrowRightLeft,
+  RotateCcw,
+  CheckCircle2,
+  FileText,
+  History,
 } from "lucide-react"
 import type jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -32,6 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
   Table,
@@ -41,7 +47,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -52,19 +58,30 @@ import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { Switch } from "@/components/ui/switch"
+import { useToast } from "@/hooks/use-toast"
 
 import { inventoryItems } from "@/lib/data"
 import type { InventoryItem } from "@/lib/data"
-
 
 type Customer = {
     id: string;
     name: string;
 }
 
+type LineItem = {
+    id: string;
+    item: string;
+    quantity: number;
+    price: number;
+    total: number;
+}
+
+type InvoiceType = "Invoice" | "Receipt" | "Estimate" | "CreditMemo";
+
 type Invoice = {
     invoice: string;
-    paymentStatus: "Paid" | "Pending" | "Unpaid";
+    type: InvoiceType;
+    paymentStatus: "Paid" | "Pending" | "Unpaid" | "Accepted" | "Refunded";
     totalAmount: string;
     paymentMethod: string;
     customerName: string;
@@ -78,134 +95,49 @@ type Invoice = {
     vatIncluded: boolean;
 }
 
-const invoicesData: Omit<Invoice, 'subtotal' | 'tax' | 'total' | 'vatIncluded'>[] = [
-  {
-    invoice: "INV001",
-    paymentStatus: "Paid",
-    totalAmount: "₦250.00",
-    paymentMethod: "Credit Card",
-    customerName: "Alice Johnson",
-    date: "2024-07-20",
-  },
-  {
-    invoice: "INV002",
-    paymentStatus: "Pending",
-    totalAmount: "₦150.00",
-    paymentMethod: "PayPal",
-    customerName: "Bob Williams",
-    date: "2024-07-21",
-  },
-  {
-    invoice: "INV003",
-    paymentStatus: "Unpaid",
-    totalAmount: "₦350.00",
-    paymentMethod: "Bank Transfer",
-    customerName: "Charlie Brown",
-     date: "2024-07-22",
-  },
-  {
-    invoice: "INV004",
-    paymentStatus: "Paid",
-    totalAmount: "₦450.00",
-    paymentMethod: "Credit Card",
-    customerName: "Diana Miller",
-     date: "2024-07-23",
-  },
-  {
-    invoice: "INV005",
-    paymentStatus: "Paid",
-    totalAmount: "₦550.00",
-    paymentMethod: "PayPal",
-    customerName: "Ethan Davis",
-    date: "2024-07-24",
-  },
-  {
-    invoice: "INV006",
-    paymentStatus: "Pending",
-    totalAmount: "₦200.00",
-    paymentMethod: "Bank Transfer",
-    customerName: "Fiona Green",
-    date: "2024-07-25",
-  },
-  {
-    invoice: "INV007",
-    paymentStatus: "Unpaid",
-    totalAmount: "₦300.00",
-    paymentMethod: "Credit Card",
-    customerName: "George Hill",
-    date: "2024-07-26",
-  },
-]
-
 const initialCustomers: Customer[] = [
     { id: "cust-001", name: "Alice Johnson" },
     { id: "cust-002", name: "Bob Williams" },
     { id: "cust-003", name: "Charlie Brown" },
 ]
 
-const processInvoices = (data: Omit<Invoice, 'subtotal' | 'tax' | 'total' | 'vatIncluded'>[]): Invoice[] => {
-    return data.map(i => {
-        const total = parseFloat(i.totalAmount.replace('₦', ''));
-        // Assume VAT was included for existing data
-        const tax = total * 0.075 / 1.075;
-        const subtotal = total - tax;
-        return {
-            ...i,
-            total,
-            subtotal,
-            tax,
-            vatIncluded: true,
-        }
-    })
-}
-
-const initialInvoices = processInvoices(invoicesData);
-
-
-const allInvoices = initialInvoices.filter(invoice => invoice.paymentStatus !== "Paid");
-const receipts = initialInvoices.filter(invoice => invoice.paymentStatus === "Paid");
-
-type LineItem = {
-    id: string;
-    item: string;
-    quantity: number;
-    price: number;
-    total: number;
-}
+const invoicesData: Invoice[] = [
+  {
+    invoice: "INV001",
+    type: "Invoice",
+    paymentStatus: "Paid",
+    totalAmount: "₦250.00",
+    paymentMethod: "Credit Card",
+    customerName: "Alice Johnson",
+    date: "2024-07-20",
+    subtotal: 232.56,
+    tax: 17.44,
+    total: 250,
+    vatIncluded: true,
+  },
+  {
+    invoice: "EST001",
+    type: "Estimate",
+    paymentStatus: "Pending",
+    totalAmount: "₦1,200.00",
+    paymentMethod: "N/A",
+    customerName: "Bob Williams",
+    date: "2024-07-21",
+    subtotal: 1116.28,
+    tax: 83.72,
+    total: 1200,
+    vatIncluded: true,
+  }
+]
 
 const downloadPdf = async (invoice: Invoice) => {
     const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF();
-    const type = invoice.paymentStatus === 'Paid' ? 'Receipt' : 'Invoice';
+    const typeLabel = invoice.type === 'CreditMemo' ? 'Credit Memo' : invoice.type;
 
-    // Add logo if available
-    const logoDataUrl = localStorage.getItem('business-logo');
-    let logoY = 15;
-    if (logoDataUrl) {
-        doc.addImage(logoDataUrl, 'PNG', 14, logoY, 30, 30);
-    }
-
-    const businessDetailsStr = localStorage.getItem('business-details');
-    if (businessDetailsStr) {
-        const details = JSON.parse(businessDetailsStr);
-        let yPos = logoDataUrl ? 50 : 20;
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        if (details.name) {
-            doc.text(details.name, 14, yPos);
-            yPos += 5;
-        }
-        doc.setFont('helvetica', 'normal');
-        if (details.address) {
-            doc.text(details.address, 14, yPos, { maxWidth: 80 });
-        }
-    }
-
-
-    // Header
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text(`${type} #${invoice.invoice}`, doc.internal.pageSize.getWidth() - 14, 22, { align: 'right' });
+    doc.text(`${typeLabel} #${invoice.invoice}`, doc.internal.pageSize.getWidth() - 14, 22, { align: 'right' });
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
@@ -217,19 +149,17 @@ const downloadPdf = async (invoice: Invoice) => {
    
     doc.text(`Customer: ${invoice.customerName}`, 14, 60);
 
-    // Items table
     if (invoice.items && invoice.items.length > 0) {
         (doc as any).autoTable({
             startY: 70,
             head: [['Item', 'Quantity', 'Price', 'Total']],
             body: invoice.items.map(item => [item.item, item.quantity, `₦${item.price.toFixed(2)}`, `₦${item.total.toFixed(2)}`]),
             theme: 'striped',
-            headStyles: { fillColor: [50, 153, 50] } // Dark green
+            headStyles: { fillColor: [82, 51, 255] }
         });
     }
 
-    // Totals
-    let finalY = (doc as any).lastAutoTable.finalY || 80;
+    let finalY = (doc as any).lastAutoTable?.finalY || 80;
     let yPos = finalY + 10;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
@@ -247,160 +177,11 @@ const downloadPdf = async (invoice: Invoice) => {
     doc.text('Total:', 140, yPos);
     doc.text(`₦${invoice.total.toFixed(2)}`, 200, yPos, { align: 'right' });
 
-    // Bank Details
-    const bankDetailsStr = localStorage.getItem('business-profile-bank');
-    if (bankDetailsStr) {
-        const bankDetails = JSON.parse(bankDetailsStr);
-        if (bankDetails.bankName && bankDetails.accountNumber && bankDetails.accountName) {
-            yPos += 15;
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Payment Details:', 14, yPos);
-            doc.setFont('helvetica', 'normal');
-            yPos += 5;
-            doc.text(`Bank: ${bankDetails.bankName}`, 14, yPos);
-            yPos += 5;
-            doc.text(`Account Number: ${bankDetails.accountNumber}`, 14, yPos);
-            yPos += 5;
-            doc.text(`Account Name: ${bankDetails.accountName}`, 14, yPos);
-        }
-    }
-
-
-    // Notes
-    if (invoice.notes) {
-        yPos += 15;
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text('Notes:', 14, yPos);
-        doc.text(invoice.notes, 14, yPos + 5, { maxWidth: 180 });
-    }
-
-    // Footer
-    doc.setFontSize(10);
-    doc.text('Thank you for your business!', 105, 285, { align: 'center' });
-
-    doc.save(`${type}_${invoice.invoice}.pdf`);
+    doc.save(`${invoice.type}_${invoice.invoice}.pdf`);
 };
-
-function InvoiceDetailsDialog({ invoice, onOpenChange }: { invoice: Invoice | null; onOpenChange: (open: boolean) => void; }) {
-    if (!invoice) return null;
-
-    const type = invoice.paymentStatus === 'Paid' ? 'Receipt' : 'Invoice';
-
-    return (
-        <Dialog open={!!invoice} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                    <DialogTitle>{type} #{invoice.invoice}</DialogTitle>
-                    <DialogDescription>
-                        Details for {type.toLowerCase()} to {invoice.customerName} on {format(new Date(invoice.date), "PPP")}.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-6 py-4" id={`details-${invoice.invoice}`}>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <p className="font-semibold">Customer</p>
-                            <p>{invoice.customerName}</p>
-                        </div>
-                         <div>
-                            <p className="font-semibold">{type} Date</p>
-                            <p>{format(new Date(invoice.date), "PPP")}</p>
-                        </div>
-                        {invoice.dueDate && (
-                             <div>
-                                <p className="font-semibold">Due Date</p>
-                                <p>{format(new Date(invoice.dueDate), "PPP")}</p>
-                            </div>
-                        )}
-                        <div>
-                            <p className="font-semibold">Status</p>
-                            <Badge variant={
-                                invoice.paymentStatus === "Paid" ? "default" :
-                                invoice.paymentStatus === "Pending" ? "secondary" :
-                                "destructive"
-                            }>
-                                {invoice.paymentStatus}
-                            </Badge>
-                        </div>
-                    </div>
-                    
-                    {invoice.items && invoice.items.length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="font-semibold">Items</h4>
-                            <div className="rounded-md border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Item</TableHead>
-                                            <TableHead className="w-[100px]">Quantity</TableHead>
-                                            <TableHead className="w-[120px]">Price</TableHead>
-                                            <TableHead className="w-[120px] text-right">Total</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {invoice.items.map(line => (
-                                            <TableRow key={line.id}>
-                                                <TableCell>{line.item}</TableCell>
-                                                <TableCell>{line.quantity}</TableCell>
-                                                <TableCell>₦{line.price.toLocaleString()}</TableCell>
-                                                <TableCell className="text-right">₦{line.total.toLocaleString()}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                        <div className="md:col-start-3 space-y-2">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Subtotal</span>
-                                <span>₦{invoice.subtotal.toLocaleString()}</span>
-                            </div>
-                            {invoice.vatIncluded && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">VAT (7.5%)</span>
-                                    <span>₦{invoice.tax.toLocaleString()}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between font-bold text-lg">
-                                <span>Total</span>
-                                <span>₦{invoice.total.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {invoice.notes && (
-                        <div className="space-y-2">
-                            <h4 className="font-semibold">Notes</h4>
-                            <p className="text-sm text-muted-foreground">{invoice.notes}</p>
-                        </div>
-                    )}
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print</Button>
-                    <Button onClick={() => downloadPdf(invoice)}><Download className="mr-2 h-4 w-4" />Download PDF</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
 
 function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Customer) => void }) {
     const [name, setName] = React.useState('');
-
-    const handleSave = () => {
-        if (name) {
-            const newCustomer: Customer = {
-                id: `cust-${Date.now()}`,
-                name,
-            };
-            onSave(newCustomer);
-        }
-    };
-
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -409,29 +190,19 @@ function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Customer) => void
                     Add new customer
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Add New Customer</DialogTitle>
-                    <DialogDescription>Enter the new customer's name below.</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="customer-name" className="text-right">Name</Label>
-                        <Input
-                            id="customer-name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="col-span-3"
-                            placeholder="e.g. John Doe"
-                        />
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Name</Label>
+                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Doe" />
                     </div>
                 </div>
                 <DialogFooter>
                     <DialogClose asChild>
-                        <Button type="button" variant="secondary">Cancel</Button>
-                    </DialogClose>
-                    <DialogClose asChild>
-                         <Button type="submit" onClick={handleSave} disabled={!name}>Save Customer</Button>
+                         <Button onClick={() => onSave({ id: `cust-${Date.now()}`, name })} disabled={!name}>Save Customer</Button>
                     </DialogClose>
                 </DialogFooter>
             </DialogContent>
@@ -439,275 +210,41 @@ function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Customer) => void
     );
 }
 
-function AddReceiptDialog({ onSave, customers, onCustomerAdd }: { onSave: (newReceipt: Invoice) => void; customers: Customer[]; onCustomerAdd: (customer: Customer) => void; }) {
+function CreateDocumentDialog({ 
+    type, 
+    onSave, 
+    customers, 
+    onCustomerAdd 
+}: { 
+    type: InvoiceType; 
+    onSave: (doc: Invoice) => void; 
+    customers: Customer[]; 
+    onCustomerAdd: (c: Customer) => void; 
+}) {
     const [customer, setCustomer] = React.useState('');
-    const [receiptDate, setReceiptDate] = React.useState<Date | undefined>(new Date());
-    const [lineItems, setLineItems] = React.useState<LineItem[]>([
-        { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }
-    ]);
-     const [paymentMethod, setPaymentMethod] = React.useState('');
-     const [notes, setNotes] = React.useState('');
-     const [includeVat, setIncludeVat] = React.useState(true);
-     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-
-    const handleItemChange = (id: string, selectedItemId: string) => {
-        const selectedItem = inventoryItems.find(i => i.id === selectedItemId);
-        if (selectedItem) {
-            setLineItems(lineItems.map(line =>
-                line.id === id ? { ...line, item: selectedItem.name, price: selectedItem.price, total: line.quantity * selectedItem.price } : line
-            ));
-        }
-    };
-
-    const handleQuantityChange = (id: string, quantity: number) => {
-        setLineItems(lineItems.map(line =>
-            line.id === id ? { ...line, quantity, total: quantity * line.price } : line
-        ));
-    };
-
-    const handlePriceChange = (id: string, price: number) => {
-        setLineItems(lineItems.map(line =>
-            line.id === id ? { ...line, price, total: line.quantity * price } : line
-        ));
-    };
-
-    const addLineItem = () => {
-        setLineItems([...lineItems, { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }]);
-    };
-
-    const removeLineItem = (id: string) => {
-        setLineItems(lineItems.filter(line => line.id !== id));
-    };
-
-    const subtotal = React.useMemo(() => lineItems.reduce((acc, item) => acc + item.total, 0), [lineItems]);
-    const tax = includeVat ? subtotal * 0.075 : 0;
-    const total = subtotal + tax;
-
-    const handleSave = () => {
-        const newReceipt: Invoice = {
-            invoice: `RCPT${(Math.random() * 1000).toFixed(0).padStart(3, '0')}`,
-            paymentStatus: "Paid",
-            totalAmount: `₦${total.toLocaleString()}`,
-            paymentMethod: paymentMethod || "Cash",
-            customerName: customers.find(c => c.id === customer)?.name || 'Unknown',
-            date: format(receiptDate || new Date(), "yyyy-MM-dd"),
-            items: lineItems,
-            notes,
-            subtotal,
-            tax,
-            total,
-            vatIncluded: includeVat,
-        };
-        onSave(newReceipt);
-        setIsDialogOpen(false);
-    }
-    
-    const handleNewCustomerSave = (newCustomer: Customer) => {
-        onCustomerAdd(newCustomer);
-        setCustomer(newCustomer.id);
-    }
-
-    return (
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Receipt
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                    <DialogTitle>Create New Receipt</DialogTitle>
-                    <DialogDescription>Fill out the details below to create a new receipt for a sale.</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-6 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label>Customer</Label>
-                            <Select value={customer} onValueChange={setCustomer}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a customer" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {customers.map(c => (
-                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                    ))}
-                                    <AddCustomerDialog onSave={handleNewCustomerSave} />
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                             <Label>Receipt Date</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !receiptDate && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {receiptDate ? format(receiptDate, "PPP") : <span>Pick a date</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={receiptDate} onSelect={setReceiptDate} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Payment Method</Label>
-                            <Select onValueChange={setPaymentMethod}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select payment method" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Cash">Cash</SelectItem>
-                                    <SelectItem value="Credit Card">Credit Card</SelectItem>
-                                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                    <SelectItem value="PayPal">PayPal</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                        <Label>Items Sold</Label>
-                        <div className="rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Item</TableHead>
-                                        <TableHead className="w-[100px]">Quantity</TableHead>
-                                        <TableHead className="w-[120px]">Price</TableHead>
-                                        <TableHead className="w-[120px] text-right">Total</TableHead>
-                                        <TableHead className="w-[50px]"><span className="sr-only">Actions</span></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {lineItems.map(line => (
-                                        <TableRow key={line.id}>
-                                            <TableCell>
-                                                <Select onValueChange={(value) => handleItemChange(line.id, value)}>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select an item" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {inventoryItems.map(item => (
-                                                            <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input type="number" value={line.quantity} onChange={(e) => handleQuantityChange(line.id, parseInt(e.target.value))} min="1" />
-                                            </TableCell>
-                                             <TableCell>
-                                                <Input type="number" value={line.price} onChange={(e) => handlePriceChange(line.id, parseFloat(e.target.value))} />
-                                            </TableCell>
-                                            <TableCell className="text-right">₦{line.total.toLocaleString()}</TableCell>
-                                            <TableCell>
-                                                <Button variant="ghost" size="icon" onClick={() => removeLineItem(line.id)}>
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={addLineItem} className="mt-2">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Item
-                        </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                        <div className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                                <Switch id="vat-switch" checked={includeVat} onCheckedChange={setIncludeVat} />
-                                <Label htmlFor="vat-switch">Include VAT (7.5%)</Label>
-                            </div>
-                        </div>
-                        <div className="md:col-start-3 space-y-2">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Subtotal</span>
-                                <span>₦{subtotal.toLocaleString()}</span>
-                            </div>
-                            {includeVat && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">VAT (7.5%)</span>
-                                    <span>₦{tax.toLocaleString()}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between font-bold text-lg">
-                                <span>Total</span>
-                                <span>₦{total.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Notes</Label>
-                        <Textarea placeholder="Add any notes for the customer..." value={notes} onChange={(e) => setNotes(e.target.value)} />
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button onClick={handleSave} className="w-full sm:w-auto">Save Receipt</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-
-function AddInvoiceDialog({ onSave, customers, onCustomerAdd }: { onSave: (newInvoice: Invoice) => void; customers: Customer[]; onCustomerAdd: (customer: Customer) => void; }) {
-    const [customer, setCustomer] = React.useState('');
-    const [invoiceDate, setInvoiceDate] = React.useState<Date | undefined>(new Date());
+    const [date, setDate] = React.useState<Date | undefined>(new Date());
     const [dueDate, setDueDate] = React.useState<Date | undefined>();
     const [lineItems, setLineItems] = React.useState<LineItem[]>([
         { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }
     ]);
     const [notes, setNotes] = React.useState('');
     const [includeVat, setIncludeVat] = React.useState(true);
-    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+    const [isOpen, setIsOpen] = React.useState(false);
 
-    const handleItemChange = (id: string, selectedItemId: string) => {
-        const selectedItem = inventoryItems.find(i => i.id === selectedItemId);
-        if (selectedItem) {
-            setLineItems(lineItems.map(line =>
-                line.id === id ? { ...line, item: selectedItem.name, price: selectedItem.price, total: line.quantity * selectedItem.price } : line
-            ));
-        }
-    };
-
-    const handleQuantityChange = (id: string, quantity: number) => {
-        setLineItems(lineItems.map(line =>
-            line.id === id ? { ...line, quantity, total: quantity * line.price } : line
-        ));
-    };
-
-    const handlePriceChange = (id: string, price: number) => {
-        setLineItems(lineItems.map(line =>
-            line.id === id ? { ...line, price, total: line.quantity * price } : line
-        ));
-    };
-
-    const addLineItem = () => {
-        setLineItems([...lineItems, { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }]);
-    };
-
-    const removeLineItem = (id: string) => {
-        setLineItems(lineItems.filter(line => line.id !== id));
-    };
-
-    const subtotal = React.useMemo(() => lineItems.reduce((acc, item) => acc + item.total, 0), [lineItems]);
+    const subtotal = lineItems.reduce((acc, item) => acc + item.total, 0);
     const tax = includeVat ? subtotal * 0.075 : 0;
     const total = subtotal + tax;
 
     const handleSave = () => {
-        const newInvoice: Invoice = {
-            invoice: `INV${(Math.random() * 1000).toFixed(0).padStart(3, '0')}`,
-            paymentStatus: "Pending",
+        const prefix = type === 'Invoice' ? 'INV' : type === 'Estimate' ? 'EST' : type === 'CreditMemo' ? 'MEMO' : 'RCPT';
+        const doc: Invoice = {
+            invoice: `${prefix}${(Math.random() * 1000).toFixed(0).padStart(3, '0')}`,
+            type,
+            paymentStatus: type === 'Receipt' ? 'Paid' : 'Pending',
             totalAmount: `₦${total.toLocaleString()}`,
-            paymentMethod: "N/A",
+            paymentMethod: type === 'Receipt' ? 'Cash' : 'N/A',
             customerName: customers.find(c => c.id === customer)?.name || 'Unknown',
-            date: format(invoiceDate || new Date(), "yyyy-MM-dd"),
+            date: format(date || new Date(), "yyyy-MM-dd"),
             dueDate: dueDate ? format(dueDate, "yyyy-MM-dd") : undefined,
             items: lineItems,
             notes,
@@ -716,27 +253,21 @@ function AddInvoiceDialog({ onSave, customers, onCustomerAdd }: { onSave: (newIn
             total,
             vatIncluded: includeVat,
         };
-        onSave(newInvoice);
-        setIsDialogOpen(false);
-    }
-    
-    const handleNewCustomerSave = (newCustomer: Customer) => {
-        onCustomerAdd(newCustomer);
-        setCustomer(newCustomer.id);
+        onSave(doc);
+        setIsOpen(false);
     }
 
     return (
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 <Button size="sm">
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Invoice
+                    New {type === 'CreditMemo' ? 'Credit Memo' : type}
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                    <DialogTitle>Create New Invoice</DialogTitle>
-                    <DialogDescription>Fill out the details below to create a new invoice.</DialogDescription>
+                    <DialogTitle>Create {type === 'CreditMemo' ? 'Credit Memo' : type}</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-6 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -744,282 +275,253 @@ function AddInvoiceDialog({ onSave, customers, onCustomerAdd }: { onSave: (newIn
                             <Label>Customer</Label>
                             <Select value={customer} onValueChange={setCustomer}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select a customer" />
+                                    <SelectValue placeholder="Select customer" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {customers.map(c => (
-                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                    ))}
-                                    <AddCustomerDialog onSave={handleNewCustomerSave} />
+                                    {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                    <AddCustomerDialog onSave={(c) => { onCustomerAdd(c); setCustomer(c.id); }} />
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="space-y-2">
-                             <Label>Invoice Date</Label>
-                             <Popover>
+                            <Label>Date</Label>
+                            <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !invoiceDate && "text-muted-foreground")}>
+                                    <Button variant="outline" className="w-full justify-start text-left font-normal">
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {invoiceDate ? format(invoiceDate, "PPP") : <span>Pick a date</span>}
+                                        {date ? format(date, "PPP") : <span>Pick a date</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={invoiceDate} onSelect={setInvoiceDate} initialFocus />
-                                </PopoverContent>
+                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={date} onSelect={setDate} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
-                         <div className="space-y-2">
-                             <Label>Due Date</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !dueDate && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
+                        {type === 'Invoice' && (
+                            <div className="space-y-2">
+                                <Label>Due Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {dueDate ? format(dueDate, "PPP") : <span>Set due date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus /></PopoverContent>
+                                </Popover>
+                            </div>
+                        )}
                     </div>
-                    
-                    <div className="space-y-2">
-                        <Label>Invoice Items</Label>
-                        <div className="rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Item</TableHead>
-                                        <TableHead className="w-[100px]">Quantity</TableHead>
-                                        <TableHead className="w-[120px]">Price</TableHead>
-                                        <TableHead className="w-[120px] text-right">Total</TableHead>
-                                        <TableHead className="w-[50px]"><span className="sr-only">Actions</span></TableHead>
+
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead className="w-[100px]">Qty</TableHead>
+                                    <TableHead className="w-[120px]">Price</TableHead>
+                                    <TableHead className="text-right">Total</TableHead>
+                                    <TableHead className="w-[50px]"></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {lineItems.map(line => (
+                                    <TableRow key={line.id}>
+                                        <TableCell>
+                                            <Select onValueChange={(val) => {
+                                                const item = inventoryItems.find(i => i.id === val);
+                                                if(item) setLineItems(lineItems.map(l => l.id === line.id ? { ...l, item: item.name, price: item.price, total: l.quantity * item.price } : l));
+                                            }}>
+                                                <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
+                                                <SelectContent>{inventoryItems.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}</SelectContent>
+                                            </Select>
+                                        </TableCell>
+                                        <TableCell><Input type="number" value={line.quantity} onChange={(e) => setLineItems(lineItems.map(l => l.id === line.id ? { ...l, quantity: parseInt(e.target.value), total: parseInt(e.target.value) * l.price } : l))} /></TableCell>
+                                        <TableCell><Input type="number" value={line.price} onChange={(e) => setLineItems(lineItems.map(l => l.id === line.id ? { ...l, price: parseFloat(e.target.value), total: l.quantity * parseFloat(e.target.value) } : l))} /></TableCell>
+                                        <TableCell className="text-right">₦{line.total.toLocaleString()}</TableCell>
+                                        <TableCell><Button variant="ghost" size="icon" onClick={() => setLineItems(lineItems.filter(l => l.id !== line.id))}><X className="h-4 w-4" /></Button></TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {lineItems.map(line => (
-                                        <TableRow key={line.id}>
-                                            <TableCell>
-                                                <Select onValueChange={(value) => handleItemChange(line.id, value)}>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select an item" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {inventoryItems.map(item => (
-                                                            <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input type="number" value={line.quantity} onChange={(e) => handleQuantityChange(line.id, parseInt(e.target.value))} min="1" />
-                                            </TableCell>
-                                             <TableCell>
-                                                <Input type="number" value={line.price} onChange={(e) => handlePriceChange(line.id, parseFloat(e.target.value))} />
-                                            </TableCell>
-                                            <TableCell className="text-right">₦{line.total.toLocaleString()}</TableCell>
-                                            <TableCell>
-                                                <Button variant="ghost" size="icon" onClick={() => removeLineItem(line.id)}>
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={addLineItem} className="mt-2">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Item
-                        </Button>
+                                ))}
+                            </TableBody>
+                        </Table>
                     </div>
+                    <Button variant="outline" size="sm" onClick={() => setLineItems([...lineItems, { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }])}>Add Item</Button>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                        <div className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                                <Switch id="vat-switch-invoice" checked={includeVat} onCheckedChange={setIncludeVat} />
-                                <Label htmlFor="vat-switch-invoice">Include VAT (7.5%)</Label>
-                            </div>
+                    <div className="flex justify-end gap-12">
+                        <div className="flex items-center space-x-2"><Switch checked={includeVat} onCheckedChange={setIncludeVat} /><Label>VAT (7.5%)</Label></div>
+                        <div className="w-48 space-y-2">
+                            <div className="flex justify-between text-sm"><span>Subtotal</span><span>₦{subtotal.toLocaleString()}</span></div>
+                            <div className="flex justify-between font-bold text-lg"><span>Total</span><span>₦{total.toLocaleString()}</span></div>
                         </div>
-                        <div className="md:col-start-3 space-y-2">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Subtotal</span>
-                                <span>₦{subtotal.toLocaleString()}</span>
-                            </div>
-                            {includeVat && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">VAT (7.5%)</span>
-                                    <span>₦{tax.toLocaleString()}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between font-bold text-lg">
-                                <span>Total</span>
-                                <span>₦{total.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Notes</Label>
-                        <Textarea placeholder="Add any notes for the customer..." value={notes} onChange={(e) => setNotes(e.target.value)} />
                     </div>
                 </div>
-                <DialogFooter>
-                    <Button onClick={handleSave} className="w-full sm:w-auto">Save Invoice</Button>
-                </DialogFooter>
+                <DialogFooter><Button onClick={handleSave} className="w-full">Create {type}</Button></DialogFooter>
             </DialogContent>
         </Dialog>
-    )
+    );
 }
 
-
-function InvoiceTable({ data, onMarkAsPaid, onViewDetails }: { data: Invoice[], onMarkAsPaid: (invoiceId: string) => void, onViewDetails: (invoice: Invoice) => void }) {
+function InvoiceTable({ data, onAction }: { data: Invoice[], onAction: (action: string, inv: Invoice) => void }) {
     return (
         <div className="rounded-md border">
             <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>
-                        <span className="sr-only">Actions</span>
-                    </TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {data.map((invoice) => (
-                <TableRow key={invoice.invoice}>
-                    <TableCell>
-                        <div className="font-medium">{invoice.customerName}</div>
-                        <div className="text-sm text-muted-foreground">{invoice.invoice}</div>
-                    </TableCell>
-                    <TableCell>
-                        <Badge variant={
-                            invoice.paymentStatus === "Paid" ? "default" :
-                            invoice.paymentStatus === "Pending" ? "secondary" :
-                            "destructive"
-                        }>
-                            {invoice.paymentStatus}
-                        </Badge>
-                    </TableCell>
-                    <TableCell>{invoice.date}</TableCell>
-                    <TableCell className="text-right">₦{invoice.total.toLocaleString()}</TableCell>
-                    <TableCell>
-                        <div className="flex justify-end">
-                            <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button aria-haspopup="true" size="icon" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => onViewDetails(invoice)}>View Details</DropdownMenuItem>
-                                {invoice.paymentStatus !== 'Paid' && <DropdownMenuItem onClick={() => onMarkAsPaid(invoice.invoice)}>Mark as Paid</DropdownMenuItem>}
-                                <DropdownMenuItem onClick={() => downloadPdf(invoice)}>Download PDF</DropdownMenuItem>
-                            </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                    </TableCell>
-                </TableRow>
-                ))}
-            </TableBody>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>No.</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {data.map((inv) => (
+                        <TableRow key={inv.invoice}>
+                            <TableCell className="font-medium">{inv.customerName}</TableCell>
+                            <TableCell className="text-xs font-mono">{inv.invoice}</TableCell>
+                            <TableCell>
+                                <Badge variant={
+                                    inv.paymentStatus === "Paid" || inv.paymentStatus === "Accepted" ? "default" :
+                                    inv.paymentStatus === "Pending" ? "secondary" : "destructive"
+                                } className={cn(
+                                    inv.paymentStatus === "Paid" && "bg-emerald-500/10 text-emerald-700",
+                                    inv.paymentStatus === "Accepted" && "bg-blue-500/10 text-blue-700",
+                                )}>
+                                    {inv.paymentStatus}
+                                </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">{inv.date}</TableCell>
+                            <TableCell className="text-right font-bold">{inv.totalAmount}</TableCell>
+                            <TableCell>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => downloadPdf(inv)}>Download PDF</DropdownMenuItem>
+                                        {inv.type === 'Estimate' && inv.paymentStatus !== 'Accepted' && (
+                                            <DropdownMenuItem onClick={() => onAction('convert', inv)} className="text-primary"><CheckCircle2 className="mr-2 h-4 w-4" /> Convert to Invoice</DropdownMenuItem>
+                                        )}
+                                        {inv.type === 'Invoice' && inv.paymentStatus !== 'Paid' && (
+                                            <DropdownMenuItem onClick={() => onAction('pay', inv)}>Mark as Paid</DropdownMenuItem>
+                                        )}
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                    {data.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground">No records found.</TableCell></TableRow>
+                    )}
+                </TableBody>
             </Table>
         </div>
     )
 }
 
 export default function InvoicesPage() {
+  const [docs, setDocs] = React.useState<Invoice[]>(invoicesData);
+  const [customers, setCustomers] = React.useState<Customer[]>(initialCustomers);
   const [activeTab, setActiveTab] = React.useState("invoices");
-  const [allInvoicesState, setAllInvoicesState] = React.useState(allInvoices);
-  const [receiptsState, setReceiptsState] = React.useState(receipts);
-  const [selectedInvoice, setSelectedInvoice] = React.useState<Invoice | null>(null);
-  const [customersState, setCustomersState] = React.useState<Customer[]>(initialCustomers);
+  const { toast } = useToast();
 
-  const handleSave = (newItem: Invoice) => {
-    if (newItem.paymentStatus === 'Paid') {
-        setReceiptsState([newItem, ...receiptsState]);
-    } else {
-        setAllInvoicesState([newItem, ...allInvoicesState]);
-    }
-  }
-
-  const handleMarkAsPaid = (invoiceId: string) => {
-    const itemToMove = allInvoicesState.find(inv => inv.invoice === invoiceId);
-    if (itemToMove) {
-        setAllInvoicesState(allInvoicesState.filter(inv => inv.invoice !== invoiceId));
-        setReceiptsState([{ ...itemToMove, paymentStatus: 'Paid', paymentMethod: itemToMove.paymentMethod === 'N/A' ? 'Cash' : itemToMove.paymentMethod }, ...receiptsState]);
+  const handleAction = (action: string, inv: Invoice) => {
+    if (action === 'pay') {
+        setDocs(docs.map(d => d.invoice === inv.invoice ? { ...d, paymentStatus: 'Paid', type: 'Receipt' } : d));
+        toast({ title: "Payment Recorded", description: `Invoice ${inv.invoice} marked as paid.` });
+    } else if (action === 'convert') {
+        const newInvoice: Invoice = {
+            ...inv,
+            invoice: inv.invoice.replace('EST', 'INV'),
+            type: 'Invoice',
+            paymentStatus: 'Pending',
+            dueDate: format(new Date(), 'yyyy-MM-dd'),
+        };
+        setDocs([...docs.map(d => d.invoice === inv.invoice ? { ...d, paymentStatus: 'Accepted' } : d), newInvoice]);
+        toast({ title: "Estimate Converted", description: `Quote ${inv.invoice} converted to Invoice ${newInvoice.invoice}.` });
     }
   };
-  
-  const handleViewDetails = (invoice: Invoice) => {
-      setSelectedInvoice(invoice);
-  }
-  
-  const handleAddCustomer = (customer: Customer) => {
-      setCustomersState(prev => [customer, ...prev]);
-  }
+
+  const filteredDocs = docs.filter(d => {
+    if (activeTab === 'invoices') return d.type === 'Invoice';
+    if (activeTab === 'receipts') return d.type === 'Receipt';
+    if (activeTab === 'estimates') return d.type === 'Estimate';
+    if (activeTab === 'refunds') return d.type === 'CreditMemo';
+    return false;
+  });
 
   return (
-    <>
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <CardTitle>Invoices & Receipts</CardTitle>
-                <CardDescription>
-                    Manage your invoices and view customer receipts.
-                </CardDescription>
+                <h1 className="font-headline text-3xl font-bold">Billing & Receivables</h1>
+                <p className="text-muted-foreground">Manage quotes, invoices, receipts, and customer credits.</p>
             </div>
             <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline">
-                    <File className="mr-2 h-4 w-4" />
-                    Export
-                </Button>
-                {activeTab === 'invoices' ? <AddInvoiceDialog onSave={handleSave} customers={customersState} onCustomerAdd={handleAddCustomer} /> : <AddReceiptDialog onSave={handleSave} customers={customersState} onCustomerAdd={handleAddCustomer} />}
+                <Button variant="outline" size="sm"><File className="mr-2 h-4 w-4" /> Export All</Button>
+                <CreateDocumentDialog 
+                    type={activeTab === 'estimates' ? 'Estimate' : activeTab === 'refunds' ? 'CreditMemo' : activeTab === 'receipts' ? 'Receipt' : 'Invoice'} 
+                    onSave={(d) => setDocs([d, ...docs])} 
+                    customers={customers} 
+                    onCustomerAdd={(c) => setCustomers([c, ...customers])} 
+                />
             </div>
         </div>
-      </CardHeader>
-      <CardContent>
+
         <Tabs defaultValue="invoices" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 sm:w-auto h-auto p-1 bg-primary/5 border border-primary/10 shadow-lg shadow-primary/5 rounded-xl">
-                <TabsTrigger 
-                    value="invoices"
-                    className="py-2.5 rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all shadow-sm"
-                >
-                    Invoices
-                </TabsTrigger>
-                <TabsTrigger 
-                    value="receipts"
-                    className="py-2.5 rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white transition-all shadow-sm"
-                >
-                    Receipts
-                </TabsTrigger>
+            <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full lg:w-max h-auto p-1 bg-primary/5 border border-primary/10 rounded-xl">
+                <TabsTrigger value="invoices" className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Invoices</TabsTrigger>
+                <TabsTrigger value="estimates" className="rounded-lg data-[state=active]:bg-amber-600 data-[state=active]:text-white">Quotes / Estimates</TabsTrigger>
+                <TabsTrigger value="receipts" className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white">Receipts</TabsTrigger>
+                <TabsTrigger value="refunds" className="rounded-lg data-[state=active]:bg-red-600 data-[state=active]:text-white">Refunds / Credits</TabsTrigger>
             </TabsList>
-            <TabsContent value="invoices" className="mt-4">
-                <InvoiceTable data={allInvoicesState} onMarkAsPaid={handleMarkAsPaid} onViewDetails={handleViewDetails} />
-                 <CardFooter className="pt-6">
-                    <div className="text-xs text-muted-foreground">
-                    Showing <strong>1-{allInvoicesState.length}</strong> of <strong>{allInvoicesState.length}</strong> invoices
-                    </div>
-                </CardFooter>
-            </TabsContent>
-             <TabsContent value="receipts" className="mt-4">
-                <InvoiceTable data={receiptsState} onMarkAsPaid={() => {}} onViewDetails={handleViewDetails} />
-                 <CardFooter className="pt-6">
-                    <div className="text-xs text-muted-foreground">
-                    Showing <strong>1-{receiptsState.length}</strong> of <strong>{receiptsState.length}</strong> receipts
-                    </div>
-                </CardFooter>
-            </TabsContent>
+
+            <div className="mt-6">
+                <InvoiceTable data={filteredDocs} onAction={handleAction} />
+            </div>
         </Tabs>
-      </CardContent>
-    </Card>
-    <InvoiceDetailsDialog invoice={selectedInvoice} onOpenChange={(open) => !open && setSelectedInvoice(null)} />
-    </>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="bg-primary/5 border-primary/10">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-primary" /> Unbilled Estimates
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold font-headline">
+                        ₦{docs.filter(d => d.type === 'Estimate' && d.paymentStatus === 'Pending').reduce((acc, d) => acc + d.total, 0).toLocaleString()}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Projected revenue in the pipeline</p>
+                </CardContent>
+            </Card>
+            <Card className="bg-primary/5 border-primary/10">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <History className="h-4 w-4 text-primary" /> Outstanding A/R
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold font-headline">
+                        ₦{docs.filter(d => d.type === 'Invoice' && d.paymentStatus !== 'Paid').reduce((acc, d) => acc + d.total, 0).toLocaleString()}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Pending customer payments</p>
+                </CardContent>
+            </Card>
+            <Card className="bg-primary/5 border-primary/10">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <RotateCcw className="h-4 w-4 text-red-500" /> Total Refunds Issued
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold font-headline">
+                        ₦{docs.filter(d => d.type === 'CreditMemo').reduce((acc, d) => acc + d.total, 0).toLocaleString()}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Credit given for returns/overpayments</p>
+                </CardContent>
+            </Card>
+        </div>
+    </div>
   )
 }
