@@ -78,6 +78,7 @@ type LineItem = {
 type InvoiceType = "Invoice" | "Receipt" | "Estimate" | "CreditMemo";
 
 type Invoice = {
+    id: string;
     invoice: string;
     type: InvoiceType;
     paymentStatus: "Paid" | "Pending" | "Unpaid" | "Accepted" | "Refunded";
@@ -102,6 +103,7 @@ const initialCustomers: Customer[] = [
 
 const invoicesData: Invoice[] = [
   {
+    id: "1",
     invoice: "INV001",
     type: "Invoice",
     paymentStatus: "Paid",
@@ -115,6 +117,7 @@ const invoicesData: Invoice[] = [
     vatIncluded: true,
   },
   {
+    id: "2",
     invoice: "EST001",
     type: "Estimate",
     paymentStatus: "Pending",
@@ -237,6 +240,7 @@ function CreateDocumentDialog({
     const handleSave = () => {
         const prefix = type === 'Invoice' ? 'INV' : type === 'Estimate' ? 'EST' : type === 'CreditMemo' ? 'MEMO' : 'RCPT';
         const doc: Invoice = {
+            id: crypto.randomUUID(),
             invoice: `${prefix}${(Math.random() * 1000).toFixed(0).padStart(3, '0')}`,
             type,
             paymentStatus: type === 'Receipt' ? 'Paid' : 'Pending',
@@ -374,7 +378,7 @@ function InvoiceTable({ data, onAction }: { data: Invoice[], onAction: (action: 
                 </TableHeader>
                 <TableBody>
                     {data.map((inv) => (
-                        <TableRow key={inv.invoice}>
+                        <TableRow key={inv.id}>
                             <TableCell className="font-medium">{inv.customerName}</TableCell>
                             <TableCell className="text-xs font-mono">{inv.invoice}</TableCell>
                             <TableCell>
@@ -426,17 +430,18 @@ export default function InvoicesPage() {
 
   const handleAction = (action: string, inv: Invoice) => {
     if (action === 'pay') {
-        setDocs(docs.map(d => d.invoice === inv.invoice ? { ...d, paymentStatus: 'Paid', type: 'Receipt' } : d));
+        setDocs(docs.map(d => d.id === inv.id ? { ...d, paymentStatus: 'Paid', type: 'Receipt' } : d));
         toast({ title: "Payment Recorded", description: `Invoice ${inv.invoice} marked as paid.` });
     } else if (action === 'convert') {
         const newInvoice: Invoice = {
             ...inv,
+            id: crypto.randomUUID(),
             invoice: inv.invoice.replace('EST', 'INV'),
             type: 'Invoice',
             paymentStatus: 'Pending',
             dueDate: format(new Date(), 'yyyy-MM-dd'),
         };
-        setDocs([...docs.map(d => d.invoice === inv.invoice ? { ...d, paymentStatus: 'Accepted' } : d), newInvoice]);
+        setDocs([...docs.map(d => d.id === inv.id ? { ...d, paymentStatus: 'Accepted' } : d), newInvoice]);
         toast({ title: "Estimate Converted", description: `Quote ${inv.invoice} converted to Invoice ${newInvoice.invoice}.` });
     }
   };
