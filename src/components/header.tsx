@@ -27,6 +27,10 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/hr': 'HR',
   '/apps': 'Integrations',
   '/setup': 'Setup',
+  '/accounting': 'Accounting',
+  '/accounting/chart-of-accounts': 'Chart of Accounts',
+  '/accounting/journal-entries': 'Journal Adjustments',
+  '/accounting/trial-balance': 'Trial Balance',
 };
 
 function ThemeToggle() {

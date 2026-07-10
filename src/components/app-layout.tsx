@@ -17,7 +17,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Banknote, Users2, LifeBuoy, AppWindow, Settings, LogOut, Briefcase, Receipt, ChevronDown, Store, MonitorSpeaker } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, Package, FileText, Users, PieChart, Banknote, Users2, LifeBuoy, AppWindow, Settings, LogOut, Briefcase, Receipt, ChevronDown, Store, MonitorSpeaker, BookText, Scale, FilePenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
 import Link from 'next/link';
@@ -34,6 +34,16 @@ const navItems = [
   { href: '/invoices', label: 'Invoices & Receipts', icon: Receipt },
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/storefront', label: 'Storefront', icon: Store },
+  {
+    href: '/accounting',
+    label: 'Accounting',
+    icon: BookText,
+    children: [
+      { href: '/accounting/chart-of-accounts', label: 'Chart of Accounts' },
+      { href: '/accounting/journal-entries', label: 'Journal Adjustments' },
+      { href: '/accounting/trial-balance', label: 'Trial Balance' },
+    ],
+  },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/customers', label: 'Customers', icon: Users },
   { 
