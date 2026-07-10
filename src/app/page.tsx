@@ -28,7 +28,8 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ChartConfig } from '@/components/ui/chart';
-import { format } from 'date-fns';
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const chartConfig = {
   "Services": { label: "Services", color: "hsl(var(--chart-1))" },
@@ -86,6 +87,7 @@ function StatCard({ title, value, subtext, icon: Icon, trend, variant = 'default
 
 export default function DashboardPage() {
   const [businessType, setBusinessType] = React.useState<BusinessType>('HYBRID');
+  const [granularity, setGranularity] = React.useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -93,6 +95,39 @@ export default function DashboardPage() {
     const savedType = localStorage.getItem('business-type') as BusinessType;
     if (savedType) setBusinessType(savedType);
   }, []);
+
+  const performanceData = React.useMemo(() => {
+    switch (granularity) {
+      case 'daily':
+        return [
+          { month: 'Mon', income: 1200, expense: 800 },
+          { month: 'Tue', income: 900, expense: 1100 },
+          { month: 'Wed', income: 1500, expense: 700 },
+          { month: 'Thu', income: 1800, expense: 950 },
+          { month: 'Fri', income: 2200, expense: 1200 },
+          { month: 'Sat', income: 1100, expense: 400 },
+          { month: 'Sun', income: 800, expense: 300 },
+        ];
+      case 'weekly':
+        return [
+          { month: 'Week 1', income: 8500, expense: 4200 },
+          { month: 'Week 2', income: 9200, expense: 5100 },
+          { month: 'Week 3', income: 7800, expense: 3900 },
+          { month: 'Week 4', income: 11500, expense: 6200 },
+        ];
+      case 'monthly':
+        return incomeVsExpenseData;
+      case 'quarterly':
+        return [
+          { month: 'Q1', income: 35000, expense: 18000 },
+          { month: 'Q2', income: 42000, expense: 22000 },
+          { month: 'Q3', income: 38000, expense: 19500 },
+          { month: 'Q4', income: 51000, expense: 28000 },
+        ];
+      default:
+        return incomeVsExpenseData;
+    }
+  }, [granularity]);
 
   if (!mounted) return null;
 
@@ -193,14 +228,27 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div className="space-y-1">
               <CardTitle className="font-headline text-xl">Revenue Flow</CardTitle>
-              <CardDescription>Performance trends across the selected period</CardDescription>
+              <CardDescription>Performance trends for your business</CardDescription>
             </div>
-            <Target className="h-5 w-5 text-primary/20" />
+            <div className="flex items-center gap-2">
+              <Select value={granularity} onValueChange={(v: any) => setGranularity(v)}>
+                <SelectTrigger className="w-[120px] h-8 text-xs rounded-xl">
+                  <SelectValue placeholder="Granularity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                </SelectContent>
+              </Select>
+              <Target className="h-5 w-5 text-primary/20" />
+            </div>
           </CardHeader>
           <CardContent className="pt-6">
             <DataChart 
               type="area" 
-              data={incomeVsExpenseData} 
+              data={performanceData} 
               config={{
                 income: { label: "Income", color: "#22c55e" },
                 expense: { label: "Expense", color: "#ef4444" },
