@@ -4,8 +4,8 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { inventoryItems as allInventoryItems } from '@/lib/data';
-import type { InventoryItem } from '@/lib/data';
+import { catalogItems } from '@/lib/data';
+import type { CatalogItem } from '@/lib/data';
 import { PlusCircle, MoreHorizontal, Upload, X } from 'lucide-react';
 import {
     DropdownMenu,
@@ -48,13 +48,13 @@ import { Label } from "@/components/ui/label"
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 
-function getStatus(quantity: number, reorderLevel: number): InventoryItem['status'] {
+function getStatus(quantity: number, reorderLevel: number): CatalogItem['status'] {
     if (quantity === 0) return 'Out of Stock';
     if (quantity <= reorderLevel) return 'Low Stock';
     return 'In Stock';
 }
 
-function AddProductDialog({ onSave }: { onSave: (newProduct: InventoryItem) => void }) {
+function AddProductDialog({ onSave }: { onSave: (newProduct: CatalogItem) => void }) {
     const [name, setName] = React.useState('');
     const [sku, setSku] = React.useState('');
     const [quantity, setQuantity] = React.useState('0');
@@ -68,10 +68,13 @@ function AddProductDialog({ onSave }: { onSave: (newProduct: InventoryItem) => v
         const numReorderLevel = parseInt(reorderLevel, 10);
 
         if (name && sku && !isNaN(numQuantity) && !isNaN(numPrice) && !isNaN(numReorderLevel)) {
-            const newProduct: InventoryItem = {
+            const newProduct: CatalogItem = {
                 id: `prod-${Date.now()}`,
+                type: 'Product',
                 name,
                 sku,
+                category: 'Uncategorized',
+                description: '',
                 quantity: numQuantity,
                 price: numPrice,
                 reorderLevel: numReorderLevel,
@@ -79,7 +82,6 @@ function AddProductDialog({ onSave }: { onSave: (newProduct: InventoryItem) => v
             };
             onSave(newProduct);
             setIsOpen(false);
-            // Reset form
             setName('');
             setSku('');
             setQuantity('0');
@@ -136,7 +138,7 @@ function AddProductDialog({ onSave }: { onSave: (newProduct: InventoryItem) => v
     )
 }
 
-function EditProductDialog({ item, onSave, onOpenChange, open }: { item: InventoryItem | null; onSave: (updatedProduct: InventoryItem) => void; onOpenChange: (open: boolean) => void, open: boolean }) {
+function EditProductDialog({ item, onSave, onOpenChange, open }: { item: CatalogItem | null; onSave: (updatedProduct: CatalogItem) => void; onOpenChange: (open: boolean) => void, open: boolean }) {
     const [name, setName] = React.useState('');
     const [sku, setSku] = React.useState('');
     const [quantity, setQuantity] = React.useState('0');
@@ -146,10 +148,10 @@ function EditProductDialog({ item, onSave, onOpenChange, open }: { item: Invento
     React.useEffect(() => {
         if(item) {
             setName(item.name);
-            setSku(item.sku);
-            setQuantity(String(item.quantity));
+            setSku(item.sku || '');
+            setQuantity(String(item.quantity || 0));
             setPrice(String(item.price));
-            setReorderLevel(String(item.reorderLevel));
+            setReorderLevel(String(item.reorderLevel || 0));
         }
     }, [item]);
 
@@ -161,7 +163,7 @@ function EditProductDialog({ item, onSave, onOpenChange, open }: { item: Invento
         const numReorderLevel = parseInt(reorderLevel, 10);
 
         if (name && sku && !isNaN(numQuantity) && !isNaN(numPrice) && !isNaN(numReorderLevel)) {
-            const updatedProduct: InventoryItem = {
+            const updatedProduct: CatalogItem = {
                 ...item,
                 name,
                 sku,
@@ -217,7 +219,7 @@ function EditProductDialog({ item, onSave, onOpenChange, open }: { item: Invento
     )
 }
 
-function RecordSaleDialog({ item, onRecordSale, open, onOpenChange }: { item: InventoryItem | null; onRecordSale: (itemId: string, quantitySold: number) => void; open: boolean; onOpenChange: (open: boolean) => void }) {
+function RecordSaleDialog({ item, onRecordSale, open, onOpenChange }: { item: CatalogItem | null; onRecordSale: (itemId: string, quantitySold: number) => void; open: boolean; onOpenChange: (open: boolean) => void }) {
     const [quantity, setQuantity] = React.useState('1');
     const { toast } = useToast();
 
@@ -225,12 +227,13 @@ function RecordSaleDialog({ item, onRecordSale, open, onOpenChange }: { item: In
         if (!item) return;
 
         const soldQuantity = parseInt(quantity, 10);
+        const currentQty = item.quantity || 0;
         if (isNaN(soldQuantity) || soldQuantity <= 0) {
             toast({ variant: 'destructive', title: "Invalid Quantity", description: "Please enter a valid quantity." });
             return;
         }
-        if (soldQuantity > item.quantity) {
-            toast({ variant: 'destructive', title: "Insufficient Stock", description: `Only ${item.quantity} units available.` });
+        if (soldQuantity > currentQty) {
+            toast({ variant: 'destructive', title: "Insufficient Stock", description: `Only ${currentQty} units available.` });
             return;
         }
 
@@ -265,38 +268,41 @@ function RecordSaleDialog({ item, onRecordSale, open, onOpenChange }: { item: In
 }
 
 export default function InventoryPage() {
-    const [inventoryItems, setInventoryItems] = React.useState<InventoryItem[]>(allInventoryItems);
+    const [inventoryItems, setInventoryItems] = React.useState<CatalogItem[]>(catalogItems.filter(item => item.type === 'Product'));
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     
-    const [editingItem, setEditingItem] = React.useState<InventoryItem | null>(null);
+    const [editingItem, setEditingItem] = React.useState<CatalogItem | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
     
-    const [sellingItem, setSellingItem] = React.useState<InventoryItem | null>(null);
+    const [sellingItem, setSellingItem] = React.useState<CatalogItem | null>(null);
     const [isSaleDialogOpen, setIsSaleDialogOpen] = React.useState(false);
 
-    const getStatusBadgeVariant = (status: InventoryItem['status']) => {
+    const getStatusBadgeVariant = (status: CatalogItem['status']) => {
         switch (status) {
             case 'In Stock': return 'default';
+            case 'Active': return 'default';
             case 'Low Stock': return 'secondary';
             case 'Out of Stock': return 'destructive';
+            case 'Inactive': return 'secondary';
+            default: return 'outline';
         }
     };
     
-    const handleAddProduct = (newProduct: InventoryItem) => {
+    const handleAddProduct = (newProduct: CatalogItem) => {
         setInventoryItems(prev => [newProduct, ...prev]);
     };
 
-    const handleEditProduct = (updatedProduct: InventoryItem) => {
+    const handleEditProduct = (updatedProduct: CatalogItem) => {
         setInventoryItems(prev => prev.map(item => item.id === updatedProduct.id ? updatedProduct : item));
     }
     
-    const openEditDialog = (item: InventoryItem) => {
+    const openEditDialog = (item: CatalogItem) => {
         setEditingItem(item);
         setIsEditDialogOpen(true);
     };
 
-    const openSaleDialog = (item: InventoryItem) => {
+    const openSaleDialog = (item: CatalogItem) => {
         setSellingItem(item);
         setIsSaleDialogOpen(true);
     }
@@ -304,14 +310,15 @@ export default function InventoryPage() {
     const handleRecordSale = (itemId: string, quantitySold: number) => {
         setInventoryItems(prev => prev.map(item => {
             if (item.id === itemId) {
-                const newQuantity = item.quantity - quantitySold;
-                return { ...item, quantity: newQuantity, status: getStatus(newQuantity, item.reorderLevel) };
+                const currentQty = item.quantity || 0;
+                const newQuantity = currentQty - quantitySold;
+                return { ...item, quantity: newQuantity, status: getStatus(newQuantity, item.reorderLevel || 0) };
             }
             return item;
         }));
     };
 
-    const handleReorder = (item: InventoryItem) => {
+    const handleReorder = (item: CatalogItem) => {
         toast({
             title: "Reorder Initiated",
             description: `A reorder request for ${item.name} has been created.`,
@@ -326,7 +333,6 @@ export default function InventoryPage() {
         })
     };
 
-
     const handleBulkUploadClick = () => {
         fileInputRef.current?.click();
     };
@@ -334,12 +340,10 @@ export default function InventoryPage() {
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
-            // Placeholder for bulk upload logic
             toast({
                 title: "File Selected",
                 description: `${file.name} is ready for upload. (Functionality to process the file is not yet implemented.)`,
             });
-             // Reset file input
             if(fileInputRef.current) {
                 fileInputRef.current.value = "";
             }

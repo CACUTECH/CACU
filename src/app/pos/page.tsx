@@ -22,30 +22,31 @@ import {
     AlertCircle,
     UserCircle2
 } from "lucide-react"
-import { inventoryItems as initialInventory } from "@/lib/data"
-import type { InventoryItem } from "@/lib/data"
+import { catalogItems } from "@/lib/data"
+import type { CatalogItem } from "@/lib/data"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 
-type CartItem = InventoryItem & { cartQuantity: number }
+type CartItem = CatalogItem & { cartQuantity: number }
 
 export default function POSPage() {
     const [searchTerm, setSearchTerm] = React.useState("")
     const [cart, setCart] = React.useState<CartItem[]>([])
-    const [inventory, setInventory] = React.useState<InventoryItem[]>(initialInventory)
+    const [inventory, setInventory] = React.useState<CatalogItem[]>(catalogItems.filter(item => item.type === 'Product'))
     const [paymentMethod, setPaymentMethod] = React.useState<"Cash" | "Card" | "Transfer">("Cash")
     const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false)
     const { toast } = useToast()
 
     const filteredInventory = inventory.filter(item => 
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+        (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
     )
 
-    const addToCart = (item: InventoryItem) => {
-        if (item.quantity <= 0) {
+    const addToCart = (item: CatalogItem) => {
+        const availableQty = item.quantity || 0;
+        if (availableQty <= 0) {
             toast({
                 variant: "destructive",
                 title: "Out of Stock",
@@ -57,11 +58,11 @@ export default function POSPage() {
         setCart(prev => {
             const existing = prev.find(i => i.id === item.id)
             if (existing) {
-                if (existing.cartQuantity >= item.quantity) {
+                if (existing.cartQuantity >= availableQty) {
                     toast({
                         variant: "destructive",
                         title: "Stock Limit Reached",
-                        description: `Only ${item.quantity} units available.`
+                        description: `Only ${availableQty} units available.`
                     })
                     return prev
                 }
@@ -74,7 +75,8 @@ export default function POSPage() {
     const updateCartQuantity = (id: string, delta: number) => {
         setCart(prev => prev.map(item => {
             if (item.id === id) {
-                const newQty = Math.max(1, Math.min(item.cartQuantity + delta, item.quantity))
+                const maxQty = item.quantity || 0;
+                const newQty = Math.max(1, Math.min(item.cartQuantity + delta, maxQty))
                 return { ...item, cartQuantity: newQty }
             }
             return item
@@ -89,8 +91,6 @@ export default function POSPage() {
     }
 
     const removeFromCart = (id: string) => {
-        setCart(prev => prev.filter(item => id === id ? item.id !== id : true))
-        // Fixed logic for filtering
         setCart(prev => prev.filter(item => item.id !== id))
     }
 
@@ -99,27 +99,25 @@ export default function POSPage() {
     const total = subtotal + tax
 
     const handleCheckout = () => {
-        // Simulate flow to other modules
         toast({
             title: "Checkout Successful",
             description: `Sale of ₦${total.toLocaleString()} recorded. Inventory updated and transaction added to P&L.`,
         })
 
-        // 1. Update local inventory state (Flows to Inventory module logic)
         setInventory(prev => prev.map(invItem => {
             const soldItem = cart.find(c => c.id === invItem.id)
             if (soldItem) {
-                const newQty = invItem.quantity - soldItem.cartQuantity
+                const currentQty = invItem.quantity || 0;
+                const newQty = currentQty - soldItem.cartQuantity
                 return { 
                     ...invItem, 
                     quantity: newQty,
-                    status: newQty === 0 ? 'Out of Stock' : newQty <= invItem.reorderLevel ? 'Low Stock' : 'In Stock'
+                    status: newQty === 0 ? 'Out of Stock' : newQty <= (invItem.reorderLevel || 0) ? 'Low Stock' : 'In Stock'
                 }
             }
             return invItem
         }))
 
-        // 2. Reset cart
         setCart([])
         setIsCheckoutOpen(false)
     }
@@ -141,7 +139,6 @@ export default function POSPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-hidden">
-                {/* Product Selection (Left) */}
                 <Card className="lg:col-span-7 flex flex-col overflow-hidden border-primary/5">
                     <CardHeader className="pb-4">
                         <div className="relative">
@@ -163,7 +160,7 @@ export default function POSPage() {
                                         onClick={() => addToCart(item)}
                                         className={cn(
                                             "group p-4 rounded-2xl border transition-all text-left flex flex-col gap-2 relative overflow-hidden",
-                                            item.quantity > 0 ? "hover:border-primary hover:shadow-lg hover:shadow-primary/5 bg-card" : "bg-muted/50 opacity-60 cursor-not-allowed"
+                                            (item.quantity || 0) > 0 ? "hover:border-primary hover:shadow-lg hover:shadow-primary/5 bg-card" : "bg-muted/50 opacity-60 cursor-not-allowed"
                                         )}
                                     >
                                         <div className="flex justify-between items-start">
@@ -179,7 +176,7 @@ export default function POSPage() {
                                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-auto">
                                             <Package className="h-3 w-3" /> {item.quantity} in stock
                                         </div>
-                                        {item.quantity > 0 && (
+                                        {(item.quantity || 0) > 0 && (
                                             <div className="absolute right-2 bottom-2 bg-primary text-white p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <Plus className="h-4 w-4" />
                                             </div>
@@ -191,7 +188,6 @@ export default function POSPage() {
                     </CardContent>
                 </Card>
 
-                {/* Cart & Totals (Right) */}
                 <Card className="lg:col-span-5 flex flex-col overflow-hidden border-primary/20 shadow-xl shadow-primary/5">
                     <CardHeader className="bg-primary/5 border-b pb-4">
                         <div className="flex items-center justify-between">
@@ -223,7 +219,7 @@ export default function POSPage() {
                                                     <Input 
                                                         type="number"
                                                         value={item.cartQuantity}
-                                                        onChange={(e) => handleQuantityInputChange(item.id, e.target.value, item.quantity)}
+                                                        onChange={(e) => handleQuantityInputChange(item.id, e.target.value, item.quantity || 0)}
                                                         className="w-10 h-6 text-center text-xs font-bold border-none shadow-none focus-visible:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-transparent"
                                                     />
                                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateCartQuantity(item.id, 1)}><Plus className="h-3 w-3" /></Button>

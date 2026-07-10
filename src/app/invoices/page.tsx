@@ -59,8 +59,8 @@ import { format } from "date-fns"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 
-import { inventoryItems } from "@/lib/data"
-import type { InventoryItem } from "@/lib/data"
+import { catalogItems } from "@/lib/data"
+import type { CatalogItem } from "@/lib/data"
 
 type Customer = {
     id: string;
@@ -330,11 +330,11 @@ function CreateDocumentDialog({
                                     <TableRow key={line.id}>
                                         <TableCell>
                                             <Select onValueChange={(val) => {
-                                                const item = inventoryItems.find(i => i.id === val);
+                                                const item = catalogItems.find(i => i.id === val);
                                                 if(item) setLineItems(lineItems.map(l => l.id === line.id ? { ...l, item: item.name, price: item.price, total: l.quantity * item.price } : l));
                                             }}>
                                                 <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
-                                                <SelectContent>{inventoryItems.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}</SelectContent>
+                                                <SelectContent>{catalogItems.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}</SelectContent>
                                             </Select>
                                         </TableCell>
                                         <TableCell><Input type="number" value={line.quantity} onChange={(e) => setLineItems(lineItems.map(l => l.id === line.id ? { ...l, quantity: parseInt(e.target.value), total: parseInt(e.target.value) * l.price } : l))} /></TableCell>
