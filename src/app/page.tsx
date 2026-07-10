@@ -54,8 +54,8 @@ const NairaIcon = ({ className }: { className?: string }) => (
 
 export default function DashboardPage() {
   const [date, setDate] = React.useState<DateRange | undefined>({
-    from: new Date(2024, 6, 1),
-    to: new Date(2024, 7, 1),
+    from: new Date(2024, 6, 1), // July 1, 2024
+    to: new Date(2024, 7, 1),   // August 1, 2024
   });
   
   const [granularity, setGranularity] = React.useState("Month");
@@ -79,9 +79,12 @@ export default function DashboardPage() {
     .reduce((acc, t) => acc + t.amount, 0), [filteredTransactions]);
 
   const netProfit = totalRevenue - totalExpenses;
-  const totalCustomers = 54;
+  
+  // Simulated stats based on date range
+  const totalCustomers = React.useMemo(() => 44 + Math.floor(filteredTransactions.length / 2), [filteredTransactions]);
 
   const performanceData = React.useMemo(() => {
+    // If granularity is Month but date range is tight, we should still show something
     switch (granularity) {
       case "Day":
         return [
@@ -109,9 +112,15 @@ export default function DashboardPage() {
         ];
       case "Month":
       default:
-        return incomeVsExpenseData.map(d => ({ period: d.month, income: d.income, expense: d.expense }));
+        // Use static chart data as base but scale slightly with filters for visual effect
+        const scale = filteredTransactions.length > 0 ? 1 : 0;
+        return incomeVsExpenseData.map(d => ({ 
+          period: d.month, 
+          income: d.income * (d.month === 'Jul' ? (totalRevenue / 12500 || 1) : 1), 
+          expense: d.expense * (d.month === 'Jul' ? (totalExpenses / 1845 || 1) : 1) 
+        }));
     }
-  }, [granularity]);
+  }, [granularity, totalRevenue, totalExpenses, filteredTransactions]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -127,7 +136,7 @@ export default function DashboardPage() {
                 id="date"
                 variant={"outline"}
                 className={cn(
-                  "w-full sm:w-[300px] justify-start text-left font-normal shadow-sm",
+                  "w-full sm:w-[300px] justify-start text-left font-normal shadow-sm bg-background",
                   !date && "text-muted-foreground"
                 )}
               >
@@ -168,7 +177,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-headline text-green-700 dark:text-green-400">₦{totalRevenue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground text-green-500 font-medium">+20.1% from last month</p>
+            <p className={cn("text-xs font-medium mt-1", totalRevenue > 0 ? "text-green-500" : "text-muted-foreground")}>
+              {totalRevenue > 0 ? "+20.1% from last month" : "No revenue in this period"}
+            </p>
           </CardContent>
         </Card>
         <Card className="shadow-lg shadow-red-500/10 border-red-500/20 transition-all hover:shadow-red-500/20">
@@ -178,7 +189,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-headline text-red-700 dark:text-red-400">₦{totalExpenses.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground text-red-500 font-medium">+18.3% from last month</p>
+            <p className={cn("text-xs font-medium mt-1", totalExpenses > 0 ? "text-red-500" : "text-muted-foreground")}>
+              {totalExpenses > 0 ? "+18.3% from last month" : "No expenses in this period"}
+            </p>
           </CardContent>
         </Card>
         <Card className="shadow-lg shadow-green-500/10 border-green-500/20 transition-all hover:shadow-green-500/20">
@@ -187,8 +200,10 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline text-green-700 dark:text-green-400">₦{netProfit.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground text-green-500 font-medium">+19% from last month</p>
+            <div className={cn("text-2xl font-bold font-headline", netProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600")}>
+              ₦{netProfit.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground font-medium mt-1">Bottom line for selected range</p>
           </CardContent>
         </Card>
         <Card className="shadow-lg shadow-primary/5 border-primary/10 transition-all hover:shadow-primary/10">
@@ -197,8 +212,8 @@ export default function DashboardPage() {
             <Users className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-headline text-primary">+{totalCustomers}</div>
-            <p className="text-xs text-muted-foreground text-green-500 font-medium">+10 since last month</p>
+            <div className="text-2xl font-bold font-headline text-primary">{totalCustomers}</div>
+            <p className="text-xs text-muted-foreground font-medium mt-1">Active relationships</p>
           </CardContent>
         </Card>
       </div>
@@ -211,7 +226,7 @@ export default function DashboardPage() {
                 <TrendingUp className="h-5 w-5 text-primary" />
                 Performance Trend
               </CardTitle>
-              <CardDescription>Income vs Expenses over time</CardDescription>
+              <CardDescription>Income vs Expenses analysis</CardDescription>
             </div>
             <Select value={granularity} onValueChange={setGranularity}>
               <SelectTrigger className="w-[120px] shadow-sm">
@@ -246,7 +261,7 @@ export default function DashboardPage() {
                 <PieChart className="h-5 w-5 text-primary" />
                 Expenses by Category
               </CardTitle>
-              <CardDescription>Major cost drivers for this period</CardDescription>
+              <CardDescription>Main cost drivers</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -266,10 +281,10 @@ export default function DashboardPage() {
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <CardTitle className="font-headline">Recent Transactions</CardTitle>
-                <CardDescription>A log of the most recent financial activities.</CardDescription>
+                <CardDescription>Showing records from {date?.from ? format(date.from, "PPP") : "the beginning"}.</CardDescription>
             </div>
-            <Button asChild size="sm" className="w-full sm:w-auto shadow-sm">
-                <Link href="/transactions">View All</Link>
+            <Button asChild size="sm" variant="outline" className="w-full sm:w-auto shadow-sm">
+                <Link href="/transactions">View Full Ledger</Link>
             </Button>
         </CardHeader>
         <CardContent>
@@ -283,16 +298,32 @@ export default function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredTransactions.slice(0, 5).map((transaction) => (
+              {filteredTransactions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                    No transactions found for the selected dates.
+                  </TableCell>
+                </TableRow>
+              ) : filteredTransactions.slice(0, 8).map((transaction) => (
                 <TableRow key={transaction.id} className="hover:bg-primary/5 transition-colors">
                   <TableCell className="font-medium">
                     <div>{transaction.description}</div>
                     <div className="text-xs text-muted-foreground sm:hidden">{transaction.category} - {transaction.date}</div>
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">{transaction.category}</TableCell>
-                  <TableCell className="hidden md:table-cell">{transaction.date}</TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <Badge variant="outline" className="font-normal">{transaction.category}</Badge>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">{transaction.date}</TableCell>
                   <TableCell className="text-right">
-                    <Badge variant={transaction.type === 'Income' ? 'default' : 'destructive'} className={cn("font-medium whitespace-nowrap shadow-sm", transaction.type === 'Income' ? 'bg-green-500/20 text-green-700 hover:bg-green-500/30' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30 border-red-500/20')}>
+                    <Badge 
+                      variant={transaction.type === 'Income' ? 'default' : 'destructive'} 
+                      className={cn(
+                        "font-bold whitespace-nowrap shadow-sm border-none", 
+                        transaction.type === 'Income' 
+                          ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20' 
+                          : 'bg-red-500/10 text-red-700 hover:bg-red-500/20'
+                      )}
+                    >
                       {transaction.type === 'Income' ? '+' : '-'}₦{transaction.amount.toLocaleString()}
                     </Badge>
                   </TableCell>

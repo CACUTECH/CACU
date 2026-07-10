@@ -10,6 +10,7 @@ export type Transaction = {
 };
 
 export const transactions: Transaction[] = [
+  // July 2024
   { id: '1', date: '2024-07-20', description: 'Client Project A Payment', amount: 5000, type: 'Income', category: 'Client Revenue', account: 'Business Checking' },
   { id: '2', date: '2024-07-19', description: 'Office Supplies', amount: 150, type: 'Expense', category: 'Office Supplies', account: 'Business Credit Card' },
   { id: '3', date: '2024-07-18', description: 'Software Subscription (SaaS)', amount: 45, type: 'Expense', category: 'Software', account: 'Business Credit Card' },
@@ -18,6 +19,11 @@ export const transactions: Transaction[] = [
   { id: '6', date: '2024-07-15', description: 'Freelance Designer Payment', amount: 1200, type: 'Expense', category: 'Contractors', account: 'Business Checking' },
   { id: '7', date: '2024-07-14', description: 'Social Media Ad Campaign', amount: 300, type: 'Expense', category: 'Marketing', account: 'Business Credit Card' },
   { id: '8', date: '2024-07-13', description: 'Domain Name Renewal', amount: 20, type: 'Expense', category: 'Utilities', account: 'Business Credit Card' },
+  // June 2024
+  { id: '9', date: '2024-06-25', description: 'June Consulting Retainer', amount: 4000, type: 'Income', category: 'Client Revenue', account: 'Business Checking' },
+  { id: '10', date: '2024-06-10', description: 'Office Rent - June', amount: 2500, type: 'Expense', category: 'Utilities', account: 'Business Checking' },
+  // August 2024
+  { id: '11', date: '2024-08-01', description: 'August Software Advance', amount: 3000, type: 'Income', category: 'Client Revenue', account: 'Business Checking' },
 ];
 
 export type InventoryItem = {
@@ -36,22 +42,6 @@ export const inventoryItems: InventoryItem[] = [
     { id: 'prod-003', name: 'Basic Thingamajig', sku: 'BT-003', quantity: 15, price: 9.99, reorderLevel: 20, status: 'Low Stock' },
     { id: 'prod-004', name: 'Advanced Contraption', sku: 'AC-004', quantity: 0, price: 99.99, reorderLevel: 10, status: 'Out of Stock' },
     { id: 'prod-005', name: 'Simple Doohickey', sku: 'SD-005', quantity: 200, price: 4.99, reorderLevel: 100, status: 'In Stock' },
-];
-
-export const accounts = [
-    { id: 'acc-1', name: 'Business Checking', balance: 12500.50 },
-    { id: 'acc-2', name: 'Business Credit Card', balance: -2450.75 },
-    { id: 'acc-3', name: 'Savings Account', balance: 50000.00 },
-];
-
-export const categories = [
-    { id: 'cat-1', name: 'Client Revenue', type: 'Income' },
-    { id: 'cat-2', name: 'Office Supplies', type: 'Expense' },
-    { id: 'cat-3', name: 'Software', type: 'Expense' },
-    { id: 'cat-4', name: 'Meals & Entertainment', type: 'Expense' },
-    { id: 'cat-5', name: 'Contractors', type: 'Expense' },
-    { id: 'cat-6', name: 'Marketing', type: 'Expense' },
-    { id: 'cat-7', name: 'Utilities', type: 'Expense' },
 ];
 
 export const incomeVsExpenseData = [
