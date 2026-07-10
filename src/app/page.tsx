@@ -15,7 +15,8 @@ import {
     ArrowRight,
     TrendingDown,
     Activity,
-    Target
+    Target,
+    NFC
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -99,19 +100,22 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-8 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-headline text-3xl font-bold text-foreground">Business Control Center</h1>
-          <p className="text-muted-foreground mt-1">Real-time performance metrics for your {businessType.toLowerCase()} operations.</p>
+          <h1 className="font-headline text-3xl font-bold text-foreground">Control Center</h1>
+          <p className="text-muted-foreground mt-1">
+            Performance metrics for your <span className="text-primary font-bold">{businessType.toLowerCase()}</span> operations.
+          </p>
         </div>
         <div className="flex items-center gap-2">
             <Badge variant="outline" className="px-3 py-1 bg-primary/5 text-primary border-primary/10 font-bold uppercase tracking-tighter">
-                {businessType} Mode Active
+                {businessType} Mode
             </Badge>
             <Button asChild size="sm" variant="outline" className="rounded-xl">
-                <Link href="/reports">Full Analytics</Link>
+                <Link href="/reports">Full Reports</Link>
             </Button>
         </div>
       </div>
 
+      {/* Dynamic Stat Cards Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard 
             title="Revenue MTD" 
@@ -121,16 +125,26 @@ export default function DashboardPage() {
             icon={NairaIcon} 
             variant="primary" 
         />
-        {businessType !== 'PRODUCT' ? (
-            <StatCard 
+        
+        {/* Metric 2: Contextual based on business type */}
+        {businessType === 'HYBRID' ? (
+             <StatCard 
                 title="Jobs Completion" 
                 value="92%" 
-                subtext="24 jobs completed this month" 
+                subtext="24 active orders" 
                 trend="up" 
                 icon={Wrench} 
             />
-        ) : (
+        ) : businessType === 'SERVICE' ? (
             <StatCard 
+                title="Service Revenue" 
+                value="₦842k" 
+                subtext="MTD billable services" 
+                trend="up" 
+                icon={Target} 
+            />
+        ) : (
+             <StatCard 
                 title="Sales Volume" 
                 value="842" 
                 subtext="Total units sold MTD" 
@@ -138,26 +152,37 @@ export default function DashboardPage() {
                 icon={Package} 
             />
         )}
-        {businessType !== 'PRODUCT' ? (
+
+        {/* Metric 3: Contextual based on business type */}
+        {businessType === 'HYBRID' ? (
+            <StatCard 
+                title="Sales Volume" 
+                value="842" 
+                subtext="MTD product turnover" 
+                trend="up" 
+                icon={Package} 
+            />
+        ) : businessType === 'SERVICE' ? (
             <StatCard 
                 title="Today's Appts" 
                 value="5" 
-                subtext="First at 10:00 AM" 
+                subtext="Next: 10:00 AM" 
                 icon={Clock} 
             />
         ) : (
             <StatCard 
                 title="Inventory Health" 
                 value="85%" 
-                subtext="4 items low on stock" 
+                subtext="4 items low stock" 
                 trend="down" 
                 icon={Activity} 
             />
         )}
+
         <StatCard 
             title="Customer Base" 
             value="148" 
-            subtext="12 new acquisitions" 
+            subtext="12 new additions" 
             trend="up" 
             icon={Users} 
         />
@@ -168,7 +193,7 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div className="space-y-1">
               <CardTitle className="font-headline text-xl">Revenue Flow</CardTitle>
-              <CardDescription>Income vs Expenses monthly comparison</CardDescription>
+              <CardDescription>Performance trends across the selected period</CardDescription>
             </div>
             <Target className="h-5 w-5 text-primary/20" />
           </CardHeader>
@@ -188,8 +213,8 @@ export default function DashboardPage() {
 
         <Card className="lg:col-span-3 shadow-xl shadow-primary/5 border-primary/10">
           <CardHeader>
-            <CardTitle className="font-headline text-xl">Operating Costs</CardTitle>
-            <CardDescription>Major expenditure drivers</CardDescription>
+            <CardTitle className="font-headline text-xl">Operational Split</CardTitle>
+            <CardDescription>Expense distribution analysis</CardDescription>
           </CardHeader>
           <CardContent>
             <DataChart 
@@ -205,14 +230,14 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Service Context: Active Jobs or Product Context: Low Stock */}
-        {businessType !== 'PRODUCT' ? (
+        {/* Hybrid & Service: Active Jobs Section */}
+        {(businessType === 'SERVICE' || businessType === 'HYBRID') && (
             <Card className="shadow-lg border-primary/5">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle className="font-headline">Jobs in Progress</CardTitle>
-                            <CardDescription>Service orders requiring attention.</CardDescription>
+                            <CardTitle className="font-headline">Service Workboard</CardTitle>
+                            <CardDescription>Live tracking of active work orders.</CardDescription>
                         </div>
                         <Button asChild variant="ghost" size="sm">
                             <Link href="/jobs">View Board <ArrowRight className="ml-2 h-4 w-4" /></Link>
@@ -224,7 +249,7 @@ export default function DashboardPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Customer</TableHead>
-                                <TableHead>Work Title</TableHead>
+                                <TableHead>Job Title</TableHead>
                                 <TableHead className="text-right">Amount</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -245,45 +270,54 @@ export default function DashboardPage() {
                     </Table>
                 </CardContent>
             </Card>
-        ) : (
+        )}
+
+        {/* Hybrid & Product: Inventory Intelligence Section */}
+        {(businessType === 'PRODUCT' || businessType === 'HYBRID') && (
             <Card className="shadow-lg border-primary/5">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle className="font-headline">Inventory Intelligence</CardTitle>
-                            <CardDescription>Items reaching critical reorder levels.</CardDescription>
+                            <CardTitle className="font-headline">Stock Intelligence</CardTitle>
+                            <CardDescription>Critical reorder alerts and velocity.</CardDescription>
                         </div>
                         <Button asChild variant="ghost" size="sm">
-                            <Link href="/catalog">Manage Stock <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                            <Link href="/catalog">Inventory <ArrowRight className="ml-2 h-4 w-4" /></Link>
                         </Button>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
-                        <Package className="h-12 w-12 opacity-10 mb-2" />
-                        <p className="text-sm font-medium">All products are within healthy stock levels.</p>
-                        <p className="text-[10px] uppercase font-bold mt-1">Last scan 5 mins ago</p>
+                    <div className="flex flex-col items-center justify-center h-48 text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
+                        <Package className="h-10 w-10 opacity-20 mb-2" />
+                        <p className="text-sm font-medium">All critical stock levels are healthy.</p>
+                        <p className="text-[10px] uppercase font-bold mt-1">Automatic scan active</p>
                     </div>
                 </CardContent>
             </Card>
         )}
 
-        {/* Dynamic Activity: Appointments or Sales */}
-        <Card className="shadow-lg border-primary/5">
+        {/* Global Recent Activity (shows for everyone) */}
+        <Card className={cn(
+            "shadow-lg border-primary/5",
+            businessType === 'HYBRID' ? "lg:col-span-2" : ""
+        )}>
           <CardHeader>
             <div className="flex items-center justify-between">
                 <div>
                     <CardTitle className="font-headline">Recent Activity</CardTitle>
-                    <CardDescription>Latest operational transactions.</CardDescription>
+                    <CardDescription>Latest financial and operational events.</CardDescription>
                 </div>
                 <div className="bg-emerald-500/10 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold border border-emerald-500/20 flex items-center gap-2">
-                    <Activity className="h-3 w-3" /> System Live
+                    <Activity className="h-3 w-3" /> System Synchronized
                 </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-                {transactions.slice(0, 5).map((tx) => (
+            <div className={cn(
+                "space-y-4",
+                businessType === 'HYBRID' ? "grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4" : ""
+            )}>
+                {transactions.slice(0, 6).map((tx) => (
                     <div key={tx.id} className="flex items-center justify-between p-3 rounded-xl border border-dashed hover:bg-muted/20 transition-all cursor-pointer">
                         <div className="flex items-center gap-3">
                             <div className={cn(
@@ -315,26 +349,17 @@ export default function DashboardPage() {
         <CardContent className="p-10 text-white relative z-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
                 <div className="max-w-xl space-y-4 text-center md:text-left">
-                    <h2 className="text-3xl font-bold font-headline">Ready for more business?</h2>
+                    <h2 className="text-3xl font-bold font-headline">Ready to expand?</h2>
                     <p className="text-white/80 leading-relaxed text-sm">
-                        You are currently in **{businessType}** mode. You can expand your service menu, add professional packages, or link a point-of-sale terminal to grow your operations in Nigeria.
+                        You are currently optimizing for **{businessType}** operations. You can adjust your business model at any time in settings to unlock new modules or dashboards tailored for your growth.
                     </p>
                     <div className="flex flex-wrap gap-4 justify-center md:justify-start">
                         <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-8">
                             Upgrade Plan
                         </Button>
-                        <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
-                            Custom Solutions
+                        <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                            <Link href="/settings/business">Switch Model</Link>
                         </Button>
-                    </div>
-                </div>
-                <div className="flex flex-col items-center gap-4 bg-black/20 p-6 rounded-2xl backdrop-blur-md border border-white/10 shrink-0">
-                    <div className="p-4 bg-white/10 rounded-full">
-                        <Users className="h-8 w-8" />
-                    </div>
-                    <div className="text-center">
-                        <p className="text-2xl font-bold font-headline">50,000+</p>
-                        <p className="text-[10px] uppercase font-bold tracking-widest opacity-70">Entrepreneurs onboard</p>
                     </div>
                 </div>
             </div>
