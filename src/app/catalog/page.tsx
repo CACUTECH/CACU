@@ -295,7 +295,7 @@ export default function CatalogPage() {
             </Card>
 
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="sm:max-w-xl">
+                <DialogContent className="sm:max-xl">
                     <DialogHeader>
                         <DialogTitle className="font-headline">Edit Catalog Entry</DialogTitle>
                         <DialogDescription>Modify details for {selectedItem?.name}.</DialogDescription>
@@ -314,6 +314,11 @@ export default function CatalogPage() {
 }
 
 function CatalogItemForm({ data, setData, businessType }: { data: Partial<CatalogItem>, setData: (d: any) => void, businessType: BusinessType }) {
+    const handleNumericChange = (field: string, value: string) => {
+        const num = value === "" ? 0 : parseFloat(value);
+        setData({ ...data, [field]: num });
+    };
+
     return (
         <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -355,8 +360,8 @@ function CatalogItemForm({ data, setData, businessType }: { data: Partial<Catalo
                     <Label>Selling Price (₦)</Label>
                     <Input 
                         type="number" 
-                        value={data.price} 
-                        onChange={(e) => setData({...data, price: parseFloat(e.target.value)})} 
+                        value={isNaN(data.price as any) ? "" : data.price} 
+                        onChange={(e) => handleNumericChange('price', e.target.value)} 
                     />
                 </div>
                 {data.type === 'Service' && (
@@ -385,18 +390,30 @@ function CatalogItemForm({ data, setData, businessType }: { data: Partial<Catalo
                     </div>
                     <div className="space-y-2">
                         <Label>Stock Qty</Label>
-                        <Input type="number" value={data.quantity} onChange={(e) => setData({...data, quantity: parseInt(e.target.value)})} />
+                        <Input 
+                            type="number" 
+                            value={isNaN(data.quantity as any) ? "" : data.quantity} 
+                            onChange={(e) => handleNumericChange('quantity', e.target.value)} 
+                        />
                     </div>
                     <div className="space-y-2">
                         <Label>Reorder Level</Label>
-                        <Input type="number" value={data.reorderLevel} onChange={(e) => setData({...data, reorderLevel: parseInt(e.target.value)})} />
+                        <Input 
+                            type="number" 
+                            value={isNaN(data.reorderLevel as any) ? "" : data.reorderLevel} 
+                            onChange={(e) => handleNumericChange('reorderLevel', e.target.value)} 
+                        />
                     </div>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 p-4 rounded-xl bg-muted/30 border border-dashed">
                     <div className="space-y-2">
                         <Label>Average Duration (minutes)</Label>
-                        <Input type="number" value={data.duration} onChange={(e) => setData({...data, duration: parseInt(e.target.value)})} />
+                        <Input 
+                            type="number" 
+                            value={isNaN(data.duration as any) ? "" : data.duration} 
+                            onChange={(e) => handleNumericChange('duration', e.target.value)} 
+                        />
                     </div>
                 </div>
             )}
