@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -14,6 +13,7 @@ import { useTheme } from "@/components/theme-provider";
 
 const breadcrumbNameMap: { [key: string]: string } = {
   '/': 'Dashboard',
+  '/pos': 'POS Checkout',
   '/transactions': 'Transactions',
   '/invoices': 'Invoices',
   '/inventory': 'Inventory',

@@ -5,7 +5,8 @@
       "source": "genkit-ai/skills",
       "ref": "main",
       "sourceType": "github",
-      "computedHash": "3e09c0258b269a48146071a23d46ce3e19e3d2004c645d13e64e45aa5b867a92"
+      "skillPath": "skills/developing-genkit-js/SKILL.md",
+      "computedHash": "511fbb0045b1e5150d529140055a5ddb47d504918be34052f8fde93109dba146"
     }
   }
 }
