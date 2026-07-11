@@ -16,13 +16,16 @@ import {
     TrendingDown,
     Activity,
     Target,
-    NFC
+    Receipt,
+    PlusCircle,
+    MonitorSpeaker,
+    ArrowLeftRight
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { transactions as allTransactions, incomeVsExpenseData, expensesByCategoryData, jobs, appointments } from '@/lib/data';
-import type { BusinessType, Transaction } from '@/lib/data';
+import { transactions as allTransactions, incomeVsExpenseData, expensesByCategoryData, jobs } from '@/lib/data';
+import type { BusinessType } from '@/lib/data';
 import { DataChart } from '@/components/data-chart';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -86,6 +89,22 @@ function StatCard({ title, value, subtext, icon: Icon, trend, variant = 'default
                 )}
             </CardContent>
         </Card>
+    )
+}
+
+function QuickAction({ icon: Icon, label, href, color = 'bg-primary' }: any) {
+    return (
+        <Link href={href} className="flex flex-col items-center gap-2 group flex-1 min-w-[80px]">
+            <div className={cn(
+                "h-12 w-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-lg shadow-sm text-white",
+                color
+            )}>
+                <Icon className="h-6 w-6" />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground group-hover:text-primary transition-colors text-center whitespace-nowrap">
+                {label}
+            </span>
+        </Link>
     )
 }
 
@@ -284,6 +303,24 @@ export default function DashboardPage() {
             icon={TrendingDown} 
         />
       </div>
+
+      {/* Quick Actions */}
+      <Card className="border-primary/10 shadow-lg shadow-primary/5">
+        <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 overflow-x-auto">
+                <QuickAction icon={Receipt} label="New Invoice" href="/invoices" color="bg-indigo-600" />
+                <QuickAction icon={ArrowLeftRight} label="Transaction" href="/transactions" color="bg-emerald-600" />
+                {(businessType === 'SERVICE' || businessType === 'HYBRID') && (
+                    <QuickAction icon={Wrench} label="New Job" href="/jobs" color="bg-amber-600" />
+                )}
+                {(businessType === 'PRODUCT' || businessType === 'HYBRID') && (
+                    <QuickAction icon={MonitorSpeaker} label="POS Sale" href="/pos" color="bg-violet-600" />
+                )}
+                <QuickAction icon={Users} label="Customer" href="/customers" color="bg-blue-600" />
+                <QuickAction icon={PlusCircle} label="Add Item" href="/catalog" color="bg-rose-600" />
+            </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-7">
         <Card className="lg:col-span-4 shadow-xl shadow-primary/5 border-primary/10">
