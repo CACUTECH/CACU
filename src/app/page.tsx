@@ -167,7 +167,7 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-8 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-headline text-3xl font-bold text-foreground">Control Center</h1>
+          <h1 className="font-headline text-3xl font-bold text-foreground">Business Snapshot</h1>
           <p className="text-muted-foreground mt-1">
             Performance metrics for your <span className="text-primary font-bold">{businessType.toLowerCase()}</span> operations.
           </p>
