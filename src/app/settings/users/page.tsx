@@ -41,6 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 type UserRole = "Owner" | "Admin" | "Editor" | "Viewer";
 type UserStatus = "Active" | "Pending" | "Inactive";
@@ -57,6 +58,8 @@ const MODULES = [
     { id: 'hr', label: 'Human Resources' },
     { id: 'analytics', label: 'Analytics' },
     { id: 'customers', label: 'Customers (CRM)' },
+    { id: 'community', label: 'Community' },
+    { id: 'apps', label: 'Integrations' },
 ];
 
 interface User {
@@ -120,8 +123,6 @@ function PermissionSelector({
         </div>
     );
 }
-
-import { cn } from "@/lib/utils";
 
 function InviteUserDialog({ onInvite }: { onInvite: (user: Omit<User, "id" | "status">) => void }) {
     const [name, setName] = React.useState("");
