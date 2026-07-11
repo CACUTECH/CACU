@@ -127,7 +127,10 @@ export default function DashboardPage() {
     if (!dateRange?.from || !dateRange?.to) return allTransactions;
     return allTransactions.filter(tx => {
       const txDate = new Date(tx.date);
-      return isWithinInterval(txDate, { start: startOfDay(dateRange.from!), end: endOfDay(dateRange.to!) });
+      return isWithinInterval(txDate, { 
+        start: startOfDay(dateRange.from!), 
+        end: endOfDay(dateRange.to!) 
+      });
     });
   }, [dateRange]);
 
