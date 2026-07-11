@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Image from "next/image";
 import placeholders from "@/app/lib/placeholder-images.json";
+import { cn } from "@/lib/utils";
 
 const forumTopics = [
     { id: 1, title: "Adapting to new FX regulations in Nigeria", category: "Finance", replies: 24, views: "1.2k", lastPost: "2h ago" },
