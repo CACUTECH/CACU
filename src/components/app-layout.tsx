@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -125,6 +124,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [businessType, setBusinessType] = useState<BusinessType>('HYBRID');
   const [mounted, setMounted] = useState(false);
 
+  // Simulation of RBAC: In a real app, this would be the logged-in user's role/perms
+  const [userRole, setUserRole] = useState<'Owner' | 'Admin' | 'Staff'>('Owner');
+  const [userPermissions, setUserPermissions] = useState<string[]>(['pos', 'appointments', 'jobs', 'transactions', 'invoices', 'catalog', 'accounting', 'reports', 'customers', 'analytics', 'hr', 'community', 'apps']);
+
   useEffect(() => {
     setMounted(true);
     const savedLogo = localStorage.getItem('business-logo');
@@ -145,21 +148,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    // Show POS for Hybrid and Product
-    ...(businessType !== 'SERVICE' ? [
+    // POS access check
+    ...(businessType !== 'SERVICE' && userPermissions.includes('pos') ? [
         { href: '/pos', label: 'POS Checkout', icon: MonitorSpeaker },
     ] : []),
-    // Conditionally show Appointments & Jobs for Service/Hybrid
+    // Appointments & Jobs access check
     ...(businessType !== 'PRODUCT' ? [
-        { href: '/appointments', label: 'Appointments', icon: CalendarClock },
-        { href: '/jobs', label: 'Work Orders / Jobs', icon: Wrench },
+        ...(userPermissions.includes('appointments') ? [{ href: '/appointments', label: 'Appointments', icon: CalendarClock }] : []),
+        ...(userPermissions.includes('jobs') ? [{ href: '/jobs', label: 'Work Orders / Jobs', icon: Wrench }] : []),
     ] : []),
-    { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
-    { href: '/invoices', label: 'Invoices & Receipts', icon: Receipt },
-    // Catalog is unified now
-    { href: '/catalog', label: businessType === 'SERVICE' ? 'Service Menu' : 'Catalog', icon: Package },
+    // Standard module checks
+    ...(userPermissions.includes('transactions') ? [{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight }] : []),
+    ...(userPermissions.includes('invoices') ? [{ href: '/invoices', label: 'Invoices & Receipts', icon: Receipt }] : []),
+    ...(userPermissions.includes('catalog') ? [{ href: '/catalog', label: businessType === 'SERVICE' ? 'Service Menu' : 'Catalog', icon: Package }] : []),
     { href: '/storefront', label: 'Storefront', icon: Store },
-    {
+    ...(userPermissions.includes('accounting') ? [{
       href: '/accounting',
       label: 'Accounting',
       icon: BookText,
@@ -168,10 +171,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/accounting/journal-entries', label: 'Journal Adjustments' },
         { href: '/accounting/trial-balance', label: 'Trial Balance' },
       ],
-    },
-    { href: '/reports', label: 'Reports', icon: FileText },
-    { href: '/customers', label: 'Customers', icon: Users },
-    { 
+    }] : []),
+    ...(userPermissions.includes('reports') ? [{ href: '/reports', label: 'Reports', icon: FileText }] : []),
+    ...(userPermissions.includes('customers') ? [{ href: '/customers', label: 'Customers', icon: Users }] : []),
+    ...(userPermissions.includes('analytics') ? [{ 
       href: '/analytics', 
       label: 'Analytics', 
       icon: PieChart,
@@ -183,9 +186,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           { href: '/analytics/top-selling', label: 'Top-Selling' },
           { href: '/analytics/aging-reports', label: 'Aging Reports' },
       ]
-    },
+    }] : []),
     { href: '/credit', label: 'Credit', icon: Banknote },
-    {
+    ...(userPermissions.includes('hr') ? [{
       href: '/hr',
       label: 'HR',
       icon: Users2,
@@ -195,7 +198,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/hr/payroll', label: 'Payroll' },
         { href: '/hr/termination', label: 'Exits & Termination' },
       ],
-    },
+    }] : []),
     { href: '/community', label: 'Community', icon: LifeBuoy },
     { href: '/apps', label: 'Integrations', icon: AppWindow },
   ];
@@ -244,7 +247,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Avatar>
             <div className="flex flex-col overflow-hidden group-data-[state=collapsed]:hidden">
                 <span className="truncate text-sm font-medium">Jane Doe</span>
-                <span className="truncate text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Business Owner</span>
+                <span className="truncate text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">{userRole}</span>
             </div>
           </div>
         </SidebarFooter>

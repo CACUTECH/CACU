@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus, MoreHorizontal, UserCog, Trash2, Mail, Loader2 } from 'lucide-react';
+import { UserPlus, MoreHorizontal, UserCog, Trash2, Mail, ShieldCheck, Lock } from 'lucide-react';
 import { 
     DropdownMenu, 
     DropdownMenuContent, 
@@ -38,10 +38,26 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type UserRole = "Owner" | "Admin" | "Editor" | "Viewer";
 type UserStatus = "Active" | "Pending" | "Inactive";
+
+const MODULES = [
+    { id: 'pos', label: 'POS Checkout' },
+    { id: 'appointments', label: 'Appointments' },
+    { id: 'jobs', label: 'Work Orders' },
+    { id: 'transactions', label: 'Transactions' },
+    { id: 'invoices', label: 'Invoices & Billing' },
+    { id: 'catalog', label: 'Catalog / Inventory' },
+    { id: 'accounting', label: 'Accounting' },
+    { id: 'reports', label: 'Financial Reports' },
+    { id: 'hr', label: 'Human Resources' },
+    { id: 'analytics', label: 'Analytics' },
+    { id: 'customers', label: 'Customers (CRM)' },
+];
 
 interface User {
     id: string;
@@ -49,28 +65,79 @@ interface User {
     email: string;
     role: UserRole;
     status: UserStatus;
+    permissions: string[]; // List of module IDs they can see
 }
 
 const initialUsers: User[] = [
-    { id: "1", name: "Jane Doe", email: "jane@example.com", role: "Owner", status: "Active" },
-    { id: "2", name: "John Smith", email: "john@example.com", role: "Admin", status: "Active" },
-    { id: "3", name: "Samuel Okoro", email: "samuel@example.com", role: "Editor", status: "Active" },
-    { id: "4", name: "Grace Adebayo", email: "grace@example.com", role: "Viewer", status: "Pending" },
+    { id: "1", name: "Jane Doe", email: "jane@example.com", role: "Owner", status: "Active", permissions: MODULES.map(m => m.id) },
+    { id: "2", name: "John Smith", email: "john@example.com", role: "Admin", status: "Active", permissions: MODULES.map(m => m.id) },
+    { id: "3", name: "Samuel Okoro", email: "samuel@example.com", role: "Editor", status: "Active", permissions: ['pos', 'catalog', 'customers'] },
+    { id: "4", name: "Grace Adebayo", email: "grace@example.com", role: "Viewer", status: "Pending", permissions: ['reports', 'analytics'] },
 ];
+
+function PermissionSelector({ 
+    selected, 
+    onChange, 
+    disabled 
+}: { 
+    selected: string[], 
+    onChange: (ids: string[]) => void, 
+    disabled?: boolean 
+}) {
+    const toggle = (id: string) => {
+        if (selected.includes(id)) {
+            onChange(selected.filter(i => i !== id));
+        } else {
+            onChange([...selected, id]);
+        }
+    };
+
+    return (
+        <div className="space-y-3 mt-4">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Lock className="h-3 w-3" /> Module Access Control
+            </Label>
+            <div className={cn("grid grid-cols-1 gap-2 p-4 rounded-xl border bg-muted/30", disabled && "opacity-50 grayscale")}>
+                {MODULES.map((mod) => (
+                    <div key={mod.id} className="flex items-center space-x-2">
+                        <Checkbox 
+                            id={`mod-${mod.id}`} 
+                            checked={disabled ? true : selected.includes(mod.id)} 
+                            onCheckedChange={() => !disabled && toggle(mod.id)}
+                            disabled={disabled}
+                        />
+                        <label htmlFor={`mod-${mod.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                            {mod.label}
+                        </label>
+                    </div>
+                ))}
+                {disabled && (
+                    <p className="text-[10px] text-primary font-bold mt-2 italic">
+                        * Admins and Owners have full access to all modules by default.
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}
+
+import { cn } from "@/lib/utils";
 
 function InviteUserDialog({ onInvite }: { onInvite: (user: Omit<User, "id" | "status">) => void }) {
     const [name, setName] = React.useState("");
     const [email, setEmail] = React.useState("");
     const [role, setRole] = React.useState<UserRole>("Viewer");
+    const [permissions, setPermissions] = React.useState<string[]>([]);
     const [isOpen, setIsOpen] = React.useState(false);
 
     const handleInvite = () => {
         if (name && email && role) {
-            onInvite({ name, email, role });
+            onInvite({ name, email, role, permissions: (role === 'Admin' || role === 'Owner') ? MODULES.map(m => m.id) : permissions });
             setIsOpen(false);
             setName("");
             setEmail("");
             setRole("Viewer");
+            setPermissions([]);
         }
     };
 
@@ -82,37 +149,45 @@ function InviteUserDialog({ onInvite }: { onInvite: (user: Omit<User, "id" | "st
                     Invite Member
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0">
+                <DialogHeader className="p-6 pb-0">
                     <DialogTitle className="font-headline">Invite Team Member</DialogTitle>
                     <DialogDescription>
                         Send an invitation to join your business ecosystem.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="invite-name">Full Name</Label>
-                        <Input id="invite-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Doe" />
+                <ScrollArea className="flex-1 px-6">
+                    <div className="grid gap-4 py-4 pb-8">
+                        <div className="space-y-2">
+                            <Label htmlFor="invite-name">Full Name</Label>
+                            <Input id="invite-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Doe" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="invite-email">Email Address</Label>
+                            <Input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="invite-role">Access Role</Label>
+                            <Select value={role} onValueChange={(val: UserRole) => setRole(val)}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Admin">Admin (Full Access)</SelectItem>
+                                    <SelectItem value="Editor">Editor (Can edit records)</SelectItem>
+                                    <SelectItem value="Viewer">Viewer (Read-only)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        
+                        <PermissionSelector 
+                            selected={permissions} 
+                            onChange={setPermissions} 
+                            disabled={role === 'Admin' || role === 'Owner'} 
+                        />
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="invite-email">Email Address</Label>
-                        <Input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="invite-role">Access Role</Label>
-                        <Select value={role} onValueChange={(val: UserRole) => setRole(val)}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a role" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Admin">Admin (Full Access)</SelectItem>
-                                <SelectItem value="Editor">Editor (Can edit records)</SelectItem>
-                                <SelectItem value="Viewer">Viewer (Read-only)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                <DialogFooter>
+                </ScrollArea>
+                <DialogFooter className="p-6 border-t bg-muted/10">
                     <DialogClose asChild>
                         <Button type="button" variant="secondary">Cancel</Button>
                     </DialogClose>
@@ -123,43 +198,62 @@ function InviteUserDialog({ onInvite }: { onInvite: (user: Omit<User, "id" | "st
     );
 }
 
-function EditRoleDialog({ user, onUpdate, open, onOpenChange }: { user: User | null, onUpdate: (id: string, role: UserRole) => void, open: boolean, onOpenChange: (open: boolean) => void }) {
+function EditRoleDialog({ user, onUpdate, open, onOpenChange }: { user: User | null, onUpdate: (id: string, role: UserRole, perms: string[]) => void, open: boolean, onOpenChange: (open: boolean) => void }) {
     const [role, setRole] = React.useState<UserRole>(user?.role || "Viewer");
+    const [permissions, setPermissions] = React.useState<string[]>(user?.permissions || []);
 
     React.useEffect(() => {
-        if (user) setRole(user.role);
+        if (user) {
+            setRole(user.role);
+            setPermissions(user.permissions);
+        }
     }, [user]);
+
+    const handleSave = () => {
+        if (user) {
+            const finalPerms = (role === 'Admin' || role === 'Owner') ? MODULES.map(m => m.id) : permissions;
+            onUpdate(user.id, role, finalPerms);
+        }
+    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0">
+                <DialogHeader className="p-6 pb-0">
                     <DialogTitle className="font-headline">Manage Permissions</DialogTitle>
                     <DialogDescription>
-                        Update the access level for {user?.name}.
+                        Update the access level and modules for {user?.name}.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                        <Label>Role</Label>
-                        <Select value={role} onValueChange={(val: UserRole) => setRole(val)}>
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Owner">Owner</SelectItem>
-                                <SelectItem value="Admin">Admin</SelectItem>
-                                <SelectItem value="Editor">Editor</SelectItem>
-                                <SelectItem value="Viewer">Viewer</SelectItem>
-                            </SelectContent>
-                        </Select>
+                <ScrollArea className="flex-1 px-6">
+                    <div className="grid gap-4 py-4 pb-8">
+                        <div className="space-y-2">
+                            <Label>Role</Label>
+                            <Select value={role} onValueChange={(val: UserRole) => setRole(val)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Owner">Owner</SelectItem>
+                                    <SelectItem value="Admin">Admin</SelectItem>
+                                    <SelectItem value="Editor">Editor</SelectItem>
+                                    <SelectItem value="Viewer">Viewer</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        
+                        <PermissionSelector 
+                            selected={permissions} 
+                            onChange={setPermissions} 
+                            disabled={role === 'Admin' || role === 'Owner'} 
+                        />
                     </div>
-                </div>
-                <DialogFooter>
+                </ScrollArea>
+                <DialogFooter className="p-6 border-t bg-muted/10">
                     <DialogClose asChild>
                         <Button type="button" variant="secondary">Cancel</Button>
                     </DialogClose>
-                    <Button type="submit" onClick={() => user && onUpdate(user.id, role)}>Update Role</Button>
+                    <Button type="submit" onClick={handleSave}>Update Access</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -185,12 +279,12 @@ export default function UserManagementPage() {
         });
     };
 
-    const handleUpdateRole = (id: string, role: UserRole) => {
-        setUsers(prev => prev.map(u => u.id === id ? { ...u, role } : u));
+    const handleUpdateRole = (id: string, role: UserRole, permissions: string[]) => {
+        setUsers(prev => prev.map(u => u.id === id ? { ...u, role, permissions } : u));
         setIsEditOpen(false);
         toast({
-            title: "Role Updated",
-            description: "Permissions have been successfully modified.",
+            title: "Access Updated",
+            description: "Permissions and roles have been successfully modified.",
         });
     };
 
@@ -214,7 +308,7 @@ export default function UserManagementPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-headline text-3xl font-bold tracking-tight">User Management</h1>
-                    <p className="text-muted-foreground mt-1">Manage team permissions and access levels across your business.</p>
+                    <p className="text-muted-foreground mt-1">Manage team permissions and role-based module access.</p>
                 </div>
                 <InviteUserDialog onInvite={handleInvite} />
             </div>
@@ -222,7 +316,7 @@ export default function UserManagementPage() {
             <Card className="shadow-xl shadow-primary/5 border-primary/10">
                 <CardHeader>
                     <CardTitle className="font-headline">Team Members</CardTitle>
-                    <CardDescription>Collaborate with your employees and partners with fine-grained access control.</CardDescription>
+                    <CardDescription>Collaborate with fine-grained control over what each staff member can see.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="rounded-xl border overflow-hidden">
@@ -231,6 +325,7 @@ export default function UserManagementPage() {
                                 <TableRow>
                                     <TableHead>User</TableHead>
                                     <TableHead>Role</TableHead>
+                                    <TableHead className="hidden md:table-cell">Module Access</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -250,9 +345,28 @@ export default function UserManagementPage() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className="bg-background">
+                                            <Badge variant="outline" className="bg-background flex items-center gap-1 w-fit">
+                                                <ShieldCheck className="h-3 w-3 text-primary" />
                                                 {user.role}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell className="hidden md:table-cell">
+                                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                                {user.role === 'Admin' || user.role === 'Owner' ? (
+                                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-tighter">Full Suite Access</span>
+                                                ) : user.permissions.length === 0 ? (
+                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter italic">No Access Assigned</span>
+                                                ) : (
+                                                    user.permissions.slice(0, 3).map(p => (
+                                                        <Badge key={p} variant="secondary" className="text-[9px] h-4 py-0 px-1">
+                                                            {MODULES.find(m => m.id === p)?.label.split(' ')[0]}
+                                                        </Badge>
+                                                    ))
+                                                )}
+                                                {user.permissions.length > 3 && !(user.role === 'Admin' || user.role === 'Owner') && (
+                                                    <span className="text-[9px] text-muted-foreground font-bold">+{user.permissions.length - 3} more</span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant={user.status === 'Active' ? 'default' : 'secondary'} className={
@@ -275,7 +389,7 @@ export default function UserManagementPage() {
                                                         setIsEditOpen(true);
                                                     }}>
                                                         <UserCog className="mr-2 h-4 w-4" />
-                                                        Edit Role
+                                                        Manage Permissions
                                                     </DropdownMenuItem>
                                                     {user.status === 'Pending' && (
                                                         <DropdownMenuItem onClick={() => handleResendInvite(user.email)}>
@@ -332,10 +446,10 @@ export default function UserManagementPage() {
 
             <Card className="bg-primary/5 border-dashed border-2">
                 <CardHeader>
-                    <CardTitle className="text-base">Security Note</CardTitle>
+                    <CardTitle className="text-base">Security & Access Note</CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">
-                    Owners and Admins can manage team members and settings. Editors can modify business records but cannot invite new users. Viewers have read-only access to all modules.
+                    Owners and Admins always have unrestricted access to all features. Use the "Editor" or "Viewer" roles to grant limited access to specific sub-modules like POS or Reports for your operational staff.
                 </CardContent>
             </Card>
         </div>
