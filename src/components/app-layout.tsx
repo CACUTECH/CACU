@@ -38,7 +38,8 @@ import {
     MonitorSpeaker, 
     BookText, 
     Wrench,
-    CalendarClock
+    CalendarClock,
+    UserX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
@@ -192,6 +193,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/hr/employees', label: 'Employees' },
         { href: '/hr/attendance', label: 'Attendance' },
         { href: '/hr/payroll', label: 'Payroll' },
+        { href: '/hr/termination', label: 'Exits & Termination' },
       ],
     },
     { href: '/community', label: 'Community', icon: LifeBuoy },

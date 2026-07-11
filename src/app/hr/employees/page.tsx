@@ -1,3 +1,4 @@
+
 "use client"
 import * as React from "react"
 import { MoreHorizontal, PlusCircle, UserCog, Trash2, Edit2, User, Mail, ShieldCheck, Phone, Briefcase } from "lucide-react"
@@ -84,7 +85,7 @@ export default function EmployeesPage() {
     const updateStatus = (id: string, status: Employee['status']) => {
         setEmployees(employees.map(e => e.id === id ? { ...e, status } : e))
         toast({ 
-            title: status === 'Terminated' ? "Employee Terminated" : "Status Updated", 
+            title: "Status Updated", 
             description: `Employee profile is now ${status}.` 
         })
     }
@@ -235,21 +236,11 @@ export default function EmployeesPage() {
                                                             <Edit2 className="h-4 w-4 mr-2" /> Adjust Role
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
-                                                        {employee.status !== 'Terminated' ? (
-                                                            <DropdownMenuItem 
-                                                                className="text-destructive focus:bg-destructive/10 focus:text-destructive" 
-                                                                onClick={() => updateStatus(employee.id, 'Terminated')}
-                                                            >
-                                                                <Trash2 className="h-4 w-4 mr-2" /> Terminate Employment
-                                                            </DropdownMenuItem>
-                                                        ) : (
-                                                            <DropdownMenuItem 
-                                                                className="text-emerald-600 focus:bg-emerald-50" 
-                                                                onClick={() => updateStatus(employee.id, 'Active')}
-                                                            >
-                                                                <PlusCircle className="h-4 w-4 mr-2" /> Reinstate Profile
-                                                            </DropdownMenuItem>
-                                                        )}
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href="/hr/termination">
+                                                                <Briefcase className="h-4 w-4 mr-2" /> Process Exit
+                                                            </Link>
+                                                        </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableCell>

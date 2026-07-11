@@ -1,5 +1,6 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Database, UserCheck, CalendarDays, ClipboardCheck, Calculator, FileDown, ArrowRight } from 'lucide-react';
+import { Database, UserCheck, CalendarDays, ClipboardCheck, Calculator, FileDown, ArrowRight, UserX } from 'lucide-react';
 import Link from 'next/link';
 
 function FeatureCard({ icon: Icon, title, description, href }: { icon: React.ElementType, title: string, description: string, href: string }) {
@@ -53,6 +54,12 @@ export default function HRPage() {
                     title="Payroll"
                     description="Generate payroll and allow employees to download their payslips directly from their profile."
                     href="/hr/payroll"
+                />
+                <FeatureCard
+                    icon={UserX}
+                    title="Exits & Termination"
+                    description="Manage employee exits, record reasons, and generate professional termination notices."
+                    href="/hr/termination"
                 />
             </div>
         </div>
