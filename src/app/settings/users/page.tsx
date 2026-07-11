@@ -102,14 +102,14 @@ function PermissionSelector({
             </Label>
             <div className={cn("grid grid-cols-1 gap-2 p-4 rounded-xl border bg-muted/30", disabled && "opacity-50 grayscale")}>
                 {MODULES.map((mod) => (
-                    <div key={mod.id} className="flex items-center space-x-2">
+                    <div key={mod.id} className="flex items-center space-x-2 py-1">
                         <Checkbox 
                             id={`mod-${mod.id}`} 
                             checked={disabled ? true : selected.includes(mod.id)} 
                             onCheckedChange={() => !disabled && toggle(mod.id)}
                             disabled={disabled}
                         />
-                        <label htmlFor={`mod-${mod.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                        <label htmlFor={`mod-${mod.id}`} className="text-sm font-medium leading-none cursor-pointer select-none">
                             {mod.label}
                         </label>
                     </div>
@@ -150,15 +150,15 @@ function InviteUserDialog({ onInvite }: { onInvite: (user: Omit<User, "id" | "st
                     Invite Member
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0">
-                <DialogHeader className="p-6 pb-0">
-                    <DialogTitle className="font-headline">Invite Team Member</DialogTitle>
+            <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-6 pb-2">
+                    <DialogTitle className="font-headline text-xl">Invite Team Member</DialogTitle>
                     <DialogDescription>
                         Send an invitation to join your business ecosystem.
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="flex-1 px-6">
-                    <div className="grid gap-4 py-4 pb-8">
+                    <div className="grid gap-4 py-4 pb-12">
                         <div className="space-y-2">
                             <Label htmlFor="invite-name">Full Name</Label>
                             <Input id="invite-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Doe" />
@@ -219,15 +219,15 @@ function EditRoleDialog({ user, onUpdate, open, onOpenChange }: { user: User | n
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0">
-                <DialogHeader className="p-6 pb-0">
-                    <DialogTitle className="font-headline">Manage Permissions</DialogTitle>
+            <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-6 pb-2">
+                    <DialogTitle className="font-headline text-xl">Manage Permissions</DialogTitle>
                     <DialogDescription>
                         Update the access level and modules for {user?.name}.
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="flex-1 px-6">
-                    <div className="grid gap-4 py-4 pb-8">
+                    <div className="grid gap-4 py-4 pb-12">
                         <div className="space-y-2">
                             <Label>Role</Label>
                             <Select value={role} onValueChange={(val: UserRole) => setRole(val)}>
