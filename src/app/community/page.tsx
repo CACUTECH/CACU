@@ -24,9 +24,30 @@ const forumTopics = [
 ];
 
 const grantAlerts = [
-    { id: 1, title: "LSETF Employment Trust Fund", amount: "Up to ₦5M", deadline: "Aug 30, 2024", type: "Loan/Grant" },
-    { id: 2, title: "Tony Elumelu Foundation 2024", amount: "$5,000", deadline: "Closed (Waitlist)", type: "Grant" },
-    { id: 3, title: "Bank of Industry MSME Fund", amount: "Up to ₦10M", deadline: "Ongoing", type: "Loan" },
+    { 
+        id: 1, 
+        title: "LSETF Employment Trust Fund", 
+        amount: "Up to ₦5M", 
+        deadline: "Aug 30, 2024", 
+        type: "Loan/Grant",
+        url: "https://lsetf.ng/"
+    },
+    { 
+        id: 2, 
+        title: "Tony Elumelu Foundation 2024", 
+        amount: "$5,000", 
+        deadline: "Closed (Waitlist)", 
+        type: "Grant",
+        url: "https://www.tonyelumelufoundation.org/"
+    },
+    { 
+        id: 3, 
+        title: "Bank of Industry MSME Fund", 
+        amount: "Up to ₦10M", 
+        deadline: "Ongoing", 
+        type: "Loan",
+        url: "https://www.boi.ng/micro-small-medium-enterprises/"
+    },
 ];
 
 const upcomingAMAs = [
@@ -79,11 +100,14 @@ export default function CommunityPage() {
         });
     };
 
-    const handleApplyGrant = (title: string) => {
+    const handleApplyGrant = (title: string, url: string) => {
         toast({
-            title: "Application Portal Opened",
-            description: `Redirecting you to the secure portal for ${title}...`,
+            title: "Redirecting to Provider",
+            description: `Opening the official portal for ${title}...`,
         });
+        setTimeout(() => {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }, 500);
     };
 
     return (
@@ -323,7 +347,7 @@ export default function CommunityPage() {
                                     <Button 
                                         className="w-full rounded-xl" 
                                         disabled={grant.deadline.includes("Closed")}
-                                        onClick={() => handleApplyGrant(grant.title)}
+                                        onClick={() => handleApplyGrant(grant.title, grant.url)}
                                     >
                                         Apply Now <ArrowRight className="ml-2 w-4 h-4" />
                                     </Button>
