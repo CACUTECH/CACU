@@ -29,7 +29,6 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
-    AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
@@ -100,26 +99,28 @@ function PermissionSelector({
             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                 <Lock className="h-3 w-3" /> Module Access Control
             </Label>
-            <div className={cn("grid grid-cols-1 gap-2 p-4 rounded-xl border bg-muted/30", disabled && "opacity-50 grayscale")}>
-                {MODULES.map((mod) => (
-                    <div key={mod.id} className="flex items-center space-x-2 py-1">
-                        <Checkbox 
-                            id={`mod-${mod.id}`} 
-                            checked={disabled ? true : selected.includes(mod.id)} 
-                            onCheckedChange={() => !disabled && toggle(mod.id)}
-                            disabled={disabled}
-                        />
-                        <label htmlFor={`mod-${mod.id}`} className="text-sm font-medium leading-none cursor-pointer select-none">
-                            {mod.label}
-                        </label>
-                    </div>
-                ))}
-                {disabled && (
-                    <p className="text-[10px] text-primary font-bold mt-2 italic">
-                        * Admins and Owners have full access to all modules by default.
-                    </p>
-                )}
-            </div>
+            <ScrollArea className="h-[300px] w-full rounded-xl border bg-muted/30">
+                <div className={cn("grid grid-cols-1 gap-2 p-4", disabled && "opacity-50 grayscale")}>
+                    {MODULES.map((mod) => (
+                        <div key={mod.id} className="flex items-center space-x-2 py-1">
+                            <Checkbox 
+                                id={`mod-${mod.id}`} 
+                                checked={disabled ? true : selected.includes(mod.id)} 
+                                onCheckedChange={() => !disabled && toggle(mod.id)}
+                                disabled={disabled}
+                            />
+                            <label htmlFor={`mod-${mod.id}`} className="text-sm font-medium leading-none cursor-pointer select-none">
+                                {mod.label}
+                            </label>
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
+            {disabled && (
+                <p className="text-[10px] text-primary font-bold mt-2 italic">
+                    * Admins and Owners have full access to all modules by default.
+                </p>
+            )}
         </div>
     );
 }
@@ -150,7 +151,7 @@ function InviteUserDialog({ onInvite }: { onInvite: (user: Omit<User, "id" | "st
                     Invite Member
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden">
+            <DialogContent className="sm:max-w-md max-h-[95vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="font-headline text-xl">Invite Team Member</DialogTitle>
                     <DialogDescription>
@@ -219,7 +220,7 @@ function EditRoleDialog({ user, onUpdate, open, onOpenChange }: { user: User | n
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden">
+            <DialogContent className="sm:max-w-md max-h-[95vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="font-headline text-xl">Manage Permissions</DialogTitle>
                     <DialogDescription>
