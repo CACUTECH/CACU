@@ -36,10 +36,17 @@ export default function JournalEntriesPage() {
     const { toast } = useToast()
     const [date, setDate] = React.useState<Date | undefined>(new Date())
     const [memo, setMemo] = React.useState("")
-    const [lines, setLines] = React.useState<JournalLine[]>([
-        { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
-        { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
-    ])
+    const [lines, setLines] = React.useState<JournalLine[]>([])
+    const [mounted, setMounted] = React.useState(false)
+
+    // Fix Hydration Mismatch by generating IDs only on client
+    React.useEffect(() => {
+        setMounted(true)
+        setLines([
+            { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
+            { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
+        ])
+    }, [])
 
     const addLine = () => {
         setLines([...lines, { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 }])
@@ -88,6 +95,8 @@ export default function JournalEntriesPage() {
             { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
         ])
     }
+
+    if (!mounted) return null
 
     return (
         <div className="flex flex-col gap-6">

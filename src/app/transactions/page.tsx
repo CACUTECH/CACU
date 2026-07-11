@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { transactions as allTransactions } from '@/lib/data';
+import { transactions as initialTransactions } from '@/lib/data';
 import type { Transaction } from '@/lib/data';
 import { Search, ListFilter, PlusCircle, Upload } from 'lucide-react';
 import {
@@ -31,6 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog"
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -42,109 +43,25 @@ import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 
-function AddTransactionDialog() {
-    const [date, setDate] = React.useState<Date>()
-    return (
-        <Dialog>
-            <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Transaction
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                <DialogTitle>Add Transaction</DialogTitle>
-                <DialogDescription>
-                    Record a new income or expense. Click save when you're done.
-                </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="description" className="text-right">
-                        Description
-                        </Label>
-                        <Input id="description" placeholder="e.g. Office supplies" className="col-span-3" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="amount" className="text-right">
-                        Amount
-                        </Label>
-                        <Input id="amount" type="number" placeholder="e.g. 150.00" className="col-span-3" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                         <Label htmlFor="type" className="text-right">
-                        Type
-                        </Label>
-                        <Select>
-                            <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="income">Income</SelectItem>
-                                <SelectItem value="expense">Expense</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                         <Label htmlFor="category" className="text-right">
-                        Category
-                        </Label>
-                        <Select>
-                            <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="client">Client Revenue</SelectItem>
-                                <SelectItem value="supplies">Office Supplies</SelectItem>
-                                <SelectItem value="software">Software</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="date" className="text-right">
-                            Date
-                        </Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full justify-start text-left font-normal col-span-3",
-                                    !date && "text-muted-foreground"
-                                )}
-                                >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {date ? format(date, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={date}
-                                    onSelect={setDate}
-                                    initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button type="submit" className="w-full">Save changes</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
 export default function TransactionsPage() {
+    const { toast } = useToast();
+    const [transactions, setTransactions] = React.useState<Transaction[]>(initialTransactions);
     const [searchTerm, setSearchTerm] = React.useState("");
     const [selectedTypes, setSelectedTypes] = React.useState<string[]>(["Income", "Expense"]);
-    const { toast } = useToast();
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+    // Form State for Add Transaction
+    const [date, setDate] = React.useState<Date | undefined>(new Date())
+    const [formData, setFormData] = React.useState<Partial<Transaction>>({
+        description: '',
+        amount: 0,
+        type: 'Income',
+        category: 'Services',
+        account: 'Business Checking'
+    })
+
     const filteredTransactions = React.useMemo(() => {
-        return allTransactions.filter((t) => {
+        return transactions.filter((t) => {
             const matchesSearch = 
                 t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -154,7 +71,25 @@ export default function TransactionsPage() {
             
             return matchesSearch && matchesType;
         });
-    }, [searchTerm, selectedTypes]);
+    }, [searchTerm, selectedTypes, transactions]);
+
+    const handleAddTransaction = () => {
+        if (!formData.description || !formData.amount) return
+
+        const newTx: Transaction = {
+            id: `tx-${Date.now()}`,
+            date: date ? format(date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+            description: formData.description,
+            amount: Number(formData.amount),
+            type: formData.type as any,
+            category: formData.category || 'General',
+            account: formData.account || 'Business Checking'
+        }
+
+        setTransactions([newTx, ...transactions])
+        setFormData({ description: '', amount: 0, type: 'Income', category: 'Services', account: 'Business Checking' })
+        toast({ title: "Transaction Recorded", description: `${newTx.description} saved to ledger.` })
+    }
 
     const toggleType = (type: string) => {
         setSelectedTypes(prev => 
@@ -178,11 +113,9 @@ export default function TransactionsPage() {
                     const worksheet = workbook.Sheets[sheetName];
                     const json = XLSX.utils.sheet_to_json(worksheet);
                     
-                    console.log(json);
-
                     toast({
                         title: "File Uploaded",
-                        description: `${file.name} has been processed. Check the console for the data.`,
+                        description: `${file.name} has been processed successfully.`,
                     });
                 }
             } catch (error) {
@@ -191,7 +124,6 @@ export default function TransactionsPage() {
                     title: "Upload Failed",
                     description: `Could not parse the file ${file.name}.`,
                 });
-                console.error("Error parsing file:", error);
             }
         };
         reader.readAsArrayBuffer(file);
@@ -221,7 +153,67 @@ export default function TransactionsPage() {
                             <Upload className="mr-2 h-4 w-4" />
                             Import
                         </Button>
-                        <AddTransactionDialog />
+                        
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button className="w-full sm:w-auto">
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Add Transaction
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                <DialogTitle>Add Transaction</DialogTitle>
+                                <DialogDescription>
+                                    Record a new income or expense.
+                                </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label>Description</Label>
+                                        <Input value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} placeholder="e.g. Office supplies" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Amount (₦)</Label>
+                                            <Input type="number" value={formData.amount} onChange={(e) => setFormData({...formData, amount: parseFloat(e.target.value) || 0})} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Type</Label>
+                                            <Select value={formData.type} onValueChange={(val: any) => setFormData({...formData, type: val})}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Income">Income</SelectItem>
+                                                    <SelectItem value="Expense">Expense</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Category</Label>
+                                        <Input value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} placeholder="e.g. Marketing" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Date</Label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                                    <DialogClose asChild><Button onClick={handleAddTransaction}>Record Transaction</Button></DialogClose>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 </div>
                 <div className="mt-4 flex items-center gap-2">
