@@ -1,4 +1,3 @@
-
 "use client"
 import * as React from "react"
 import { MoreHorizontal, PlusCircle, UserCog, Trash2, Edit2, User, Mail, ShieldCheck, Phone, Briefcase } from "lucide-react"
@@ -36,6 +35,7 @@ import { employees as initialEmployees } from "@/lib/data"
 import type { Employee } from "@/lib/data"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import Link from "next/link"
 
 export default function EmployeesPage() {
     const { toast } = useToast()
