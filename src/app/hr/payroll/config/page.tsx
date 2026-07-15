@@ -17,7 +17,8 @@ import {
     CheckCircle2, 
     Info,
     Trash2,
-    PlusCircle
+    PlusCircle,
+    Edit2
 } from "lucide-react";
 import {
     Dialog,
@@ -50,7 +51,8 @@ export default function PayrollConfigPage() {
         pension: true,
     });
 
-    // New Component Form State
+    // Add Component Form State
+    const [isAddOpen, setIsAddOpen] = React.useState(false);
     const [newComp, setNewComp] = React.useState<Partial<SalaryComponent>>({
         name: "",
         type: "Earning",
@@ -58,6 +60,11 @@ export default function PayrollConfigPage() {
         value: 0,
         isStatutory: false
     });
+
+    // Edit Component Form State
+    const [isEditOpen, setIsEditOpen] = React.useState(false);
+    const [editingComp, setEditingComp] = React.useState<SalaryComponent | null>(null);
+    const [editFormData, setEditFormData] = React.useState<Partial<SalaryComponent>>({});
 
     const handleAddComponent = () => {
         if (!newComp.name) {
@@ -76,7 +83,27 @@ export default function PayrollConfigPage() {
 
         setComponents([...components, component]);
         setNewComp({ name: "", type: "Earning", calculationType: "Percentage", value: 0, isStatutory: false });
+        setIsAddOpen(false);
         toast({ title: "Component Added", description: `${component.name} is now part of the salary structure.` });
+    };
+
+    const handleOpenEdit = (comp: SalaryComponent) => {
+        setEditingComp(comp);
+        setEditFormData(comp);
+        setIsEditOpen(true);
+    };
+
+    const handleUpdateComponent = () => {
+        if (!editingComp || !editFormData.name) return;
+
+        const updated = components.map(c => 
+            c.id === editingComp.id ? { ...c, ...editFormData } as SalaryComponent : c
+        );
+
+        setComponents(updated);
+        setIsEditOpen(false);
+        setEditingComp(null);
+        toast({ title: "Component Updated", description: "Changes saved to the salary structure." });
     };
 
     const handleDeleteComponent = (id: string) => {
@@ -84,7 +111,7 @@ export default function PayrollConfigPage() {
         toast({ title: "Component Removed", description: "The item has been removed from payroll rules." });
     };
 
-    const handleSave = () => {
+    const handleSaveAll = () => {
         toast({ 
             title: "Configuration Secured", 
             description: "Global salary components and statutory rules have been saved to the master ledger." 
@@ -111,7 +138,7 @@ export default function PayrollConfigPage() {
                                 <CardTitle>Salary Components</CardTitle>
                                 <CardDescription>Earnings and deductions that make up the monthly pay.</CardDescription>
                             </div>
-                            <Dialog>
+                            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                                 <DialogTrigger asChild>
                                     <Button size="sm" variant="outline"><Plus className="mr-2 h-4 w-4" /> New Component</Button>
                                 </DialogTrigger>
@@ -174,9 +201,7 @@ export default function PayrollConfigPage() {
                                         </div>
                                     </div>
                                     <DialogFooter>
-                                        <DialogClose asChild>
-                                            <Button className="w-full" onClick={handleAddComponent}>Record Component</Button>
-                                        </DialogClose>
+                                        <Button className="w-full" onClick={handleAddComponent}>Record Component</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -199,19 +224,29 @@ export default function PayrollConfigPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-right">
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-right mr-2">
                                             <p className="font-bold text-sm">{c.value}{c.calculationType === 'Percentage' ? '%' : ' Fixed'}</p>
                                             <p className="text-[10px] text-muted-foreground">Effective Date: Jan 2024</p>
                                         </div>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            className="opacity-0 group-hover:opacity-100 text-destructive transition-opacity"
-                                            onClick={() => handleDeleteComponent(c.id)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                onClick={() => handleOpenEdit(c)}
+                                            >
+                                                <Edit2 className="h-4 w-4" />
+                                            </Button>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                                onClick={() => handleDeleteComponent(c.id)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -279,12 +314,79 @@ export default function PayrollConfigPage() {
                             <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Refreshing Gateway", description: "Verifying secure connection to bank API..." })}>Re-verify Bank Linking</Button>
                         </CardContent>
                     </Card>
-                    <Button onClick={handleSave} className="w-full h-12 rounded-xl shadow-lg shadow-primary/20">
+                    <Button onClick={handleSaveAll} className="w-full h-12 rounded-xl shadow-lg shadow-primary/20">
                         <CheckCircle2 className="mr-2 h-4 w-4" />
                         Save All Changes
                     </Button>
                 </div>
             </div>
+
+            {/* Edit Component Dialog */}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Salary Component</DialogTitle>
+                        <DialogDescription>Modify the existing rule for {editingComp?.name}.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Component Name</Label>
+                            <Input 
+                                placeholder="e.g. Utility Allowance" 
+                                value={editFormData.name} 
+                                onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} 
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Type</Label>
+                                <Select value={editFormData.type} onValueChange={(v) => setEditFormData({...editFormData, type: v as any})}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Earning">Earning</SelectItem>
+                                        <SelectItem value="Deduction">Deduction</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Statutory?</Label>
+                                <div className="flex items-center space-x-2 pt-2">
+                                    <Switch 
+                                        checked={editFormData.isStatutory} 
+                                        onCheckedChange={(v) => setEditFormData({...editFormData, isStatutory: v})} 
+                                    />
+                                    <span className="text-xs text-muted-foreground">Is regulated?</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Calculation</Label>
+                                <Select value={editFormData.calculationType} onValueChange={(v) => setEditFormData({...editFormData, calculationType: v as any})}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Fixed">Fixed Amount</SelectItem>
+                                        <SelectItem value="Percentage">Percentage (%)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Value</Label>
+                                <Input 
+                                    type="number" 
+                                    placeholder="0" 
+                                    value={editFormData.value} 
+                                    onChange={(e) => setEditFormData({...editFormData, value: parseFloat(e.target.value) || 0})} 
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                        <Button onClick={handleUpdateComponent}>Save Changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
