@@ -156,7 +156,7 @@ export type Employee = {
   role: string;
   department?: string;
   costCenter?: string;
-  status: 'Active' | 'On Probation' | 'Terminated';
+  status: 'Active' | 'On Probation' | 'Terminated' | 'On Notice';
   checkInTime?: string;
   checkOutTime?: string;
   bankName?: string;
@@ -168,7 +168,7 @@ export type Employee = {
 
 export const employees: Employee[] = [
   { id: 'emp-001', name: 'Grace Adebayo', email: 'grace@example.com', role: 'Senior Consultant', department: 'Professional Services', costCenter: 'ADM-01', status: 'Active', checkInTime: '09:05 AM', checkOutTime: '05:30 PM', baseSalary: 450000, bankName: 'Sterling Bank', accountNumber: '0012345678' },
-  { id: 'emp-002', name: 'Samuel Okoro', email: 'samuel@example.com', role: 'Operations Manager', department: 'Operations', costCenter: 'OPS-01', status: 'Active', checkInTime: '08:58 AM', checkOutTime: '06:00 PM', baseSalary: 350000, bankName: 'Access Bank', accountNumber: '0023456789' },
+  { id: 'emp-002', name: 'Samuel Okoro', email: 'samuel@example.com', role: 'Operations Manager', department: 'Operations', costCenter: 'OPS-01', status: 'On Notice', checkInTime: '08:58 AM', checkOutTime: '06:00 PM', baseSalary: 350000, bankName: 'Access Bank', accountNumber: '0023456789' },
   { id: 'emp-003', name: 'Chioma Nwosu', email: 'chioma@example.com', role: 'Technical Specialist', department: 'Engineering', costCenter: 'TECH-01', status: 'On Probation', checkInTime: '09:15 AM', baseSalary: 280000, bankName: 'Zenith Bank', accountNumber: '0034567890' },
   { id: 'emp-004', name: 'David Bello', email: 'david@example.com', role: 'Mechanic', department: 'Maintenance', costCenter: 'OPS-02', status: 'Active', checkInTime: '09:00 AM', checkOutTime: '05:00 PM', baseSalary: 220000, bankName: 'First Bank', accountNumber: '0045678901' },
 ];
@@ -246,6 +246,87 @@ export const payrollHistory: PayrollRun[] = [
       { employeeName: "David Bello", netPay: 255000, grossPay: 290000, deductions: 35000 },
     ]
   }
+];
+
+export type ExitType = 'Resignation' | 'Termination' | 'Retirement' | 'Contract Expiry' | 'Other';
+export type ExitStatus = 'Pending Approval' | 'On Notice' | 'Pending Clearance' | 'Completed';
+
+export type ExitRequest = {
+    id: string;
+    employeeId: string;
+    employeeName: string;
+    department: string;
+    jobTitle: string;
+    exitType: ExitType;
+    reason: string;
+    lastWorkingDay: string;
+    status: ExitStatus;
+    checklist: {
+        assetsReturned: boolean;
+        accessRevoked: boolean;
+        handoverDone: boolean;
+        exitInterviewDone: boolean;
+        finalSettlementDone: boolean;
+    };
+    finalSettlement: {
+        salaryDue: number;
+        leaveEncashment: number;
+        gratuity: number;
+        deductions: number;
+        netPay: number;
+    };
+};
+
+export const initialExits: ExitRequest[] = [
+    {
+        id: 'exit-1',
+        employeeId: 'emp-002',
+        employeeName: 'Samuel Okoro',
+        department: 'Operations',
+        jobTitle: 'Operations Manager',
+        exitType: 'Resignation',
+        reason: 'Personal growth and career pivot.',
+        lastWorkingDay: '2024-08-15',
+        status: 'On Notice',
+        checklist: {
+            assetsReturned: false,
+            accessRevoked: false,
+            handoverDone: true,
+            exitInterviewDone: false,
+            finalSettlementDone: false,
+        },
+        finalSettlement: {
+            salaryDue: 350000,
+            leaveEncashment: 50000,
+            gratuity: 0,
+            deductions: 50000,
+            netPay: 350000,
+        }
+    }
+];
+
+export type ExitQuery = {
+    id: string;
+    exitId: string;
+    employeeName: string;
+    subject: string;
+    message: string;
+    status: 'Open' | 'Resolved';
+    replies: { role: 'HR' | 'Employee', text: string, date: string }[];
+};
+
+export const initialExitQueries: ExitQuery[] = [
+    {
+        id: 'q-1',
+        exitId: 'exit-1',
+        employeeName: 'Samuel Okoro',
+        subject: 'Gratuity Calculation',
+        message: 'Can you please explain how the final gratuity amount was derived? I thought it would be higher based on my 3 years of service.',
+        status: 'Open',
+        replies: [
+            { role: 'Employee', text: 'Waiting for a response on this.', date: '2024-07-28' }
+        ]
+    }
 ];
 
 export const incomeVsExpenseData = [
