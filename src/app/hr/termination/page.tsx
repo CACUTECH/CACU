@@ -45,7 +45,11 @@ import {
     Search,
     History,
     FileSearch,
-    Trash2
+    Trash2,
+    Clock,
+    Package,
+    Lock,
+    Sparkles
 } from "lucide-react";
 import { 
     Dialog, 
@@ -78,11 +82,9 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
 import { employees, initialExits, initialExitQueries } from "@/lib/data";
 import type { ExitRequest, ExitQuery, ExitType, ExitStatus } from "@/lib/data";
 import { format } from "date-fns";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { generateHRLetter } from "@/ai/flows/termination-letter-flow";
 import * as XLSX from 'xlsx';
