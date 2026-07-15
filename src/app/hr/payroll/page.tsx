@@ -168,13 +168,6 @@ export default function PayrollPage() {
         }, 2000);
     };
 
-    const handleQuickLinkAction = (label: string) => {
-        toast({
-            title: label,
-            description: `Generating ${label} document for regulatory compliance...`
-        });
-    };
-
     const totalGross = editablePay.reduce((acc, p) => acc + p.basePay + p.jobIncentives + p.overtime, 0);
     const totalDeductions = editablePay.reduce((acc, p) => acc + p.loanDeduction + p.statutoryDeductions, 0);
     const totalNet = totalGross - totalDeductions;
@@ -268,11 +261,11 @@ export default function PayrollPage() {
                                     <Button variant="outline" asChild className="w-full justify-start gap-2">
                                         <Link href="/hr/payroll/loans"><FileText className="h-4 w-4" /> Loans & Advances</Link>
                                     </Button>
-                                    <Button variant="outline" className="w-full justify-start gap-2" onClick={() => handleQuickLinkAction("Tax Schedule (PAYE)")}>
-                                        <FileSpreadsheet className="h-4 w-4" /> Tax Schedule (PAYE)
+                                    <Button variant="outline" asChild className="w-full justify-start gap-2">
+                                        <Link href="/hr/payroll/tax-schedule"><FileSpreadsheet className="h-4 w-4" /> Tax Schedule (PAYE)</Link>
                                     </Button>
-                                    <Button variant="outline" className="w-full justify-start gap-2" onClick={() => handleQuickLinkAction("Pension Remittance")}>
-                                        <ShieldCheck className="h-4 w-4" /> Pension Remittance
+                                    <Button variant="outline" asChild className="w-full justify-start gap-2">
+                                        <Link href="/hr/payroll/pension-remittance"><ShieldCheck className="h-4 w-4" /> Pension Remittance</Link>
                                     </Button>
                                 </CardContent>
                             </Card>
