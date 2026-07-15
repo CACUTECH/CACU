@@ -46,21 +46,59 @@ import { cn } from "@/lib/utils";
 type UserRole = "Owner" | "Admin" | "Editor" | "Viewer";
 type UserStatus = "Active" | "Pending" | "Inactive";
 
-const MODULES = [
+interface PermissionItem {
+    id: string;
+    label: string;
+    subItems?: { id: string, label: string }[];
+}
+
+const MODULES: PermissionItem[] = [
     { id: 'pos', label: 'POS Checkout' },
     { id: 'appointments', label: 'Appointments' },
     { id: 'jobs', label: 'Work Orders' },
     { id: 'transactions', label: 'Transactions' },
     { id: 'invoices', label: 'Invoices & Billing' },
     { id: 'catalog', label: 'Catalog / Inventory' },
-    { id: 'accounting', label: 'Accounting' },
+    { id: 'storefront', label: 'Storefront' },
+    { 
+        id: 'accounting', 
+        label: 'Accounting',
+        subItems: [
+            { id: 'accounting:chart-of-accounts', label: 'Chart of Accounts' },
+            { id: 'accounting:journal-entries', label: 'Journal Adjustments' },
+            { id: 'accounting:trial-balance', label: 'Trial Balance' },
+        ]
+    },
     { id: 'reports', label: 'Financial Reports' },
-    { id: 'hr', label: 'Human Resources' },
-    { id: 'analytics', label: 'Analytics' },
     { id: 'customers', label: 'Customers (CRM)' },
+    { 
+        id: 'analytics', 
+        label: 'Analytics',
+        subItems: [
+            { id: 'analytics:kpi', label: 'KPIs' },
+            { id: 'analytics:planning', label: 'Planning & Budgeting' },
+            { id: 'analytics:budget-vs-actual', label: 'Budget vs. Actual' },
+            { id: 'analytics:reconciliation', label: 'Reconciliation' },
+            { id: 'analytics:top-selling', label: 'Top-Selling' },
+            { id: 'analytics:aging-reports', label: 'Aging Reports' },
+        ]
+    },
+    { 
+        id: 'hr', 
+        label: 'Human Resources',
+        subItems: [
+            { id: 'hr:employees', label: 'Employees' },
+            { id: 'hr:attendance', label: 'Attendance' },
+            { id: 'hr:payroll', label: 'Payroll' },
+            { id: 'hr:termination', label: 'Exits & Termination' },
+        ]
+    },
     { id: 'community', label: 'Community' },
     { id: 'apps', label: 'Integrations' },
+    { id: 'credit', label: 'Credit Access' },
 ];
+
+const ALL_PERMISSION_IDS = MODULES.flatMap(m => [m.id, ...(m.subItems?.map(s => s.id) || [])]);
 
 interface User {
     id: string;
@@ -68,14 +106,14 @@ interface User {
     email: string;
     role: UserRole;
     status: UserStatus;
-    permissions: string[]; // List of module IDs they can see
+    permissions: string[]; 
 }
 
 const initialUsers: User[] = [
-    { id: "1", name: "Jane Doe", email: "jane@example.com", role: "Owner", status: "Active", permissions: MODULES.map(m => m.id) },
-    { id: "2", name: "John Smith", email: "john@example.com", role: "Admin", status: "Active", permissions: MODULES.map(m => m.id) },
+    { id: "1", name: "Jane Doe", email: "jane@example.com", role: "Owner", status: "Active", permissions: ALL_PERMISSION_IDS },
+    { id: "2", name: "John Smith", email: "john@example.com", role: "Admin", status: "Active", permissions: ALL_PERMISSION_IDS },
     { id: "3", name: "Samuel Okoro", email: "samuel@example.com", role: "Editor", status: "Active", permissions: ['pos', 'catalog', 'customers'] },
-    { id: "4", name: "Grace Adebayo", email: "grace@example.com", role: "Viewer", status: "Pending", permissions: ['reports', 'analytics'] },
+    { id: "4", name: "Grace Adebayo", email: "grace@example.com", role: "Viewer", status: "Pending", permissions: ['reports', 'analytics', 'analytics:kpi'] },
 ];
 
 function PermissionSelector({ 
@@ -88,31 +126,81 @@ function PermissionSelector({
     disabled?: boolean 
 }) {
     const toggle = (id: string) => {
-        if (selected.includes(id)) {
-            onChange(selected.filter(i => i !== id));
+        if (disabled) return;
+
+        let newSelected = [...selected];
+        const isParent = MODULES.some(m => m.id === id);
+        
+        if (newSelected.includes(id)) {
+            // Unchecking
+            newSelected = newSelected.filter(i => i !== id);
+            
+            // If it's a parent, also uncheck all children
+            const parentItem = MODULES.find(m => m.id === id);
+            if (parentItem?.subItems) {
+                const subIds = parentItem.subItems.map(s => s.id);
+                newSelected = newSelected.filter(i => !subIds.includes(i));
+            }
         } else {
-            onChange([...selected, id]);
+            // Checking
+            newSelected.push(id);
+            
+            // If it's a child, also ensure the parent is checked
+            const parentOfChild = MODULES.find(m => m.subItems?.some(s => s.id === id));
+            if (parentOfChild && !newSelected.includes(parentOfChild.id)) {
+                newSelected.push(parentOfChild.id);
+            }
+            
+            // If it's a parent, also check all children by default for UX
+            const parentItem = MODULES.find(m => m.id === id);
+            if (parentItem?.subItems) {
+                const subIds = parentItem.subItems.map(s => s.id);
+                subIds.forEach(sid => {
+                    if (!newSelected.includes(sid)) newSelected.push(sid);
+                });
+            }
         }
+        onChange(newSelected);
     };
 
     return (
         <div className="space-y-3 mt-4">
             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                <Lock className="h-3 w-3" /> Module Access Control
+                <Lock className="h-3 w-3" /> Module & Sub-page Access
             </Label>
-            <ScrollArea className="h-[300px] w-full rounded-xl border bg-muted/30">
-                <div className={cn("grid grid-cols-1 gap-2 p-4", disabled && "opacity-50 grayscale")}>
+            <ScrollArea className="h-[400px] w-full rounded-xl border bg-muted/30">
+                <div className={cn("space-y-4 p-4", disabled && "opacity-50 grayscale")}>
                     {MODULES.map((mod) => (
-                        <div key={mod.id} className="flex items-center space-x-2 py-1">
-                            <Checkbox 
-                                id={`mod-${mod.id}`} 
-                                checked={disabled ? true : selected.includes(mod.id)} 
-                                onCheckedChange={() => !disabled && toggle(mod.id)}
-                                disabled={disabled}
-                            />
-                            <label htmlFor={`mod-${mod.id}`} className="text-sm font-medium leading-none cursor-pointer select-none">
-                                {mod.label}
-                            </label>
+                        <div key={mod.id} className="space-y-2">
+                            <div className="flex items-center space-x-2 py-1">
+                                <Checkbox 
+                                    id={`mod-${mod.id}`} 
+                                    checked={disabled ? true : selected.includes(mod.id)} 
+                                    onCheckedChange={() => toggle(mod.id)}
+                                    disabled={disabled}
+                                />
+                                <label htmlFor={`mod-${mod.id}`} className="text-sm font-bold leading-none cursor-pointer select-none">
+                                    {mod.label}
+                                </label>
+                            </div>
+                            
+                            {mod.subItems && (
+                                <div className="ml-6 space-y-2 border-l pl-4 border-primary/10">
+                                    {mod.subItems.map(sub => (
+                                        <div key={sub.id} className="flex items-center space-x-2 py-0.5">
+                                            <Checkbox 
+                                                id={`sub-${sub.id}`} 
+                                                checked={disabled ? true : selected.includes(sub.id)} 
+                                                onCheckedChange={() => toggle(sub.id)}
+                                                disabled={disabled}
+                                            />
+                                            <label htmlFor={`sub-${sub.id}`} className="text-xs font-medium leading-none cursor-pointer select-none text-muted-foreground">
+                                                {sub.label}
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -135,7 +223,7 @@ function InviteUserDialog({ onInvite }: { onInvite: (user: Omit<User, "id" | "st
 
     const handleInvite = () => {
         if (name && email && role) {
-            onInvite({ name, email, role, permissions: (role === 'Admin' || role === 'Owner') ? MODULES.map(m => m.id) : permissions });
+            onInvite({ name, email, role, permissions: (role === 'Admin' || role === 'Owner') ? ALL_PERMISSION_IDS : permissions });
             setIsOpen(false);
             setName("");
             setEmail("");
@@ -214,7 +302,7 @@ function EditRoleDialog({ user, onUpdate, open, onOpenChange }: { user: User | n
 
     const handleSave = () => {
         if (user) {
-            const finalPerms = (role === 'Admin' || role === 'Owner') ? MODULES.map(m => m.id) : permissions;
+            const finalPerms = (role === 'Admin' || role === 'Owner') ? ALL_PERMISSION_IDS : permissions;
             onUpdate(user.id, role, finalPerms);
         }
     };
@@ -362,7 +450,7 @@ export default function UserManagementPage() {
                                                 ) : (
                                                     user.permissions.slice(0, 3).map(p => (
                                                         <Badge key={p} variant="secondary" className="text-[9px] h-4 py-0 px-1">
-                                                            {MODULES.find(m => m.id === p)?.label.split(' ')[0]}
+                                                            {p.includes(':') ? p.split(':')[1] : p}
                                                         </Badge>
                                                     ))
                                                 )}

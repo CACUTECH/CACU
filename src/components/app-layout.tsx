@@ -60,7 +60,7 @@ function NavItem({ item, pathname }: { item: any, pathname: string }) {
         }
     };
 
-    if (item.children) {
+    if (item.children && item.children.length > 0) {
         return (
              <Collapsible defaultOpen={pathname.startsWith(item.href)}>
                 <SidebarMenuItem>
@@ -126,7 +126,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Simulation of RBAC: In a real app, this would be the logged-in user's role/perms
   const [userRole, setUserRole] = useState<'Owner' | 'Admin' | 'Staff'>('Owner');
-  const [userPermissions, setUserPermissions] = useState<string[]>(['pos', 'appointments', 'jobs', 'transactions', 'invoices', 'catalog', 'accounting', 'reports', 'customers', 'analytics', 'hr', 'community', 'apps']);
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -134,6 +134,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const savedDetails = localStorage.getItem('business-details');
     const savedType = localStorage.getItem('business-type') as BusinessType;
     
+    // In a real app, we would fetch the user's role and permissions from Auth/Firestore
+    // For this demo, we'll initialize with all permissions for simplicity if not found
+    setUserPermissions([
+        'pos', 'appointments', 'jobs', 'transactions', 'invoices', 'catalog', 'accounting', 
+        'accounting:chart-of-accounts', 'accounting:journal-entries', 'accounting:trial-balance',
+        'reports', 'customers', 'analytics', 'analytics:kpi', 'analytics:planning', 
+        'analytics:budget-vs-actual', 'analytics:reconciliation', 'analytics:top-selling', 'analytics:aging-reports',
+        'hr', 'hr:employees', 'hr:attendance', 'hr:payroll', 'hr:termination', 'community', 'apps', 'credit'
+    ]);
+
     if (savedLogo) setLogoUrl(savedLogo);
     if (savedType) setBusinessType(savedType);
     if (savedDetails) {
@@ -161,15 +171,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...(userPermissions.includes('transactions') ? [{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight }] : []),
     ...(userPermissions.includes('invoices') ? [{ href: '/invoices', label: 'Invoices & Receipts', icon: Receipt }] : []),
     ...(userPermissions.includes('catalog') ? [{ href: '/catalog', label: businessType === 'SERVICE' ? 'Service Menu' : 'Catalog', icon: Package }] : []),
-    { href: '/storefront', label: 'Storefront', icon: Store },
+    ...(userPermissions.includes('storefront') ? [{ href: '/storefront', label: 'Storefront', icon: Store }] : []),
     ...(userPermissions.includes('accounting') ? [{
       href: '/accounting',
       label: 'Accounting',
       icon: BookText,
       children: [
-        { href: '/accounting/chart-of-accounts', label: 'Chart of Accounts' },
-        { href: '/accounting/journal-entries', label: 'Journal Adjustments' },
-        { href: '/accounting/trial-balance', label: 'Trial Balance' },
+        ...(userPermissions.includes('accounting:chart-of-accounts') ? [{ href: '/accounting/chart-of-accounts', label: 'Chart of Accounts' }] : []),
+        ...(userPermissions.includes('accounting:journal-entries') ? [{ href: '/accounting/journal-entries', label: 'Journal Adjustments' }] : []),
+        ...(userPermissions.includes('accounting:trial-balance') ? [{ href: '/accounting/trial-balance', label: 'Trial Balance' }] : []),
       ],
     }] : []),
     ...(userPermissions.includes('reports') ? [{ href: '/reports', label: 'Reports', icon: FileText }] : []),
@@ -179,28 +189,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       label: 'Analytics', 
       icon: PieChart,
       children: [
-          { href: '/analytics/kpi', label: 'KPIs' },
-          { href: '/analytics/planning', label: 'Planning & Budgeting' },
-          { href: '/analytics/budget-vs-actual', label: 'Budget vs. Actual' },
-          { href: '/analytics/reconciliation', label: 'Reconciliation' },
-          { href: '/analytics/top-selling', label: 'Top-Selling' },
-          { href: '/analytics/aging-reports', label: 'Aging Reports' },
+          ...(userPermissions.includes('analytics:kpi') ? [{ href: '/analytics/kpi', label: 'KPIs' }] : []),
+          ...(userPermissions.includes('analytics:planning') ? [{ href: '/analytics/planning', label: 'Planning & Budgeting' }] : []),
+          ...(userPermissions.includes('analytics:budget-vs-actual') ? [{ href: '/analytics/budget-vs-actual', label: 'Budget vs. Actual' }] : []),
+          ...(userPermissions.includes('analytics:reconciliation') ? [{ href: '/analytics/reconciliation', label: 'Reconciliation' }] : []),
+          ...(userPermissions.includes('analytics:top-selling') ? [{ href: '/analytics/top-selling', label: 'Top-Selling' }] : []),
+          ...(userPermissions.includes('analytics:aging-reports') ? [{ href: '/analytics/aging-reports', label: 'Aging Reports' }] : []),
       ]
     }] : []),
-    { href: '/credit', label: 'Credit', icon: Banknote },
+    ...(userPermissions.includes('credit') ? [{ href: '/credit', label: 'Credit', icon: Banknote }] : []),
     ...(userPermissions.includes('hr') ? [{
       href: '/hr',
       label: 'HR',
       icon: Users2,
       children: [
-        { href: '/hr/employees', label: 'Employees' },
-        { href: '/hr/attendance', label: 'Attendance' },
-        { href: '/hr/payroll', label: 'Payroll' },
-        { href: '/hr/termination', label: 'Exits & Termination' },
+        ...(userPermissions.includes('hr:employees') ? [{ href: '/hr/employees', label: 'Employees' }] : []),
+        ...(userPermissions.includes('hr:attendance') ? [{ href: '/hr/attendance', label: 'Attendance' }] : []),
+        ...(userPermissions.includes('hr:payroll') ? [{ href: '/hr/payroll', label: 'Payroll' }] : []),
+        ...(userPermissions.includes('hr:termination') ? [{ href: '/hr/termination', label: 'Exits & Termination' }] : []),
       ],
     }] : []),
-    { href: '/community', label: 'Community', icon: LifeBuoy },
-    { href: '/apps', label: 'Integrations', icon: AppWindow },
+    ...(userPermissions.includes('community') ? [{ href: '/community', label: 'Community', icon: LifeBuoy }] : []),
+    ...(userPermissions.includes('apps') ? [{ href: '/apps', label: 'Integrations', icon: AppWindow }] : []),
   ];
 
   if (pathname === '/setup' || pathname === '/login' || pathname === '/signup' || pathname === '/verify-email') {
