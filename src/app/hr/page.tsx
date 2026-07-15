@@ -8,7 +8,8 @@ import {
     ArrowRight, 
     UserX, 
     ShieldCheck, 
-    Landmark 
+    Landmark,
+    UserPlus
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -27,7 +28,7 @@ function FeatureCard({ icon: Icon, title, description, href, badge }: { icon: Re
                             <Icon className="h-6 w-6 text-primary" />
                         </div>
                         <div>
-                            <CardTitle>{title}</CardTitle>
+                            <CardTitle className="text-lg">{title}</CardTitle>
                         </div>
                     </div>
                 </CardHeader>
@@ -51,6 +52,13 @@ export default function HRPage() {
             <p className="text-muted-foreground">Manage your team, payroll, and HR processes efficiently.</p>
             
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <FeatureCard
+                    icon={UserPlus}
+                    title="Employee Onboarding"
+                    description="Automate new hire integration, documents, and digital welcome packs with AI."
+                    href="/hr/onboarding"
+                    badge="AI Powered"
+                />
                 <FeatureCard
                     icon={Database}
                     title="Employee Database"

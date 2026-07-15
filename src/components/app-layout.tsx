@@ -40,7 +40,8 @@ import {
     Wrench,
     CalendarClock,
     UserX,
-    BarChart3
+    BarChart3,
+    UserPlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
@@ -140,7 +141,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         'accounting:chart-of-accounts', 'accounting:journal-entries', 'accounting:trial-balance',
         'reports', 'customers', 'analytics', 'analytics:kpi', 'analytics:planning', 
         'analytics:budget-vs-actual', 'analytics:reconciliation', 'analytics:top-selling', 'analytics:aging-reports',
-        'hr', 'hr:employees', 'hr:attendance', 'hr:payroll', 'hr:termination', 'hr:payroll:reports', 'community', 'apps', 'credit'
+        'hr', 'hr:employees', 'hr:attendance', 'hr:payroll', 'hr:termination', 'hr:onboarding', 'hr:payroll:reports', 'community', 'apps', 'credit'
     ]);
 
     if (savedLogo) setLogoUrl(savedLogo);
@@ -199,6 +200,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       label: 'HR',
       icon: Users2,
       children: [
+        ...(userPermissions.includes('hr:onboarding') ? [{ href: '/hr/onboarding', label: 'Onboarding', icon: UserPlus }] : []),
         ...(userPermissions.includes('hr:employees') ? [{ href: '/hr/employees', label: 'Employees' }] : []),
         ...(userPermissions.includes('hr:attendance') ? [{ href: '/hr/attendance', label: 'Attendance' }] : []),
         ...(userPermissions.includes('hr:payroll') ? [{ href: '/hr/payroll', label: 'Payroll' }] : []),

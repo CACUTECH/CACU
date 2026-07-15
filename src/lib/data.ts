@@ -329,6 +329,75 @@ export const initialExitQueries: ExitQuery[] = [
     }
 ];
 
+export type OnboardingStatus = 'Draft' | 'Sent' | 'In Progress' | 'Awaiting Approval' | 'Completed';
+export type EmploymentType = 'Full-time' | 'Contract' | 'Part-time' | 'Internship';
+
+export type OnboardingRequest = {
+    id: string;
+    employeeName: string;
+    email: string;
+    phoneNumber?: string;
+    jobTitle: string;
+    department: string;
+    employmentType: EmploymentType;
+    startDate: string;
+    salary: number;
+    managerName: string;
+    status: OnboardingStatus;
+    checklist: {
+        id: string;
+        task: string;
+        completed: boolean;
+        category: 'Document' | 'IT' | 'Legal' | 'Admin';
+    }[];
+};
+
+export const initialOnboarding: OnboardingRequest[] = [
+    {
+        id: 'onb-1',
+        employeeName: 'Amara Kalu',
+        email: 'amara.k@example.com',
+        jobTitle: 'Product Designer',
+        department: 'Product',
+        employmentType: 'Full-time',
+        startDate: '2024-09-01',
+        salary: 400000,
+        managerName: 'Grace Adebayo',
+        status: 'In Progress',
+        checklist: [
+            { id: 't1', task: 'Offer Accepted', completed: true, category: 'Legal' },
+            { id: 't2', task: 'Contract Signed', completed: false, category: 'Legal' },
+            { id: 't3', task: 'Bank Details Provided', completed: true, category: 'Admin' },
+            { id: 't4', task: 'Email Account Setup', completed: false, category: 'IT' },
+            { id: 't5', task: 'Laptop Assigned', completed: false, category: 'IT' },
+        ]
+    }
+];
+
+export type OnboardingQuery = {
+    id: string;
+    onboardingId: string;
+    employeeName: string;
+    subject: string;
+    message: string;
+    status: 'Open' | 'Resolved';
+    replies: { role: 'HR' | 'Employee', text: string, date: string }[];
+};
+
+export const initialOnboardingQueries: OnboardingQuery[] = [
+    {
+        id: 'oq-1',
+        onboardingId: 'onb-1',
+        employeeName: 'Amara Kalu',
+        subject: 'Laptop Choice',
+        message: 'Can I choose between a Mac or PC for my role?',
+        status: 'Open',
+        replies: [
+            { role: 'Employee', text: 'Just want to be sure before I start.', date: '2024-07-30' }
+        ]
+    }
+];
+
 export const incomeVsExpenseData = [
     { month: 'Jan', income: 4000, expense: 2400 },
     { month: 'Feb', income: 3000, expense: 1398 },
