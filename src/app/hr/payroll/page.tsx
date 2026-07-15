@@ -31,7 +31,13 @@ import {
     FileText,
     History,
     FileSpreadsheet,
-    ArrowRight
+    ArrowRight,
+    AlertCircle,
+    BadgeAlert,
+    BarChart3,
+    ArrowUpRight,
+    ArrowDownRight,
+    RefreshCw
 } from "lucide-react";
 import { 
     Dialog, 
@@ -53,6 +59,8 @@ import { cn } from "@/lib/utils";
 import { employees, jobs as allJobs, payrollHistory as initialPayrollHistory, initialLoans } from "@/lib/data";
 import type { PayrollRun, BusinessType, PayrollRunStatus } from "@/lib/data";
 import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface EditableStaffPay {
     employeeId: string;
@@ -61,8 +69,10 @@ interface EditableStaffPay {
     jobIncentives: number;
     overtime: number;
     loanDeduction: number;
-    statutoryDeductions: number; // Tax, Pension, etc.
+    statutoryDeductions: number; 
     netPay: number;
+    grossPay: number;
+    issues: string[];
 }
 
 export default function PayrollPage() {
@@ -79,27 +89,32 @@ export default function PayrollPage() {
         const savedType = localStorage.getItem('business-type') as BusinessType;
         if (savedType) setBusinessType(savedType);
 
-        // Calculate active run defaults based on linked data (Jobs and Attendance logic)
         const initialPay = employees.map(emp => {
             const completedJobs = allJobs.filter(j => j.assignedStaffId === emp.id && j.status === 'Completed');
             const incentives = completedJobs.reduce((acc, curr) => acc + (curr.totalAmount * 0.1), 0);
-            
-            // Check for active loans
             const loan = initialLoans.find(l => l.employeeId === emp.id && l.status === 'Active');
             const loanDed = loan ? loan.monthlyDeduction : 0;
-            
-            // Simple statutory math for MVP (approx 15% combined tax/pension)
             const statDed = emp.baseSalary * 0.15;
             
+            const grossPay = emp.baseSalary + incentives + 15000;
+            const netPay = grossPay - loanDed - statDed;
+
+            const issues: string[] = [];
+            if (!emp.bankName) issues.push("Missing Bank Name");
+            if (!emp.accountNumber) issues.push("Missing Account Number");
+            if (netPay < 0) issues.push("Negative Net Pay Warning");
+
             return {
                 employeeId: emp.id,
                 name: emp.name,
                 basePay: emp.baseSalary,
                 jobIncentives: incentives,
-                overtime: 15000, // Simulated from attendance logs
+                overtime: 15000, 
                 loanDeduction: loanDed,
                 statutoryDeductions: statDed,
-                netPay: emp.baseSalary + incentives + 15000 - loanDed - statDed
+                grossPay,
+                netPay,
+                issues
             };
         });
         setEditablePay(initialPay);
@@ -111,8 +126,8 @@ export default function PayrollPage() {
             setCurrentStep('prepare');
             setIsLoading(false);
             toast({ 
-                title: "Run Prepared", 
-                description: "Synced data from work orders, attendance sheets, and loan schedules." 
+                title: "Pre-Payroll Sweep Complete", 
+                description: "Validation engine has identified potential issues and calculation anomalies." 
             });
         }, 1200);
     };
@@ -121,56 +136,73 @@ export default function PayrollPage() {
         const value = parseFloat(newVal) || 0;
         setEditablePay(prev => prev.map(p => {
             if (p.employeeId === id) {
-                const newNet = p.basePay + value + p.overtime - p.loanDeduction - p.statutoryDeductions;
-                return { ...p, jobIncentives: value, netPay: newNet };
+                const newGross = p.basePay + value + p.overtime;
+                const newNet = newGross - p.loanDeduction - p.statutoryDeductions;
+                return { ...p, jobIncentives: value, grossPay: newGross, netPay: newNet };
             }
             return p;
         }));
     };
 
     const handleSubmitForReview = () => {
+        const criticalIssues = editablePay.flatMap(p => p.issues);
+        if (criticalIssues.length > 0) {
+            toast({
+                variant: "destructive",
+                title: "Validation Failed",
+                description: "Please resolve missing bank details or negative net pay issues before proceeding.",
+            });
+            return;
+        }
         setCurrentStep('review');
         toast({ 
-            title: "Submitted for Approval", 
-            description: "Payroll batch is now locked. Notification sent to Financial Controller for review." 
+            title: "Batch Locked for Approval", 
+            description: "Calculations frozen. Variance report generated for Auditor review." 
         });
     };
 
     const handleFinalDisburse = () => {
         setIsLoading(true);
-        toast({ 
-            title: "Disbursing Funds...", 
-            description: "Updating General Ledger and generating electronic payment instructions." 
-        });
-
         setTimeout(() => {
             const total = editablePay.reduce((acc, p) => acc + p.netPay, 0);
+            const totalGross = editablePay.reduce((acc, p) => acc + p.grossPay, 0);
+            const totalDed = totalGross - total;
+
             const newRun: PayrollRun = {
                 id: `run-${Date.now()}`,
                 month: 'July 2024',
                 totalPaid: total,
+                totalGross,
+                totalDeductions: totalDed,
                 employeesPaid: editablePay.length,
                 status: 'Paid',
                 preparedBy: 'Jane Doe',
-                approvedBy: 'Financial Controller',
+                approvedBy: 'Internal Audit',
                 payslips: editablePay.map(p => ({
                     employeeName: p.name,
-                    netPay: p.netPay
+                    netPay: p.netPay,
+                    grossPay: p.grossPay,
+                    deductions: p.loanDeduction + p.statutoryDeductions
                 }))
             };
             setPayrollHistory(prev => [newRun, ...prev]);
             setIsLoading(false);
             setCurrentStep('dashboard');
             toast({
-                title: "Payroll Finalized",
-                description: `₦${total.toLocaleString()} disbursed to ${editablePay.length} employees.`,
+                title: "Disbursement Triggered",
+                description: `₦${total.toLocaleString()} processed via Payment Gateway. GL entries synchronized.`,
             });
         }, 2000);
     };
 
-    const totalGross = editablePay.reduce((acc, p) => acc + p.basePay + p.jobIncentives + p.overtime, 0);
+    // Variance Analytics
+    const prevRun = payrollHistory[0];
+    const currentTotalNet = editablePay.reduce((acc, p) => acc + p.netPay, 0);
+    const variance = prevRun ? ((currentTotalNet - prevRun.totalPaid) / prevRun.totalPaid) * 100 : 0;
+
+    const totalGross = editablePay.reduce((acc, p) => acc + p.grossPay, 0);
     const totalDeductions = editablePay.reduce((acc, p) => acc + p.loanDeduction + p.statutoryDeductions, 0);
-    const totalNet = totalGross - totalDeductions;
+    const totalNet = currentTotalNet;
 
     if (!mounted) return null;
 
@@ -179,54 +211,80 @@ export default function PayrollPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-headline text-3xl font-bold tracking-tight text-foreground">Staff Payroll Engine</h1>
-                    <p className="text-muted-foreground mt-1">End-to-end automated processing with statutory compliance.</p>
+                    <p className="text-muted-foreground mt-1">Enterprise-grade gross-to-net automation with ecosystem integration.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" asChild size="sm">
-                        <Link href="/hr/payroll/config"><Settings className="mr-2 h-4 w-4" /> Global Config</Link>
+                        <Link href="/hr/payroll/config"><Settings className="mr-2 h-4 w-4" /> Policy Config</Link>
                     </Button>
                     {currentStep === 'dashboard' && (
                         <Button onClick={handlePrepareRun} className="rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
-                            Prepare July Run
+                            Run July Batch
                         </Button>
                     )}
                 </div>
             </div>
 
             {currentStep === 'dashboard' && (
-                <div className="grid gap-6">
+                <div className="grid gap-8">
                     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                        <PayrollStatCard title="YTD Payroll Cost" value="₦14.2M" subtext="Across all business units" icon={Wallet} />
-                        <PayrollStatCard title="Avg. Employee Net" value="₦284k" subtext="+2% from last quarter" icon={TrendingUp} />
-                        <PayrollStatCard title="Total Staff" value={employees.length.toString()} subtext="Active in database" icon={Users} />
-                        <PayrollStatCard title="Compliance Health" value="100%" subtext="All remittances current" icon={ShieldCheck} />
+                        <Card className="shadow-lg border-primary/5">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Variance Delta</CardTitle>
+                                <div className="bg-primary/10 p-2 rounded-lg">
+                                    <BarChart3 className="h-4 w-4 text-primary" />
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold font-headline">{variance >= 0 ? '+' : ''}{variance.toFixed(1)}%</div>
+                                <p className={cn(
+                                    "text-[10px] font-medium mt-1 flex items-center gap-1",
+                                    variance > 0 ? "text-amber-600" : "text-emerald-600"
+                                )}>
+                                    {variance > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                    vs. June 2024 Actuals
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <PayrollStatCard title="MTD Projected Cost" value={`₦${(totalNet / 1000000).toFixed(2)}M`} subtext="Based on prep data" icon={Wallet} />
+                        <PayrollStatCard title="Compliance Health" value="100%" subtext="Remittances synchronized" icon={ShieldCheck} />
+                        <PayrollStatCard title="Ecosystem Link" value="ACTIVE" subtext="Time/Job data synced" icon={RefreshCw} />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <Card className="lg:col-span-2">
-                            <CardHeader>
-                                <CardTitle className="font-headline">Disbursement History</CardTitle>
-                                <CardDescription>Comprehensive audit trail of past payroll executions.</CardDescription>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <Card className="lg:col-span-2 shadow-xl shadow-primary/5 border-primary/10">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div>
+                                    <CardTitle className="font-headline">Batch History & Reconciliation</CardTitle>
+                                    <CardDescription>Archive of finalized payroll executions and disbursement logs.</CardDescription>
+                                </div>
+                                <Button variant="outline" size="sm" className="rounded-xl"><FileDown className="h-4 w-4 mr-2" /> Global Report</Button>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <Table>
                                     <TableHeader className="bg-muted/50">
                                         <TableRow>
-                                            <TableHead className="pl-6">Month</TableHead>
-                                            <TableHead className="text-center">Staff</TableHead>
-                                            <TableHead className="text-right">Total (₦)</TableHead>
+                                            <TableHead className="pl-6">Period</TableHead>
+                                            <TableHead className="text-right">Gross (₦)</TableHead>
+                                            <TableHead className="text-right">Net (₦)</TableHead>
                                             <TableHead className="text-right pr-6">Status</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {payrollHistory.map(run => (
-                                            <TableRow key={run.id} className="hover:bg-muted/10 transition-colors">
-                                                <TableCell className="pl-6 font-bold">{run.month}</TableCell>
-                                                <TableCell className="text-center">{run.employeesPaid}</TableCell>
-                                                <TableCell className="text-right font-mono">₦{run.totalPaid.toLocaleString()}</TableCell>
+                                            <TableRow key={run.id} className="hover:bg-muted/10 transition-colors group">
+                                                <TableCell className="pl-6">
+                                                    <p className="font-bold text-sm">{run.month}</p>
+                                                    <p className="text-[10px] text-muted-foreground uppercase">{run.employeesPaid} staff paid</p>
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono text-xs">₦{run.totalGross?.toLocaleString() || '--'}</TableCell>
+                                                <TableCell className="text-right font-mono font-bold">₦{run.totalPaid.toLocaleString()}</TableCell>
                                                 <TableCell className="text-right pr-6">
-                                                    <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20">{run.status}</Badge>
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20">{run.status}</Badge>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100"><Eye className="h-4 w-4" /></Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -235,37 +293,37 @@ export default function PayrollPage() {
                             </CardContent>
                         </Card>
                         <div className="space-y-6">
-                            <Card className="bg-primary text-primary-foreground border-none shadow-xl shadow-primary/20">
+                            <Card className="bg-primary text-primary-foreground border-none shadow-xl shadow-primary/20 overflow-hidden relative">
+                                <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="h-24 w-24" /></div>
                                 <CardHeader>
                                     <CardTitle className="text-base flex items-center gap-2">
-                                        <Calculator className="h-5 w-5" />
-                                        Next Run Estimate
+                                        Active Preparation
                                     </CardTitle>
+                                    <CardDescription className="text-white/70">July 2024 regular run cycle.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-3xl font-bold font-headline">₦{totalNet.toLocaleString()}</div>
-                                    <p className="text-xs text-white/70 mt-2">Estimated based on current attendance logs, job completion incentives, and base salaries.</p>
+                                    <div className="text-4xl font-bold font-headline">₦{totalNet.toLocaleString()}</div>
+                                    <div className="flex items-center gap-2 mt-4 p-2 bg-white/10 rounded-lg text-[10px] uppercase font-bold tracking-widest">
+                                        <AlertCircle className="h-3 w-3" /> 2 Validation Notices
+                                    </div>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button variant="secondary" className="w-full bg-white text-primary font-bold" onClick={handlePrepareRun}>Start Preparation</Button>
+                                    <Button variant="secondary" className="w-full bg-white text-primary font-bold shadow-lg" onClick={handlePrepareRun}>Review & Adjust Pay</Button>
                                 </CardFooter>
                             </Card>
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-sm font-bold flex items-center gap-2">
-                                        <Briefcase className="h-4 w-4 text-primary" />
-                                        Quick Links
-                                    </CardTitle>
+                                    <CardTitle className="text-sm font-bold">Regulatory Workflows</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
-                                    <Button variant="outline" asChild className="w-full justify-start gap-2">
-                                        <Link href="/hr/payroll/loans"><FileText className="h-4 w-4" /> Loans & Advances</Link>
+                                    <Button variant="outline" asChild className="w-full justify-start gap-3 h-12 rounded-xl">
+                                        <Link href="/hr/payroll/tax-schedule"><FileSpreadsheet className="h-4 w-4 text-primary" /> Tax Schedule (PAYE)</Link>
                                     </Button>
-                                    <Button variant="outline" asChild className="w-full justify-start gap-2">
-                                        <Link href="/hr/payroll/tax-schedule"><FileSpreadsheet className="h-4 w-4" /> Tax Schedule (PAYE)</Link>
+                                    <Button variant="outline" asChild className="w-full justify-start gap-3 h-12 rounded-xl">
+                                        <Link href="/hr/payroll/pension-remittance"><ShieldCheck className="h-4 w-4 text-primary" /> Pension Remittance</Link>
                                     </Button>
-                                    <Button variant="outline" asChild className="w-full justify-start gap-2">
-                                        <Link href="/hr/payroll/pension-remittance"><ShieldCheck className="h-4 w-4" /> Pension Remittance</Link>
+                                    <Button variant="outline" asChild className="w-full justify-start gap-3 h-12 rounded-xl">
+                                        <Link href="/hr/payroll/loans"><Clock className="h-4 w-4 text-primary" /> Loan Recoup Schedules</Link>
                                     </Button>
                                 </CardContent>
                             </Card>
@@ -275,93 +333,116 @@ export default function PayrollPage() {
             )}
 
             {(currentStep === 'prepare' || currentStep === 'review') && (
-                <Card className="border-primary/20 shadow-2xl shadow-primary/5 overflow-hidden">
-                    <CardHeader className="bg-primary/5 border-b">
-                        <div className="flex items-center justify-between">
+                <div className="space-y-6">
+                    {currentStep === 'prepare' && editablePay.some(p => p.issues.length > 0) && (
+                        <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800 shadow-lg">
+                            <BadgeAlert className="h-4 w-4" />
+                            <AlertTitle className="font-bold">Compliance Warning</AlertTitle>
+                            <AlertDescription className="text-xs">
+                                The validation engine found issues in {editablePay.filter(p => p.issues.length > 0).length} employee records. Please fix bank details or adjust pay to resolve.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    <Card className="border-primary/20 shadow-2xl shadow-primary/5 overflow-hidden">
+                        <CardHeader className="bg-primary/5 border-b flex flex-row items-center justify-between py-6">
                             <div>
-                                <CardTitle className="font-headline text-xl">
-                                    {currentStep === 'prepare' ? "Payroll Preparation" : "Payroll Audit & Review"}
+                                <CardTitle className="font-headline text-2xl">
+                                    {currentStep === 'prepare' ? "Pay Preparation & Adjustment" : "Internal Audit Review"}
                                 </CardTitle>
-                                <CardDescription>Data derived from {businessType} operations. Adjust incentives or bonuses before final review.</CardDescription>
+                                <CardDescription>Period: July 1, 2024 - July 31, 2024 • Entity: CACU Technologies</CardDescription>
                             </div>
-                            <div className="flex gap-2">
-                                <Badge variant="outline" className={cn(
-                                    "font-bold uppercase tracking-tighter",
-                                    currentStep === 'prepare' ? "bg-amber-500/10 text-amber-700" : "bg-blue-500/10 text-blue-700"
-                                )}>
-                                    {currentStep === 'prepare' ? "MAKER STAGE" : "CHECKER STAGE"}
-                                </Badge>
+                            <div className="flex gap-4">
+                                <div className="text-right">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Workflow Stage</p>
+                                    <Badge className={cn(
+                                        "mt-1 font-bold",
+                                        currentStep === 'prepare' ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-blue-100 text-blue-800 border-blue-200"
+                                    )}>
+                                        {currentStep === 'prepare' ? "MAKER (HR PREP)" : "CHECKER (AUDIT)"}
+                                    </Badge>
+                                </div>
                             </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader className="bg-muted/50">
-                                    <TableRow>
-                                        <TableHead className="pl-6">Employee</TableHead>
-                                        <TableHead className="text-right">Base Pay (₦)</TableHead>
-                                        <TableHead className="text-right">Incentives (₦)</TableHead>
-                                        <TableHead className="text-right">Loan Repay (₦)</TableHead>
-                                        <TableHead className="text-right">Statutory (₦)</TableHead>
-                                        <TableHead className="text-right pr-6">Net Total (₦)</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {editablePay.map((p) => (
-                                        <TableRow key={p.employeeId} className="hover:bg-muted/20">
-                                            <TableCell className="pl-6">
-                                                <div className="font-bold text-sm">{p.name}</div>
-                                                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                                                    <Clock className="h-2 w-2" /> Synced Time logs
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono">₦{p.basePay.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">
-                                                <Input 
-                                                    type="number" 
-                                                    className="h-8 w-24 ml-auto text-right font-mono" 
-                                                    value={p.jobIncentives} 
-                                                    onChange={(e) => handleIncentiveChange(p.employeeId, e.target.value)}
-                                                    disabled={currentStep === 'review'}
-                                                />
-                                            </TableCell>
-                                            <TableCell className="text-right text-red-600 font-mono font-bold">
-                                                -₦{p.loanDeduction.toLocaleString()}
-                                            </TableCell>
-                                            <TableCell className="text-right text-muted-foreground font-mono">
-                                                -₦{p.statutoryDeductions.toLocaleString()}
-                                            </TableCell>
-                                            <TableCell className="text-right pr-6 font-bold font-headline text-lg text-primary">
-                                                ₦{p.netPay.toLocaleString()}
-                                            </TableCell>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <ScrollArea className="max-h-[500px]">
+                                <Table>
+                                    <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                                        <TableRow>
+                                            <TableHead className="pl-6 w-[250px]">Employee & Status</TableHead>
+                                            <TableHead className="text-right">Base Pay (₦)</TableHead>
+                                            <TableHead className="text-right">Incentives (₦)</TableHead>
+                                            <TableHead className="text-right">Loans/Deductions</TableHead>
+                                            <TableHead className="text-right pr-6">Net Payable (₦)</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="bg-muted/30 border-t p-6 flex flex-col md:flex-row justify-between items-center gap-6">
-                        <div className="flex gap-8">
-                            <SummaryItem label="Total Gross" value={`₦${totalGross.toLocaleString()}`} />
-                            <SummaryItem label="Total Deductions" value={`₦${totalDeductions.toLocaleString()}`} color="text-red-600" />
-                            <SummaryItem label="Net Disbursement" value={`₦${totalNet.toLocaleString()}`} bold />
-                        </div>
-                        <div className="flex gap-3 w-full md:w-auto">
-                            <Button variant="ghost" onClick={() => setCurrentStep('dashboard')}>Discard Batch</Button>
-                            {currentStep === 'prepare' ? (
-                                <Button onClick={handleSubmitForReview} className="h-12 px-8 rounded-xl shadow-lg">
-                                    Submit for Review <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
-                            ) : (
-                                <Button onClick={handleFinalDisburse} disabled={isLoading} className="h-12 px-8 rounded-xl shadow-lg bg-emerald-600 hover:bg-emerald-700 text-white">
-                                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
-                                    Approve & Disburse July Run
-                                </Button>
-                            )}
-                        </div>
-                    </CardFooter>
-                </Card>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {editablePay.map((p) => (
+                                            <TableRow key={p.employeeId} className={cn(
+                                                "hover:bg-muted/20 transition-colors",
+                                                p.issues.length > 0 && "bg-red-50/30"
+                                            )}>
+                                                <TableCell className="pl-6 py-4">
+                                                    <div className="font-bold text-sm">{p.name}</div>
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {p.issues.length > 0 ? (
+                                                            p.issues.map((issue, idx) => (
+                                                                <Badge key={idx} variant="destructive" className="text-[8px] h-4 py-0 px-1 uppercase">{issue}</Badge>
+                                                            ))
+                                                        ) : (
+                                                            <Badge variant="outline" className="text-[8px] h-4 py-0 px-1 uppercase bg-emerald-50 text-emerald-700">Validated</Badge>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono text-sm">₦{p.basePay.toLocaleString()}</TableCell>
+                                                <TableCell className="text-right">
+                                                    {currentStep === 'prepare' ? (
+                                                        <Input 
+                                                            type="number" 
+                                                            className="h-8 w-28 ml-auto text-right font-mono text-xs border-primary/20 focus:ring-primary" 
+                                                            value={p.jobIncentives} 
+                                                            onChange={(e) => handleIncentiveChange(p.employeeId, e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        <span className="font-mono text-sm">₦{p.jobIncentives.toLocaleString()}</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="text-red-600 font-mono font-bold text-sm">-₦{(p.loanDeduction + p.statutoryDeductions).toLocaleString()}</div>
+                                                    <div className="text-[9px] text-muted-foreground uppercase">Inc. Statutory & Loans</div>
+                                                </TableCell>
+                                                <TableCell className="text-right pr-6">
+                                                    <div className="font-bold font-headline text-lg text-primary">₦{p.netPay.toLocaleString()}</div>
+                                                    <div className="text-[9px] text-muted-foreground">Gross: ₦{p.grossPay.toLocaleString()}</div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
+                        <CardFooter className="bg-muted/30 border-t p-8 flex flex-col lg:flex-row justify-between items-center gap-8">
+                            <div className="flex gap-12">
+                                <SummaryItem label="Global Gross" value={`₦${totalGross.toLocaleString()}`} />
+                                <SummaryItem label="Global Deductions" value={`₦${totalDeductions.toLocaleString()}`} color="text-red-600" />
+                                <SummaryItem label="Net Cash Impact" value={`₦${totalNet.toLocaleString()}`} bold />
+                            </div>
+                            <div className="flex gap-3 w-full lg:w-auto">
+                                <Button variant="ghost" onClick={() => setCurrentStep('dashboard')} className="rounded-xl px-6">Cancel Batch</Button>
+                                {currentStep === 'prepare' ? (
+                                    <Button onClick={handleSubmitForReview} className="h-14 px-10 rounded-2xl shadow-xl shadow-primary/20 text-lg font-bold">
+                                        Freeze & Submit Audit <ArrowRight className="ml-2 h-5 w-5" />
+                                    </Button>
+                                ) : (
+                                    <Button onClick={handleFinalDisburse} disabled={isLoading} className="h-14 px-10 rounded-2xl shadow-xl shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold">
+                                        {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
+                                        Final Approve & Disburse
+                                    </Button>
+                                )}
+                            </div>
+                        </CardFooter>
+                    </Card>
+                </div>
             )}
         </div>
     );
@@ -385,8 +466,8 @@ function PayrollStatCard({ title, value, subtext, icon: Icon }: any) {
 function SummaryItem({ label, value, color, bold }: { label: string, value: string, color?: string, bold?: boolean }) {
     return (
         <div>
-            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">{label}</p>
-            <p className={cn("text-lg font-bold font-headline", color, bold && "text-primary")}>{value}</p>
+            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">{label}</p>
+            <p className={cn("text-xl font-bold font-headline", color, bold && "text-primary")}>{value}</p>
         </div>
     );
 }

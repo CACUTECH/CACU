@@ -154,6 +154,8 @@ export type Employee = {
   name: string;
   email: string;
   role: string;
+  department?: string;
+  costCenter?: string;
   status: 'Active' | 'On Probation' | 'Terminated';
   checkInTime?: string;
   checkOutTime?: string;
@@ -165,13 +167,13 @@ export type Employee = {
 };
 
 export const employees: Employee[] = [
-  { id: 'emp-001', name: 'Grace Adebayo', email: 'grace@example.com', role: 'Senior Consultant', status: 'Active', checkInTime: '09:05 AM', checkOutTime: '05:30 PM', baseSalary: 450000, bankName: 'Sterling Bank', accountNumber: '0012345678' },
-  { id: 'emp-002', name: 'Samuel Okoro', email: 'samuel@example.com', role: 'Operations Manager', status: 'Active', checkInTime: '08:58 AM', checkOutTime: '06:00 PM', baseSalary: 350000, bankName: 'Access Bank', accountNumber: '0023456789' },
-  { id: 'emp-003', name: 'Chioma Nwosu', email: 'chioma@example.com', role: 'Technical Specialist', status: 'On Probation', checkInTime: '09:15 AM', baseSalary: 280000, bankName: 'Zenith Bank', accountNumber: '0034567890' },
-  { id: 'emp-004', name: 'David Bello', email: 'david@example.com', role: 'Mechanic', status: 'Active', checkInTime: '09:00 AM', checkOutTime: '05:00 PM', baseSalary: 220000, bankName: 'First Bank', accountNumber: '0045678901' },
+  { id: 'emp-001', name: 'Grace Adebayo', email: 'grace@example.com', role: 'Senior Consultant', department: 'Professional Services', costCenter: 'ADM-01', status: 'Active', checkInTime: '09:05 AM', checkOutTime: '05:30 PM', baseSalary: 450000, bankName: 'Sterling Bank', accountNumber: '0012345678' },
+  { id: 'emp-002', name: 'Samuel Okoro', email: 'samuel@example.com', role: 'Operations Manager', department: 'Operations', costCenter: 'OPS-01', status: 'Active', checkInTime: '08:58 AM', checkOutTime: '06:00 PM', baseSalary: 350000, bankName: 'Access Bank', accountNumber: '0023456789' },
+  { id: 'emp-003', name: 'Chioma Nwosu', email: 'chioma@example.com', role: 'Technical Specialist', department: 'Engineering', costCenter: 'TECH-01', status: 'On Probation', checkInTime: '09:15 AM', baseSalary: 280000, bankName: 'Zenith Bank', accountNumber: '0034567890' },
+  { id: 'emp-004', name: 'David Bello', email: 'david@example.com', role: 'Mechanic', department: 'Maintenance', costCenter: 'OPS-02', status: 'Active', checkInTime: '09:00 AM', checkOutTime: '05:00 PM', baseSalary: 220000, bankName: 'First Bank', accountNumber: '0045678901' },
 ];
 
-export type SalaryComponentType = 'Earning' | 'Deduction';
+export type SalaryComponentType = 'Earning' | 'Deduction' | 'Benefit';
 
 export type SalaryComponent = {
     id: string;
@@ -186,7 +188,7 @@ export const salaryComponents: SalaryComponent[] = [
     { id: 'c1', name: 'Basic Salary', type: 'Earning', isStatutory: false, calculationType: 'Percentage', value: 50 },
     { id: 'c2', name: 'Housing Allowance', type: 'Earning', isStatutory: false, calculationType: 'Percentage', value: 30 },
     { id: 'c3', name: 'Transport Allowance', type: 'Earning', isStatutory: false, calculationType: 'Percentage', value: 20 },
-    { id: 'd1', name: 'PAYE (Tax)', type: 'Deduction', isStatutory: true, calculationType: 'Fixed', value: 0 }, // Calc'd dynamically
+    { id: 'd1', name: 'PAYE (Tax)', type: 'Deduction', isStatutory: true, calculationType: 'Fixed', value: 0 }, 
     { id: 'd2', name: 'Pension (Employee)', type: 'Deduction', isStatutory: true, calculationType: 'Percentage', value: 8 },
     { id: 'd3', name: 'NHF Contribution', type: 'Deduction', isStatutory: true, calculationType: 'Percentage', value: 2.5 },
 ];
@@ -212,6 +214,8 @@ export type PayrollRun = {
   id: string;
   month: string;
   totalPaid: number;
+  totalGross: number;
+  totalDeductions: number;
   employeesPaid: number;
   status: PayrollRunStatus;
   preparedBy: string;
@@ -219,6 +223,8 @@ export type PayrollRun = {
   payslips: {
     employeeName: string;
     netPay: number;
+    grossPay: number;
+    deductions: number;
   }[];
 };
 
@@ -227,15 +233,17 @@ export const payrollHistory: PayrollRun[] = [
     id: 'run-1',
     month: 'June 2024',
     totalPaid: 1317500,
+    totalGross: 1650000,
+    totalDeductions: 332500,
     employeesPaid: 4,
     status: 'Paid',
     preparedBy: 'Jane Doe',
     approvedBy: 'Admin Board',
     payslips: [
-      { employeeName: "Grace Adebayo", netPay: 425000 },
-      { employeeName: "Samuel Okoro", netPay: 340000 },
-      { employeeName: "Chioma Nwosu", netPay: 297500 },
-      { employeeName: "David Bello", netPay: 255000 },
+      { employeeName: "Grace Adebayo", netPay: 425000, grossPay: 500000, deductions: 75000 },
+      { employeeName: "Samuel Okoro", netPay: 340000, grossPay: 410000, deductions: 70000 },
+      { employeeName: "Chioma Nwosu", netPay: 297500, grossPay: 350000, deductions: 52500 },
+      { employeeName: "David Bello", netPay: 255000, grossPay: 290000, deductions: 35000 },
     ]
   }
 ];

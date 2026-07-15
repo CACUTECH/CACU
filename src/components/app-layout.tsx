@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -38,7 +39,8 @@ import {
     BookText, 
     Wrench,
     CalendarClock,
-    UserX
+    UserX,
+    BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
@@ -124,7 +126,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [businessType, setBusinessType] = useState<BusinessType>('HYBRID');
   const [mounted, setMounted] = useState(false);
 
-  // Simulation of RBAC: In a real app, this would be the logged-in user's role/perms
   const [userRole, setUserRole] = useState<'Owner' | 'Admin' | 'Staff'>('Owner');
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
 
@@ -134,14 +135,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const savedDetails = localStorage.getItem('business-details');
     const savedType = localStorage.getItem('business-type') as BusinessType;
     
-    // In a real app, we would fetch the user's role and permissions from Auth/Firestore
-    // For this demo, we'll initialize with all permissions for simplicity if not found
     setUserPermissions([
         'pos', 'appointments', 'jobs', 'transactions', 'invoices', 'catalog', 'accounting', 
         'accounting:chart-of-accounts', 'accounting:journal-entries', 'accounting:trial-balance',
         'reports', 'customers', 'analytics', 'analytics:kpi', 'analytics:planning', 
         'analytics:budget-vs-actual', 'analytics:reconciliation', 'analytics:top-selling', 'analytics:aging-reports',
-        'hr', 'hr:employees', 'hr:attendance', 'hr:payroll', 'hr:termination', 'community', 'apps', 'credit'
+        'hr', 'hr:employees', 'hr:attendance', 'hr:payroll', 'hr:termination', 'hr:payroll:reports', 'community', 'apps', 'credit'
     ]);
 
     if (savedLogo) setLogoUrl(savedLogo);
@@ -158,16 +157,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    // POS access check
     ...(businessType !== 'SERVICE' && userPermissions.includes('pos') ? [
         { href: '/pos', label: 'POS Checkout', icon: MonitorSpeaker },
     ] : []),
-    // Appointments & Jobs access check
     ...(businessType !== 'PRODUCT' ? [
         ...(userPermissions.includes('appointments') ? [{ href: '/appointments', label: 'Appointments', icon: CalendarClock }] : []),
         ...(userPermissions.includes('jobs') ? [{ href: '/jobs', label: 'Work Orders / Jobs', icon: Wrench }] : []),
     ] : []),
-    // Standard module checks
     ...(userPermissions.includes('transactions') ? [{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight }] : []),
     ...(userPermissions.includes('invoices') ? [{ href: '/invoices', label: 'Invoices & Receipts', icon: Receipt }] : []),
     ...(userPermissions.includes('catalog') ? [{ href: '/catalog', label: businessType === 'SERVICE' ? 'Service Menu' : 'Catalog', icon: Package }] : []),
@@ -206,6 +202,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         ...(userPermissions.includes('hr:employees') ? [{ href: '/hr/employees', label: 'Employees' }] : []),
         ...(userPermissions.includes('hr:attendance') ? [{ href: '/hr/attendance', label: 'Attendance' }] : []),
         ...(userPermissions.includes('hr:payroll') ? [{ href: '/hr/payroll', label: 'Payroll' }] : []),
+        ...(userPermissions.includes('hr:payroll:reports') ? [{ href: '/hr/payroll/reports', label: 'Workforce Analytics', icon: BarChart3 }] : []),
         ...(userPermissions.includes('hr:termination') ? [{ href: '/hr/termination', label: 'Exits & Termination' }] : []),
       ],
     }] : []),
