@@ -49,7 +49,8 @@ import {
     Clock,
     Package,
     Lock,
-    Sparkles
+    Sparkles,
+    Users
 } from "lucide-react";
 import { 
     Dialog, 
