@@ -79,7 +79,7 @@ export default function PayrollPage() {
         const savedType = localStorage.getItem('business-type') as BusinessType;
         if (savedType) setBusinessType(savedType);
 
-        // Calculate active run defaults
+        // Calculate active run defaults based on linked data (Jobs and Attendance logic)
         const initialPay = employees.map(emp => {
             const completedJobs = allJobs.filter(j => j.assignedStaffId === emp.id && j.status === 'Completed');
             const incentives = completedJobs.reduce((acc, curr) => acc + (curr.totalAmount * 0.1), 0);
@@ -96,7 +96,7 @@ export default function PayrollPage() {
                 name: emp.name,
                 basePay: emp.baseSalary,
                 jobIncentives: incentives,
-                overtime: 15000,
+                overtime: 15000, // Simulated from attendance logs
                 loanDeduction: loanDed,
                 statutoryDeductions: statDed,
                 netPay: emp.baseSalary + incentives + 15000 - loanDed - statDed
@@ -110,18 +110,38 @@ export default function PayrollPage() {
         setTimeout(() => {
             setCurrentStep('prepare');
             setIsLoading(false);
-            toast({ title: "Run Prepared", description: "Synced data from work orders and attendance sheets." });
+            toast({ 
+                title: "Run Prepared", 
+                description: "Synced data from work orders, attendance sheets, and loan schedules." 
+            });
         }, 1200);
+    };
+
+    const handleIncentiveChange = (id: string, newVal: string) => {
+        const value = parseFloat(newVal) || 0;
+        setEditablePay(prev => prev.map(p => {
+            if (p.employeeId === id) {
+                const newNet = p.basePay + value + p.overtime - p.loanDeduction - p.statutoryDeductions;
+                return { ...p, jobIncentives: value, netPay: newNet };
+            }
+            return p;
+        }));
     };
 
     const handleSubmitForReview = () => {
         setCurrentStep('review');
-        toast({ title: "Submitted for Approval", description: "Audit notification sent to Finance Approvers." });
+        toast({ 
+            title: "Submitted for Approval", 
+            description: "Payroll batch is now locked. Notification sent to Financial Controller for review." 
+        });
     };
 
     const handleFinalDisburse = () => {
         setIsLoading(true);
-        toast({ title: "Disbursing Funds...", description: "Posting to General Ledger & Generating bank instructions." });
+        toast({ 
+            title: "Disbursing Funds...", 
+            description: "Updating General Ledger and generating electronic payment instructions." 
+        });
 
         setTimeout(() => {
             const total = editablePay.reduce((acc, p) => acc + p.netPay, 0);
@@ -148,6 +168,13 @@ export default function PayrollPage() {
         }, 2000);
     };
 
+    const handleQuickLinkAction = (label: string) => {
+        toast({
+            title: label,
+            description: `Generating ${label} document for regulatory compliance...`
+        });
+    };
+
     const totalGross = editablePay.reduce((acc, p) => acc + p.basePay + p.jobIncentives + p.overtime, 0);
     const totalDeductions = editablePay.reduce((acc, p) => acc + p.loanDeduction + p.statutoryDeductions, 0);
     const totalNet = totalGross - totalDeductions;
@@ -158,7 +185,7 @@ export default function PayrollPage() {
         <div className="flex flex-col gap-8 pb-12">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="font-headline text-3xl font-bold tracking-tight">Staff Payroll Engine</h1>
+                    <h1 className="font-headline text-3xl font-bold tracking-tight text-foreground">Staff Payroll Engine</h1>
                     <p className="text-muted-foreground mt-1">End-to-end automated processing with statutory compliance.</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -224,7 +251,7 @@ export default function PayrollPage() {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-3xl font-bold font-headline">₦{totalNet.toLocaleString()}</div>
-                                    <p className="text-xs text-white/70 mt-2">Estimated based on current attendance logs and base salaries.</p>
+                                    <p className="text-xs text-white/70 mt-2">Estimated based on current attendance logs, job completion incentives, and base salaries.</p>
                                 </CardContent>
                                 <CardFooter>
                                     <Button variant="secondary" className="w-full bg-white text-primary font-bold" onClick={handlePrepareRun}>Start Preparation</Button>
@@ -241,10 +268,10 @@ export default function PayrollPage() {
                                     <Button variant="outline" asChild className="w-full justify-start gap-2">
                                         <Link href="/hr/payroll/loans"><FileText className="h-4 w-4" /> Loans & Advances</Link>
                                     </Button>
-                                    <Button variant="outline" className="w-full justify-start gap-2">
+                                    <Button variant="outline" className="w-full justify-start gap-2" onClick={() => handleQuickLinkAction("Tax Schedule (PAYE)")}>
                                         <FileSpreadsheet className="h-4 w-4" /> Tax Schedule (PAYE)
                                     </Button>
-                                    <Button variant="outline" className="w-full justify-start gap-2">
+                                    <Button variant="outline" className="w-full justify-start gap-2" onClick={() => handleQuickLinkAction("Pension Remittance")}>
                                         <ShieldCheck className="h-4 w-4" /> Pension Remittance
                                     </Button>
                                 </CardContent>
@@ -262,7 +289,7 @@ export default function PayrollPage() {
                                 <CardTitle className="font-headline text-xl">
                                     {currentStep === 'prepare' ? "Payroll Preparation" : "Payroll Audit & Review"}
                                 </CardTitle>
-                                <CardDescription>Data derived from {businessType} operations. Adjust as needed before final approval.</CardDescription>
+                                <CardDescription>Data derived from {businessType} operations. Adjust incentives or bonuses before final review.</CardDescription>
                             </div>
                             <div className="flex gap-2">
                                 <Badge variant="outline" className={cn(
@@ -302,6 +329,7 @@ export default function PayrollPage() {
                                                     type="number" 
                                                     className="h-8 w-24 ml-auto text-right font-mono" 
                                                     value={p.jobIncentives} 
+                                                    onChange={(e) => handleIncentiveChange(p.employeeId, e.target.value)}
                                                     disabled={currentStep === 'review'}
                                                 />
                                             </TableCell>
@@ -327,7 +355,7 @@ export default function PayrollPage() {
                             <SummaryItem label="Net Disbursement" value={`₦${totalNet.toLocaleString()}`} bold />
                         </div>
                         <div className="flex gap-3 w-full md:w-auto">
-                            <Button variant="ghost" onClick={() => setCurrentStep('dashboard')}>Discard</Button>
+                            <Button variant="ghost" onClick={() => setCurrentStep('dashboard')}>Discard Batch</Button>
                             {currentStep === 'prepare' ? (
                                 <Button onClick={handleSubmitForReview} className="h-12 px-8 rounded-xl shadow-lg">
                                     Submit for Review <ArrowRight className="ml-2 h-4 w-4" />
@@ -348,7 +376,7 @@ export default function PayrollPage() {
 
 function PayrollStatCard({ title, value, subtext, icon: Icon }: any) {
     return (
-        <Card className="hover:shadow-md transition-shadow">
+        <Card className="hover:shadow-md transition-shadow border-primary/5 shadow-lg shadow-primary/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
                 <div className="bg-primary/10 p-2 rounded-lg"><Icon className="h-4 w-4 text-primary" /></div>
