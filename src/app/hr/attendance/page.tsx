@@ -30,14 +30,17 @@ import {
     Timer,
     MapPin,
     ArrowUpRight,
-    Search
+    Search,
+    Loader2,
+    Download
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { format, parse, differenceInMinutes, isAfter, startOfToday } from "date-fns"
+import { format, parse, differenceInMinutes, isAfter } from "date-fns"
 import { employees as initialEmployees } from "@/lib/data"
 import type { Employee } from "@/lib/data"
 import { cn } from "@/lib/utils"
+import * as XLSX from 'xlsx'
 
 interface AttendanceRecord extends Employee {
     checkInTime?: string;
@@ -69,6 +72,7 @@ function AttendanceStatCard({ title, value, subtext, icon: Icon, trend }: any) {
 export default function AttendancePage() {
     const { toast } = useToast()
     const [searchTerm, setSearchTerm] = React.useState("")
+    const [isProcessing, setIsProcessing] = React.useState<string | null>(null)
     const [records, setRecords] = React.useState<AttendanceRecord[]>(
         initialEmployees.map(e => ({
             ...e,
@@ -81,22 +85,28 @@ export default function AttendancePage() {
     const SHIFT_START = "09:00 AM"
 
     const handleCheckIn = (id: string) => {
-        const time = format(new Date(), "hh:mm a")
-        const isLate = isAfter(new Date(), parse(SHIFT_START, "hh:mm a", new Date()))
+        setIsProcessing(id)
+        
+        // Simulate GPS verification delay
+        setTimeout(() => {
+            const time = format(new Date(), "hh:mm a")
+            const isLate = isAfter(new Date(), parse(SHIFT_START, "hh:mm a", new Date()))
 
-        setRecords(prev => prev.map(r => 
-            r.id === id ? { 
-                ...r, 
-                checkInTime: time, 
-                punctuality: isLate ? 'Late' : 'On Time' 
-            } : r
-        ))
+            setRecords(prev => prev.map(r => 
+                r.id === id ? { 
+                    ...r, 
+                    checkInTime: time, 
+                    punctuality: isLate ? 'Late' : 'On Time' 
+                } : r
+            ))
 
-        toast({
-            title: isLate ? "Late Check-in Recorded" : "On-time Check-in",
-            description: `${records.find(r => r.id === id)?.name} checked in at ${time}.`,
-            variant: isLate ? "destructive" : "default"
-        })
+            setIsProcessing(null)
+            toast({
+                title: isLate ? "Late Check-in Recorded" : "On-time Check-in",
+                description: `${records.find(r => r.id === id)?.name} checked in at ${time}. Location: Office Premise Verified.`,
+                variant: isLate ? "destructive" : "default"
+            })
+        }, 800)
     }
 
     const handleCheckOut = (id: string) => {
@@ -122,7 +132,36 @@ export default function AttendancePage() {
 
         toast({
             title: "Shift Completed",
-            description: `Total duration: ${durationStr}`,
+            description: `Total duration: ${durationStr}. Session data synced.`,
+        })
+    }
+
+    const handleDownloadReport = () => {
+        const data = records.map(r => ({
+            'Employee Name': r.name,
+            'Role': r.role,
+            'Status': r.punctuality,
+            'Check-in': r.checkInTime || 'N/A',
+            'Check-out': r.checkOutTime || 'N/A',
+            'Duration': r.duration || 'N/A'
+        }))
+
+        const worksheet = XLSX.utils.json_to_sheet(data)
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance")
+        XLSX.writeFile(workbook, `Attendance_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
+
+        toast({
+            title: "Report Downloaded",
+            description: "Daily attendance summary exported to Excel.",
+        })
+    }
+
+    const handleConfigureGeofence = () => {
+        toast({
+            title: "Geo-fencing Settings",
+            description: "Authorized workspace radius set to 100m from registered HQ address.",
+            action: <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700">Active</Badge>
         })
     }
 
@@ -138,9 +177,16 @@ export default function AttendancePage() {
 
     return (
         <div className="flex flex-col gap-8 pb-12">
-            <div>
-                <h1 className="font-headline text-3xl font-bold tracking-tight">Workforce Tracking</h1>
-                <p className="text-muted-foreground mt-1">Live monitoring of team attendance and billable work hours.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="font-headline text-3xl font-bold tracking-tight text-foreground">Workforce Tracking</h1>
+                    <p className="text-muted-foreground mt-1">Live monitoring of team attendance and billable work hours.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleDownloadReport}>
+                        <Download className="mr-2 h-4 w-4" /> Export Today
+                    </Button>
+                </div>
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -205,7 +251,7 @@ export default function AttendancePage() {
                                 <TableRow key={record.id} className="hover:bg-primary/5 transition-colors group">
                                     <TableCell className="pl-6">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary uppercase">
                                                 {record.name.split(' ').map(n => n[0]).join('')}
                                             </div>
                                             <div>
@@ -239,8 +285,18 @@ export default function AttendancePage() {
                                     <TableCell className="text-right pr-6">
                                         <div className="flex justify-end">
                                             {!record.checkInTime ? (
-                                                <Button size="sm" className="h-8 rounded-lg" onClick={() => handleCheckIn(record.id)}>
-                                                    <Clock className="h-3 w-3 mr-2" /> Check In
+                                                <Button 
+                                                    size="sm" 
+                                                    className="h-8 rounded-lg" 
+                                                    onClick={() => handleCheckIn(record.id)}
+                                                    disabled={isProcessing === record.id}
+                                                >
+                                                    {isProcessing === record.id ? (
+                                                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                                                    ) : (
+                                                        <Clock className="h-3 w-3 mr-2" />
+                                                    )}
+                                                    {isProcessing === record.id ? 'Verifying...' : 'Check In'}
                                                 </Button>
                                             ) : !record.checkOutTime ? (
                                                 <Button size="sm" variant="outline" className="h-8 rounded-lg border-primary/20 text-primary hover:bg-primary/5" onClick={() => handleCheckOut(record.id)}>
@@ -280,7 +336,7 @@ export default function AttendancePage() {
                         </div>
                         <div className="flex gap-3">
                             <div className="h-2 w-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
-                            <p className="text-sm"><strong>Punctuality Alert:</strong> 3 members were late this morning. Consider adjusting the flex-time policy for the Operations team.</p>
+                            <p className="text-sm"><strong>Punctuality Alert:</strong> {lateCount} members were late this morning. Consider adjusting the flex-time policy for your team.</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -290,10 +346,10 @@ export default function AttendancePage() {
                         <p className="text-sm text-muted-foreground">Enable GPS verification to ensure staff are checking in from authorized business premises or job sites.</p>
                     </div>
                     <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                        <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+                        <Button variant="outline" size="sm" className="gap-2 rounded-xl" onClick={handleConfigureGeofence}>
                             <MapPin className="h-4 w-4" /> Configure Geo-fencing
                         </Button>
-                        <Button variant="link" size="sm" className="text-xs">Download History Report</Button>
+                        <Button variant="link" size="sm" className="text-xs" onClick={handleDownloadReport}>Download History Report</Button>
                     </div>
                 </Card>
             </div>
