@@ -24,11 +24,9 @@ export type CatalogItem = {
     tax?: number;
     status: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Active' | 'Inactive';
     image?: string;
-    // Product specific
     sku?: string;
     quantity?: number;
     reorderLevel?: number;
-    // Service specific
     duration?: number; // in minutes
     pricingModel?: PricingModel;
     assignedStaff?: string[];
@@ -159,20 +157,65 @@ export type Employee = {
   status: 'Active' | 'On Probation' | 'Terminated';
   checkInTime?: string;
   checkOutTime?: string;
+  bankName?: string;
+  accountNumber?: string;
+  pensionId?: string;
+  tin?: string;
+  baseSalary: number;
 };
 
 export const employees: Employee[] = [
-  { id: 'emp-001', name: 'Grace Adebayo', email: 'grace@example.com', role: 'Senior Consultant', status: 'Active', checkInTime: '09:05 AM', checkOutTime: '05:30 PM' },
-  { id: 'emp-002', name: 'Samuel Okoro', email: 'samuel@example.com', role: 'Operations Manager', status: 'Active', checkInTime: '08:58 AM', checkOutTime: '06:00 PM' },
-  { id: 'emp-003', name: 'Chioma Nwosu', email: 'chioma@example.com', role: 'Technical Specialist', status: 'On Probation', checkInTime: '09:15 AM' },
-  { id: 'emp-004', name: 'David Bello', email: 'david@example.com', role: 'Mechanic', status: 'Active', checkInTime: '09:00 AM', checkOutTime: '05:00 PM' },
+  { id: 'emp-001', name: 'Grace Adebayo', email: 'grace@example.com', role: 'Senior Consultant', status: 'Active', checkInTime: '09:05 AM', checkOutTime: '05:30 PM', baseSalary: 450000, bankName: 'Sterling Bank', accountNumber: '0012345678' },
+  { id: 'emp-002', name: 'Samuel Okoro', email: 'samuel@example.com', role: 'Operations Manager', status: 'Active', checkInTime: '08:58 AM', checkOutTime: '06:00 PM', baseSalary: 350000, bankName: 'Access Bank', accountNumber: '0023456789' },
+  { id: 'emp-003', name: 'Chioma Nwosu', email: 'chioma@example.com', role: 'Technical Specialist', status: 'On Probation', checkInTime: '09:15 AM', baseSalary: 280000, bankName: 'Zenith Bank', accountNumber: '0034567890' },
+  { id: 'emp-004', name: 'David Bello', email: 'david@example.com', role: 'Mechanic', status: 'Active', checkInTime: '09:00 AM', checkOutTime: '05:00 PM', baseSalary: 220000, bankName: 'First Bank', accountNumber: '0045678901' },
 ];
+
+export type SalaryComponentType = 'Earning' | 'Deduction';
+
+export type SalaryComponent = {
+    id: string;
+    name: string;
+    type: SalaryComponentType;
+    isStatutory: boolean;
+    calculationType: 'Fixed' | 'Percentage';
+    value: number; // Amount or percentage
+};
+
+export const salaryComponents: SalaryComponent[] = [
+    { id: 'c1', name: 'Basic Salary', type: 'Earning', isStatutory: false, calculationType: 'Percentage', value: 50 },
+    { id: 'c2', name: 'Housing Allowance', type: 'Earning', isStatutory: false, calculationType: 'Percentage', value: 30 },
+    { id: 'c3', name: 'Transport Allowance', type: 'Earning', isStatutory: false, calculationType: 'Percentage', value: 20 },
+    { id: 'd1', name: 'PAYE (Tax)', type: 'Deduction', isStatutory: true, calculationType: 'Fixed', value: 0 }, // Calc'd dynamically
+    { id: 'd2', name: 'Pension (Employee)', type: 'Deduction', isStatutory: true, calculationType: 'Percentage', value: 8 },
+    { id: 'd3', name: 'NHF Contribution', type: 'Deduction', isStatutory: true, calculationType: 'Percentage', value: 2.5 },
+];
+
+export type Loan = {
+    id: string;
+    employeeId: string;
+    employeeName: string;
+    amount: number;
+    balance: number;
+    monthlyDeduction: number;
+    status: 'Active' | 'Completed' | 'Pending';
+    purpose: string;
+};
+
+export const initialLoans: Loan[] = [
+    { id: 'ln-1', employeeId: 'emp-002', employeeName: 'Samuel Okoro', amount: 500000, balance: 350000, monthlyDeduction: 50000, status: 'Active', purpose: 'Housing Advance' },
+];
+
+export type PayrollRunStatus = 'Draft' | 'Review' | 'Approved' | 'Paid';
 
 export type PayrollRun = {
   id: string;
   month: string;
   totalPaid: number;
   employeesPaid: number;
+  status: PayrollRunStatus;
+  preparedBy: string;
+  approvedBy?: string;
   payslips: {
     employeeName: string;
     netPay: number;
@@ -185,6 +228,9 @@ export const payrollHistory: PayrollRun[] = [
     month: 'June 2024',
     totalPaid: 1317500,
     employeesPaid: 4,
+    status: 'Paid',
+    preparedBy: 'Jane Doe',
+    approvedBy: 'Admin Board',
     payslips: [
       { employeeName: "Grace Adebayo", netPay: 425000 },
       { employeeName: "Samuel Okoro", netPay: 340000 },

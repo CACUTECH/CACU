@@ -24,7 +24,14 @@ import {
     CheckCircle2,
     Briefcase,
     Clock,
-    PlusCircle
+    PlusCircle,
+    ShieldCheck,
+    Lock,
+    Settings,
+    FileText,
+    History,
+    FileSpreadsheet,
+    ArrowRight
 } from "lucide-react";
 import { 
     Dialog, 
@@ -41,9 +48,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { employees, jobs as allJobs, payrollHistory as initialPayrollHistory } from "@/lib/data";
-import type { PayrollRun, BusinessType } from "@/lib/data";
+import { employees, jobs as allJobs, payrollHistory as initialPayrollHistory, initialLoans } from "@/lib/data";
+import type { PayrollRun, BusinessType, PayrollRunStatus } from "@/lib/data";
+import Link from "next/link";
 
 interface EditableStaffPay {
     employeeId: string;
@@ -51,7 +60,8 @@ interface EditableStaffPay {
     basePay: number;
     jobIncentives: number;
     overtime: number;
-    deductions: number;
+    loanDeduction: number;
+    statutoryDeductions: number; // Tax, Pension, etc.
     netPay: number;
 }
 
@@ -60,7 +70,7 @@ export default function PayrollPage() {
     const [isLoading, setIsLoading] = React.useState(false);
     const [businessType, setBusinessType] = React.useState<BusinessType>('HYBRID');
     const [payrollHistory, setPayrollHistory] = React.useState(initialPayrollHistory);
-    const [isReviewMode, setIsReviewMode] = React.useState(false);
+    const [currentStep, setCurrentStep] = React.useState<'dashboard' | 'prepare' | 'review'>('dashboard');
     const [editablePay, setEditablePay] = React.useState<EditableStaffPay[]>([]);
     const [mounted, setMounted] = React.useState(false);
 
@@ -69,43 +79,49 @@ export default function PayrollPage() {
         const savedType = localStorage.getItem('business-type') as BusinessType;
         if (savedType) setBusinessType(savedType);
 
-        // Initialize editable payroll from staff and job data
+        // Calculate active run defaults
         const initialPay = employees.map(emp => {
             const completedJobs = allJobs.filter(j => j.assignedStaffId === emp.id && j.status === 'Completed');
-            // Simulate incentive: 10% of job value for Service/Hybrid
             const incentives = completedJobs.reduce((acc, curr) => acc + (curr.totalAmount * 0.1), 0);
-            const base = 250000; // Sample base
+            
+            // Check for active loans
+            const loan = initialLoans.find(l => l.employeeId === emp.id && l.status === 'Active');
+            const loanDed = loan ? loan.monthlyDeduction : 0;
+            
+            // Simple statutory math for MVP (approx 15% combined tax/pension)
+            const statDed = emp.baseSalary * 0.15;
+            
             return {
                 employeeId: emp.id,
                 name: emp.name,
-                basePay: base,
+                basePay: emp.baseSalary,
                 jobIncentives: incentives,
-                overtime: 15000, // Sample fixed for demo
-                deductions: 35000, // Sample fixed for demo
-                netPay: base + incentives + 15000 - 35000
+                overtime: 15000,
+                loanDeduction: loanDed,
+                statutoryDeductions: statDed,
+                netPay: emp.baseSalary + incentives + 15000 - loanDed - statDed
             };
         });
         setEditablePay(initialPay);
     }, []);
 
-    const handleUpdatePay = (id: string, field: keyof EditableStaffPay, value: string) => {
-        const num = parseFloat(value) || 0;
-        setEditablePay(prev => prev.map(p => {
-            if (p.employeeId === id) {
-                const updated = { ...p, [field]: num };
-                updated.netPay = updated.basePay + updated.jobIncentives + updated.overtime - updated.deductions;
-                return updated;
-            }
-            return p;
-        }));
+    const handlePrepareRun = () => {
+        setIsLoading(true);
+        setTimeout(() => {
+            setCurrentStep('prepare');
+            setIsLoading(false);
+            toast({ title: "Run Prepared", description: "Synced data from work orders and attendance sheets." });
+        }, 1200);
     };
 
-    const handleRunPayroll = () => {
+    const handleSubmitForReview = () => {
+        setCurrentStep('review');
+        toast({ title: "Submitted for Approval", description: "Audit notification sent to Finance Approvers." });
+    };
+
+    const handleFinalDisburse = () => {
         setIsLoading(true);
-        toast({
-            title: "Disbursing Funds...",
-            description: "Calculating ledger entries and generating bank files.",
-        });
+        toast({ title: "Disbursing Funds...", description: "Posting to General Ledger & Generating bank instructions." });
 
         setTimeout(() => {
             const total = editablePay.reduce((acc, p) => acc + p.netPay, 0);
@@ -114,6 +130,9 @@ export default function PayrollPage() {
                 month: 'July 2024',
                 totalPaid: total,
                 employeesPaid: editablePay.length,
+                status: 'Paid',
+                preparedBy: 'Jane Doe',
+                approvedBy: 'Financial Controller',
                 payslips: editablePay.map(p => ({
                     employeeName: p.name,
                     netPay: p.netPay
@@ -121,16 +140,16 @@ export default function PayrollPage() {
             };
             setPayrollHistory(prev => [newRun, ...prev]);
             setIsLoading(false);
-            setIsReviewMode(false);
+            setCurrentStep('dashboard');
             toast({
-                title: "Payroll Executed Successfully",
-                description: "₦" + total.toLocaleString() + " processed for " + editablePay.length + " staff.",
+                title: "Payroll Finalized",
+                description: `₦${total.toLocaleString()} disbursed to ${editablePay.length} employees.`,
             });
         }, 2000);
     };
 
     const totalGross = editablePay.reduce((acc, p) => acc + p.basePay + p.jobIncentives + p.overtime, 0);
-    const totalDeductions = editablePay.reduce((acc, p) => acc + p.deductions, 0);
+    const totalDeductions = editablePay.reduce((acc, p) => acc + p.loanDeduction + p.statutoryDeductions, 0);
     const totalNet = totalGross - totalDeductions;
 
     if (!mounted) return null;
@@ -139,178 +158,161 @@ export default function PayrollPage() {
         <div className="flex flex-col gap-8 pb-12">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="font-headline text-3xl font-bold tracking-tight">Payroll Management</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Automated compensation linked to {businessType === 'SERVICE' ? 'jobs and hours' : businessType === 'PRODUCT' ? 'sales and time' : 'all operational metrics'}.
-                    </p>
+                    <h1 className="font-headline text-3xl font-bold tracking-tight">Staff Payroll Engine</h1>
+                    <p className="text-muted-foreground mt-1">End-to-end automated processing with statutory compliance.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {!isReviewMode ? (
-                        <Button onClick={() => setIsReviewMode(true)} className="rounded-xl shadow-lg shadow-primary/20">
-                            <Calculator className="mr-2 h-4 w-4" />
+                    <Button variant="outline" asChild size="sm">
+                        <Link href="/hr/payroll/config"><Settings className="mr-2 h-4 w-4" /> Global Config</Link>
+                    </Button>
+                    {currentStep === 'dashboard' && (
+                        <Button onClick={handlePrepareRun} className="rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
+                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
                             Prepare July Run
-                        </Button>
-                    ) : (
-                        <Button variant="outline" onClick={() => setIsReviewMode(false)}>
-                            Cancel Preparation
                         </Button>
                     )}
                 </div>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Projected Gross</CardTitle>
-                        <Wallet className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">₦{totalGross.toLocaleString()}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Total Deductions</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">₦{totalDeductions.toLocaleString()}</div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-primary/5 border-primary/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-xs font-bold uppercase text-primary">Net Disbursement</CardTitle>
-                        <CheckCircle2 className="h-4 w-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-primary">₦{totalNet.toLocaleString()}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Staff Count</CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{employees.length} Active</div>
-                    </CardContent>
-                </Card>
-            </div>
+            {currentStep === 'dashboard' && (
+                <div className="grid gap-6">
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                        <PayrollStatCard title="YTD Payroll Cost" value="₦14.2M" subtext="Across all business units" icon={Wallet} />
+                        <PayrollStatCard title="Avg. Employee Net" value="₦284k" subtext="+2% from last quarter" icon={TrendingUp} />
+                        <PayrollStatCard title="Total Staff" value={employees.length.toString()} subtext="Active in database" icon={Users} />
+                        <PayrollStatCard title="Compliance Health" value="100%" subtext="All remittances current" icon={ShieldCheck} />
+                    </div>
 
-            {isReviewMode ? (
-                <Card className="border-primary/20 shadow-xl shadow-primary/5">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <Card className="lg:col-span-2">
+                            <CardHeader>
+                                <CardTitle className="font-headline">Disbursement History</CardTitle>
+                                <CardDescription>Comprehensive audit trail of past payroll executions.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <Table>
+                                    <TableHeader className="bg-muted/50">
+                                        <TableRow>
+                                            <TableHead className="pl-6">Month</TableHead>
+                                            <TableHead className="text-center">Staff</TableHead>
+                                            <TableHead className="text-right">Total (₦)</TableHead>
+                                            <TableHead className="text-right pr-6">Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {payrollHistory.map(run => (
+                                            <TableRow key={run.id} className="hover:bg-muted/10 transition-colors">
+                                                <TableCell className="pl-6 font-bold">{run.month}</TableCell>
+                                                <TableCell className="text-center">{run.employeesPaid}</TableCell>
+                                                <TableCell className="text-right font-mono">₦{run.totalPaid.toLocaleString()}</TableCell>
+                                                <TableCell className="text-right pr-6">
+                                                    <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20">{run.status}</Badge>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                        <div className="space-y-6">
+                            <Card className="bg-primary text-primary-foreground border-none shadow-xl shadow-primary/20">
+                                <CardHeader>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Calculator className="h-5 w-5" />
+                                        Next Run Estimate
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-3xl font-bold font-headline">₦{totalNet.toLocaleString()}</div>
+                                    <p className="text-xs text-white/70 mt-2">Estimated based on current attendance logs and base salaries.</p>
+                                </CardContent>
+                                <CardFooter>
+                                    <Button variant="secondary" className="w-full bg-white text-primary font-bold" onClick={handlePrepareRun}>Start Preparation</Button>
+                                </CardFooter>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                        <Briefcase className="h-4 w-4 text-primary" />
+                                        Quick Links
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    <Button variant="outline" asChild className="w-full justify-start gap-2">
+                                        <Link href="/hr/payroll/loans"><FileText className="h-4 w-4" /> Loans & Advances</Link>
+                                    </Button>
+                                    <Button variant="outline" className="w-full justify-start gap-2">
+                                        <FileSpreadsheet className="h-4 w-4" /> Tax Schedule (PAYE)
+                                    </Button>
+                                    <Button variant="outline" className="w-full justify-start gap-2">
+                                        <ShieldCheck className="h-4 w-4" /> Pension Remittance
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {(currentStep === 'prepare' || currentStep === 'review') && (
+                <Card className="border-primary/20 shadow-2xl shadow-primary/5 overflow-hidden">
                     <CardHeader className="bg-primary/5 border-b">
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="font-headline">Review & Adjust Payroll</CardTitle>
-                                <CardDescription>Data synced from Attendance and completed Work Orders.</CardDescription>
+                                <CardTitle className="font-headline text-xl">
+                                    {currentStep === 'prepare' ? "Payroll Preparation" : "Payroll Audit & Review"}
+                                </CardTitle>
+                                <CardDescription>Data derived from {businessType} operations. Adjust as needed before final approval.</CardDescription>
                             </div>
-                            <Badge variant="outline" className="bg-blue-500/10 text-blue-700 border-blue-500/20 font-bold">
-                                PRE-RUN DRAFT
-                            </Badge>
+                            <div className="flex gap-2">
+                                <Badge variant="outline" className={cn(
+                                    "font-bold uppercase tracking-tighter",
+                                    currentStep === 'prepare' ? "bg-amber-500/10 text-amber-700" : "bg-blue-500/10 text-blue-700"
+                                )}>
+                                    {currentStep === 'prepare' ? "MAKER STAGE" : "CHECKER STAGE"}
+                                </Badge>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead className="pl-6">Employee</TableHead>
-                                    <TableHead className="text-right">Base Salary (₦)</TableHead>
-                                    <TableHead className="text-right">Job Bonus (₦)</TableHead>
-                                    <TableHead className="text-right">OT/Incentive (₦)</TableHead>
-                                    <TableHead className="text-right">Deductions (₦)</TableHead>
-                                    <TableHead className="text-right pr-6">Net Total (₦)</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {editablePay.map((p) => (
-                                    <TableRow key={p.employeeId} className="hover:bg-muted/30 transition-colors group">
-                                        <TableCell className="pl-6">
-                                            <div className="font-bold text-sm">{p.name}</div>
-                                            <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                                                <Briefcase className="h-2 w-2" /> Tracked Output
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input 
-                                                type="number" 
-                                                className="h-8 text-right font-mono" 
-                                                value={p.basePay} 
-                                                onChange={(e) => handleUpdatePay(p.employeeId, 'basePay', e.target.value)}
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input 
-                                                type="number" 
-                                                className="h-8 text-right font-mono bg-emerald-50/30" 
-                                                value={p.jobIncentives} 
-                                                onChange={(e) => handleUpdatePay(p.employeeId, 'jobIncentives', e.target.value)}
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input 
-                                                type="number" 
-                                                className="h-8 text-right font-mono" 
-                                                value={p.overtime} 
-                                                onChange={(e) => handleUpdatePay(p.employeeId, 'overtime', e.target.value)}
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input 
-                                                type="number" 
-                                                className="h-8 text-right font-mono text-red-600" 
-                                                value={p.deductions} 
-                                                onChange={(e) => handleUpdatePay(p.employeeId, 'deductions', e.target.value)}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="text-right pr-6 font-bold font-headline text-lg">
-                                            ₦{p.netPay.toLocaleString()}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                    <CardFooter className="bg-muted/30 border-t p-6 flex justify-between items-center">
-                        <p className="text-xs text-muted-foreground max-w-md italic">
-                            * Job bonuses are calculated based on 10% commission for completed service orders. Deductions include PAYE and Pension contributions.
-                        </p>
-                        <div className="flex gap-3">
-                            <Button variant="outline" onClick={() => setIsReviewMode(false)}>Discard</Button>
-                            <Button onClick={handleRunPayroll} disabled={isLoading} className="h-12 px-8 rounded-xl shadow-lg">
-                                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                Approve & Disburse
-                            </Button>
-                        </div>
-                    </CardFooter>
-                </Card>
-            ) : (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="font-headline">Disbursement History</CardTitle>
-                        <CardDescription>Past payroll runs and individual payslip logs.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="rounded-md border overflow-hidden">
+                        <div className="overflow-x-auto">
                             <Table>
                                 <TableHeader className="bg-muted/50">
                                     <TableRow>
-                                        <TableHead className="pl-6">Reporting Month</TableHead>
-                                        <TableHead className="text-center">Team Members</TableHead>
-                                        <TableHead className="text-right">Total Disbursed</TableHead>
-                                        <TableHead className="text-right pr-6">Status</TableHead>
+                                        <TableHead className="pl-6">Employee</TableHead>
+                                        <TableHead className="text-right">Base Pay (₦)</TableHead>
+                                        <TableHead className="text-right">Incentives (₦)</TableHead>
+                                        <TableHead className="text-right">Loan Repay (₦)</TableHead>
+                                        <TableHead className="text-right">Statutory (₦)</TableHead>
+                                        <TableHead className="text-right pr-6">Net Total (₦)</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {payrollHistory.map(run => (
-                                        <TableRow key={run.id} className="hover:bg-muted/10 transition-colors">
-                                            <TableCell className="pl-6 font-medium">{run.month}</TableCell>
-                                            <TableCell className="text-center">{run.employeesPaid} Paid</TableCell>
-                                            <TableCell className="text-right font-mono font-bold">₦{run.totalPaid.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right pr-6">
-                                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20 uppercase text-[10px] font-bold">
-                                                    Finalized
-                                                </Badge>
+                                    {editablePay.map((p) => (
+                                        <TableRow key={p.employeeId} className="hover:bg-muted/20">
+                                            <TableCell className="pl-6">
+                                                <div className="font-bold text-sm">{p.name}</div>
+                                                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                                                    <Clock className="h-2 w-2" /> Synced Time logs
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono">₦{p.basePay.toLocaleString()}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Input 
+                                                    type="number" 
+                                                    className="h-8 w-24 ml-auto text-right font-mono" 
+                                                    value={p.jobIncentives} 
+                                                    disabled={currentStep === 'review'}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="text-right text-red-600 font-mono font-bold">
+                                                -₦{p.loanDeduction.toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="text-right text-muted-foreground font-mono">
+                                                -₦{p.statutoryDeductions.toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="text-right pr-6 font-bold font-headline text-lg text-primary">
+                                                ₦{p.netPay.toLocaleString()}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -318,39 +320,52 @@ export default function PayrollPage() {
                             </Table>
                         </div>
                     </CardContent>
+                    <CardFooter className="bg-muted/30 border-t p-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div className="flex gap-8">
+                            <SummaryItem label="Total Gross" value={`₦${totalGross.toLocaleString()}`} />
+                            <SummaryItem label="Total Deductions" value={`₦${totalDeductions.toLocaleString()}`} color="text-red-600" />
+                            <SummaryItem label="Net Disbursement" value={`₦${totalNet.toLocaleString()}`} bold />
+                        </div>
+                        <div className="flex gap-3 w-full md:w-auto">
+                            <Button variant="ghost" onClick={() => setCurrentStep('dashboard')}>Discard</Button>
+                            {currentStep === 'prepare' ? (
+                                <Button onClick={handleSubmitForReview} className="h-12 px-8 rounded-xl shadow-lg">
+                                    Submit for Review <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <Button onClick={handleFinalDisburse} disabled={isLoading} className="h-12 px-8 rounded-xl shadow-lg bg-emerald-600 hover:bg-emerald-700 text-white">
+                                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
+                                    Approve & Disburse July Run
+                                </Button>
+                            )}
+                        </div>
+                    </CardFooter>
                 </Card>
             )}
+        </div>
+    );
+}
 
-            <div className="grid gap-6 md:grid-cols-2">
-                <Card className="bg-primary/5 border-dashed border-2">
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Clock className="h-5 w-5 text-primary" />
-                            <CardTitle className="text-lg">Attendance Link</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="text-sm space-y-4">
-                        <p className="text-muted-foreground">
-                            Payroll data is automatically matched with the workforce tracking module. Any "Late" check-ins or "Short Shifts" are flagged for manual deduction review.
-                        </p>
-                        <Button variant="link" className="p-0 text-primary h-auto text-xs font-bold">View Timesheet Reconciliation →</Button>
-                    </CardContent>
-                </Card>
-                <Card className="flex flex-col justify-center p-6 text-center md:text-left gap-4">
-                    <div className="space-y-1">
-                        <h3 className="font-headline text-xl font-bold">Regulatory Compliance</h3>
-                        <p className="text-sm text-muted-foreground">Automatically calculate and export FRCN-compliant tax schedules for your monthly state revenue filings.</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                        <Button variant="outline" size="sm" className="gap-2 rounded-xl">
-                            <FileDown className="h-4 w-4" /> Download Tax Schedule
-                        </Button>
-                        <Button variant="outline" size="sm" className="gap-2 rounded-xl">
-                            <PlusCircle className="h-4 w-4" /> Setup Benefit Scheme
-                        </Button>
-                    </div>
-                </Card>
-            </div>
+function PayrollStatCard({ title, value, subtext, icon: Icon }: any) {
+    return (
+        <Card className="hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+                <div className="bg-primary/10 p-2 rounded-lg"><Icon className="h-4 w-4 text-primary" /></div>
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold font-headline">{value}</div>
+                <p className="text-[10px] text-muted-foreground mt-1">{subtext}</p>
+            </CardContent>
+        </Card>
+    );
+}
+
+function SummaryItem({ label, value, color, bold }: { label: string, value: string, color?: string, bold?: boolean }) {
+    return (
+        <div>
+            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">{label}</p>
+            <p className={cn("text-lg font-bold font-headline", color, bold && "text-primary")}>{value}</p>
         </div>
     );
 }
