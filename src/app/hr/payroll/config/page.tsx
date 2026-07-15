@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -22,6 +21,7 @@ import {
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { salaryComponents as initialComponents } from "@/lib/data";
+import { cn } from "@/lib/utils";
 
 export default function PayrollConfigPage() {
     const { toast } = useToast();
