@@ -560,7 +560,7 @@ export default function OnboardingPage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Monthly Salary (₦)</Label>
+                                        <Label>Monthly Gross Salary (₦)</Label>
                                         <Input 
                                             type="number" 
                                             placeholder="0" 
