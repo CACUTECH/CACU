@@ -167,7 +167,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ] : []),
     ...(userPermissions.includes('transactions') ? [{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight }] : []),
     ...(userPermissions.includes('invoices') ? [{ href: '/invoices', label: 'Invoices & Receipts', icon: Receipt }] : []),
-    ...(userPermissions.includes('catalog') ? [{ href: '/catalog', label: businessType === 'SERVICE' ? 'Service Menu' : 'Catalog', icon: Package }] : []),
+    ...(userPermissions.includes('catalog') ? [{ href: '/catalog', label: businessType === 'SERVICE' ? 'Service Menu' : 'Inventory', icon: Package }] : []),
     ...(userPermissions.includes('storefront') ? [{ href: '/storefront', label: 'Storefront', icon: Store }] : []),
     ...(userPermissions.includes('accounting') ? [{
       href: '/accounting',

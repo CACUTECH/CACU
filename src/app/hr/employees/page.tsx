@@ -170,7 +170,7 @@ export default function EmployeesPage() {
                                     <Input id="role" placeholder="Sales Lead" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="salary">Base Salary (₦)</Label>
+                                    <Label htmlFor="salary">Gross Salary (₦)</Label>
                                     <Input id="salary" type="number" placeholder="250000" value={formData.baseSalary || ""} onChange={(e) => setFormData({...formData, baseSalary: parseFloat(e.target.value) || 0})} />
                                 </div>
                             </div>
@@ -216,7 +216,7 @@ export default function EmployeesPage() {
                                 <TableRow>
                                     <TableHead className="w-[300px]">Employee</TableHead>
                                     <TableHead className="hidden sm:table-cell">Role</TableHead>
-                                    <TableHead className="hidden md:table-cell">Monthly Base</TableHead>
+                                    <TableHead className="hidden md:table-cell">Monthly Gross</TableHead>
                                     <TableHead className="hidden lg:table-cell text-center">Status</TableHead>
                                     <TableHead className="text-right pr-6">Actions</TableHead>
                                 </TableRow>
@@ -312,7 +312,7 @@ export default function EmployeesPage() {
                                                 <div className="space-y-8">
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div className="p-4 rounded-xl border bg-muted/30">
-                                                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Base Salary</p>
+                                                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Gross Salary</p>
                                                             <p className="text-xl font-bold font-headline">₦{employee.baseSalary.toLocaleString()}</p>
                                                         </div>
                                                         <div className="p-4 rounded-xl border bg-muted/30">
@@ -334,7 +334,7 @@ export default function EmployeesPage() {
                                                             <div className="flex items-center gap-3 text-sm p-3 rounded-lg border bg-card">
                                                                 <Fingerprint className="h-4 w-4 text-primary" />
                                                                 <div className="flex-1">
-                                                                    <p className="font-medium">Pension ID (PEN)</p>
+                                                                    <p className="font-medium">Pension ID (RSA)</p>
                                                                     <p className="text-[10px] text-muted-foreground">{employee.pensionId || "Pending Verification"}</p>
                                                                 </div>
                                                             </div>
@@ -377,7 +377,7 @@ export default function EmployeesPage() {
                             <Input value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} />
                         </div>
                         <div className="space-y-2">
-                            <Label>Monthly Base Salary (₦)</Label>
+                            <Label>Monthly Gross Salary (₦)</Label>
                             <Input type="number" value={formData.baseSalary || ""} onChange={(e) => setFormData({...formData, baseSalary: parseFloat(e.target.value) || 0})} />
                         </div>
                         <div className="space-y-2">
