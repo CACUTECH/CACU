@@ -19,17 +19,27 @@ import {
     Settings,
     Copy,
     Share2,
-    Package
+    Package,
+    MessageCircle,
+    LayoutDashboard,
+    Image as ImageIcon,
+    Truck,
+    CheckCircle2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { catalogItems } from "@/lib/data";
 
 export default function StorefrontPage() {
     const { toast } = useToast();
     const [isLive, setIsLive] = React.useState(true);
+    const [activeTab, setActiveTab] = React.useState("overview");
     const storeUrl = "https://cacu.store/my-business";
 
     const copyUrl = () => {
@@ -44,17 +54,17 @@ export default function StorefrontPage() {
         <div className="flex flex-col gap-8 pb-12">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="font-headline text-3xl font-bold tracking-tight">Digital Storefront</h1>
+                    <h1 className="font-headline text-3xl font-bold tracking-tight">Storefront Management</h1>
                     <p className="text-muted-foreground mt-1">
-                        Manage your online shop and digital presence.
+                        Configure your online presence and direct-to-customer sales channel.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={copyUrl}>
+                    <Button variant="outline" onClick={copyUrl} className="rounded-xl">
                         <Copy className="mr-2 h-4 w-4" />
                         Copy Link
                     </Button>
-                    <Button asChild>
+                    <Button asChild className="rounded-xl shadow-lg shadow-primary/20">
                         <Link href="#" target="_blank">
                             <ExternalLink className="mr-2 h-4 w-4" />
                             View Store
@@ -65,24 +75,12 @@ export default function StorefrontPage() {
 
             {/* Store Status Banner */}
             <Card className={cn(
-                "border-none shadow-md",
+                "border-none shadow-md overflow-hidden relative",
                 isLive ? "bg-emerald-500/10" : "bg-muted"
             )}>
-                <CardContent className="flex items-center justify-between p-6">
-                    <div className="flex items-center gap-4">
-                        <div className={cn(
-                            "p-3 rounded-full",
-                            isLive ? "bg-emerald-500 text-white" : "bg-muted-foreground/20 text-muted-foreground"
-                        )}>
-                            <Store className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <p className="font-bold text-lg">{isLive ? "Your store is currently LIVE" : "Your store is OFFLINE"}</p>
-                            <p className="text-sm text-muted-foreground">Customers can {isLive ? "browse and buy" : "not access"} your catalog at {storeUrl}</p>
-                        </div>
-                    </div>
+                <div className="absolute top-0 right-0 p-4">
                     <div className="flex items-center gap-2">
-                        <Label htmlFor="store-toggle" className="text-sm font-medium">Toggle Status</Label>
+                        <Label htmlFor="store-toggle" className="text-xs font-bold uppercase tracking-widest">Store Status</Label>
                         <Switch 
                             id="store-toggle" 
                             checked={isLive} 
@@ -95,176 +93,259 @@ export default function StorefrontPage() {
                             }} 
                         />
                     </div>
+                </div>
+                <CardContent className="flex items-center gap-4 p-6">
+                    <div className={cn(
+                        "p-4 rounded-2xl",
+                        isLive ? "bg-emerald-500 text-white" : "bg-muted-foreground/20 text-muted-foreground"
+                    )}>
+                        <Store className="h-8 w-8" />
+                    </div>
+                    <div>
+                        <p className="font-bold text-lg">{isLive ? "Your store is currently LIVE" : "Your store is OFFLINE"}</p>
+                        <p className="text-sm text-muted-foreground">URL: <span className="font-mono text-primary underline">{storeUrl}</span></p>
+                    </div>
                 </CardContent>
             </Card>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Store Views</CardTitle>
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">1,284</div>
-                        <p className="text-xs text-green-600 font-medium">+12% from last week</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Online Orders</CardTitle>
-                        <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">42</div>
-                        <p className="text-xs text-green-600 font-medium">₦184,200 total value</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Avg. Order Value</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">₦4,385</div>
-                        <p className="text-xs text-muted-foreground">-2% from last week</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Catalog Items</CardTitle>
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">124</div>
-                        <p className="text-xs text-muted-foreground">85% in stock</p>
-                    </CardContent>
-                </Card>
-            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 h-auto p-1 bg-primary/5 border border-primary/10 shadow-xl shadow-primary/5 rounded-xl mb-8">
+                    <TabsTrigger value="overview" className="py-2.5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white transition-all shadow-sm">
+                        <LayoutDashboard className="w-4 h-4 mr-2" /> Overview
+                    </TabsTrigger>
+                    <TabsTrigger value="setup" className="py-2.5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white transition-all shadow-sm">
+                        <Settings className="w-4 h-4 mr-2" /> Store Setup
+                    </TabsTrigger>
+                    <TabsTrigger value="design" className="py-2.5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white transition-all shadow-sm">
+                        <Palette className="w-4 h-4 mr-2" /> Design
+                    </TabsTrigger>
+                    <TabsTrigger value="products" className="py-2.5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white transition-all shadow-sm">
+                        <Package className="w-4 h-4 mr-2" /> Product Manager
+                    </TabsTrigger>
+                </TabsList>
 
-            <div className="grid gap-6 md:grid-cols-2">
-                {/* Customization & Design */}
-                <Card className="flex flex-col h-full">
-                    <CardHeader>
-                        <div className="bg-primary/10 w-fit p-2 rounded-lg mb-2">
-                            <Palette className="h-5 w-5 text-primary" />
-                        </div>
-                        <CardTitle>Theme & Appearance</CardTitle>
-                        <CardDescription>Customize the look and feel of your online shop to match your brand.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow space-y-4">
-                        <div className="p-4 rounded-xl border border-dashed flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="h-8 w-8 rounded bg-primary" />
-                                <div>
-                                    <p className="text-sm font-bold">Modern Professional</p>
-                                    <p className="text-xs text-muted-foreground">Currently active theme</p>
+                <TabsContent value="overview" className="space-y-6">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        <SummaryCard title="Store Views" value="1,284" subtext="+12% from last week" icon={Eye} />
+                        <SummaryCard title="Online Orders" value="42" subtext="₦184,200 total value" icon={ShoppingCart} />
+                        <SummaryCard title="Avg. Order Value" value="₦4,385" subtext="-2% from last week" icon={TrendingUp} />
+                        <SummaryCard title="Live Items" value="18" subtext="Active on storefront" icon={Package} />
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Setup Checklist</CardTitle>
+                                <CardDescription>Boost your sales by completing your profile.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <ChecklistItem label="Add Business Logo" completed={true} />
+                                <ChecklistItem label="Configure WhatsApp Checkout" completed={true} />
+                                <ChecklistItem label="Set Shipping Rates" completed={false} />
+                                <ChecklistItem label="Link Custom Domain" completed={false} />
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-primary/5 border-dashed border-2 flex flex-col justify-center p-6 text-center">
+                            <h3 className="font-headline text-xl font-bold text-primary">Need more customers?</h3>
+                            <p className="text-sm text-muted-foreground mt-2 mb-6">
+                                Enable SEO optimization and social media pixel tracking to reach thousands of buyers in Nigeria.
+                            </p>
+                            <Button variant="outline" className="w-fit mx-auto border-primary/20 text-primary hover:bg-primary/10">
+                                Configure Growth Tools
+                            </Button>
+                        </Card>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="setup" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Core Information</CardTitle>
+                            <CardDescription>This information is visible to your customers.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Store Display Name</Label>
+                                    <Input placeholder="e.g. CACU Technologies Shop" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Support Email</Label>
+                                    <Input placeholder="sales@yourbusiness.com" />
                                 </div>
                             </div>
-                            <Button variant="ghost" size="sm">Change</Button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium">Brand Color</p>
-                                <div className="flex gap-2">
-                                    <div className="h-6 w-6 rounded-full bg-indigo-600 cursor-pointer border-2 border-white ring-1 ring-black/10" />
-                                    <div className="h-6 w-6 rounded-full bg-emerald-600 cursor-pointer" />
-                                    <div className="h-6 w-6 rounded-full bg-amber-600 cursor-pointer" />
+                            <div className="space-y-2">
+                                <Label>Store Bio / About</Label>
+                                <Textarea placeholder="Tell your customers what you do..." className="min-h-[100px]" />
+                            </div>
+                            
+                            <Separator />
+
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-base font-bold flex items-center gap-2">
+                                            <MessageCircle className="h-5 w-5 text-emerald-500" />
+                                            WhatsApp Business Checkout
+                                        </Label>
+                                        <p className="text-sm text-muted-foreground">Customers can send orders directly to your WhatsApp.</p>
+                                    </div>
+                                    <Switch defaultChecked />
+                                </div>
+                                <div className="grid gap-4 max-w-md">
+                                    <div className="space-y-2">
+                                        <Label>WhatsApp Number</Label>
+                                        <Input placeholder="+234 800 000 0000" />
+                                    </div>
                                 </div>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium">Typography</p>
-                                <Badge variant="outline">Inter & Space Grotesk</Badge>
-                            </div>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="pt-0">
-                        <Button className="w-full" variant="outline">
-                            Customize Theme <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                    </CardFooter>
-                </Card>
+                        </CardContent>
+                        <CardFooter className="border-t bg-muted/20 py-6">
+                            <Button onClick={() => toast({ title: "Configuration Saved" })}>Save Changes</Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
 
-                {/* Domain & SEO */}
-                <Card className="flex flex-col h-full">
-                    <CardHeader>
-                        <div className="bg-primary/10 w-fit p-2 rounded-lg mb-2">
-                            <Globe className="h-5 w-5 text-primary" />
-                        </div>
-                        <CardTitle>Domain & SEO</CardTitle>
-                        <CardDescription>Manage your store address and how you appear in search results.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow space-y-4">
-                        <div className="space-y-2">
-                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Current Domain</p>
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-                                <span className="text-sm font-mono">{storeUrl}</span>
-                                <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/20">SSL Active</Badge>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg border border-primary/10">
-                            <Smartphone className="h-4 w-4 text-primary shrink-0" />
-                            <p className="text-xs text-muted-foreground">Mobile performance is optimized for 2G/3G networks in Nigeria.</p>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="pt-0">
-                        <Button className="w-full" variant="outline">
-                            Link Custom Domain <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                    </CardFooter>
-                </Card>
-            </div>
+                <TabsContent value="design" className="space-y-6">
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Branding & Colors</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div className="space-y-2">
+                                    <Label>Brand Identity (Logo)</Label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-16 w-16 rounded-xl border-2 border-dashed bg-muted flex items-center justify-center">
+                                            <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                                        </div>
+                                        <Button variant="outline" size="sm">Upload Logo</Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Primary Color</Label>
+                                    <div className="flex gap-3">
+                                        <div className="h-8 w-8 rounded-full bg-indigo-600 ring-2 ring-primary ring-offset-2 cursor-pointer" />
+                                        <div className="h-8 w-8 rounded-full bg-emerald-600 cursor-pointer" />
+                                        <div className="h-8 w-8 rounded-full bg-amber-600 cursor-pointer" />
+                                        <div className="h-8 w-8 rounded-full bg-red-600 cursor-pointer" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Hero Section</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>Hero Headline</Label>
+                                    <Input placeholder="Welcome to our official store" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Call to Action Button</Label>
+                                    <Input placeholder="Shop Now" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
 
-            {/* Quick Setup Checklist */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="font-headline">Setup Checklist</CardTitle>
-                    <CardDescription>Complete these steps to optimize your storefront for more sales.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
-                            <CircleCheck className="h-5 w-5 text-emerald-500 mt-0.5" />
+                <TabsContent value="products" className="space-y-6">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
                             <div>
-                                <p className="text-sm font-bold">Add at least 5 products</p>
-                                <p className="text-xs text-muted-foreground">Help customers find what they need with a good variety.</p>
+                                <CardTitle>Product Visibility</CardTitle>
+                                <CardDescription>Toggle which inventory items are visible to customers online.</CardDescription>
                             </div>
-                        </div>
-                        <div className="flex items-start gap-3 p-3 rounded-lg border">
-                            <div className="h-5 w-5 rounded-full border-2 border-primary/20 mt-0.5" />
-                            <div className="flex-grow">
-                                <p className="text-sm font-bold">Set up WhatsApp Checkout</p>
-                                <p className="text-xs text-muted-foreground">Allow customers to send their cart directly to your WhatsApp Business.</p>
+                            <Button asChild variant="outline" size="sm">
+                                <Link href="/catalog">Manage Inventory</Link>
+                            </Button>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y">
+                                {catalogItems.filter(i => i.type === 'Product').map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between p-4 px-6 hover:bg-muted/10 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center">
+                                                <Package className="h-5 w-5 text-primary" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-sm">{item.name}</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">SKU: {item.sku}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-6">
+                                            <div className="text-right">
+                                                <p className="text-sm font-bold">₦{item.price.toLocaleString()}</p>
+                                                <Badge variant="outline" className="text-[9px]">{item.status}</Badge>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Visible</Label>
+                                                <Switch defaultChecked />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                            <Button size="sm" variant="ghost">Setup</Button>
-                        </div>
-                        <div className="flex items-start gap-3 p-3 rounded-lg border">
-                            <div className="h-5 w-5 rounded-full border-2 border-primary/20 mt-0.5" />
-                            <div className="flex-grow">
-                                <p className="text-sm font-bold">Configure Shipping Rates</p>
-                                <p className="text-xs text-muted-foreground">Add delivery zones for major cities like Lagos, Abuja, and Port Harcourt.</p>
-                            </div>
-                            <Button size="sm" variant="ghost">Manage</Button>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
 
-            <Card className="bg-primary border-none shadow-xl shadow-primary/20">
-                <CardContent className="p-8 text-primary-foreground text-center">
-                    <h3 className="font-headline text-2xl font-bold mb-2">Promote Your Shop</h3>
-                    <p className="text-primary-foreground/80 mb-6 max-w-lg mx-auto">
-                        Share your storefront on social media to start accepting orders directly. No commission fees on CACU storefronts.
+            <Card className="bg-primary text-primary-foreground border-none shadow-2xl shadow-primary/20">
+                <CardContent className="p-8 text-center flex flex-col items-center gap-4">
+                    <div className="bg-white/20 p-3 rounded-full">
+                        <Share2 className="h-6 w-6" />
+                    </div>
+                    <h3 className="font-headline text-2xl font-bold">Promote Your Digital Shop</h3>
+                    <p className="text-white/80 max-w-lg">
+                        You can now share your store directly on social media. Orders will populate in your "Invoices" and "Transactions" sections automatically.
                     </p>
-                    <div className="flex flex-wrap justify-center gap-4">
-                        <Button variant="secondary" className="bg-white text-primary hover:bg-white/90">
-                            <Share2 className="mr-2 h-4 w-4" /> Share to Instagram
+                    <div className="flex flex-wrap justify-center gap-3">
+                        <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-6">
+                            Share to Instagram
                         </Button>
-                        <Button variant="secondary" className="bg-white text-primary hover:bg-white/90">
-                            <Share2 className="mr-2 h-4 w-4" /> Share to WhatsApp
+                        <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-6">
+                            Share to WhatsApp
                         </Button>
                     </div>
                 </CardContent>
             </Card>
+        </div>
+    );
+}
+
+function SummaryCard({ title, value, subtext, icon: Icon }: { title: string, value: string, subtext: string, icon: any }) {
+    return (
+        <Card className="hover:shadow-md transition-shadow border-primary/5">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+                <div className="bg-primary/10 p-2 rounded-lg">
+                    <Icon className="h-4 w-4 text-primary" />
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold font-headline">{value}</div>
+                <p className={cn(
+                    "text-[10px] font-medium mt-1",
+                    subtext.startsWith('+') ? "text-emerald-600" : "text-muted-foreground"
+                )}>{subtext}</p>
+            </CardContent>
+        </Card>
+    );
+}
+
+function ChecklistItem({ label, completed }: { label: string, completed: boolean }) {
+    return (
+        <div className="flex items-center gap-3 p-3 rounded-xl border bg-muted/10">
+            {completed ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+            ) : (
+                <div className="h-5 w-5 rounded-full border-2 border-primary/20 shrink-0" />
+            )}
+            <span className={cn("text-sm font-medium", completed && "text-muted-foreground line-through")}>{label}</span>
+            {!completed && <Button variant="ghost" size="sm" className="ml-auto text-[10px] font-bold text-primary uppercase tracking-widest">Setup</Button>}
         </div>
     );
 }
