@@ -137,7 +137,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const savedType = localStorage.getItem('business-type') as BusinessType;
     
     setUserPermissions([
-        'pos', 'appointments', 'jobs', 'transactions', 'invoices', 'catalog', 'accounting', 
+        'pos', 'appointments', 'jobs', 'transactions', 'invoices', 'catalog', 'storefront', 'accounting', 
         'accounting:chart-of-accounts', 'accounting:journal-entries', 'accounting:trial-balance',
         'reports', 'customers', 'analytics', 'analytics:kpi', 'analytics:planning', 
         'analytics:budget-vs-actual', 'analytics:reconciliation', 'analytics:top-selling', 'analytics:aging-reports',
