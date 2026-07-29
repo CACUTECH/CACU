@@ -23,7 +23,8 @@ import {
     LayoutDashboard,
     Image as ImageIcon,
     Truck,
-    CheckCircle2
+    CheckCircle2,
+    Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -33,20 +34,73 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { catalogItems } from "@/lib/data";
+import { catalogItems as initialCatalog } from "@/lib/data";
 import { Separator } from "@/components/ui/separator";
 
 export default function StorefrontPage() {
     const { toast } = useToast();
     const [isLive, setIsLive] = React.useState(true);
     const [activeTab, setActiveTab] = React.useState("overview");
+    const [isSaving, setIsSaving] = React.useState(false);
     const storeUrl = "https://cacu.store/my-business";
+
+    // Form States
+    const [storeInfo, setStoreInfo] = React.useState({
+        name: "CACU Technologies Shop",
+        email: "sales@yourbusiness.com",
+        bio: "Providing high-quality goods and professional services to Lagos and beyond.",
+        whatsapp: "+234 800 000 0000",
+        whatsappEnabled: true
+    });
+
+    const [design, setDesign] = React.useState({
+        primaryColor: "indigo",
+        heroHeadline: "Welcome to our official store",
+        ctaText: "Shop Now"
+    });
+
+    const [visibleProducts, setVisibleProducts] = React.useState<Record<string, boolean>>(
+        initialCatalog.reduce((acc, item) => ({ ...acc, [item.id]: true }), {})
+    );
 
     const copyUrl = () => {
         navigator.clipboard.writeText(storeUrl);
         toast({
             title: "URL Copied",
             description: "Storefront link copied to clipboard.",
+        });
+    };
+
+    const handleSaveSetup = () => {
+        setIsSaving(true);
+        setTimeout(() => {
+            setIsSaving(false);
+            toast({
+                title: "Storefront Updated",
+                description: "Your core information and checkout settings have been saved.",
+            });
+        }, 800);
+    };
+
+    const toggleProductVisibility = (id: string) => {
+        setVisibleProducts(prev => ({ ...prev, [id]: !prev[id] }));
+        toast({
+            title: visibleProducts[id] ? "Hidden from Store" : "Visible in Store",
+            description: `Product visibility status updated.`,
+        });
+    };
+
+    const handleShare = (platform: string) => {
+        toast({
+            title: `Sharing to ${platform}`,
+            description: "Generating your store preview link...",
+        });
+    };
+
+    const handleGrowthTools = () => {
+        toast({
+            title: "Growth Tools Module",
+            description: "Opening SEO and Pixel configuration suite...",
         });
     };
 
@@ -129,7 +183,7 @@ export default function StorefrontPage() {
                         <SummaryCard title="Store Views" value="1,284" subtext="+12% from last week" icon={Eye} />
                         <SummaryCard title="Online Orders" value="42" subtext="₦184,200 total value" icon={ShoppingCart} />
                         <SummaryCard title="Avg. Order Value" value="₦4,385" subtext="-2% from last week" icon={TrendingUp} />
-                        <SummaryCard title="Live Items" value="18" subtext="Active on storefront" icon={Package} />
+                        <SummaryCard title="Live Items" value={Object.values(visibleProducts).filter(v => v).length.toString()} subtext="Active on storefront" icon={Package} />
                     </div>
 
                     <div className="grid gap-6 md:grid-cols-2">
@@ -139,10 +193,10 @@ export default function StorefrontPage() {
                                 <CardDescription>Boost your sales by completing your profile.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <ChecklistItem label="Add Business Logo" completed={true} />
-                                <ChecklistItem label="Configure WhatsApp Checkout" completed={true} />
-                                <ChecklistItem label="Set Shipping Rates" completed={false} />
-                                <ChecklistItem label="Link Custom Domain" completed={false} />
+                                <ChecklistItem label="Add Business Logo" completed={true} onAction={() => setActiveTab("design")} />
+                                <ChecklistItem label="Configure WhatsApp Checkout" completed={true} onAction={() => setActiveTab("setup")} />
+                                <ChecklistItem label="Set Shipping Rates" completed={false} onAction={() => toast({ title: "Module Locked", description: "Shipping module setup coming in next update." })} />
+                                <ChecklistItem label="Link Custom Domain" completed={false} onAction={() => toast({ title: "Custom Domain", description: "Contact support to link a custom .com or .ng domain." })} />
                             </CardContent>
                         </Card>
                         <Card className="bg-primary/5 border-dashed border-2 flex flex-col justify-center p-6 text-center">
@@ -150,7 +204,7 @@ export default function StorefrontPage() {
                             <p className="text-sm text-muted-foreground mt-2 mb-6">
                                 Enable SEO optimization and social media pixel tracking to reach thousands of buyers in Nigeria.
                             </p>
-                            <Button variant="outline" className="w-fit mx-auto border-primary/20 text-primary hover:bg-primary/10">
+                            <Button variant="outline" className="w-fit mx-auto border-primary/20 text-primary hover:bg-primary/10" onClick={handleGrowthTools}>
                                 Configure Growth Tools
                             </Button>
                         </Card>
@@ -167,16 +221,29 @@ export default function StorefrontPage() {
                             <div className="grid gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label>Store Display Name</Label>
-                                    <Input placeholder="e.g. CACU Technologies Shop" />
+                                    <Input 
+                                        value={storeInfo.name} 
+                                        onChange={(e) => setStoreInfo({ ...storeInfo, name: e.target.value })} 
+                                        placeholder="e.g. CACU Technologies Shop" 
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Support Email</Label>
-                                    <Input placeholder="sales@yourbusiness.com" />
+                                    <Input 
+                                        value={storeInfo.email} 
+                                        onChange={(e) => setStoreInfo({ ...storeInfo, email: e.target.value })} 
+                                        placeholder="sales@yourbusiness.com" 
+                                    />
                                 </div>
                             </div>
                             <div className="space-y-2">
                                 <Label>Store Bio / About</Label>
-                                <Textarea placeholder="Tell your customers what you do..." className="min-h-[100px]" />
+                                <Textarea 
+                                    value={storeInfo.bio} 
+                                    onChange={(e) => setStoreInfo({ ...storeInfo, bio: e.target.value })} 
+                                    placeholder="Tell your customers what you do..." 
+                                    className="min-h-[100px]" 
+                                />
                             </div>
                             
                             <Separator />
@@ -190,18 +257,29 @@ export default function StorefrontPage() {
                                         </Label>
                                         <p className="text-sm text-muted-foreground">Customers can send orders directly to your WhatsApp.</p>
                                     </div>
-                                    <Switch defaultChecked />
+                                    <Switch 
+                                        checked={storeInfo.whatsappEnabled} 
+                                        onCheckedChange={(val) => setStoreInfo({ ...storeInfo, whatsappEnabled: val })} 
+                                    />
                                 </div>
                                 <div className="grid gap-4 max-w-md">
                                     <div className="space-y-2">
                                         <Label>WhatsApp Number</Label>
-                                        <Input placeholder="+234 800 000 0000" />
+                                        <Input 
+                                            value={storeInfo.whatsapp} 
+                                            onChange={(e) => setStoreInfo({ ...storeInfo, whatsapp: e.target.value })} 
+                                            placeholder="+234 800 000 0000" 
+                                            disabled={!storeInfo.whatsappEnabled}
+                                        />
                                     </div>
                                 </div>
                             </div>
                         </CardContent>
                         <CardFooter className="border-t bg-muted/20 py-6">
-                            <Button onClick={() => toast({ title: "Configuration Saved" })}>Save Changes</Button>
+                            <Button onClick={handleSaveSetup} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Save Changes
+                            </Button>
                         </CardFooter>
                     </Card>
                 </TabsContent>
@@ -219,16 +297,28 @@ export default function StorefrontPage() {
                                         <div className="h-16 w-16 rounded-xl border-2 border-dashed bg-muted flex items-center justify-center">
                                             <ImageIcon className="h-6 w-6 text-muted-foreground" />
                                         </div>
-                                        <Button variant="outline" size="sm">Upload Logo</Button>
+                                        <Button variant="outline" size="sm" onClick={() => toast({ title: "Upload Triggered", description: "Choose a file from your device." })}>Upload Logo</Button>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Primary Color</Label>
+                                    <Label>Primary Color Theme</Label>
                                     <div className="flex gap-3">
-                                        <div className="h-8 w-8 rounded-full bg-indigo-600 ring-2 ring-primary ring-offset-2 cursor-pointer" />
-                                        <div className="h-8 w-8 rounded-full bg-emerald-600 cursor-pointer" />
-                                        <div className="h-8 w-8 rounded-full bg-amber-600 cursor-pointer" />
-                                        <div className="h-8 w-8 rounded-full bg-red-600 cursor-pointer" />
+                                        {[
+                                            { name: "indigo", bg: "bg-indigo-600" },
+                                            { name: "emerald", bg: "bg-emerald-600" },
+                                            { name: "amber", bg: "bg-amber-600" },
+                                            { name: "rose", bg: "bg-rose-600" }
+                                        ].map((c) => (
+                                            <button
+                                                key={c.name}
+                                                onClick={() => setDesign({ ...design, primaryColor: c.name })}
+                                                className={cn(
+                                                    "h-10 w-10 rounded-full transition-all ring-offset-2",
+                                                    c.bg,
+                                                    design.primaryColor === c.name ? "ring-2 ring-primary scale-110" : "hover:scale-105 opacity-80"
+                                                )}
+                                            />
+                                        ))}
                                     </div>
                                 </div>
                             </CardContent>
@@ -240,12 +330,21 @@ export default function StorefrontPage() {
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
                                     <Label>Hero Headline</Label>
-                                    <Input placeholder="Welcome to our official store" />
+                                    <Input 
+                                        value={design.heroHeadline} 
+                                        onChange={(e) => setDesign({ ...design, heroHeadline: e.target.value })} 
+                                        placeholder="Welcome to our official store" 
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Call to Action Button</Label>
-                                    <Input placeholder="Shop Now" />
+                                    <Input 
+                                        value={design.ctaText} 
+                                        onChange={(e) => setDesign({ ...design, ctaText: e.target.value })} 
+                                        placeholder="Shop Now" 
+                                    />
                                 </div>
+                                <Button className="w-full mt-4" onClick={() => toast({ title: "Design Saved" })}>Update Store Appearance</Button>
                             </CardContent>
                         </Card>
                     </div>
@@ -264,7 +363,7 @@ export default function StorefrontPage() {
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="divide-y">
-                                {catalogItems.filter(i => i.type === 'Product').map((item) => (
+                                {initialCatalog.filter(i => i.type === 'Product').map((item) => (
                                     <div key={item.id} className="flex items-center justify-between p-4 px-6 hover:bg-muted/10 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center">
@@ -282,7 +381,10 @@ export default function StorefrontPage() {
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Label className="text-[10px] uppercase font-bold text-muted-foreground">Visible</Label>
-                                                <Switch defaultChecked />
+                                                <Switch 
+                                                    checked={!!visibleProducts[item.id]} 
+                                                    onCheckedChange={() => toggleProductVisibility(item.id)}
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -303,10 +405,10 @@ export default function StorefrontPage() {
                         You can now share your store directly on social media. Orders will populate in your "Invoices" and "Transactions" sections automatically.
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
-                        <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-6">
+                        <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-6" onClick={() => handleShare("Instagram")}>
                             Share to Instagram
                         </Button>
-                        <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-6">
+                        <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-6" onClick={() => handleShare("WhatsApp")}>
                             Share to WhatsApp
                         </Button>
                     </div>
@@ -336,7 +438,7 @@ function SummaryCard({ title, value, subtext, icon: Icon }: { title: string, val
     );
 }
 
-function ChecklistItem({ label, completed }: { label: string, completed: boolean }) {
+function ChecklistItem({ label, completed, onAction }: { label: string, completed: boolean, onAction: () => void }) {
     return (
         <div className="flex items-center gap-3 p-3 rounded-xl border bg-muted/10">
             {completed ? (
@@ -345,7 +447,9 @@ function ChecklistItem({ label, completed }: { label: string, completed: boolean
                 <div className="h-5 w-5 rounded-full border-2 border-primary/20 shrink-0" />
             )}
             <span className={cn("text-sm font-medium", completed && "text-muted-foreground line-through")}>{label}</span>
-            {!completed && <Button variant="ghost" size="sm" className="ml-auto text-[10px] font-bold text-primary uppercase tracking-widest">Setup</Button>}
+            <Button variant="ghost" size="sm" className="ml-auto text-[10px] font-bold text-primary uppercase tracking-widest" onClick={onAction}>
+                {completed ? "Edit" : "Setup"}
+            </Button>
         </div>
     );
 }
