@@ -7,11 +7,16 @@ CACU Technologies Limited provides a unified ERP solution designed to empower Ni
 ## 🚀 Core Features
 
 - **Adaptive Business Intelligence**: The UI reconfigures itself based on your business type (Retail, Consulting, or Hybrid).
-- **Unified Catalog**: Manage goods with inventory tracking alongside billable services with duration and staff assignments.
+- **AI-Powered HR Suite**:
+    - **Smart Onboarding**: Automated new hire integration with AI-generated offer letters and contracts.
+    - **Exit & Termination**: Professional offboarding with AI-drafted resignation acceptances and service certificates.
+    - **Payroll Engine**: Automated gross-to-net processing with built-in validation and variance analysis.
+- **Digital Storefront**: Integrated online presence with **WhatsApp Business Checkout** to reach customers directly.
+- **Unified Inventory**: Manage physical goods alongside billable services with duration and staff assignments.
 - **Job & Work Order Module**: Professional service delivery workflows from quotation to completion.
 - **Financial Integrity**: Full double-entry bookkeeping with automated Chart of Accounts, Journal Entries, and Trial Balance.
-- **AI Business Consultant**: Context-aware insights powered by Gemini 2.0 to help optimize cash flow and growth.
-- **Digital Storefront**: Integrated online presence to reach customers directly.
+- **AI Business Consultant**: Context-aware insights powered by Gemini 2.0 via Google Genkit.
+- **Community Hub**: Connect with fellow entrepreneurs and get real-time alerts on SME grants and funding.
 
 ---
 
@@ -20,9 +25,9 @@ CACU Technologies Limited provides a unified ERP solution designed to empower Ni
 - **Framework**: [Next.js 15 (App Router)](https://nextjs.org/)
 - **UI Components**: [Shadcn UI](https://ui.shadcn.com/) / [Radix UI](https://www.radix-ui.com/)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **AI Engine**: [Genkit](https://firebase.google.com/docs/genkit) with Gemini 2.0
-- **State Management**: React Hooks & Context API
+- **AI Engine**: [Google Genkit](https://firebase.google.com/docs/genkit) with Gemini 2.0 Flash
 - **Data Export**: jsPDF (PDF) & XLSX (Excel)
+- **State Management**: React Hooks & Context API
 
 ---
 
@@ -71,9 +76,9 @@ As your user base grows, migrate to a more robust infrastructure:
 
 ## 📂 Project Structure
 
-- `src/app/`: App Router pages and layouts.
-- `src/components/`: Reusable UI components (Shadcn).
-- `src/ai/`: Genkit flows and prompts for business insights.
+- `src/app/`: Next.js App Router pages and layouts.
+- `src/components/`: Reusable UI components (Shadcn/Custom).
+- `src/ai/`: Genkit flows and prompts for business and HR automation.
 - `src/lib/`: Shared data models, types, and utility functions.
 - `docs/`: Technical specifications and database IR files.
 
