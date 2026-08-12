@@ -20,6 +20,13 @@ CACU Technologies Limited provides a unified ERP solution designed to empower Ni
 
 ---
 
+## 🛠 Developer Resources
+
+If you are looking to port this application to a mobile platform or recreate the logic in a new environment, please refer to our master blueprint:
+- [**Master Developer Prompt**](./docs/MASTER_DEVELOPER_PROMPT.md) - A comprehensive guide for AI-driven development.
+
+---
+
 ## 🛠 Tech Stack
 
 - **Framework**: [Next.js 15 (App Router)](https://nextjs.org/)
@@ -71,16 +78,6 @@ As your user base grows, migrate to a more robust infrastructure:
     ```
 4.  **Initial Setup**:
     Navigate to `/setup` to run the Business Configuration Wizard and choose your operating mode.
-
----
-
-## 📂 Project Structure
-
-- `src/app/`: Next.js App Router pages and layouts.
-- `src/components/`: Reusable UI components (Shadcn/Custom).
-- `src/ai/`: Genkit flows and prompts for business and HR automation.
-- `src/lib/`: Shared data models, types, and utility functions.
-- `docs/`: Technical specifications and database IR files.
 
 ---
 
