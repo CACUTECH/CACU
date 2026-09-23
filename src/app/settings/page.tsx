@@ -1,6 +1,7 @@
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Briefcase, Users, Globe, Power, Banknote, FileText, Truck, Heart, ArrowRight, Palette, Bell, BookText } from 'lucide-react';
+import { User, Briefcase, Users, Globe, Power, Banknote, FileText, Truck, Heart, ArrowRight, Palette, Bell, BookText, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 
 function SettingCard({ icon: Icon, title, description, href }: { icon: React.ElementType, title: string, description: string, href: string }) {
@@ -40,6 +41,7 @@ export default function SettingsPage() {
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 <SettingCard icon={User} title="Profile" description="Update your personal account information and preferences." href="/settings/profile" />
                 <SettingCard icon={Briefcase} title="Business" description="Configure your core business details, products, and services." href="/settings/business" />
+                <SettingCard icon={CreditCard} title="Subscription & Billing" description="Manage your plan, invoices, and payment settlement accounts." href="/settings/billing" />
                 <SettingCard icon={BookText} title="Chart of Accounts" description="Manage your structured ledger, account types, and codes." href="/accounting/chart-of-accounts" />
                 <SettingCard icon={Users} title="User Management" description="Invite and manage team members and their permissions." href="/settings/users" />
                 <SettingCard icon={Globe} title="Language & Currency" description="Set your preferred language and default currency for reports." href="/settings/locale" />

@@ -1,0 +1,59 @@
+
+{
+  "entities": {
+    "BusinessProfile": {
+      "title": "Business Profile",
+      "description": "The primary configuration for a business account.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "sector": { "type": "string" },
+        "address": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "subscriptionLevel": { "type": "string", "enum": ["Starter", "Growth", "Enterprise"] },
+        "ownerUid": { "type": "string" }
+      },
+      "required": ["name", "subscriptionLevel", "ownerUid"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Details for a team member within a business.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["Owner", "Admin", "Editor", "Viewer"] },
+        "businessId": { "type": "string" }
+      },
+      "required": ["email", "role", "businessId"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Product or service in the business catalog.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "number" },
+        "type": { "type": "string", "enum": ["Product", "Service"] }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["password", "google"]
+  },
+  "firestore": {
+    "/businesses/{businessId}": {
+      "schema": "BusinessProfile",
+      "description": "Root configuration for a tenant."
+    },
+    "/businesses/{businessId}/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Team members with access to this business."
+    },
+    "/businesses/{businessId}/catalog/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "The shared catalog of products and services."
+    }
+  }
+}

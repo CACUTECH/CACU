@@ -1,8 +1,10 @@
+
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import AppLayout from '@/components/app-layout';
 import { ThemeProvider } from '@/components/theme-provider';
+import { SubscriptionProvider } from '@/components/subscription-guard';
 
 export const metadata: Metadata = {
   title: 'CACU',
@@ -23,10 +25,12 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
         <ThemeProvider>
-          <AppLayout>
-            {children}
-          </AppLayout>
-          <Toaster />
+          <SubscriptionProvider>
+            <AppLayout>
+              {children}
+            </AppLayout>
+            <Toaster />
+          </SubscriptionProvider>
         </ThemeProvider>
       </body>
     </html>
