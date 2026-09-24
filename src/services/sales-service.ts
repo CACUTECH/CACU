@@ -15,7 +15,7 @@ export class SalesService extends BaseService {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
 
-    // Execute atomic RPC
+    // Execute atomic RPC to handle Sale + Ledger + Inventory in one transaction
     const { data, error } = await supabase.rpc('process_sale', {
       p_business_id: businessId,
       p_customer_id: input.customerId || null,

@@ -77,6 +77,7 @@ type CatalogItem = {
 type LineItem = {
     id: string;
     item: string;
+    catalog_item_id?: string; // Important for inventory tracking
     quantity: number;
     price: number;
     total: number;
@@ -164,8 +165,10 @@ export default function InvoicesPage() {
             method: 'Cash'
         });
         if (res.success) {
-            toast({ title: "Payment Recorded" });
+            toast({ title: "Payment Recorded", description: "Invoiced settled and ledger updated." });
             fetchData();
+        } else {
+            toast({ variant: "destructive", title: "Payment Failed", description: res.error });
         }
     } else if (action === 'convert') {
         const res = await updateInvoiceStatusAction(inv.id, 'Accepted');
@@ -399,7 +402,7 @@ function CreateDocumentDialog({
                                         <TableCell>
                                             <Select onValueChange={(val) => {
                                                 const item = catalogItems.find(i => i.id === val);
-                                                if(item) setLineItems(lineItems.map(l => l.id === line.id ? { ...l, item: item.name, price: item.price, total: l.quantity * item.price } : l));
+                                                if(item) setLineItems(lineItems.map(l => l.id === line.id ? { ...l, item: item.name, catalog_item_id: item.id, price: item.price, total: l.quantity * item.price } : l));
                                             }}>
                                                 <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
                                                 <SelectContent>{catalogItems.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}</SelectContent>
