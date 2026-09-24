@@ -1,23 +1,25 @@
-
 # CACU Production Deployment Checklist
 
 ### 1. Database & Security
-- [ ] **Firestore Rules**: Deploy rules from `docs/backend.json` structure to restrict access to `request.auth.uid`.
-- [ ] **Encryption**: Ensure all business-sensitive data (Bank details, Salaries) are accessed only via HTTPS.
-- [ ] **Backups**: Enable Google Cloud Firestore PITR (Point-in-Time Recovery).
+- [x] **Supabase RLS**: All tables have `tenant_isolation` policies enabled.
+- [x] **Hardened RPCs**: Financial functions verify membership internally.
+- [x] **Audit Logging**: `record_audit` is active for manual ledger entries.
+- [x] **Encryption**: All connections forced to HTTPS.
 
-### 2. Authentication
-- [ ] **Email Verification**: Force email verification before allowing dashboard access.
-- [ ] **RBAC**: Map Firebase custom claims to application roles (Owner, Admin, Staff).
+### 2. Infrastructure (Vercel)
+- [x] **CI/CD**: GitHub Actions blocking PRs on test failure.
+- [x] **Security Headers**: HSTS, CSP, and XFO configured in `vercel.json`.
+- [x] **Secrets**: Env variables separated between Preview and Production.
 
-### 3. Payment Integration (Nigeria)
-- [ ] **Paystack/Flutterwave**: Configure live API keys for `Standard` and `Enterprise` plan billing.
-- [ ] **Webhook Handling**: Setup a Next.js API route to process `charge.success` events to update subscription status.
+### 3. Application Health
+- [x] **Observability**: `StructuredLogger` active in production environment.
+- [x] **Error Handling**: Global `ErrorBoundary` configured with log ingestion.
+- [x] **Performance**: B-Tree and GIN indexes applied to high-traffic columns.
 
-### 4. AI (Genkit)
-- [ ] **Environment Variables**: Move `GEMINI_API_KEY` to production secret management.
-- [ ] **Quota Management**: Monitor API usage to avoid disruptions for Enterprise users.
+### 4. Compliance (Nigeria)
+- [x] **FIRS/LIRS**: PAYE tax tables verified for 2024 standards.
+- [x] **Data Privacy**: Redaction policy active for PII in logs.
 
-### 5. Compliance
-- [ ] **FIRS/LIRS**: Verify that the PAYE tax table reflects current 2024 consolidated relief allowances.
-- [ ] **CAC**: Ensure the business registration guide links to the latest official portals.
+### 5. AI (Genkit)
+- [x] **Quota**: Monitoring API usage for Enterprise-tier document generation.
+- [x] **Prompt Safety**: Handlebars templates sanitized for injection prevention.
