@@ -1,0 +1,46 @@
+import { SalesService } from '@/services/sales-service';
+import { createClient } from '@/lib/supabase/server';
+
+describe('Financial Integrity Tests', () => {
+  let service: SalesService;
+
+  beforeEach(() => {
+    service = new SalesService();
+  });
+
+  it('should use atomic process_sale RPC for checkouts', async () => {
+    const mockSupabase = await (createClient as jest.Mock)();
+    (service as any).getContext = jest.fn().mockResolvedValue({
+        supabase: mockSupabase,
+        businessId: 'biz-123'
+    });
+
+    await service.processCheckout({
+        items: [{ id: '1', name: 'Item', quantity: 1, price: 10 }],
+        paymentMethod: 'Cash',
+        totalAmount: 10
+    });
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('process_sale', expect.any(Object));
+  });
+
+  it('should trigger low stock notifications after valid checkout', async () => {
+    const mockSupabase = await (createClient as jest.Mock)();
+    (service as any).getContext = jest.fn().mockResolvedValue({
+        supabase: mockSupabase,
+        businessId: 'biz-123'
+    });
+
+    // Mock stock level falling below threshold
+    mockSupabase.from().single.mockResolvedValueOnce({
+        data: { name: 'Running Low', quantity: 2, reorder_level: 5 },
+        error: null
+    });
+
+    // Note: private method testing requires casting or public trigger
+    await (service as any).checkInventoryThresholds([{ id: '1' }]);
+    
+    // Verify notification insert was attempted
+    expect(mockSupabase.from).toHaveBeenCalledWith('notifications');
+  });
+});
