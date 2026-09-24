@@ -1,7 +1,14 @@
 
 import { BaseService } from './base-service';
 
+/**
+ * @fileOverview LedgerService manages high-integrity financial records.
+ * Provides the system of record for Profit & Loss reporting.
+ */
 export class LedgerService extends BaseService {
+  /**
+   * Retrieves transaction history for the active tenant.
+   */
   async getRecentTransactions() {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) return [];
@@ -16,9 +23,21 @@ export class LedgerService extends BaseService {
     return data;
   }
 
-  async recordEntry(entry: any) {
+  /**
+   * Records a manual ledger entry with audit logging.
+   */
+  async recordEntry(entry: {
+      description: string;
+      amount: number;
+      type: 'Income' | 'Expense';
+      category: string;
+      date?: string;
+  }) {
     const { supabase, businessId, user } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
+
+    // Server-side validation of financial values
+    if (entry.amount === 0) throw new Error('Transaction amount cannot be zero');
 
     const data = {
       ...entry,
@@ -34,6 +53,16 @@ export class LedgerService extends BaseService {
       .single();
 
     if (error) throw error;
+
+    // Manual audit log for traceable manual adjustments
+    await supabase.rpc('record_audit', {
+        p_business_id: businessId,
+        p_action: 'MANUAL_JOURNAL_ENTRY',
+        p_table: 'financial_transactions',
+        p_record_id: result.id,
+        p_details: jsonb_build_object('amount', entry.amount, 'type', entry.type)
+    }).catch(e => console.warn('Audit logging failed, but transaction committed.'));
+
     return result;
   }
 }
