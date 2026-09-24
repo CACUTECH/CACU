@@ -6,14 +6,13 @@ CACU Technologies Limited provides a unified ERP solution designed to empower Ni
 
 ## 🚀 Production-Ready Architecture
 
-The platform has been engineered for extreme scalability and security, capable of supporting **1 million+ consumer users** with a multi-tenant cloud backend.
+The platform has been re-engineered for extreme scalability and security, utilizing a relational backend capable of supporting **1 million+ consumer users** with strict multi-tenant isolation.
 
-### 🛡️ Security & Scalability Features (P0 Remittance)
-- **Multi-Tenant Isolation**: Every business is strictly isolated at the database level. Security rules ensure that users can never access data from another organization.
-- **High-Performance Authorization**: Uses **Firebase Custom Claims** for role-based access control (RBAC), eliminating expensive database lookups and ensuring O(1) latency.
-- **Abuse Protection**: Integrated with **Firebase App Check** (reCAPTCHA Enterprise) to block unauthorized bot traffic and prevent "Denial of Wallet" attacks.
-- **Identity Integrity**: Mandatory **Email Verification** and strict session management via Firebase Authentication.
-- **Atomic Provisioning**: Business setup logic is handled via **Server Actions** and **Firestore Batch Writes** to ensure data consistency.
+### 🛡️ Security & Scalability Features
+- **Multi-Tenant Isolation**: Every business is strictly isolated at the database level using **PostgreSQL Row Level Security (RLS)**. Data access is governed by authenticated business membership, ensuring zero cross-tenant leakage.
+- **High-Performance Authorization**: Utilizes JWT-based session management with Supabase Auth, providing O(1) latency for authorization checks.
+- **Relational Integrity**: Built on **PostgreSQL**, ensuring transactional consistency for all financial records, inventory movements, and payroll executions.
+- **Atomic Provisioning**: Business setup and onboarding are handled via **Next.js Server Actions** and **SQL Transactions** to guarantee data consistency during tenant initialization.
 
 ---
 
@@ -34,7 +33,7 @@ The platform has been engineered for extreme scalability and security, capable o
 ## 🛠 Tech Stack
 
 - **Framework**: [Next.js 15 (App Router)](https://nextjs.org/)
-- **Backend**: [Firebase](https://firebase.google.com/) (Auth, Firestore, App Check)
+- **Backend**: [Supabase](https://supabase.com/) (Auth, PostgreSQL, RLS, Storage)
 - **UI Components**: [Shadcn UI](https://ui.shadcn.com/) / [Radix UI](https://www.radix-ui.com/)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **AI Engine**: [Google Genkit](https://firebase.google.com/docs/genkit) with Gemini 2.0 Flash
@@ -44,24 +43,23 @@ The platform has been engineered for extreme scalability and security, capable o
 
 ## 📦 Deployment & Environment
 
-### Security Audits
-For a deep dive into the security posture and remediation roadmap for high-scale deployment, refer to:
-- [**Production Readiness Checklist**](./docs/PRODUCTION_CHECKLIST.md)
-- [**Master Developer Prompt**](./docs/MASTER_DEVELOPER_PROMPT.md)
-
 ### Environment Setup
 1.  **Clone the Repo**:
     ```bash
     git clone https://github.com/cacu-tech/solution.git
     cd solution
     ```
-2.  **Configure Firebase**:
-    - Create a Firebase Project.
-    - Enable Authentication (Email/Password & Google).
-    - Provision Cloud Firestore in Native Mode.
-    - Configure App Check with reCAPTCHA Enterprise.
+2.  **Configure Supabase**:
+    - Create a Supabase Project.
+    - Run the schema migration found in `docs/supabase_schema.sql`.
+    - Enable Email/Password and Google Auth providers.
 3.  **Environment Variables**:
-    Create a `.env.local` file with your Firebase config and Gemini API key.
+    Create a `.env.local` file with your credentials:
+    ```env
+    NEXT_PUBLIC_SUPABASE_URL=your-project-url
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+    GEMINI_API_KEY=your-gemini-key
+    ```
 4.  **Run Development**:
     ```bash
     npm install
