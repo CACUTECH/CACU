@@ -4,7 +4,6 @@ import { Toaster } from "@/components/ui/toaster";
 import AppLayout from '@/components/app-layout';
 import { ThemeProvider } from '@/components/theme-provider';
 import { SubscriptionProvider } from '@/components/subscription-guard';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { BusinessProvider } from '@/components/business-provider';
 import { ErrorBoundary } from '@/components/error-boundary';
 
@@ -27,20 +26,18 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
-        <FirebaseClientProvider>
-          <ThemeProvider>
-            <SubscriptionProvider>
-              <BusinessProvider>
-                <ErrorBoundary>
-                  <AppLayout>
-                    {children}
-                  </AppLayout>
-                </ErrorBoundary>
-                <Toaster />
-              </BusinessProvider>
-            </SubscriptionProvider>
-          </ThemeProvider>
-        </FirebaseClientProvider>
+        <ThemeProvider>
+          <SubscriptionProvider>
+            <BusinessProvider>
+              <ErrorBoundary>
+                <AppLayout>
+                  {children}
+                </AppLayout>
+              </ErrorBoundary>
+              <Toaster />
+            </BusinessProvider>
+          </SubscriptionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

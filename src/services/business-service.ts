@@ -1,7 +1,5 @@
-
 import { BaseService } from './base-service';
 import { createClient } from '@/lib/supabase/server';
-import { NotificationService } from './notification-service';
 
 export interface CreateBusinessInput {
   name: string;
@@ -56,9 +54,7 @@ export class BusinessService extends BaseService {
 
     if (memberError) throw new Error(`Membership Initialization Failed: ${memberError.message}`);
 
-    // Welcome Notification
-    const notificationService = new NotificationService();
-    // We bypass BaseService context check here manually as it's the first login
+    // Welcome Notification via direct insert to bypass Service lifecycle for first-run
     await supabase.from('notifications').insert({
       business_id: business.id,
       user_id: user.id,
