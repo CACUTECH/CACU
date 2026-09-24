@@ -1,6 +1,7 @@
 
 import { BaseService } from './base-service';
 import { createClient } from '@/lib/supabase/server';
+import { NotificationService } from './notification-service';
 
 export interface CreateBusinessInput {
   name: string;
@@ -20,7 +21,6 @@ export class BusinessService extends BaseService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    // Atomic provisioning
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .insert({
@@ -33,6 +33,7 @@ export class BusinessService extends BaseService {
         bank_name: input.bank_name,
         account_number: input.account_number,
         account_name: input.account_name,
+        owner_uid: user.id
       })
       .select()
       .single();
@@ -54,6 +55,17 @@ export class BusinessService extends BaseService {
       });
 
     if (memberError) throw new Error(`Membership Initialization Failed: ${memberError.message}`);
+
+    // Welcome Notification
+    const notificationService = new NotificationService();
+    // We bypass BaseService context check here manually as it's the first login
+    await supabase.from('notifications').insert({
+      business_id: business.id,
+      user_id: user.id,
+      title: 'Welcome to CACU',
+      message: 'Your production workspace has been launched. Start by adding your team or catalog items.',
+      type: 'WELCOME'
+    });
 
     return business;
   }

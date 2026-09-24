@@ -1,15 +1,11 @@
 
 import { BaseService } from './base-service';
+import { NotificationService } from './notification-service';
 
 /**
  * @fileOverview SalesService handles POS checkouts and atomic retail operations.
- * Leverages PostgreSQL functions (process_sale) to ensure inventory and ledger consistency.
  */
 export class SalesService extends BaseService {
-  /**
-   * Processes a retail checkout atomically.
-   * Ensures stock validation, sale record, line items, and ledger entry occur as one unit.
-   */
   async processCheckout(input: {
     items: { id: string; quantity: number; price: number; name: string }[];
     paymentMethod: 'Cash' | 'Card' | 'Transfer';
@@ -19,7 +15,6 @@ export class SalesService extends BaseService {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
 
-    // Execute atomic RPC for High-Integrity Transaction
     const { data, error } = await supabase.rpc('process_sale', {
       p_business_id: businessId,
       p_customer_id: input.customerId || null,
@@ -34,20 +29,40 @@ export class SalesService extends BaseService {
     });
 
     if (error) {
-      console.error('POS Checkout Failed:', error);
-      // Hardened error responses for financial clarity
       if (error.message.includes('Insufficient stock')) {
           throw new Error(`Inventory Error: ${error.message}`);
       }
       throw new Error(`Checkout Error: ${error.message || 'Atomic transaction failed'}`);
     }
 
+    // Post-Sale Operations
+    this.checkInventoryThresholds(input.items);
+
     return { saleId: data };
   }
 
-  /**
-   * Fetches recent sales with customer details.
-   */
+  private async checkInventoryThresholds(soldItems: any[]) {
+    const { supabase, businessId } = await this.getContext();
+    const notificationService = new NotificationService();
+
+    for (const item of soldItems) {
+      const { data: updatedItem } = await supabase
+        .from('catalog_items')
+        .select('name, quantity, reorder_level')
+        .eq('id', item.id)
+        .single();
+
+      if (updatedItem && updatedItem.quantity <= updatedItem.reorder_level) {
+        await notificationService.trigger({
+          title: 'Low Stock Alert',
+          message: `${updatedItem.name} has dropped to ${updatedItem.quantity} units. Please restock soon.`,
+          type: 'LOW_STOCK',
+          metadata: { itemId: item.id, currentQty: updatedItem.quantity }
+        });
+      }
+    }
+  }
+
   async getRecentSales() {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) return [];

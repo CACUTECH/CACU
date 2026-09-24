@@ -1,18 +1,11 @@
 
 import { BaseService } from './base-service';
+import { NotificationService } from './notification-service';
 
 /**
  * @fileOverview PaymentService handles collection and ledger synchronization.
- * Uses record_payment_atomic RPC to update invoice status and decrement inventory.
  */
 export class PaymentService extends BaseService {
-  /**
-   * Records a payment atomically.
-   * 1. Updates Invoice to 'Paid'
-   * 2. Records Payment Detail
-   * 3. Syncs Financial Ledger
-   * 4. Decrements Inventory for Product items
-   */
   async recordPayment(paymentData: {
     invoiceId: string;
     customerId?: string;
@@ -33,9 +26,17 @@ export class PaymentService extends BaseService {
     });
 
     if (error) {
-      console.error('Payment Processing Failed:', error);
       throw new Error(`Payment Integrity Error: ${error.message || 'Transaction rolled back'}`);
     }
+
+    // Trigger Notification
+    const notificationService = new NotificationService();
+    await notificationService.trigger({
+      title: 'Payment Received',
+      message: `₦${paymentData.amount.toLocaleString()} received via ${paymentData.method}.`,
+      type: 'PAYMENT_RECEIVED',
+      metadata: { paymentId, invoiceId: paymentData.invoiceId }
+    });
 
     return { paymentId };
   }
