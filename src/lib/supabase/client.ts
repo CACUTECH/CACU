@@ -1,5 +1,12 @@
 import { createBrowserClient } from '@supabase/ssr'
 
+/**
+ * @fileOverview Browser-side Supabase client.
+ * 
+ * Used in Client Components. Queries made with this client are 
+ * automatically scoped by Row Level Security (RLS) based on 
+ * the current user's session cookies.
+ */
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
