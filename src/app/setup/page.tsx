@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -24,18 +23,21 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, UploadCloud, Briefcase, Package, Sparkles } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useUser } from "@/firebase";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 const formSchema = z.object({
   businessName: z.string().min(1, "Business name is required"),
@@ -54,8 +56,16 @@ const formSchema = z.object({
 export default function SetupPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const db = useFirestore();
+  const { user, loading: userLoading } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, userLoading, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -77,40 +87,78 @@ export default function SetupPage() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        const result = reader.result as string;
-        setLogoPreview(result);
-        localStorage.setItem('business-logo', result);
+        setLogoPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!user) return;
     setIsLoading(true);
     
-    // Save configuration to localStorage for persistence in this demo
-    localStorage.setItem('business-type', values.businessType);
-    localStorage.setItem('business-details', JSON.stringify({
-      name: values.businessName,
-      address: values.businessAddress,
-      type: values.businessType,
-      sector: values.businessSector
-    }));
-    
-    localStorage.setItem('business-profile-bank', JSON.stringify({
-      bankName: values.bankName,
-      accountNumber: values.accountNumber,
-      accountName: values.accountName,
-    }));
+    const businessId = user.uid; // Root multi-tenant ID is the owner's initial UID
+    const businessRef = doc(db, "businesses", businessId);
+    const userRef = doc(db, "businesses", businessId, "users", user.uid);
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsLoading(false);
-    toast({
-      title: "Business Profile Saved",
-      description: `Your ${values.businessType.toLowerCase()} business is ready.`,
-    });
-    router.push("/");
+    const businessData = {
+      name: values.businessName,
+      type: values.businessType,
+      sector: values.businessSector,
+      address: values.businessAddress,
+      email: values.businessEmail,
+      phone: values.phoneNumber,
+      bank: {
+        name: values.bankName,
+        number: values.accountNumber,
+        accountName: values.accountName,
+      },
+      ownerUid: user.uid,
+      subscriptionLevel: "Starter",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    const userData = {
+      email: user.email,
+      role: "Owner",
+      businessId: businessId,
+      createdAt: serverTimestamp(),
+    };
+
+    // Sequential writes for integrity (could use batch, but for setup simple is fine)
+    setDoc(businessRef, businessData, { merge: true })
+      .then(() => {
+        setDoc(userRef, userData, { merge: true })
+          .then(() => {
+            localStorage.setItem('business-type', values.businessType);
+            toast({
+              title: "Business Launched",
+              description: `Configuration finalized for ${values.businessName}.`,
+            });
+            router.push("/");
+          })
+          .catch(async (e) => {
+             const permissionError = new FirestorePermissionError({
+                path: userRef.path,
+                operation: 'write',
+                requestResourceData: userData,
+              });
+              errorEmitter.emit('permission-error', permissionError);
+          });
+      })
+      .catch(async (e) => {
+         const permissionError = new FirestorePermissionError({
+            path: businessRef.path,
+            operation: 'write',
+            requestResourceData: businessData,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => setIsLoading(false));
   };
+
+  if (userLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-muted/40 px-4 py-12">
@@ -118,7 +166,7 @@ export default function SetupPage() {
         <Card className="shadow-2xl border-primary/5">
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-headline">Welcome to CACU</CardTitle>
-            <CardDescription>Let’s configure your business ecosystem</CardDescription>
+            <CardDescription>Configure your secure business environment</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -136,7 +184,7 @@ export default function SetupPage() {
                     <div className="flex-1">
                       <Input id="logo-upload" type="file" onChange={handleLogoChange} accept="image/*" className="hidden" />
                       <Button type="button" variant="outline" onClick={() => document.getElementById('logo-upload')?.click()}>
-                        Upload Brand Identity
+                        Upload Identity
                       </Button>
                       <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold tracking-widest">PNG or JPG. Max 2MB.</p>
                     </div>
@@ -151,7 +199,7 @@ export default function SetupPage() {
                             <FormItem>
                                 <FormLabel>Legal Business Name</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="e.g. Acme Services Ltd" {...field} />
+                                    <Input placeholder="e.g. Acme Services Ltd" disabled={isLoading} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -173,6 +221,7 @@ export default function SetupPage() {
                                         <button
                                             key={type.val}
                                             type="button"
+                                            disabled={isLoading}
                                             onClick={() => field.onChange(type.val)}
                                             className={cn(
                                                 "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center",
@@ -202,7 +251,7 @@ export default function SetupPage() {
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Industry Sector</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
                                     <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select industry" />
@@ -228,7 +277,7 @@ export default function SetupPage() {
                             <FormItem>
                                 <FormLabel>Business Phone</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="+234..." {...field} />
+                                    <Input placeholder="+234..." disabled={isLoading} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -238,12 +287,26 @@ export default function SetupPage() {
 
                 <FormField
                     control={form.control}
+                    name="businessEmail"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Public Business Email</FormLabel>
+                            <FormControl>
+                                <Input placeholder="sales@yourbiz.com" disabled={isLoading} {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
                     name="businessAddress"
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Physical Address</FormLabel>
                             <FormControl>
-                                <Input placeholder="Headquarters location" {...field} />
+                                <Input placeholder="Headquarters location" disabled={isLoading} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -266,7 +329,7 @@ export default function SetupPage() {
                                 <FormItem>
                                     <FormLabel>Bank Name</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="e.g. Sterling Bank" {...field} />
+                                        <Input placeholder="e.g. Sterling Bank" disabled={isLoading} {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -279,7 +342,7 @@ export default function SetupPage() {
                                 <FormItem>
                                     <FormLabel>Account Number</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="0123456789" {...field} />
+                                        <Input placeholder="0123456789" disabled={isLoading} {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -293,7 +356,7 @@ export default function SetupPage() {
                             <FormItem>
                                 <FormLabel>Beneficiary Name</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Registered business name" {...field} />
+                                    <Input placeholder="Registered business name" disabled={isLoading} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -303,10 +366,10 @@ export default function SetupPage() {
 
                 <Button 
                   type="submit" 
-                  className="w-full h-12 text-lg rounded-xl shadow-xl shadow-primary/20"
+                  className="w-full h-14 text-lg rounded-xl shadow-xl shadow-primary/20"
                   disabled={isLoading}
                 >
-                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Launch Business"}
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Launch Production Workspace"}
                 </Button>
               </form>
             </Form>
