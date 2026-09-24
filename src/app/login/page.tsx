@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button"
@@ -25,8 +24,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -38,6 +38,14 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
   const [isLoading, setIsLoading] = useState(false);
+  const [configMissing, setConfigMissing] = useState(false);
+
+  useEffect(() => {
+    // Check if Supabase URL is present
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')) {
+      setConfigMissing(true);
+    }
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -104,6 +112,16 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {configMissing && (
+            <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle className="font-bold">System Configuration Missing</AlertTitle>
+              <AlertDescription className="text-xs">
+                Please set <strong>NEXT_PUBLIC_SUPABASE_URL</strong> in your environment variables to enable authentication.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
               <FormField
@@ -116,7 +134,7 @@ export default function LoginPage() {
                       <Input
                         type="email"
                         placeholder="m@example.com"
-                        disabled={isLoading}
+                        disabled={isLoading || configMissing}
                         {...field}
                       />
                     </FormControl>
@@ -136,14 +154,14 @@ export default function LoginPage() {
                         </Link>
                       </div>
                     <FormControl>
-                      <Input type="password" disabled={isLoading} {...field} />
+                      <Input type="password" disabled={isLoading || configMissing} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <Button type="submit" className="w-full h-11 rounded-xl" disabled={isLoading}>
+              <Button type="submit" className="w-full h-11 rounded-xl" disabled={isLoading || configMissing}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Login to CACU"}
               </Button>
               
@@ -156,7 +174,7 @@ export default function LoginPage() {
                 </div>
               </div>
               
-              <Button variant="outline" className="w-full h-11 rounded-xl" type="button" onClick={handleGoogleLogin} disabled={isLoading}>
+              <Button variant="outline" className="w-full h-11 rounded-xl" type="button" onClick={handleGoogleLogin} disabled={isLoading || configMissing}>
                 Login with Google
               </Button>
             </form>

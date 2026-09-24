@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
@@ -18,9 +17,16 @@ export function useSupabaseUser() {
   useEffect(() => {
     // 1. Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      setLoading(false);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        setUser(session?.user ?? null);
+      } catch (e) {
+        console.error("Auth session fetch error:", e);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
     getInitialSession();

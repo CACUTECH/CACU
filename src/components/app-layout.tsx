@@ -147,22 +147,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user) {
       const fetchProfile = async () => {
-        const { data } = await supabase
-          .from('business_members')
-          .select('role, businesses (*)')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (data) {
-          setBusinessProfile({
-            ...data.businesses,
-            role: data.role
-          });
-          if (data.businesses.business_type) {
-            setBusinessType(data.businesses.business_type as BusinessType);
+        try {
+          const { data } = await supabase
+            .from('business_members')
+            .select('role, businesses (*)')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (data) {
+            setBusinessProfile({
+              ...data.businesses,
+              role: data.role
+            });
+            if (data.businesses.business_type) {
+              setBusinessType(data.businesses.business_type as BusinessType);
+            }
           }
+        } catch (error) {
+          console.error("Profile fetch error:", error);
+        } finally {
+          setBusinessLoading(false);
         }
-        setBusinessLoading(false);
       };
       fetchProfile();
     } else {
@@ -231,12 +236,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { href: '/apps', label: 'Integrations', icon: AppWindow },
   ];
 
+  // Auth page check must happen before loader check
   if (pathname === '/setup' || pathname === '/login' || pathname === '/signup' || pathname === '/verify-email') {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 
   if (!mounted || userLoading || (user && businessLoading)) {
-    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground animate-pulse font-medium">Initializing workspace...</p>
+      </div>
+    );
   }
 
   return (
