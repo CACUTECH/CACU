@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -106,10 +107,10 @@ export default function SetupPage() {
         bank_name: values.bankName,
         account_number: values.accountNumber,
         account_name: values.accountName,
+        logo_data_url: logoPreview || undefined
       });
 
       if (result.success) {
-        localStorage.setItem('business-type', values.businessType);
         toast({
           title: "Business Launched",
           description: `Security profile initialized for ${values.businessName}.`,
