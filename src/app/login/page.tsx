@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button"
@@ -28,8 +29,8 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 export default function LoginPage() {
@@ -61,6 +62,7 @@ export default function LoginPage() {
         description: "Welcome back to CACU.",
       });
       router.push("/");
+      router.refresh();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -73,19 +75,22 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
+    setIsLoading(true);
     try {
-      await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
+      if (error) throw error;
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Google Login Failed",
         description: error.message,
       });
+      setIsLoading(false);
     }
   };
 
@@ -93,7 +98,7 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-background px-4">
       <Card className="mx-auto max-w-sm w-full shadow-2xl border-primary/5">
         <CardHeader>
-          <CardTitle className="text-2xl font-headline">Login</CardTitle>
+          <CardTitle className="text-2xl font-headline text-primary">Login</CardTitle>
           <CardDescription>
             Access your business dashboard
           </CardDescription>
@@ -126,7 +131,7 @@ export default function LoginPage() {
                   <FormItem className="grid gap-2">
                      <div className="flex items-center">
                         <FormLabel>Password</FormLabel>
-                        <Link href="#" className="ml-auto inline-block text-xs underline">
+                        <Link href="/forgot-password" className="ml-auto inline-block text-xs underline hover:text-primary transition-colors">
                           Forgot password?
                         </Link>
                       </div>
@@ -139,17 +144,18 @@ export default function LoginPage() {
               />
 
               <Button type="submit" className="w-full h-11 rounded-xl" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Login to CACU
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Login to CACU"}
               </Button>
-              <div className="relative">
+              
+              <div className="relative my-2">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                <div className="relative flex justify-center text-[10px] uppercase">
+                  <span className="bg-background px-2 text-muted-foreground font-bold tracking-widest">Or continue with</span>
                 </div>
               </div>
+              
               <Button variant="outline" className="w-full h-11 rounded-xl" type="button" onClick={handleGoogleLogin} disabled={isLoading}>
                 Login with Google
               </Button>

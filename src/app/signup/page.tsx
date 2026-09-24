@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ import { createClient } from "@/lib/supabase/client";
 
 const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
-    email: z.string().email(),
+    email: z.string().email("Invalid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
   }).refine((data) => data.password === data.confirmPassword, {
@@ -69,11 +70,21 @@ export default function SignupPage() {
       
       if (error) throw error;
 
-      toast({
-        title: "Account Created",
-        description: "Please check your email to verify your account.",
-      });
-      router.push("/setup");
+      if (data.session) {
+        // Automatic login if email verification is disabled
+        toast({
+          title: "Account Created",
+          description: "Welcome to CACU!",
+        });
+        router.push("/setup");
+      } else {
+        // Verification required
+        toast({
+          title: "Verification Sent",
+          description: "Please check your email to confirm your account.",
+        });
+        router.push("/verify-email");
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -87,9 +98,9 @@ export default function SignupPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background px-4">
-      <Card className="mx-auto max-sm w-full shadow-2xl border-primary/5">
+      <Card className="mx-auto max-w-sm w-full shadow-2xl border-primary/5">
         <CardHeader>
-          <CardTitle className="text-2xl font-headline">Sign Up</CardTitle>
+          <CardTitle className="text-2xl font-headline text-primary">Sign Up</CardTitle>
           <CardDescription>
             Join CACU and transform your business
           </CardDescription>
@@ -156,14 +167,13 @@ export default function SignupPage() {
               />
 
               <Button type="submit" className="w-full h-11 rounded-xl" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Account
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create Account"}
               </Button>
             </form>
           </Form>
           <div className="mt-6 text-center text-sm">
             Already have an account?{" "}
-            <Link href="/login" className="underline font-bold text-primary">
+            <Link href="/login" className="underline font-bold text-primary hover:text-primary/80 transition-colors">
               Login
             </Link>
           </div>
