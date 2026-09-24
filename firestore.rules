@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper: Is the user authenticated?
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Get user profile data
+    function getUserData(businessId) {
+      return get(/databases/$(database)/documents/businesses/$(businessId)/users/$(request.auth.uid)).data;
+    }
+
+    // Helper: Is the user a member of this business?
+    function isMember(businessId) {
+      return isAuthenticated() && exists(/databases/$(database)/documents/businesses/$(businessId)/users/$(request.auth.uid));
+    }
+
+    // Helper: Does the user have a specific role in this business?
+    function hasRole(businessId, roles) {
+      return isMember(businessId) && getUserData(businessId).role in roles;
+    }
+
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Business Profiles: Users can see their own business profile
+    match /businesses/{businessId} {
+      allow read: if isMember(businessId);
+      allow create: if isAuthenticated(); // First user creates business
+      allow update: if hasRole(businessId, ['Owner', 'Admin']);
+      
+      // Users sub-collection (Membership & RBAC)
+      match /users/{userId} {
+        allow read: if isMember(businessId);
+        allow write: if hasRole(businessId, ['Owner', 'Admin']) || (request.auth.uid == userId);
+      }
+
+      // Catalog / Inventory (Tenant Data)
+      match /catalog/{itemId} {
+        allow read: if isMember(businessId);
+        allow write: if hasRole(businessId, ['Owner', 'Admin', 'Editor']);
+      }
+
+      // Transactions (Financial Data)
+      match /transactions/{txId} {
+        allow read: if isMember(businessId);
+        allow write: if hasRole(businessId, ['Owner', 'Admin', 'Editor']);
+      }
+
+      // Employees (HR Data)
+      match /employees/{empId} {
+        allow read: if hasRole(businessId, ['Owner', 'Admin', 'HR']);
+        allow write: if hasRole(businessId, ['Owner', 'Admin', 'HR']);
+      }
+    }
+  }
+}

@@ -4,9 +4,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { catalogItems } from '@/lib/data';
-import type { CatalogItem } from '@/lib/data';
-import { PlusCircle, MoreHorizontal, Upload, X } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Upload, Loader2 } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -46,15 +44,178 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
+import { collection, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { useFirestore, useUser, useCollection, useDoc } from '@/firebase';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
-function getStatus(quantity: number, reorderLevel: number): CatalogItem['status'] {
+type CatalogItem = {
+    id: string;
+    type: 'Product' | 'Service';
+    name: string;
+    sku?: string;
+    category: string;
+    description: string;
+    quantity?: number;
+    price: number;
+    reorderLevel?: number;
+    status: string;
+}
+
+function getStatus(quantity: number, reorderLevel: number): string {
     if (quantity === 0) return 'Out of Stock';
     if (quantity <= reorderLevel) return 'Low Stock';
     return 'In Stock';
 }
 
-function AddProductDialog({ onSave }: { onSave: (newProduct: CatalogItem) => void }) {
+export default function InventoryPage() {
+    const { user } = useUser();
+    const db = useFirestore();
+    const { toast } = useToast();
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Context Loading
+    const businessId = user?.uid;
+    const itemsRef = businessId ? collection(db, 'businesses', businessId, 'catalog') : null;
+    const itemsQuery = itemsRef ? query(itemsRef, orderBy('name')) : null;
+    const { data: inventoryItems, loading } = useCollection<CatalogItem>(itemsQuery);
+
+    const [editingItem, setEditingItem] = React.useState<CatalogItem | null>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+
+    const handleSaveItem = (item: Partial<CatalogItem>) => {
+        if (!businessId || !itemsRef) return;
+        
+        const id = item.id || `prod-${Date.now()}`;
+        const docRef = doc(itemsRef, id);
+        const data = { ...item, id };
+
+        setDoc(docRef, data, { merge: true })
+            .then(() => {
+                toast({ title: item.id ? "Product Updated" : "Product Added" });
+            })
+            .catch(async (e) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+    };
+
+    const handleDelete = (itemId: string) => {
+        if (!businessId || !itemsRef) return;
+        const docRef = doc(itemsRef, itemId);
+        
+        deleteDoc(docRef)
+            .then(() => toast({ title: "Product Removed" }))
+            .catch(async (e) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'delete',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+    };
+
+    if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+
+    return (
+        <div className="flex flex-col gap-6">
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <CardTitle className="font-headline">Inventory</CardTitle>
+                            <CardDescription>Manage your product inventory and stock levels in the cloud.</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                                <Upload className="mr-2 h-4 w-4" /> Bulk Upload
+                            </Button>
+                            <AddProductDialog onSave={handleSaveItem} />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Product Name</TableHead>
+                                    <TableHead>SKU</TableHead>
+                                    <TableHead className="text-center">Quantity</TableHead>
+                                    <TableHead className="text-right">Price</TableHead>
+                                    <TableHead className="text-center">Status</TableHead>
+                                    <TableHead><span className="sr-only">Actions</span></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {inventoryItems?.map((item) => (
+                                    <TableRow key={item.id}>
+                                        <TableCell className="font-medium">{item.name}</TableCell>
+                                        <TableCell>{item.sku}</TableCell>
+                                        <TableCell className="text-center">{item.quantity}</TableCell>
+                                        <TableCell className="text-right">₦{item.price.toLocaleString()}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant={item.status === 'In Stock' ? 'default' : 'secondary'}>{item.status}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex justify-end">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => { setEditingItem(item); setIsEditDialogOpen(true); }}>Edit</DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <DropdownMenuItem className="text-destructive" onSelect={(e) => e.preventDefault()}>Delete</DropdownMenuItem>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>This action will permanently delete this product from the database.</AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDelete(item.id)}>Delete</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {inventoryItems?.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                                            Your inventory is empty. Add your first product to get started.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+            
+            <EditProductDialog 
+                item={editingItem} 
+                open={isEditDialogOpen} 
+                onOpenChange={setIsEditDialogOpen} 
+                onSave={handleSaveItem} 
+            />
+            <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx" />
+        </div>
+    );
+}
+
+function AddProductDialog({ onSave }: { onSave: (item: Partial<CatalogItem>) => void }) {
     const [name, setName] = React.useState('');
     const [sku, setSku] = React.useState('');
     const [quantity, setQuantity] = React.useState('0');
@@ -63,392 +224,79 @@ function AddProductDialog({ onSave }: { onSave: (newProduct: CatalogItem) => voi
     const [isOpen, setIsOpen] = React.useState(false);
 
     const handleSave = () => {
-        const numQuantity = parseInt(quantity, 10);
-        const numPrice = parseFloat(price);
-        const numReorderLevel = parseInt(reorderLevel, 10);
-
-        if (name && sku && !isNaN(numQuantity) && !isNaN(numPrice) && !isNaN(numReorderLevel)) {
-            const newProduct: CatalogItem = {
-                id: `prod-${Date.now()}`,
-                type: 'Product',
-                name,
-                sku,
-                category: 'Uncategorized',
-                description: '',
-                quantity: numQuantity,
-                price: numPrice,
-                reorderLevel: numReorderLevel,
-                status: getStatus(numQuantity, numReorderLevel),
-            };
-            onSave(newProduct);
-            setIsOpen(false);
-            setName('');
-            setSku('');
-            setQuantity('0');
-            setPrice('0');
-            setReorderLevel('10');
-        }
+        const q = parseInt(quantity);
+        const rl = parseInt(reorderLevel);
+        onSave({
+            type: 'Product',
+            name,
+            sku,
+            category: 'General',
+            description: '',
+            quantity: q,
+            price: parseFloat(price),
+            reorderLevel: rl,
+            status: getStatus(q, rl)
+        });
+        setIsOpen(false);
+        setName(''); setSku(''); setQuantity('0'); setPrice('0');
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Product
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Add New Product</DialogTitle>
-                    <DialogDescription>
-                        Enter the details of the new product.
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add Product</Button></DialogTrigger>
+            <DialogContent>
+                <DialogHeader><DialogTitle>New Product</DialogTitle></DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">Name</Label>
-                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" placeholder="e.g. Premium Widget" />
+                    <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2"><Label>SKU</Label><Input value={sku} onChange={(e) => setSku(e.target.value)} /></div>
+                        <div className="space-y-2"><Label>Price (₦)</Label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="sku" className="text-right">SKU</Label>
-                        <Input id="sku" value={sku} onChange={(e) => setSku(e.target.value)} className="col-span-3" placeholder="e.g. PW-001" />
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="quantity" className="text-right">Quantity</Label>
-                        <Input id="quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="col-span-3" />
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="price" className="text-right">Price (₦)</Label>
-                        <Input id="price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" />
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="reorderLevel" className="text-right">Reorder Level</Label>
-                        <Input id="reorderLevel" type="number" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} className="col-span-3" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2"><Label>Quantity</Label><Input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></div>
+                        <div className="space-y-2"><Label>Reorder Level</Label><Input type="number" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} /></div>
                     </div>
                 </div>
                 <DialogFooter>
-                    <DialogClose asChild>
-                        <Button type="button" variant="secondary">Cancel</Button>
-                    </DialogClose>
-                    <Button type="submit" onClick={handleSave}>Save Product</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-function EditProductDialog({ item, onSave, onOpenChange, open }: { item: CatalogItem | null; onSave: (updatedProduct: CatalogItem) => void; onOpenChange: (open: boolean) => void, open: boolean }) {
-    const [name, setName] = React.useState('');
-    const [sku, setSku] = React.useState('');
-    const [quantity, setQuantity] = React.useState('0');
-    const [price, setPrice] = React.useState('0');
-    const [reorderLevel, setReorderLevel] = React.useState('10');
-
-    React.useEffect(() => {
-        if(item) {
-            setName(item.name);
-            setSku(item.sku || '');
-            setQuantity(String(item.quantity || 0));
-            setPrice(String(item.price));
-            setReorderLevel(String(item.reorderLevel || 0));
-        }
-    }, [item]);
-
-    const handleSave = () => {
-        if (!item) return;
-
-        const numQuantity = parseInt(quantity, 10);
-        const numPrice = parseFloat(price);
-        const numReorderLevel = parseInt(reorderLevel, 10);
-
-        if (name && sku && !isNaN(numQuantity) && !isNaN(numPrice) && !isNaN(numReorderLevel)) {
-            const updatedProduct: CatalogItem = {
-                ...item,
-                name,
-                sku,
-                quantity: numQuantity,
-                price: numPrice,
-                reorderLevel: numReorderLevel,
-                status: getStatus(numQuantity, numReorderLevel),
-            };
-            onSave(updatedProduct);
-            onOpenChange(false);
-        }
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Edit Product</DialogTitle>
-                    <DialogDescription>
-                        Update the details of {item?.name}.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="edit-name" className="text-right">Name</Label>
-                        <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="edit-sku" className="text-right">SKU</Label>
-                        <Input id="edit-sku" value={sku} onChange={(e) => setSku(e.target.value)} className="col-span-3" />
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="edit-quantity" className="text-right">Quantity</Label>
-                        <Input id="edit-quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="col-span-3" />
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="edit-price" className="text-right">Price (₦)</Label>
-                        <Input id="edit-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" />
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="edit-reorderLevel" className="text-right">Reorder Level</Label>
-                        <Input id="edit-reorderLevel" type="number" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} className="col-span-3" />
-                    </div>
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild>
-                        <Button type="button" variant="secondary">Cancel</Button>
-                    </DialogClose>
-                    <Button type="submit" onClick={handleSave}>Save Changes</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-function RecordSaleDialog({ item, onRecordSale, open, onOpenChange }: { item: CatalogItem | null; onRecordSale: (itemId: string, quantitySold: number) => void; open: boolean; onOpenChange: (open: boolean) => void }) {
-    const [quantity, setQuantity] = React.useState('1');
-    const { toast } = useToast();
-
-    const handleRecord = () => {
-        if (!item) return;
-
-        const soldQuantity = parseInt(quantity, 10);
-        const currentQty = item.quantity || 0;
-        if (isNaN(soldQuantity) || soldQuantity <= 0) {
-            toast({ variant: 'destructive', title: "Invalid Quantity", description: "Please enter a valid quantity." });
-            return;
-        }
-        if (soldQuantity > currentQty) {
-            toast({ variant: 'destructive', title: "Insufficient Stock", description: `Only ${currentQty} units available.` });
-            return;
-        }
-
-        onRecordSale(item.id, soldQuantity);
-        toast({ title: "Sale Recorded", description: `${soldQuantity} units of ${item.name} sold.` });
-        onOpenChange(false);
-        setQuantity('1');
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Record Sale</DialogTitle>
-                    <DialogDescription>Record a sale for {item?.name}. Current stock: {item?.quantity}</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="sale-quantity" className="text-right">Quantity Sold</Label>
-                        <Input id="sale-quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="col-span-3" min="1" max={item?.quantity} />
-                    </div>
-                </div>
-                <DialogFooter>
-                     <DialogClose asChild>
-                        <Button type="button" variant="secondary">Cancel</Button>
-                    </DialogClose>
-                    <Button onClick={handleRecord}>Record Sale</Button>
+                    <Button variant="secondary" onClick={() => setIsOpen(false)}>Cancel</Button>
+                    <Button onClick={handleSave} disabled={!name}>Save Product</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
     );
 }
 
-export default function InventoryPage() {
-    const [inventoryItems, setInventoryItems] = React.useState<CatalogItem[]>(catalogItems.filter(item => item.type === 'Product'));
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
-    const { toast } = useToast();
-    
-    const [editingItem, setEditingItem] = React.useState<CatalogItem | null>(null);
-    const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
-    
-    const [sellingItem, setSellingItem] = React.useState<CatalogItem | null>(null);
-    const [isSaleDialogOpen, setIsSaleDialogOpen] = React.useState(false);
+function EditProductDialog({ item, open, onOpenChange, onSave }: { item: CatalogItem | null, open: boolean, onOpenChange: (o: boolean) => void, onSave: (i: Partial<CatalogItem>) => void }) {
+    const [name, setName] = React.useState('');
+    const [quantity, setQuantity] = React.useState('0');
+    const [price, setPrice] = React.useState('0');
 
-    const getStatusBadgeVariant = (status: CatalogItem['status']) => {
-        switch (status) {
-            case 'In Stock': return 'default';
-            case 'Active': return 'default';
-            case 'Low Stock': return 'secondary';
-            case 'Out of Stock': return 'destructive';
-            case 'Inactive': return 'secondary';
-            default: return 'outline';
+    React.useEffect(() => {
+        if (item) {
+            setName(item.name);
+            setQuantity(item.quantity?.toString() || '0');
+            setPrice(item.price.toString());
         }
-    };
-    
-    const handleAddProduct = (newProduct: CatalogItem) => {
-        setInventoryItems(prev => [newProduct, ...prev]);
-    };
-
-    const handleEditProduct = (updatedProduct: CatalogItem) => {
-        setInventoryItems(prev => prev.map(item => item.id === updatedProduct.id ? updatedProduct : item));
-    }
-    
-    const openEditDialog = (item: CatalogItem) => {
-        setEditingItem(item);
-        setIsEditDialogOpen(true);
-    };
-
-    const openSaleDialog = (item: CatalogItem) => {
-        setSellingItem(item);
-        setIsSaleDialogOpen(true);
-    }
-    
-    const handleRecordSale = (itemId: string, quantitySold: number) => {
-        setInventoryItems(prev => prev.map(item => {
-            if (item.id === itemId) {
-                const currentQty = item.quantity || 0;
-                const newQuantity = currentQty - quantitySold;
-                return { ...item, quantity: newQuantity, status: getStatus(newQuantity, item.reorderLevel || 0) };
-            }
-            return item;
-        }));
-    };
-
-    const handleReorder = (item: CatalogItem) => {
-        toast({
-            title: "Reorder Initiated",
-            description: `A reorder request for ${item.name} has been created.`,
-        })
-    }
-
-    const handleDelete = (itemId: string) => {
-        setInventoryItems(prev => prev.filter(item => item.id !== itemId));
-        toast({
-            title: "Product Deleted",
-            description: "The product has been removed from your inventory.",
-        })
-    };
-
-    const handleBulkUploadClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            toast({
-                title: "File Selected",
-                description: `${file.name} is ready for upload. (Functionality to process the file is not yet implemented.)`,
-            });
-            if(fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
-        }
-    };
+    }, [item]);
 
     return (
-        <>
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <CardTitle className="font-headline">Inventory</CardTitle>
-                        <CardDescription>Manage your product inventory and stock levels.</CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                         <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            onChange={handleFileChange}
-                            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                        />
-                        <Button variant="outline" onClick={handleBulkUploadClick}>
-                            <Upload className="mr-2 h-4 w-4" />
-                            Bulk Upload
-                        </Button>
-                        <AddProductDialog onSave={handleAddProduct} />
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader><DialogTitle>Edit {item?.name}</DialogTitle></DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2"><Label>Quantity</Label><Input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></div>
+                        <div className="space-y-2"><Label>Price (₦)</Label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
                     </div>
                 </div>
-            </CardHeader>
-            <CardContent>
-                <div className="rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Product Name</TableHead>
-                                <TableHead>SKU</TableHead>
-                                <TableHead className="text-center">Quantity</TableHead>
-                                <TableHead className="text-right">Price</TableHead>
-                                <TableHead className="text-center">Status</TableHead>
-                                <TableHead><span className="sr-only">Actions</span></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {inventoryItems.map((item) => (
-                                <TableRow key={item.id}>
-                                    <TableCell className="font-medium">{item.name}</TableCell>
-                                    <TableCell>{item.sku}</TableCell>
-                                    <TableCell className="text-center">{item.quantity}</TableCell>
-                                    <TableCell className="text-right">₦{item.price.toLocaleString()}</TableCell>
-                                    <TableCell className="text-center">
-                                        <Badge variant={getStatusBadgeVariant(item.status)}>{item.status}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex justify-end">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                    <span className="sr-only">Open menu</span>
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem onClick={() => openEditDialog(item)}>Edit</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => openSaleDialog(item)}>Record Sale</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleReorder(item)}>Reorder</DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <DropdownMenuItem 
-                                                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                                            onSelect={(e) => e.preventDefault()}
-                                                        >
-                                                            Delete
-                                                        </DropdownMenuItem>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            This action cannot be undone. This will permanently delete the product
-                                                            and remove its data from our servers.
-                                                        </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDelete(item.id)}>Continue</AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            </CardContent>
-        </Card>
-        <EditProductDialog item={editingItem} onSave={handleEditProduct} open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} />
-        <RecordSaleDialog item={sellingItem} onRecordSale={handleRecordSale} open={isSaleDialogOpen} onOpenChange={setIsSaleDialogOpen} />
-        </>
+                <DialogFooter>
+                    <Button onClick={() => {
+                        onSave({ ...item, name, quantity: parseInt(quantity), price: parseFloat(price) });
+                        onOpenChange(false);
+                    }}>Update Item</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
