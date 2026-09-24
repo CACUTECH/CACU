@@ -23,10 +23,9 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { useAuth } from "@/firebase";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -41,7 +40,7 @@ const formSchema = z.object({
 export default function SignupPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const auth = useAuth();
+  const supabase = createClient();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -57,9 +56,19 @@ export default function SignupPage() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      await sendEmailVerification(userCredential.user);
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            full_name: values.name,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        }
+      });
       
+      if (error) throw error;
+
       toast({
         title: "Account Created",
         description: "Please check your email to verify your account.",
@@ -78,7 +87,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background px-4">
-      <Card className="mx-auto max-w-sm w-full shadow-2xl border-primary/5">
+      <Card className="mx-auto max-sm w-full shadow-2xl border-primary/5">
         <CardHeader>
           <CardTitle className="text-2xl font-headline">Sign Up</CardTitle>
           <CardDescription>

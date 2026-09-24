@@ -10,11 +10,9 @@ const businessSchema = z.object({
   address: z.string(),
   email: z.string().email(),
   phone: z.string(),
-  bank: z.object({
-    name: z.string(),
-    number: z.string(),
-    accountName: z.string(),
-  }),
+  bank_name: z.string(),
+  account_number: z.string(),
+  account_name: z.string(),
 });
 
 export async function createBusinessAction(data: z.infer<typeof businessSchema>) {
@@ -25,7 +23,6 @@ export async function createBusinessAction(data: z.infer<typeof businessSchema>)
 
   const validated = businessSchema.parse(data);
 
-  // Use a transaction-like approach in Supabase
   // 1. Create Business
   const { data: business, error: bizError } = await supabase
     .from('businesses')
@@ -36,21 +33,29 @@ export async function createBusinessAction(data: z.infer<typeof businessSchema>)
       address: validated.address,
       email: validated.email,
       phone: validated.phone,
-      bank_name: validated.bank.name,
-      account_number: validated.bank.number,
-      account_name: validated.bank.accountName,
+      bank_name: validated.bank_name,
+      account_number: validated.account_number,
+      account_name: validated.account_name,
     })
     .select()
     .single();
 
-  if (bizError) throw bizError;
+  if (bizError) {
+    console.error('Error creating business:', bizError);
+    throw new Error(bizError.message);
+  }
 
-  // 2. Create Profile (if not exists)
-  await supabase.from('profiles').upsert({
+  // 2. Create/Update Profile (linked to auth.users)
+  const { error: profileError } = await supabase.from('profiles').upsert({
     id: user.id,
     email: user.email!,
-    full_name: user.user_metadata.full_name || validated.name,
+    full_name: user.user_metadata?.full_name || validated.name,
   });
+
+  if (profileError) {
+    console.error('Error creating profile:', profileError);
+    throw new Error(profileError.message);
+  }
 
   // 3. Create Business Membership (Owner)
   const { error: memberError } = await supabase
@@ -61,7 +66,10 @@ export async function createBusinessAction(data: z.infer<typeof businessSchema>)
       role: 'Owner',
     });
 
-  if (memberError) throw memberError;
+  if (memberError) {
+    console.error('Error creating membership:', memberError);
+    throw new Error(memberError.message);
+  }
 
   return { success: true, businessId: business.id };
 }

@@ -53,10 +53,8 @@ import Image from 'next/image';
 import { AIAssistant } from './ai-assistant';
 import type { BusinessType } from '@/lib/data';
 import { MobileNav } from './mobile-nav';
-import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc, DocumentReference } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
-import { useAuth } from '@/firebase';
+import { createClient } from '@/lib/supabase/client';
+import { useSupabaseUser } from '@/hooks/use-supabase-user';
 
 function NavItem({ item, pathname }: { item: any, pathname: string }) {
     const { setOpenMobile, isMobile } = useSidebar();
@@ -128,35 +126,52 @@ function NavItem({ item, pathname }: { item: any, pathname: string }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const auth = useAuth();
-  const db = useFirestore();
-  const { user, loading: userLoading } = useUser();
+  const supabase = createClient();
+  const { user, loading: userLoading } = useSupabaseUser();
   
+  const [businessProfile, setBusinessProfile] = useState<any>(null);
+  const [businessLoading, setBusinessLoading] = useState(true);
   const [businessType, setBusinessType] = useState<BusinessType>('HYBRID');
   const [mounted, setMounted] = useState(false);
-
-  // Fetch Business Profile from Firestore
-  // Note: For multi-tenancy, we assume the user's root businessId is their UID for now 
-  // (or fetched from their UserProfile document)
-  const businessId = user?.uid;
-  const businessRef = businessId ? doc(db, 'businesses', businessId) : null;
-  const { data: businessProfile, loading: businessLoading } = useDoc(businessRef as DocumentReference);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!userLoading && !user && !['/login', '/signup', '/verify-email'].includes(pathname)) {
+    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup'].includes(pathname)) {
         router.push('/login');
     }
-    if (businessProfile?.type) {
-        setBusinessType(businessProfile.type as BusinessType);
+  }, [user, userLoading, pathname, router]);
+
+  useEffect(() => {
+    if (user) {
+      const fetchProfile = async () => {
+        const { data } = await supabase
+          .from('business_members')
+          .select('role, businesses (*)')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (data) {
+          setBusinessProfile({
+            ...data.businesses,
+            role: data.role
+          });
+          if (data.businesses.business_type) {
+            setBusinessType(data.businesses.business_type as BusinessType);
+          }
+        }
+        setBusinessLoading(false);
+      };
+      fetchProfile();
+    } else {
+      setBusinessLoading(false);
     }
-  }, [user, userLoading, pathname, router, businessProfile]);
+  }, [user, supabase]);
 
   const handleLogout = async () => {
-    await signOut(auth);
+    await supabase.auth.signOut();
     router.push('/login');
   };
 
@@ -265,12 +280,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
           <div className="flex items-center gap-3 p-2 mt-2 border-t">
             <Avatar className="size-8 border-2 border-primary/20">
-              <AvatarImage src={user?.photoURL || "https://placehold.co/40x40"} alt="User" />
-              <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
+              <AvatarImage src={user?.user_metadata?.avatar_url || "https://placehold.co/40x40"} alt="User" />
+              <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden group-data-[state=collapsed]:hidden">
-                <span className="truncate text-sm font-medium">{user?.displayName || user?.email?.split('@')[0]}</span>
-                <span className="truncate text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Owner</span>
+                <span className="truncate text-sm font-medium">{user?.user_metadata?.full_name || user?.email?.split('@')[0]}</span>
+                <span className="truncate text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">{businessProfile?.role || 'User'}</span>
             </div>
           </div>
         </SidebarFooter>

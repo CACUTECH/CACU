@@ -34,9 +34,8 @@ import { Loader2, UploadCloud, Briefcase, Package, Sparkles } from "lucide-react
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
-import { useFirestore, useUser } from "@/firebase";
 import { createBusinessAction } from "./actions";
+import { useSupabaseUser } from "@/hooks/use-supabase-user";
 
 const formSchema = z.object({
   businessName: z.string().min(1, "Business name is required"),
@@ -55,8 +54,7 @@ const formSchema = z.object({
 export default function SetupPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const db = useFirestore();
-  const { user, loading: userLoading } = useUser();
+  const { user, loading: userLoading } = useSupabaseUser();
   const [isLoading, setIsLoading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -97,47 +95,24 @@ export default function SetupPage() {
     setIsLoading(true);
     
     try {
-      // P0 FIX: Perform atomic provisioning via batch write
-      const businessId = user.uid;
-      const batch = writeBatch(db);
-      
-      const setupResult = await createBusinessAction({
-        businessId,
-        ownerUid: user.uid,
+      // Atomic provisioning via Supabase Server Action
+      const result = await createBusinessAction({
         name: values.businessName,
         type: values.businessType,
         sector: values.businessSector,
         address: values.businessAddress,
         email: values.businessEmail,
         phone: values.phoneNumber,
-        bank: {
-          name: values.bankName,
-          number: values.accountNumber,
-          accountName: values.accountName,
-        }
+        bank_name: values.bankName,
+        account_number: values.accountNumber,
+        account_name: values.accountName,
       });
 
-      if (setupResult.success) {
-        const businessRef = doc(db, "businesses", businessId);
-        const userRef = doc(db, "businesses", businessId, "users", user.uid);
-
-        batch.set(businessRef, {
-          ...setupResult.businessData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-
-        batch.set(userRef, {
-          ...setupResult.userData,
-          createdAt: serverTimestamp(),
-        });
-
-        await batch.commit();
-
+      if (result.success) {
         localStorage.setItem('business-type', values.businessType);
         toast({
           title: "Business Launched",
-          description: `Security claims and profile initialized for ${values.businessName}.`,
+          description: `Security profile initialized for ${values.businessName}.`,
         });
         router.push("/");
       }
