@@ -2,11 +2,8 @@
 "use client"
 import * as React from "react"
 import { 
-    MoreHorizontal, 
     PlusCircle, 
-    Loader2,
-    Search,
-    Users
+    Loader2
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,12 +14,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -37,6 +28,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
+import { addEmployeeAction } from "./actions"
 
 type Employee = {
     id: string;
@@ -46,7 +38,6 @@ type Employee = {
     department: string;
     status: string;
     base_salary: number;
-    business_id: string;
 }
 
 export default function EmployeesPage() {
@@ -55,14 +46,12 @@ export default function EmployeesPage() {
     const { toast } = useToast();
     const [employees, setEmployees] = React.useState<Employee[]>([]);
     const [loading, setLoading] = React.useState(true);
-    const [businessId, setBusinessId] = React.useState<string | null>(null);
 
-    const fetchStaff = React.useCallback(async (bid: string) => {
+    const fetchStaff = React.useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('employees')
             .select('*')
-            .eq('business_id', bid)
             .order('name');
         
         if (error) {
@@ -74,33 +63,16 @@ export default function EmployeesPage() {
     }, [supabase, toast]);
 
     React.useEffect(() => {
-        if (user) {
-            supabase.from('business_members')
-                .select('business_id')
-                .eq('user_id', user.id)
-                .limit(1)
-                .single()
-                .then(({ data }) => {
-                    if (data) {
-                        setBusinessId(data.business_id);
-                        fetchStaff(data.business_id);
-                    }
-                });
-        }
-    }, [user, supabase, fetchStaff]);
+        if (user) fetchStaff();
+    }, [user, fetchStaff]);
 
     const handleSaveEmployee = async (emp: Partial<Employee>) => {
-        if (!businessId) return;
-
-        const { error } = await supabase
-            .from('employees')
-            .insert({ ...emp, business_id: businessId });
-
-        if (error) {
-            toast({ variant: 'destructive', title: 'HR Error', description: error.message });
+        const result = await addEmployeeAction(emp);
+        if (!result.success) {
+            toast({ variant: 'destructive', title: 'HR Error', description: result.error });
         } else {
             toast({ title: "New Hire Added" });
-            fetchStaff(businessId);
+            fetchStaff();
         }
     };
 
@@ -111,7 +83,7 @@ export default function EmployeesPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="font-headline text-3xl font-bold">Personnel Records</h1>
-                    <p className="text-muted-foreground text-sm">Secure employee data protected by RLS policies.</p>
+                    <p className="text-muted-foreground text-sm">Secure records managed via HRService.</p>
                 </div>
                 <AddEmployeeDialog onSave={handleSaveEmployee} />
             </div>

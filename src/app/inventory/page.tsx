@@ -5,13 +5,11 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, MoreHorizontal, Upload, Loader2, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Loader2 } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -24,29 +22,18 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
+import { saveCatalogItemAction, deleteCatalogItemAction } from './actions';
 
 type CatalogItem = {
     id: string;
@@ -68,14 +55,12 @@ export default function InventoryPage() {
     const { toast } = useToast();
     const [items, setItems] = React.useState<CatalogItem[]>([]);
     const [loading, setLoading] = React.useState(true);
-    const [businessId, setBusinessId] = React.useState<string | null>(null);
 
-    const fetchItems = React.useCallback(async (bid: string) => {
+    const fetchItems = React.useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('catalog_items')
             .select('*')
-            .eq('business_id', bid)
             .order('name');
         
         if (error) {
@@ -87,49 +72,26 @@ export default function InventoryPage() {
     }, [supabase, toast]);
 
     React.useEffect(() => {
-        if (user) {
-            // Get active business
-            supabase.from('business_members')
-                .select('business_id')
-                .eq('user_id', user.id)
-                .limit(1)
-                .single()
-                .then(({ data }) => {
-                    if (data) {
-                        setBusinessId(data.business_id);
-                        fetchItems(data.business_id);
-                    }
-                });
-        }
-    }, [user, supabase, fetchItems]);
+        if (user) fetchItems();
+    }, [user, fetchItems]);
 
     const handleSaveItem = async (item: Partial<CatalogItem>) => {
-        if (!businessId) return;
-
-        const data = { ...item, business_id: businessId };
-        const { error } = await supabase
-            .from('catalog_items')
-            .upsert(data);
-
-        if (error) {
-            toast({ variant: 'destructive', title: 'Save Failed', description: error.message });
+        const result = await saveCatalogItemAction(item);
+        if (!result.success) {
+            toast({ variant: 'destructive', title: 'Save Failed', description: result.error });
         } else {
             toast({ title: 'Success', description: 'Catalog item updated.' });
-            fetchItems(businessId);
+            fetchItems();
         }
     };
 
     const handleDelete = async (id: string) => {
-        const { error } = await supabase
-            .from('catalog_items')
-            .delete()
-            .eq('id', id);
-
-        if (error) {
-            toast({ variant: 'destructive', title: 'Delete Failed', description: error.message });
+        const result = await deleteCatalogItemAction(id);
+        if (!result.success) {
+            toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
         } else {
             toast({ title: 'Removed', description: 'Item deleted from catalog.' });
-            if (businessId) fetchItems(businessId);
+            fetchItems();
         }
     };
 
@@ -142,7 +104,7 @@ export default function InventoryPage() {
                     <div className="flex items-center justify-between gap-4">
                         <div>
                             <CardTitle className="font-headline text-2xl">Inventory & Catalog</CardTitle>
-                            <CardDescription>Managed via Supabase PostgreSQL RLS.</CardDescription>
+                            <CardDescription>Secure relational data managed via Backend Services.</CardDescription>
                         </div>
                         <AddProductDialog onSave={handleSaveItem} />
                     </div>
@@ -204,7 +166,7 @@ function AddProductDialog({ onSave }: { onSave: (item: Partial<CatalogItem>) => 
                 </div>
                 <DialogFooter>
                     <DialogClose asChild>
-                        <Button onClick={() => onSave({ name, price: parseFloat(price), type: 'Product', status: 'Active' })}>Save to Ledger</Button>
+                        <Button onClick={() => onSave({ name, price: parseFloat(price), type: 'Product', status: 'Active' })}>Post via Service</Button>
                     </DialogClose>
                 </DialogFooter>
             </DialogContent>

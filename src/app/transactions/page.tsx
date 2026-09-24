@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
+import { recordLedgerEntryAction } from './actions';
 
 type Transaction = {
     id: string;
@@ -45,7 +46,6 @@ export default function TransactionsPage() {
     const { toast } = useToast();
     const [transactions, setTransactions] = React.useState<Transaction[]>([]);
     const [loading, setLoading] = React.useState(true);
-    const [businessId, setBusinessId] = React.useState<string | null>(null);
 
     const [formData, setFormData] = React.useState<Partial<Transaction>>({
         description: '',
@@ -54,12 +54,11 @@ export default function TransactionsPage() {
         category: 'Services'
     })
 
-    const fetchTX = React.useCallback(async (bid: string) => {
+    const fetchTX = React.useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('financial_transactions')
             .select('*')
-            .eq('business_id', bid)
             .order('date', { ascending: false });
         
         if (error) {
@@ -71,40 +70,16 @@ export default function TransactionsPage() {
     }, [supabase, toast]);
 
     React.useEffect(() => {
-        if (user) {
-            supabase.from('business_members')
-                .select('business_id')
-                .eq('user_id', user.id)
-                .limit(1)
-                .single()
-                .then(({ data }) => {
-                    if (data) {
-                        setBusinessId(data.business_id);
-                        fetchTX(data.business_id);
-                    }
-                });
-        }
-    }, [user, supabase, fetchTX]);
+        if (user) fetchTX();
+    }, [user, fetchTX]);
 
     const handleAddTransaction = async () => {
-        if (!businessId || !formData.description || !formData.amount) return;
-
-        const data = {
-            ...formData,
-            business_id: businessId,
-            date: new Date().toISOString().split('T')[0],
-            created_by: user?.id
-        };
-
-        const { error } = await supabase
-            .from('financial_transactions')
-            .insert(data);
-
-        if (error) {
-            toast({ variant: 'destructive', title: 'Post Failed', description: error.message });
+        const result = await recordLedgerEntryAction(formData);
+        if (!result.success) {
+            toast({ variant: 'destructive', title: 'Post Failed', description: result.error });
         } else {
             toast({ title: "Transaction Posted" });
-            fetchTX(businessId);
+            fetchTX();
             setFormData({ description: '', amount: 0, type: 'Income', category: 'Services' });
         }
     }
@@ -116,7 +91,7 @@ export default function TransactionsPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="font-headline text-3xl font-bold">Financial Ledger</h1>
-                    <p className="text-muted-foreground text-sm">Strict multi-tenant transactional record.</p>
+                    <p className="text-muted-foreground text-sm">Strict multi-tenant records managed by LedgerService.</p>
                 </div>
                 <Dialog>
                     <DialogTrigger asChild>
