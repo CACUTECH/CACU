@@ -1,10 +1,11 @@
+
 "use client"
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, MoreHorizontal, Upload, Loader2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Upload, Loader2, Trash2 } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -44,10 +45,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, setDoc, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
-import { useFirestore, useUser, useCollection, useDoc } from '@/firebase';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { createClient } from '@/lib/supabase/client';
+import { useSupabaseUser } from '@/hooks/use-supabase-user';
 
 type CatalogItem = {
     id: string;
@@ -58,67 +57,80 @@ type CatalogItem = {
     description: string;
     quantity?: number;
     price: number;
-    reorderLevel?: number;
+    reorder_level?: number;
     status: string;
-}
-
-function getStatus(quantity: number, reorderLevel: number): string {
-    if (quantity === 0) return 'Out of Stock';
-    if (quantity <= reorderLevel) return 'Low Stock';
-    return 'In Stock';
+    business_id: string;
 }
 
 export default function InventoryPage() {
-    const { user } = useUser();
-    const db = useFirestore();
+    const { user } = useSupabaseUser();
+    const supabase = createClient();
     const { toast } = useToast();
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [items, setItems] = React.useState<CatalogItem[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [businessId, setBusinessId] = React.useState<string | null>(null);
 
-    // Context Loading
-    const businessId = user?.uid;
-    const itemsRef = businessId ? collection(db, 'businesses', businessId, 'catalog') : null;
-    
-    // P2 FIX: Implement strict limits to prevent DoW read spikes
-    const itemsQuery = itemsRef ? query(itemsRef, orderBy('name'), limit(50)) : null;
-    const { data: inventoryItems, loading } = useCollection<CatalogItem>(itemsQuery);
-
-    const [editingItem, setEditingItem] = React.useState<CatalogItem | null>(null);
-    const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
-
-    const handleSaveItem = (item: Partial<CatalogItem>) => {
-        if (!businessId || !itemsRef) return;
+    const fetchItems = React.useCallback(async (bid: string) => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('catalog_items')
+            .select('*')
+            .eq('business_id', bid)
+            .order('name');
         
-        const id = item.id || `prod-${Date.now()}`;
-        const docRef = doc(itemsRef, id);
-        const data = { ...item, id };
+        if (error) {
+            toast({ variant: 'destructive', title: 'Fetch Failed', description: error.message });
+        } else {
+            setItems(data || []);
+        }
+        setLoading(false);
+    }, [supabase, toast]);
 
-        setDoc(docRef, data, { merge: true })
-            .then(() => {
-                toast({ title: item.id ? "Product Updated" : "Product Added" });
-            })
-            .catch(async (e) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'write',
-                    requestResourceData: data,
+    React.useEffect(() => {
+        if (user) {
+            // Get active business
+            supabase.from('business_members')
+                .select('business_id')
+                .eq('user_id', user.id)
+                .limit(1)
+                .single()
+                .then(({ data }) => {
+                    if (data) {
+                        setBusinessId(data.business_id);
+                        fetchItems(data.business_id);
+                    }
                 });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+        }
+    }, [user, supabase, fetchItems]);
+
+    const handleSaveItem = async (item: Partial<CatalogItem>) => {
+        if (!businessId) return;
+
+        const data = { ...item, business_id: businessId };
+        const { error } = await supabase
+            .from('catalog_items')
+            .upsert(data);
+
+        if (error) {
+            toast({ variant: 'destructive', title: 'Save Failed', description: error.message });
+        } else {
+            toast({ title: 'Success', description: 'Catalog item updated.' });
+            fetchItems(businessId);
+        }
     };
 
-    const handleDelete = (itemId: string) => {
-        if (!businessId || !itemsRef) return;
-        const docRef = doc(itemsRef, itemId);
-        
-        deleteDoc(docRef)
-            .then(() => toast({ title: "Product Removed" }))
-            .catch(async (e) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'delete',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+    const handleDelete = async (id: string) => {
+        const { error } = await supabase
+            .from('catalog_items')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            toast({ variant: 'destructive', title: 'Delete Failed', description: error.message });
+        } else {
+            toast({ title: 'Removed', description: 'Item deleted from catalog.' });
+            if (businessId) fetchItems(businessId);
+        }
     };
 
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -129,15 +141,10 @@ export default function InventoryPage() {
                 <CardHeader>
                     <div className="flex items-center justify-between gap-4">
                         <div>
-                            <CardTitle className="font-headline">Inventory</CardTitle>
-                            <CardDescription>Manage your product inventory and stock levels in the cloud.</CardDescription>
+                            <CardTitle className="font-headline text-2xl">Inventory & Catalog</CardTitle>
+                            <CardDescription>Managed via Supabase PostgreSQL RLS.</CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                                <Upload className="mr-2 h-4 w-4" /> Bulk Upload
-                            </Button>
-                            <AddProductDialog onSave={handleSaveItem} />
-                        </div>
+                        <AddProductDialog onSave={handleSaveItem} />
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -150,153 +157,55 @@ export default function InventoryPage() {
                                     <TableHead className="text-center">Quantity</TableHead>
                                     <TableHead className="text-right">Price</TableHead>
                                     <TableHead className="text-center">Status</TableHead>
-                                    <TableHead><span className="sr-only">Actions</span></TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {inventoryItems?.map((item) => (
+                                {items.map((item) => (
                                     <TableRow key={item.id}>
                                         <TableCell className="font-medium">{item.name}</TableCell>
                                         <TableCell>{item.sku}</TableCell>
-                                        <TableCell className="text-center">{item.quantity}</TableCell>
-                                        <TableCell className="text-right">₦{item.price.toLocaleString()}</TableCell>
+                                        <TableCell className="text-center">{item.quantity || '--'}</TableCell>
+                                        <TableCell className="text-right">₦{Number(item.price).toLocaleString()}</TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant={item.status === 'In Stock' ? 'default' : 'secondary'}>{item.status}</Badge>
+                                            <Badge variant={item.status === 'Active' ? 'default' : 'secondary'}>{item.status}</Badge>
                                         </TableCell>
-                                        <TableCell>
-                                            <div className="flex justify-end">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => { setEditingItem(item); setIsEditDialogOpen(true); }}>Edit</DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
-                                                                <DropdownMenuItem className="text-destructive" onSelect={(e) => e.preventDefault()}>Delete</DropdownMenuItem>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                    <AlertDialogDescription>This action will permanently delete this product from the database.</AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handleDelete(item.id)}>Delete</AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleDelete(item.id)} className="text-destructive">Delete</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {inventoryItems?.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                                            Your inventory is empty. Add your first product to get started.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
                             </TableBody>
                         </Table>
                     </div>
                 </CardContent>
             </Card>
-            
-            <EditProductDialog 
-                item={editingItem} 
-                open={isEditDialogOpen} 
-                onOpenChange={setIsEditDialogOpen} 
-                onSave={handleSaveItem} 
-            />
-            <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx" />
         </div>
     );
 }
 
 function AddProductDialog({ onSave }: { onSave: (item: Partial<CatalogItem>) => void }) {
     const [name, setName] = React.useState('');
-    const [sku, setSku] = React.useState('');
-    const [quantity, setQuantity] = React.useState('0');
-    const [price, setPrice] = React.useState('0');
-    const [reorderLevel, setReorderLevel] = React.useState('10');
-    const [isOpen, setIsOpen] = React.useState(false);
-
-    const handleSave = () => {
-        const q = parseInt(quantity);
-        const rl = parseInt(reorderLevel);
-        onSave({
-            type: 'Product',
-            name,
-            sku,
-            category: 'General',
-            description: '',
-            quantity: q,
-            price: parseFloat(price),
-            reorderLevel: rl,
-            status: getStatus(q, rl)
-        });
-        setIsOpen(false);
-        setName(''); setSku(''); setQuantity('0'); setPrice('0');
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add Product</Button></DialogTrigger>
-            <DialogContent>
-                <DialogHeader><DialogTitle>New Product</DialogTitle></DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2"><Label>SKU</Label><Input value={sku} onChange={(e) => setSku(e.target.value)} /></div>
-                        <div className="space-y-2"><Label>Price (₦)</Label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2"><Label>Quantity</Label><Input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></div>
-                        <div className="space-y-2"><Label>Reorder Level</Label><Input type="number" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} /></div>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="secondary" onClick={() => setIsOpen(false)}>Cancel</Button>
-                    <Button onClick={handleSave} disabled={!name}>Save Product</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function EditProductDialog({ item, open, onOpenChange, onSave }: { item: CatalogItem | null, open: boolean, onOpenChange: (o: boolean) => void, onSave: (i: Partial<CatalogItem>) => void }) {
-    const [name, setName] = React.useState('');
-    const [quantity, setQuantity] = React.useState('0');
     const [price, setPrice] = React.useState('0');
 
-    React.useEffect(() => {
-        if (item) {
-            setName(item.name);
-            setQuantity(item.quantity?.toString() || '0');
-            setPrice(item.price.toString());
-        }
-    }, [item]);
-
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog>
+            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button></DialogTrigger>
             <DialogContent>
-                <DialogHeader><DialogTitle>Edit {item?.name}</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>New Catalog Entry</DialogTitle></DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2"><Label>Quantity</Label><Input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></div>
-                        <div className="space-y-2"><Label>Price (₦)</Label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
-                    </div>
+                    <div className="space-y-2"><Label>Item Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+                    <div className="space-y-2"><Label>Price (₦)</Label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
                 </div>
                 <DialogFooter>
-                    <Button onClick={() => {
-                        onSave({ ...item, name, quantity: parseInt(quantity), price: parseFloat(price) });
-                        onOpenChange(false);
-                    }}>Update Item</Button>
+                    <DialogClose asChild>
+                        <Button onClick={() => onSave({ name, price: parseFloat(price), type: 'Product', status: 'Active' })}>Save to Ledger</Button>
+                    </DialogClose>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

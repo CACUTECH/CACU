@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from 'react';
@@ -5,15 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, ListFilter, PlusCircle, Upload, Loader2 } from 'lucide-react';
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Search, PlusCircle, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -24,7 +17,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -33,16 +25,9 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { CalendarIcon } from 'lucide-react';
-import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
-import { useFirestore, useUser, useCollection } from '@/firebase';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { createClient } from '@/lib/supabase/client';
+import { useSupabaseUser } from '@/hooks/use-supabase-user';
 
 type Transaction = {
     id: string;
@@ -51,155 +36,152 @@ type Transaction = {
     amount: number;
     type: 'Income' | 'Expense';
     category: string;
-    account: string;
+    business_id: string;
 }
 
 export default function TransactionsPage() {
-    const { user } = useUser();
-    const db = useFirestore();
+    const { user } = useSupabaseUser();
+    const supabase = createClient();
     const { toast } = useToast();
-    const [searchTerm, setSearchTerm] = React.useState("");
-    const [selectedTypes, setSelectedTypes] = React.useState<string[]>(["Income", "Expense"]);
+    const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [businessId, setBusinessId] = React.useState<string | null>(null);
 
-    // Context Loading
-    const businessId = user?.uid;
-    const txRef = businessId ? collection(db, 'businesses', businessId, 'transactions') : null;
-    const txQuery = txRef ? query(txRef, orderBy('date', 'desc'), limit(100)) : null;
-    const { data: transactions, loading } = useCollection<Transaction>(txQuery);
-
-    const [date, setDate] = React.useState<Date | undefined>(new Date())
     const [formData, setFormData] = React.useState<Partial<Transaction>>({
         description: '',
         amount: 0,
         type: 'Income',
-        category: 'Services',
-        account: 'Business Checking'
+        category: 'Services'
     })
 
-    const filteredTransactions = React.useMemo(() => {
-        if (!transactions) return [];
-        return transactions.filter((t) => {
-            const matchesSearch = 
-                t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                t.category.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesType = selectedTypes.includes(t.type);
-            return matchesSearch && matchesType;
-        });
-    }, [searchTerm, selectedTypes, transactions]);
+    const fetchTX = React.useCallback(async (bid: string) => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('financial_transactions')
+            .select('*')
+            .eq('business_id', bid)
+            .order('date', { ascending: false });
+        
+        if (error) {
+            toast({ variant: 'destructive', title: 'Ledger Error', description: error.message });
+        } else {
+            setTransactions(data || []);
+        }
+        setLoading(false);
+    }, [supabase, toast]);
 
-    const handleAddTransaction = () => {
-        if (!businessId || !txRef || !formData.description || !formData.amount) return;
+    React.useEffect(() => {
+        if (user) {
+            supabase.from('business_members')
+                .select('business_id')
+                .eq('user_id', user.id)
+                .limit(1)
+                .single()
+                .then(({ data }) => {
+                    if (data) {
+                        setBusinessId(data.business_id);
+                        fetchTX(data.business_id);
+                    }
+                });
+        }
+    }, [user, supabase, fetchTX]);
 
-        const id = `tx-${Date.now()}`;
-        const docRef = doc(txRef, id);
+    const handleAddTransaction = async () => {
+        if (!businessId || !formData.description || !formData.amount) return;
+
         const data = {
-            id,
-            date: date ? format(date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
-            description: formData.description,
-            amount: Number(formData.amount),
-            type: formData.type as any,
-            category: formData.category || 'General',
-            account: formData.account || 'Business Checking'
+            ...formData,
+            business_id: businessId,
+            date: new Date().toISOString().split('T')[0],
+            created_by: user?.id
         };
 
-        setDoc(docRef, data)
-            .then(() => {
-                toast({ title: "Transaction Recorded" });
-                setFormData({ description: '', amount: 0, type: 'Income', category: 'Services', account: 'Business Checking' });
-            })
-            .catch(async (e) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'create',
-                    requestResourceData: data,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+        const { error } = await supabase
+            .from('financial_transactions')
+            .insert(data);
+
+        if (error) {
+            toast({ variant: 'destructive', title: 'Post Failed', description: error.message });
+        } else {
+            toast({ title: "Transaction Posted" });
+            fetchTX(businessId);
+            setFormData({ description: '', amount: 0, type: 'Income', category: 'Services' });
+        }
     }
 
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <CardTitle className="font-headline">Transactions</CardTitle>
-                        <CardDescription>Live cloud ledger for your organization.</CardDescription>
-                    </div>
-                     <div className="flex flex-col sm:flex-row items-center gap-2">
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button className="w-full sm:w-auto">
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Add Transaction
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
-                                <div className="grid gap-4 py-4">
-                                    <div className="space-y-2"><Label>Description</Label><Input value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} /></div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2"><Label>Amount (₦)</Label><Input type="number" value={formData.amount} onChange={(e) => setFormData({...formData, amount: parseFloat(e.target.value) || 0})} /></div>
-                                        <div className="space-y-2">
-                                            <Label>Type</Label>
-                                            <Select value={formData.type} onValueChange={(val: any) => setFormData({...formData, type: val})}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="Income">Income</SelectItem>
-                                                    <SelectItem value="Expense">Expense</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2"><Label>Date</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="outline" className="w-full justify-start text-left"><CalendarIcon className="mr-2 h-4 w-4" />{date ? format(date, "PPP") : 'Pick a date'}</Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={date} onSelect={setDate} initialFocus /></PopoverContent>
-                                        </Popover>
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button onClick={handleAddTransaction}>Record Transaction</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
+        <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="font-headline text-3xl font-bold">Financial Ledger</h1>
+                    <p className="text-muted-foreground text-sm">Strict multi-tenant transactional record.</p>
                 </div>
-            </CardHeader>
-            <CardContent>
-                <div className="rounded-md border">
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button><PlusCircle className="mr-2 h-4 w-4" /> Record Entry</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader><DialogTitle>Manual Journal Entry</DialogTitle></DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="space-y-2"><Label>Description</Label><Input value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} /></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label>Amount (₦)</Label><Input type="number" value={formData.amount} onChange={(e) => setFormData({...formData, amount: parseFloat(e.target.value) || 0})} /></div>
+                                <div className="space-y-2">
+                                    <Label>Type</Label>
+                                    <Select value={formData.type} onValueChange={(val: any) => setFormData({...formData, type: val})}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Income">Income (+)</SelectItem>
+                                            <SelectItem value="Expense">Expense (-)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button onClick={handleAddTransaction}>Post to Ledger</Button>
+                            </DialogClose>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+
+            <Card className="shadow-xl border-primary/5">
+                <CardContent className="p-0">
                     <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-muted/50">
                             <TableRow>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="hidden sm:table-cell">Category</TableHead>
-                                <TableHead className="hidden lg:table-cell">Date</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead className="pl-6">Description</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right pr-6">Amount</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredTransactions.map((tx) => (
-                                <TableRow key={tx.id}>
-                                    <TableCell className="font-medium">{tx.description}</TableCell>
-                                    <TableCell className="hidden sm:table-cell"><Badge variant="outline">{tx.category}</Badge></TableCell>
-                                    <TableCell className="hidden lg:table-cell">{tx.date}</TableCell>
-                                    <TableCell className="text-right">
-                                        <Badge variant={tx.type === 'Income' ? 'default' : 'destructive'}>
-                                            {tx.type === 'Income' ? '+' : '-'}₦{tx.amount.toLocaleString()}
-                                        </Badge>
+                            {transactions.map((tx) => (
+                                <TableRow key={tx.id} className="hover:bg-primary/5 transition-colors">
+                                    <TableCell className="pl-6">
+                                        <div className="flex items-center gap-2">
+                                            {tx.type === 'Income' ? <TrendingUp className="h-4 w-4 text-emerald-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
+                                            <span className="font-bold">{tx.description}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell><Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-tighter">{tx.category}</Badge></TableCell>
+                                    <TableCell className="text-xs text-muted-foreground">{tx.date}</TableCell>
+                                    <TableCell className="text-right pr-6 font-mono font-bold">
+                                        <span className={tx.type === 'Income' ? 'text-emerald-600' : 'text-red-600'}>
+                                            {tx.type === 'Income' ? '+' : '-'}₦{Number(tx.amount).toLocaleString()}
+                                        </span>
                                     </TableCell>
                                 </TableRow>
                             ))}
-                            {filteredTransactions.length === 0 && (
-                                <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No transactions found.</TableCell></TableRow>
-                            )}
                         </TableBody>
                     </Table>
-                </div>
-            </CardContent>
-        </Card>
+                </CardContent>
+            </Card>
+        </div>
     );
 }
