@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
@@ -52,6 +51,7 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { AIAssistant } from './ai-assistant';
 import type { BusinessType } from '@/lib/data';
+import { MobileNav } from './mobile-nav';
 
 function NavItem({ item, pathname }: { item: any, pathname: string }) {
     const { setOpenMobile, isMobile } = useSidebar();
@@ -167,7 +167,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ] : []),
     ...(userPermissions.includes('transactions') ? [{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight }] : []),
     ...(userPermissions.includes('invoices') ? [{ href: '/invoices', label: 'Invoices & Receipts', icon: Receipt }] : []),
-    ...(userPermissions.includes('catalog') ? [{ href: '/catalog', label: businessType === 'SERVICE' ? 'Service Menu' : 'Inventory', icon: Package }] : []),
+    ...(userPermissions.includes('catalog') ? [{ href: '/catalog', label: 'Inventory', icon: Package }] : []),
     ...(userPermissions.includes('storefront') ? [{ href: '/storefront', label: 'Storefront', icon: Store }] : []),
     ...(userPermissions.includes('accounting') ? [{
       href: '/accounting',
@@ -218,7 +218,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon">
+      <Sidebar collapsible="icon" className="hidden lg:flex">
         <SidebarHeader>
             <div className="flex items-center gap-2 p-2">
                 {logoUrl ? (
@@ -263,9 +263,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Sidebar>
       <SidebarInset>
         <Header />
-        <main className="p-4 lg:p-8 flex-1 overflow-auto bg-muted/5">
+        <main className="p-4 lg:p-8 flex-1 overflow-auto bg-muted/5 pb-20 lg:pb-8">
           {children}
         </main>
+        <MobileNav />
         <AIAssistant />
       </SidebarInset>
     </SidebarProvider>
