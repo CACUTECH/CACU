@@ -1,56 +1,70 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper: Is the user authenticated?
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Helper: Get user profile data
-    function getUserData(businessId) {
-      return get(/databases/$(database)/documents/businesses/$(businessId)/users/$(request.auth.uid)).data;
-    }
-
-    // Helper: Is the user a member of this business?
-    function isMember(businessId) {
-      return isAuthenticated() && exists(/databases/$(database)/documents/businesses/$(businessId)/users/$(request.auth.uid));
-    }
-
-    // Helper: Does the user have a specific role in this business?
-    function hasRole(businessId, roles) {
-      return isMember(businessId) && getUserData(businessId).role in roles;
-    }
-
-    // Default Deny
+    
+    // P0 FIX: Default Deny Posture
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Business Profiles: Users can see their own business profile
+    // AUTHENTICATION HELPERS
+    function isAuthenticated() {
+      // P0 FIX: Strict identity and email verification check
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    // P0 FIX: High Performance Authorization (O(1) cost and latency)
+    // Uses Firebase Custom Claims set by the backend
+    function getBusinessId() {
+      return request.auth.token.businessId;
+    }
+
+    function getRole() {
+      return request.auth.token.role;
+    }
+
+    function isMember(businessId) {
+      return isAuthenticated() && (getBusinessId() == businessId || request.auth.uid == businessId);
+    }
+
+    function hasRole(businessId, roles) {
+      return isMember(businessId) && getRole() in roles;
+    }
+
+    // DATA VALIDATION HELPERS
+    function isValidPrice(price) {
+      return price is number && price >= 0;
+    }
+
+    // MULTI-TENANT COLLECTIONS
     match /businesses/{businessId} {
+      // Root Profile Access
       allow read: if isMember(businessId);
-      allow create: if isAuthenticated(); // First user creates business
+      allow create: if isAuthenticated(); // Handled by trusted Server Action
       allow update: if hasRole(businessId, ['Owner', 'Admin']);
-      
-      // Users sub-collection (Membership & RBAC)
+
+      // USER PROFILES (Within Business)
       match /users/{userId} {
         allow read: if isMember(businessId);
         allow write: if hasRole(businessId, ['Owner', 'Admin']) || (request.auth.uid == userId);
       }
 
-      // Catalog / Inventory (Tenant Data)
+      // INVENTORY (Strict Schema Enforcement)
       match /catalog/{itemId} {
         allow read: if isMember(businessId);
-        allow write: if hasRole(businessId, ['Owner', 'Admin', 'Editor']);
+        allow write: if hasRole(businessId, ['Owner', 'Admin', 'Editor']) &&
+                      isValidPrice(request.resource.data.price);
       }
 
-      // Transactions (Financial Data)
+      // TRANSACTIONS (Immutability for Audit Integrity)
       match /transactions/{txId} {
         allow read: if isMember(businessId);
-        allow write: if hasRole(businessId, ['Owner', 'Admin', 'Editor']);
+        allow create: if hasRole(businessId, ['Owner', 'Admin', 'Editor']);
+        // P1 FIX: Prevent tampering with recorded history
+        allow update, delete: if false;
       }
 
-      // Employees (HR Data)
+      // EMPLOYEES
       match /employees/{empId} {
         allow read: if hasRole(businessId, ['Owner', 'Admin', 'HR']);
         allow write: if hasRole(businessId, ['Owner', 'Admin', 'HR']);

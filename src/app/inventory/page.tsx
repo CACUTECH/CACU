@@ -44,7 +44,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useUser, useCollection, useDoc } from '@/firebase';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -77,7 +77,9 @@ export default function InventoryPage() {
     // Context Loading
     const businessId = user?.uid;
     const itemsRef = businessId ? collection(db, 'businesses', businessId, 'catalog') : null;
-    const itemsQuery = itemsRef ? query(itemsRef, orderBy('name')) : null;
+    
+    // P2 FIX: Implement strict limits to prevent DoW read spikes
+    const itemsQuery = itemsRef ? query(itemsRef, orderBy('name'), limit(50)) : null;
     const { data: inventoryItems, loading } = useCollection<CatalogItem>(itemsQuery);
 
     const [editingItem, setEditingItem] = React.useState<CatalogItem | null>(null);

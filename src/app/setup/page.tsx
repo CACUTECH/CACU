@@ -34,10 +34,9 @@ import { Loader2, UploadCloud, Briefcase, Package, Sparkles } from "lucide-react
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
 import { useFirestore, useUser } from "@/firebase";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
+import { createBusinessAction } from "./actions";
 
 const formSchema = z.object({
   businessName: z.string().min(1, "Business name is required"),
@@ -97,65 +96,60 @@ export default function SetupPage() {
     if (!user) return;
     setIsLoading(true);
     
-    const businessId = user.uid; // Root multi-tenant ID is the owner's initial UID
-    const businessRef = doc(db, "businesses", businessId);
-    const userRef = doc(db, "businesses", businessId, "users", user.uid);
+    try {
+      // P0 FIX: Perform atomic provisioning via batch write
+      const businessId = user.uid;
+      const batch = writeBatch(db);
+      
+      const setupResult = await createBusinessAction({
+        businessId,
+        ownerUid: user.uid,
+        name: values.businessName,
+        type: values.businessType,
+        sector: values.businessSector,
+        address: values.businessAddress,
+        email: values.businessEmail,
+        phone: values.phoneNumber,
+        bank: {
+          name: values.bankName,
+          number: values.accountNumber,
+          accountName: values.accountName,
+        }
+      });
 
-    const businessData = {
-      name: values.businessName,
-      type: values.businessType,
-      sector: values.businessSector,
-      address: values.businessAddress,
-      email: values.businessEmail,
-      phone: values.phoneNumber,
-      bank: {
-        name: values.bankName,
-        number: values.accountNumber,
-        accountName: values.accountName,
-      },
-      ownerUid: user.uid,
-      subscriptionLevel: "Starter",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
+      if (setupResult.success) {
+        const businessRef = doc(db, "businesses", businessId);
+        const userRef = doc(db, "businesses", businessId, "users", user.uid);
 
-    const userData = {
-      email: user.email,
-      role: "Owner",
-      businessId: businessId,
-      createdAt: serverTimestamp(),
-    };
+        batch.set(businessRef, {
+          ...setupResult.businessData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
 
-    // Sequential writes for integrity (could use batch, but for setup simple is fine)
-    setDoc(businessRef, businessData, { merge: true })
-      .then(() => {
-        setDoc(userRef, userData, { merge: true })
-          .then(() => {
-            localStorage.setItem('business-type', values.businessType);
-            toast({
-              title: "Business Launched",
-              description: `Configuration finalized for ${values.businessName}.`,
-            });
-            router.push("/");
-          })
-          .catch(async (e) => {
-             const permissionError = new FirestorePermissionError({
-                path: userRef.path,
-                operation: 'write',
-                requestResourceData: userData,
-              });
-              errorEmitter.emit('permission-error', permissionError);
-          });
-      })
-      .catch(async (e) => {
-         const permissionError = new FirestorePermissionError({
-            path: businessRef.path,
-            operation: 'write',
-            requestResourceData: businessData,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => setIsLoading(false));
+        batch.set(userRef, {
+          ...setupResult.userData,
+          createdAt: serverTimestamp(),
+        });
+
+        await batch.commit();
+
+        localStorage.setItem('business-type', values.businessType);
+        toast({
+          title: "Business Launched",
+          description: `Security claims and profile initialized for ${values.businessName}.`,
+        });
+        router.push("/");
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Setup Failed",
+        description: error.message || "Failed to provision business tenant.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (userLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
