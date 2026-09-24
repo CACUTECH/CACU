@@ -1,4 +1,3 @@
-
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +6,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { SubscriptionProvider } from '@/components/subscription-guard';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { BusinessProvider } from '@/components/business-provider';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 export const metadata: Metadata = {
   title: 'CACU',
@@ -31,9 +31,11 @@ export default function RootLayout({
           <ThemeProvider>
             <SubscriptionProvider>
               <BusinessProvider>
-                <AppLayout>
-                  {children}
-                </AppLayout>
+                <ErrorBoundary>
+                  <AppLayout>
+                    {children}
+                  </AppLayout>
+                </ErrorBoundary>
                 <Toaster />
               </BusinessProvider>
             </SubscriptionProvider>

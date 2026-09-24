@@ -1,6 +1,6 @@
-
 import { BaseService } from './base-service';
 import { NotificationService } from './notification-service';
+import { logger } from '@/lib/logger';
 
 /**
  * @fileOverview SalesService handles POS checkouts and atomic retail operations.
@@ -12,6 +12,7 @@ export class SalesService extends BaseService {
     totalAmount: number;
     customerId?: string;
   }) {
+    const startTime = Date.now();
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
 
@@ -28,12 +29,18 @@ export class SalesService extends BaseService {
       p_total_amount: input.totalAmount
     });
 
+    const duration = Date.now() - startTime;
+    logger.perf('Process Sale', duration, { businessId, itemCount: input.items.length }, this.serviceName);
+
     if (error) {
+      this.logError('Checkout Failed', error, { input, businessId });
       if (error.message.includes('Insufficient stock')) {
           throw new Error(`Inventory Error: ${error.message}`);
       }
       throw new Error(`Checkout Error: ${error.message || 'Atomic transaction failed'}`);
     }
+
+    this.logInfo('Sale Processed Successfully', { saleId: data, businessId });
 
     // Post-Sale Operations
     this.checkInventoryThresholds(input.items);
@@ -74,7 +81,10 @@ export class SalesService extends BaseService {
       .order('created_at', { ascending: false })
       .limit(50);
 
-    if (error) throw error;
+    if (error) {
+      this.logError('Get Recent Sales Failed', error, { businessId });
+      throw error;
+    }
     return data;
   }
 }
