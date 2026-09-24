@@ -1,11 +1,9 @@
 'use server';
 
 import { z } from "zod";
-import { format } from "date-fns";
+import { createClient } from "@/lib/supabase/server";
 
 const businessSchema = z.object({
-  businessId: z.string(),
-  ownerUid: z.string(),
   name: z.string().min(1),
   type: z.enum(['PRODUCT', 'SERVICE', 'HYBRID']),
   sector: z.string(),
@@ -19,32 +17,51 @@ const businessSchema = z.object({
   }),
 });
 
-/**
- * Server Action to provision a new business tenant atomically.
- * In a full production environment, this would use the Firebase Admin SDK 
- * to set Custom Claims (businessId and role) for the user.
- */
 export async function createBusinessAction(data: z.infer<typeof businessSchema>) {
-  // Validate input server-side
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Unauthorized");
+
   const validated = businessSchema.parse(data);
 
-  // Note: This logic assumes the caller is authenticated via Firebase.
-  // We return the structured data to be written via a batch or secure client call 
-  // (or perform the Admin write here if Admin SDK is configured).
-  
-  return {
-    success: true,
-    businessData: {
-      ...validated,
-      subscriptionLevel: "Starter",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    userData: {
+  // Use a transaction-like approach in Supabase
+  // 1. Create Business
+  const { data: business, error: bizError } = await supabase
+    .from('businesses')
+    .insert({
+      name: validated.name,
+      business_type: validated.type,
+      sector: validated.sector,
+      address: validated.address,
       email: validated.email,
-      role: "Owner",
-      businessId: validated.businessId,
-      createdAt: new Date().toISOString(),
-    }
-  };
+      phone: validated.phone,
+      bank_name: validated.bank.name,
+      account_number: validated.bank.number,
+      account_name: validated.bank.accountName,
+    })
+    .select()
+    .single();
+
+  if (bizError) throw bizError;
+
+  // 2. Create Profile (if not exists)
+  await supabase.from('profiles').upsert({
+    id: user.id,
+    email: user.email!,
+    full_name: user.user_metadata.full_name || validated.name,
+  });
+
+  // 3. Create Business Membership (Owner)
+  const { error: memberError } = await supabase
+    .from('business_members')
+    .insert({
+      business_id: business.id,
+      user_id: user.id,
+      role: 'Owner',
+    });
+
+  if (memberError) throw memberError;
+
+  return { success: true, businessId: business.id };
 }
