@@ -2,22 +2,41 @@
 import { BaseService } from './base-service';
 
 /**
- * @fileOverview InventoryService manages the business catalog of products and services.
- * Integrates with PostgreSQL catalog_items table with strict multi-tenant isolation.
+ * @fileOverview InventoryService manages the business catalog.
+ * Optimized with server-side search and pagination for million-row scale.
  */
 export class InventoryService extends BaseService {
-  async listItems() {
+  
+  async listItems(options: { 
+    search?: string; 
+    type?: 'Product' | 'Service'; 
+    limit?: number; 
+    offset?: number;
+  } = {}) {
     const { supabase, businessId } = await this.getContext();
-    if (!businessId) return [];
+    if (!businessId) return { data: [], total: 0 };
 
-    const { data, error } = await supabase
+    const { limit = 20, offset = 0, search, type } = options;
+
+    let query = supabase
       .from('catalog_items')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('business_id', businessId)
       .order('name');
 
+    if (type) {
+      query = query.eq('type', type);
+    }
+
+    if (search) {
+      // Leverages pg_trgm index for fast fuzzy matching
+      query = query.ilike('name', `%${search}%`);
+    }
+
+    const { data, count, error } = await query.range(offset, offset + limit - 1);
+
     if (error) throw error;
-    return data;
+    return { data: data || [], total: count || 0 };
   }
 
   async upsertItem(item: any) {
@@ -25,7 +44,6 @@ export class InventoryService extends BaseService {
     if (!businessId) throw new Error('Business context missing');
     if (role === 'Viewer') throw new Error('Insufficient permissions');
 
-    // Schema Enforcement
     const data = {
       ...item,
       business_id: businessId,
@@ -56,33 +74,15 @@ export class InventoryService extends BaseService {
     return true;
   }
 
-  /**
-   * Atomic inventory adjustment
-   */
-  async updateStock(id: string, delta: number) {
+  async adjustStockAtomic(id: string, delta: number) {
     const { supabase, businessId } = await this.getContext();
-    
-    const { data: item, error: fetchError } = await supabase
-      .from('catalog_items')
-      .select('quantity')
-      .eq('id', id)
-      .eq('business_id', businessId)
-      .single();
-
-    if (fetchError || !item) throw new Error('Item not found');
-
-    const newQty = (item.quantity || 0) + delta;
-    if (newQty < 0) throw new Error('Insufficient stock');
-
-    const { error: updateError } = await supabase
-      .from('catalog_items')
-      .update({ 
-        quantity: newQty,
-        status: newQty === 0 ? 'Out of Stock' : 'Active'
-      })
-      .eq('id', id);
-
-    if (updateError) throw updateError;
+    // Uses PostgreSQL atomic increment/decrement to prevent race conditions
+    const { error } = await supabase.rpc('adjust_inventory_stock', {
+      p_item_id: id,
+      p_business_id: businessId,
+      p_delta: delta
+    });
+    if (error) throw error;
     return true;
   }
 }
