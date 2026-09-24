@@ -1,42 +1,41 @@
 # CACU Deployment Guide (Vercel & Supabase)
 
-This document outlines the high-integrity workflow for deploying CACU to production.
+This document outlines the high-integrity workflow for deploying CACU to staging and production.
 
-## 1. Git Workflow
-All changes must follow this lifecycle to maintain financial and security integrity:
+## 1. Environment Strategy
 
-1.  **Feature Branch**: Create a branch `feat/your-feature`.
-2.  **Pull Request**: Open a PR to `main`.
-3.  **CI Validation**: GitHub Actions will automatically run:
-    *   `npm run lint` (Code Quality)
-    *   `npm run typecheck` (Type Safety)
-    *   `npm run test` (Security & Financial Integrity Suite)
-    *   `npm run build` (Production Build Verification)
-4.  **Preview Deployment**: Vercel generates a preview URL for QA.
-5.  **Merge & Deploy**: Merging to `main` triggers the production deployment.
+We maintain three strictly isolated environments:
 
-## 2. Environment Variables & Secrets
-Secrets are managed in the Vercel and Supabase dashboards. **Never commit secrets to Git.**
+| Environment | Purpose | Vercel Scope | Supabase Project |
+| :--- | :--- | :--- | :--- |
+| **Development** | Local coding | `development` | Local / Dev Project |
+| **Staging** | QA & Regression | `preview` (branch: `staging`) | Staging Project |
+| **Production** | Live Users | `production` | Production Project |
 
-| Variable | Dev / Preview (Staging) | Production |
+## 2. Git Workflow (Promote-to-Prod)
+
+1.  **Feature**: Create `feat/your-feature` -> PR to `main`.
+2.  **Verify**: GitHub Actions run lint/typecheck/tests.
+3.  **Staging**: Merge to `staging` branch. Vercel deploys to Staging URL.
+4.  **QA**: Run Staging Smoke Tests at `/admin/staging`.
+5.  **Release**: PR from `staging` to `main`.
+6.  **Production**: Merging to `main` triggers production deploy.
+
+## 3. Environment Variables & Secrets
+
+**NEVER share keys between Staging and Production.**
+
+| Variable | Staging (Preview) | Production |
 | :--- | :--- | :--- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Staging Project URL | Production Project URL |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://staging-xyz.supabase.co` | `https://prod-abc.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Staging Anon Key | Production Anon Key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Staging Service Role | Production Service Role |
 | `GEMINI_API_KEY` | Sandbox Key | Production Key |
 
-## 3. Database Migration Safety
-Production database schema changes must be managed via Supabase CLI migrations:
+## 4. Staging Data Policy
 
-1.  Create migration: `npx supabase migration new your_change`
-2.  Test locally: `npx supabase db reset`
-3.  Apply to Production: Use the Supabase dashboard "SQL Editor" or linked GitHub migration workflow.
+*   **Anonymization**: If production data is required for testing, use a script to redact `email`, `phone`, and `bank_account` fields before importing to Staging.
+*   **Wiping**: Staging database can be reset (`db reset`) during major version upgrades.
 
-**Warning**: Never run `db reset` or destructive SQL against the production instance.
-
-## 4. Post-Deployment Verification
-After every production deploy, verify:
-1.  **Login**: Ensure sessions persist correctly.
-2.  **Ledger**: Post a test ₦1 transaction and verify the Audit Log.
-3.  **Storage**: Upload a test logo and verify the RLS isolation.
-4.  **AI**: Run an onboarding document generation test.
+## 5. Post-Deployment (Staging)
+Verify all systems via the **Staging Command Center**: `https://staging.cacu.app/admin/staging`
