@@ -1,3 +1,4 @@
+
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -5,6 +6,7 @@ import AppLayout from '@/components/app-layout';
 import { ThemeProvider } from '@/components/theme-provider';
 import { SubscriptionProvider } from '@/components/subscription-guard';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { BusinessProvider } from '@/components/business-provider';
 
 export const metadata: Metadata = {
   title: 'CACU',
@@ -28,10 +30,12 @@ export default function RootLayout({
         <FirebaseClientProvider>
           <ThemeProvider>
             <SubscriptionProvider>
-              <AppLayout>
-                {children}
-              </AppLayout>
-              <Toaster />
+              <BusinessProvider>
+                <AppLayout>
+                  {children}
+                </AppLayout>
+                <Toaster />
+              </BusinessProvider>
             </SubscriptionProvider>
           </ThemeProvider>
         </FirebaseClientProvider>

@@ -20,7 +20,7 @@ export class BusinessService extends BaseService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    // Atomic provisioning of Business, Profile, and Membership
+    // Atomic provisioning
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .insert({
@@ -56,6 +56,22 @@ export class BusinessService extends BaseService {
     if (memberError) throw new Error(`Membership Initialization Failed: ${memberError.message}`);
 
     return business;
+  }
+
+  async updateBusiness(id: string, data: Partial<CreateBusinessInput>) {
+    const { supabase, businessId, role } = await this.getContext();
+    if (!businessId || id !== businessId) throw new Error('Unauthorized');
+    if (role !== 'Owner' && role !== 'Admin') throw new Error('Insufficient permissions');
+
+    const { data: updated, error } = await supabase
+      .from('businesses')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return updated;
   }
 
   async getActiveBusiness() {
