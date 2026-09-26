@@ -26,9 +26,9 @@ describe('BusinessService', () => {
     })).rejects.toThrow('Unauthorized');
   });
 
-  it('should initialize membership as Owner during creation', async () => {
+  it('should create the business and profile (owner membership is handled by a DB trigger, not application code)', async () => {
     const mockSupabase = await (createClient as jest.Mock)();
-    const result = await service.createBusiness({
+    await service.createBusiness({
       name: 'Safe Biz',
       type: 'HYBRID',
       sector: 'IT',
@@ -40,7 +40,7 @@ describe('BusinessService', () => {
       account_name: 'Test'
     });
 
-    // Check if membership insert was called
-    expect(mockSupabase.from).toHaveBeenCalledWith('memberships');
+    expect(mockSupabase.from).toHaveBeenCalledWith('businesses');
+    expect(mockSupabase.from).toHaveBeenCalledWith('profiles');
   });
 });

@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * @fileOverview Structured Logger for CACU Production.
  * Outputs JSON logs for automated ingestion by log management platforms.

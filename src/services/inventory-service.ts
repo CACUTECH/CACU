@@ -25,7 +25,7 @@ export class InventoryService extends BaseService {
       .order('name');
 
     if (type) {
-      query = query.eq('item_type', type);
+      query = query.eq('item_type', type.toUpperCase());
     }
 
     if (search) {
@@ -50,7 +50,7 @@ export class InventoryService extends BaseService {
       business_id: businessId,
       updated_at: new Date().toISOString()
     };
-    if (type !== undefined) data.item_type = type;
+    if (type !== undefined) data.item_type = type.toUpperCase();
     if (price !== undefined) data.unit_price = price;
     if (quantity !== undefined) data.stock_quantity = quantity;
     if (status !== undefined) data.is_active = status === 'Active';

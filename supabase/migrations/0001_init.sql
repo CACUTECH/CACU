@@ -402,9 +402,9 @@ CREATE OR REPLACE VIEW view_inventory_valuation
 WITH (security_invoker = true) AS
 SELECT
   business_id,
-  COUNT(*) FILTER (WHERE item_type = 'Product') AS total_skus,
-  COALESCE(SUM(unit_price * stock_quantity) FILTER (WHERE item_type = 'Product'), 0) AS total_asset_value,
-  COUNT(*) FILTER (WHERE item_type = 'Product' AND stock_quantity <= reorder_level) AS low_stock_count
+  COUNT(*) FILTER (WHERE item_type = 'PRODUCT') AS total_skus,
+  COALESCE(SUM(unit_price * stock_quantity) FILTER (WHERE item_type = 'PRODUCT'), 0) AS total_asset_value,
+  COUNT(*) FILTER (WHERE item_type = 'PRODUCT' AND stock_quantity <= reorder_level) AS low_stock_count
 FROM catalog_items
 GROUP BY business_id;
 

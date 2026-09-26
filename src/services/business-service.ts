@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { BaseService } from './base-service';
 import { createClient } from '@/lib/supabase/server';
 
@@ -19,9 +20,19 @@ export class BusinessService extends BaseService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    const { data: business, error: bizError } = await supabase
+    // Insert without .select(): Postgres 15+ also checks the SELECT policy
+    // (businesses_select_members, which depends on the caller already being
+    // a member) against an INSERT's RETURNING data. The AFTER INSERT trigger
+    // handle_new_business() creates that membership row, but its effect
+    // isn't reliably visible to the RETURNING check in the same statement,
+    // so a chained .select() intermittently fails with a false RLS
+    // rejection. Fetching the row in a separate follow-up query sidesteps
+    // the race entirely, once the trigger has definitely committed.
+    const id = randomUUID();
+    const { error: bizError } = await supabase
       .from('businesses')
       .insert({
+        id,
         name: input.name,
         business_type: input.type,
         sector: input.sector,
@@ -32,11 +43,17 @@ export class BusinessService extends BaseService {
         bank_account_number: input.account_number,
         bank_account_name: input.account_name,
         created_by: user.id
-      })
-      .select()
-      .single();
+      });
 
     if (bizError) throw new Error(`Business Provisioning Failed: ${bizError.message}`);
+
+    const { data: business, error: fetchError } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw new Error(`Business Provisioning Failed: ${fetchError.message}`);
 
     await supabase.from('profiles').upsert({
       id: user.id,
@@ -44,15 +61,9 @@ export class BusinessService extends BaseService {
       full_name: user.user_metadata?.full_name || input.name,
     });
 
-    const { error: memberError } = await supabase
-      .from('memberships')
-      .insert({
-        business_id: business.id,
-        user_id: user.id,
-        role: 'owner',
-      });
-
-    if (memberError) throw new Error(`Membership Initialization Failed: ${memberError.message}`);
+    // Owner membership is created automatically by the
+    // businesses_create_owner_membership trigger (handle_new_business()) —
+    // no manual insert needed here.
 
     // Welcome Notification via direct insert to bypass Service lifecycle for first-run
     await supabase.from('notifications').insert({

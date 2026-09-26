@@ -137,7 +137,7 @@ export class ReportService extends BaseService {
       .from('catalog_items')
       .select('unit_price, stock_quantity')
       .eq('business_id', businessId)
-      .eq('item_type', 'Product');
+      .eq('item_type', 'PRODUCT');
 
     if (invError) throw invError;
 

@@ -187,7 +187,7 @@ export default function CatalogPage() {
                                     <TableCell className="pl-6">
                                         <div className="flex items-center gap-3">
                                             <div className="bg-primary/5 p-2 rounded-lg">
-                                                {item.type === 'Product' ? <Box className="h-4 w-4 text-primary" /> : <Clock className="h-4 w-4 text-primary" />}
+                                                {item.type?.toUpperCase() === 'PRODUCT' ? <Box className="h-4 w-4 text-primary" /> : <Clock className="h-4 w-4 text-primary" />}
                                             </div>
                                             <div className="font-bold text-sm">{item.name}</div>
                                         </div>
@@ -195,7 +195,7 @@ export default function CatalogPage() {
                                     <TableCell><Badge variant="outline" className="text-[10px] uppercase">{item.type}</Badge></TableCell>
                                     <TableCell className="text-right font-bold font-mono">₦{Number(item.price).toLocaleString()}</TableCell>
                                     <TableCell className="text-center font-mono text-xs">
-                                        {item.type === 'Product' ? `${item.quantity} units` : `${item.duration} mins`}
+                                        {item.type?.toUpperCase() === 'PRODUCT' ? `${item.quantity} units` : `${item.duration} mins`}
                                     </TableCell>
                                     <TableCell className="text-right pr-6">
                                         <DropdownMenu>
