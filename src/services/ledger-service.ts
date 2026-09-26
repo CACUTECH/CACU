@@ -55,13 +55,14 @@ export class LedgerService extends BaseService {
     if (error) throw error;
 
     // Manual audit log for traceable manual adjustments
-    await supabase.rpc('record_audit', {
+    const { error: auditError } = await supabase.rpc('record_audit', {
         p_business_id: businessId,
         p_action: 'MANUAL_JOURNAL_ENTRY',
         p_table: 'financial_transactions',
         p_record_id: result.id,
-        p_details: jsonb_build_object('amount', entry.amount, 'type', entry.type)
-    }).catch(e => console.warn('Audit logging failed, but transaction committed.'));
+        p_details: { amount: entry.amount, type: entry.type }
+    });
+    if (auditError) console.warn('Audit logging failed, but transaction committed.', auditError);
 
     return result;
   }

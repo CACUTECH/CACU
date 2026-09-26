@@ -48,8 +48,8 @@ export default function InventoryPage() {
         setLoading(true);
         const { data, error } = await supabase
             .from('catalog_items')
-            .select('*')
-            .eq('type', 'Product')
+            .select('*, type:item_type, price:unit_price, quantity:stock_quantity')
+            .eq('item_type', 'Product')
             .order('name');
         
         if (error) {

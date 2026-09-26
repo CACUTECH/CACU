@@ -454,7 +454,7 @@ export default function JobsPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="text-xs space-y-3">
-                        <p className="text-muted-foreground italic">"Ensure all inspection photos are uploaded before marking a job as Completed."</p>
+                        <p className="text-muted-foreground italic">&quot;Ensure all inspection photos are uploaded before marking a job as Completed.&quot;</p>
                         <div className="flex items-center gap-2 text-emerald-600 font-bold uppercase tracking-tighter">
                             <AlertCircle className="h-3 w-3" /> QA Standards Applied
                         </div>

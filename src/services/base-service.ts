@@ -26,7 +26,7 @@ export abstract class BaseService {
     }
 
     const { data: membership, error: memberError } = await supabase
-      .from('business_members')
+      .from('memberships')
       .select('business_id, role')
       .eq('user_id', user.id)
       .limit(1)

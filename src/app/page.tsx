@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useRouter } from 'next/navigation';
 import { useBusiness } from '@/components/business-provider';
 import { getDashboardStatsAction, getRevenueTrendAction } from './reports/actions';
 
@@ -72,14 +73,24 @@ function QuickAction({ icon: Icon, label, href, color = 'bg-primary' }: any) {
 }
 
 export default function DashboardPage() {
-  const { business } = useBusiness();
+  const router = useRouter();
+  const { business, loading: businessLoading } = useBusiness();
   const [loading, setLoading] = React.useState(true);
   const [stats, setStats] = React.useState<any>(null);
   const [trendData, setTrendData] = React.useState<any[]>([]);
   const [granularity, setGranularity] = React.useState<'day' | 'week' | 'month'>('month');
 
+  React.useEffect(() => {
+    if (!businessLoading && !business) {
+      router.push('/setup');
+    }
+  }, [businessLoading, business, router]);
+
   const fetchData = React.useCallback(async () => {
-    if (!business) return;
+    if (!business) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const start = startOfMonth(new Date()).toISOString();
     const end = endOfMonth(new Date()).toISOString();
@@ -98,7 +109,7 @@ export default function DashboardPage() {
     fetchData();
   }, [fetchData]);
 
-  if (loading && !stats) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+  if (businessLoading || (loading && !stats) || !business) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
 
   return (
     <div className="flex flex-col gap-8 pb-12">

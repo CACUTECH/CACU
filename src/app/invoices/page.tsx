@@ -103,7 +103,7 @@ type Invoice = {
 
 const downloadPdf = async (invoice: Invoice) => {
     const { default: jsPDF } = await import('jspdf');
-    require('jspdf-autotable');
+    await import('jspdf-autotable');
     const doc = new jsPDF();
     const typeLabel = invoice.type === 'CreditMemo' ? 'Credit Memo' : invoice.type;
 
@@ -136,9 +136,9 @@ export default function InvoicesPage() {
   const fetchData = React.useCallback(async () => {
     setLoading(true);
     const [invRes, custRes, itemRes] = await Promise.all([
-        supabase.from('invoices').select('*, customers(name)').order('created_at', { ascending: false }),
+        supabase.from('invoices').select('*, date:issue_date, customers(name)').order('created_at', { ascending: false }),
         supabase.from('customers').select('id, name').order('name'),
-        supabase.from('catalog_items').select('id, name, price').order('name')
+        supabase.from('catalog_items').select('id, name, price:unit_price').order('name')
     ]);
 
     if (!invRes.error) {

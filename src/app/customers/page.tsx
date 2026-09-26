@@ -81,7 +81,7 @@ export default function CustomersPage() {
         setLoading(true);
         const { data, error } = await supabase
             .from('customers')
-            .select('*')
+            .select('*, phone:phone_number')
             .order('name');
         
         if (error) {
@@ -186,7 +186,7 @@ export default function CustomersPage() {
                                 {filteredCustomers.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                                            No customers found matching "{searchTerm}"
+                                            No customers found matching &quot;{searchTerm}&quot;
                                         </TableCell>
                                     </TableRow>
                                 ) : filteredCustomers.map(customer => (

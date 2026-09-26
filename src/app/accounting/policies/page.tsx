@@ -199,7 +199,7 @@ export default function AccountingPoliciesPage() {
                             <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Why Policies Matter?</CardTitle>
                         </CardHeader>
                         <CardContent className="text-xs space-y-3 text-muted-foreground">
-                            <p>Consistency in accounting policies is crucial for multi-year trend analysis. Changing a policy usually requires restating previous years' results.</p>
+                            <p>Consistency in accounting policies is crucial for multi-year trend analysis. Changing a policy usually requires restating previous years&apos; results.</p>
                             <div className="flex items-center gap-2 text-emerald-600 font-bold uppercase tracking-tighter">
                                 <CheckCircle2 className="h-3 w-3" /> Audit Ready
                             </div>

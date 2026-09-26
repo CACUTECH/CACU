@@ -1,4 +1,5 @@
 import { LedgerService } from '@/services/ledger-service';
+import { CustomerService } from '@/services/customer-service';
 import { createClient } from '@/lib/supabase/server';
 
 describe('Multi-Tenant Isolation Security Tests', () => {
@@ -39,17 +40,17 @@ describe('Multi-Tenant Isolation Security Tests', () => {
      (service as any).getContext = jest.fn().mockResolvedValue({
         supabase: mockSupabase,
         businessId: 'biz-1',
-        role: 'Viewer'
+        role: 'viewer'
      });
 
      // recordEntry doesn't have explicit role check but relies on RLS
      // but we can add one in ledger-service.ts later if needed.
      // For now we test existing CustomerService which has the check
-     const customerService = new (require('@/services/customer-service').CustomerService)();
+     const customerService = new CustomerService();
      (customerService as any).getContext = jest.fn().mockResolvedValue({
         supabase: mockSupabase,
         businessId: 'biz-1',
-        role: 'Viewer'
+        role: 'viewer'
      });
 
      await expect(customerService.upsertCustomer({ name: 'Hacker' })).rejects.toThrow('Insufficient permissions');

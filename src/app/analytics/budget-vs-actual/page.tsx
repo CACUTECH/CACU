@@ -181,7 +181,7 @@ export default function BudgetVsActualPage() {
                 <div className="flex flex-col justify-center gap-4 text-center md:text-left p-6">
                     <h3 className="font-headline text-xl font-bold">Optimize Your Cash Flow</h3>
                     <p className="text-muted-foreground text-sm">
-                        Use these variances to adjust your next month's planning. Our AI Assistant can help you find ways to cut costs in over-budget categories.
+                        Use these variances to adjust your next month&apos;s planning. Our AI Assistant can help you find ways to cut costs in over-budget categories.
                     </p>
                     <div className="flex flex-wrap gap-3 justify-center md:justify-start">
                         <Badge variant="outline" className="px-3 py-1 cursor-pointer hover:bg-primary/5">Adjust Budget</Badge>

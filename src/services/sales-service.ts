@@ -55,16 +55,16 @@ export class SalesService extends BaseService {
     for (const item of soldItems) {
       const { data: updatedItem } = await supabase
         .from('catalog_items')
-        .select('name, quantity, reorder_level')
+        .select('name, stock_quantity, reorder_level')
         .eq('id', item.id)
         .single();
 
-      if (updatedItem && updatedItem.quantity <= updatedItem.reorder_level) {
+      if (updatedItem && updatedItem.stock_quantity <= updatedItem.reorder_level) {
         await notificationService.trigger({
           title: 'Low Stock Alert',
-          message: `${updatedItem.name} has dropped to ${updatedItem.quantity} units. Please restock soon.`,
+          message: `${updatedItem.name} has dropped to ${updatedItem.stock_quantity} units. Please restock soon.`,
           type: 'LOW_STOCK',
-          metadata: { itemId: item.id, currentQty: updatedItem.quantity }
+          metadata: { itemId: item.id, currentQty: updatedItem.stock_quantity }
         });
       }
     }
@@ -75,7 +75,7 @@ export class SalesService extends BaseService {
     if (!businessId) return [];
 
     const { data, error } = await supabase
-      .from('sales')
+      .from('transactions')
       .select('*, customers(name)')
       .eq('business_id', businessId)
       .order('created_at', { ascending: false })

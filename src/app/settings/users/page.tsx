@@ -540,7 +540,7 @@ export default function UserManagementPage() {
                     <CardTitle className="text-base">Security & Access Note</CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">
-                    Owners and Admins always have unrestricted access to all features. Use the "Editor" or "Viewer" roles to grant limited access to specific sub-modules like POS or Reports for your operational staff.
+                    Owners and Admins always have unrestricted access to all features. Use the &quot;Editor&quot; or &quot;Viewer&quot; roles to grant limited access to specific sub-modules like POS or Reports for your operational staff.
                 </CardContent>
             </Card>
         </div>

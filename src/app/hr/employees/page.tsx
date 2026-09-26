@@ -51,8 +51,8 @@ export default function EmployeesPage() {
         setLoading(true);
         const { data, error } = await supabase
             .from('employees')
-            .select('*')
-            .order('name');
+            .select('*, name:full_name, role:job_title, status:employment_status, base_salary:monthly_salary')
+            .order('full_name');
         
         if (error) {
             toast({ variant: 'destructive', title: 'HR Sync Error', description: error.message });

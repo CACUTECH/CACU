@@ -31,11 +31,19 @@ describe('Financial Integrity Tests', () => {
         businessId: 'biz-123'
     });
 
-    // Mock stock level falling below threshold
-    mockSupabase.from().single.mockResolvedValueOnce({
-        data: { name: 'Running Low', quantity: 2, reorder_level: 5 },
-        error: null
-    });
+    // Mock stock level falling below threshold. checkInventoryThresholds
+    // constructs its own NotificationService internally, which resolves its
+    // *real* (unmocked) getContext() — that does a second `.single()` call
+    // against `memberships`, so it needs its own queued response too.
+    mockSupabase.from().single
+        .mockResolvedValueOnce({
+            data: { name: 'Running Low', stock_quantity: 2, reorder_level: 5 },
+            error: null
+        })
+        .mockResolvedValueOnce({
+            data: { business_id: 'biz-123', role: 'owner' },
+            error: null
+        });
 
     // Note: private method testing requires casting or public trigger
     await (service as any).checkInventoryThresholds([{ id: '1' }]);

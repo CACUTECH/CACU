@@ -29,7 +29,7 @@ export async function createBusinessAction(data: z.infer<typeof businessSchema>)
     if (!user) throw new Error('Unauthorized');
 
     const { data: existingMember } = await supabase
-      .from('business_members')
+      .from('memberships')
       .select('id')
       .eq('user_id', user.id)
       .maybeSingle();

@@ -65,10 +65,10 @@ export default function CatalogPage() {
         setLoading(true);
         let query = supabase
             .from('catalog_items')
-            .select('*', { count: 'exact' })
+            .select('*, type:item_type, price:unit_price, quantity:stock_quantity', { count: 'exact' })
             .order('name');
         
-        if (filter !== 'All') query = query.eq('type', filter);
+        if (filter !== 'All') query = query.eq('item_type', filter);
         if (searchTerm) query = query.ilike('name', `%${searchTerm}%`);
         
         const { data, count, error } = await query.range(page * limit, (page + 1) * limit - 1);

@@ -1,0 +1,11 @@
+project_id = "cacu"
+
+[db]
+port = 54322
+major_version = 15
+
+[api]
+port = 54321
+
+[studio]
+port = 54323

@@ -29,7 +29,7 @@ export default function TopSellingPage() {
     React.useEffect(() => {
         const fetch = async () => {
             const res = await getProductPerformanceAction();
-            if (res.success) setData(res.data);
+            if (res.success) setData(res.data || []);
             setLoading(false);
         };
         fetch();

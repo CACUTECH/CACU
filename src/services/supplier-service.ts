@@ -23,7 +23,7 @@ export class SupplierService extends BaseService {
   async upsertSupplier(supplier: any) {
     const { supabase, businessId, role } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
-    if (role === 'Viewer') throw new Error('Insufficient permissions');
+    if (role === 'viewer') throw new Error('Insufficient permissions');
 
     const payload = {
       ...supplier,
@@ -43,7 +43,7 @@ export class SupplierService extends BaseService {
 
   async deleteSupplier(id: string) {
     const { supabase, businessId, role } = await this.getContext();
-    if (role !== 'Owner' && role !== 'Admin') throw new Error('Access denied');
+    if (role !== 'owner' && role !== 'admin') throw new Error('Access denied');
 
     const { error } = await supabase
       .from('suppliers')

@@ -14,7 +14,7 @@ export class HRService extends BaseService {
       .from('employees')
       .select('*')
       .eq('business_id', businessId)
-      .order('name');
+      .order('full_name');
 
     if (error) throw error;
     return data;
@@ -24,14 +24,20 @@ export class HRService extends BaseService {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
 
+    const { name, role, base_salary, status, ...rest } = employee;
+    const payload: Record<string, unknown> = {
+      ...rest,
+      business_id: businessId,
+      employment_status: status || 'Active',
+      created_at: new Date().toISOString()
+    };
+    if (name !== undefined) payload.full_name = name;
+    if (role !== undefined) payload.job_title = role;
+    if (base_salary !== undefined) payload.monthly_salary = base_salary;
+
     const { data, error } = await supabase
       .from('employees')
-      .insert({
-        ...employee,
-        business_id: businessId,
-        status: employee.status || 'Active',
-        created_at: new Date().toISOString()
-      })
+      .insert(payload)
       .select()
       .single();
 
@@ -47,7 +53,7 @@ export class HRService extends BaseService {
 
     const { data, error } = await supabase
       .from('attendance')
-      .select('*, employees(name, role)')
+      .select('*, employees(full_name, job_title)')
       .eq('business_id', businessId)
       .gte('check_in', `${today}T00:00:00`)
       .lte('check_in', `${today}T23:59:59`);

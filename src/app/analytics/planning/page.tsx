@@ -202,7 +202,7 @@ export default function PlanningPage() {
                     <CardContent className="space-y-4 text-sm text-muted-foreground">
                         <p>• <strong>Flexibility:</strong> Review your budget monthly to adjust for unexpected market shifts in Nigeria.</p>
                         <p>• <strong>Liquidity:</strong> Ensure at least 15% of your allocation goes into a reserve fund for liquidity.</p>
-                        <p>• <strong>Reporting:</strong> Use the "Export Plan" feature to share financial roadmaps with stakeholders or lenders.</p>
+                        <p>• <strong>Reporting:</strong> Use the &quot;Export Plan&quot; feature to share financial roadmaps with stakeholders or lenders.</p>
                         <Button variant="link" className="p-0 h-auto text-primary">Read full strategy guide →</Button>
                     </CardContent>
                 </Card>

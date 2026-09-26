@@ -110,4 +110,50 @@ export class ReportService extends BaseService {
       categories: breakdown
     };
   }
+
+  /**
+   * Simplified balance sheet: no liabilities are tracked in this schema,
+   * so equity is derived entirely from cumulative cash + inventory value.
+   */
+  async getBalanceSheet() {
+    const { supabase, businessId } = await this.getContext();
+    if (!businessId) {
+      return { assets: { cash: 0, inventory: 0, total: 0 }, equity: { retainedEarnings: 0, total: 0 } };
+    }
+
+    const { data: transactions, error: txError } = await supabase
+      .from('financial_transactions')
+      .select('type, amount')
+      .eq('business_id', businessId);
+
+    if (txError) throw txError;
+
+    const cash = (transactions || []).reduce(
+      (sum, t) => sum + (t.type === 'Income' ? 1 : -1) * Number(t.amount),
+      0
+    );
+
+    const { data: items, error: invError } = await supabase
+      .from('catalog_items')
+      .select('unit_price, stock_quantity')
+      .eq('business_id', businessId)
+      .eq('item_type', 'Product');
+
+    if (invError) throw invError;
+
+    const inventory = (items || []).reduce(
+      (sum, item) => sum + Number(item.unit_price) * Number(item.stock_quantity),
+      0
+    );
+
+    const totalAssets = cash + inventory;
+
+    return {
+      assets: { cash, inventory, total: totalAssets },
+      // No liabilities are tracked in this schema, so equity balances the sheet:
+      // total equity = total assets. Retained earnings isolates the P&L-derived
+      // (cash) component from inventory value for display purposes.
+      equity: { retainedEarnings: cash, total: totalAssets }
+    };
+  }
 }

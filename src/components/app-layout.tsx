@@ -149,18 +149,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const fetchProfile = async () => {
         try {
           const { data } = await supabase
-            .from('business_members')
+            .from('memberships')
             .select('role, businesses (*)')
             .eq('user_id', user.id)
             .maybeSingle();
           
           if (data) {
+            const business: any = Array.isArray(data.businesses) ? data.businesses[0] : data.businesses;
             setBusinessProfile({
-              ...data.businesses,
+              ...business,
               role: data.role
             });
-            if (data.businesses.business_type) {
-              setBusinessType(data.businesses.business_type as BusinessType);
+            if (business?.business_type) {
+              setBusinessType(business.business_type as BusinessType);
             }
           }
         } catch (error) {

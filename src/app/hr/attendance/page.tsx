@@ -68,8 +68,8 @@ export default function AttendancePage() {
         const today = new Date().toISOString().split('T')[0];
         
         const [attRes, staffRes] = await Promise.all([
-            supabase.from('attendance').select('*, employees(name, role)').gte('check_in', `${today}T00:00:00`),
-            supabase.from('employees').select('id, name, role').eq('status', 'Active')
+            supabase.from('attendance').select('*, employees(name:full_name, role:job_title)').gte('check_in', `${today}T00:00:00`),
+            supabase.from('employees').select('id, name:full_name, role:job_title').eq('employment_status', 'Active')
         ]);
 
         if (!attRes.error) setRecords(attRes.data || []);

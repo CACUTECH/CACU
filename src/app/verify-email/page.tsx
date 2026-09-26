@@ -22,12 +22,12 @@ export default function VerifyEmailPage() {
           </div>
           <CardTitle className="text-2xl font-headline text-primary">Verify Your Email</CardTitle>
           <CardDescription>
-            We've sent a verification link to your email address. Please click the link to activate your account.
+            We&apos;ve sent a verification link to your email address. Please click the link to activate your account.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            Once verified, you'll be able to launch your production workspace.
+            Once verified, you&apos;ll be able to launch your production workspace.
           </p>
           <Button asChild variant="outline" className="w-full h-11 rounded-xl">
             <Link href="/login" className="flex items-center justify-center gap-2">

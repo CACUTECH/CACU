@@ -402,7 +402,7 @@ export default function StorefrontPage() {
                     </div>
                     <h3 className="font-headline text-2xl font-bold">Promote Your Digital Shop</h3>
                     <p className="text-white/80 max-w-lg">
-                        You can now share your store directly on social media. Orders will populate in your "Invoices" and "Transactions" sections automatically.
+                        You can now share your store directly on social media. Orders will populate in your &quot;Invoices&quot; and &quot;Transactions&quot; sections automatically.
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
                         <Button variant="secondary" className="bg-white text-primary hover:bg-white/90 font-bold px-6" onClick={() => handleShare("Instagram")}>

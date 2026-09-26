@@ -26,14 +26,15 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     }
 
     const { data: member } = await supabase
-      .from('business_members')
+      .from('memberships')
       .select('role, businesses (*)')
       .eq('user_id', user.id)
       .maybeSingle();
 
     if (member) {
+      const business = Array.isArray(member.businesses) ? member.businesses[0] : member.businesses;
       setBusiness({
-        ...member.businesses,
+        ...business,
         userRole: member.role
       });
     }

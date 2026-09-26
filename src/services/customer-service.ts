@@ -19,10 +19,12 @@ export class CustomerService extends BaseService {
   async upsertCustomer(customer: any) {
     const { supabase, businessId, role } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
-    if (role === 'Viewer') throw new Error('Insufficient permissions');
+    if (role === 'viewer') throw new Error('Insufficient permissions');
 
+    const { phone, ...rest } = customer;
     const payload = {
-      ...customer,
+      ...rest,
+      ...(phone !== undefined ? { phone_number: phone } : {}),
       business_id: businessId,
       updated_at: new Date().toISOString()
     };
@@ -39,7 +41,7 @@ export class CustomerService extends BaseService {
 
   async deleteCustomer(id: string) {
     const { supabase, businessId, role } = await this.getContext();
-    if (role !== 'Owner' && role !== 'Admin') throw new Error('Access denied');
+    if (role !== 'owner' && role !== 'admin') throw new Error('Access denied');
 
     const { error } = await supabase
       .from('customers')

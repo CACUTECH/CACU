@@ -25,11 +25,11 @@ export class NotificationService extends BaseService {
     if (!input.userId) {
       // Fetch all admins for the business
       const { data: admins } = await supabase
-        .from('business_members')
+        .from('memberships')
         .select('user_id')
         .eq('business_id', businessId)
-        .in('role', ['Owner', 'Admin']);
-      
+        .in('role', ['owner', 'admin']);
+
       targetUserIds = admins?.map(a => a.user_id) || [];
     }
 
@@ -38,10 +38,9 @@ export class NotificationService extends BaseService {
       business_id: businessId,
       user_id: uid,
       title: input.title,
-      message: input.message,
-      type: input.type,
-      metadata: input.metadata,
-      channel: input.channels?.join(',') || 'IN_APP'
+      body: input.message,
+      event_type: input.type,
+      data: input.metadata,
     }));
 
     const { error: dbError } = await supabase.from('notifications').insert(records);

@@ -66,7 +66,7 @@ export default function TrialBalancePage() {
 
     const exportToPdf = async () => {
         const { default: jsPDF } = await import('jspdf')
-        require('jspdf-autotable')
+        await import('jspdf-autotable')
         const doc = new jsPDF()
 
         doc.setFontSize(18)

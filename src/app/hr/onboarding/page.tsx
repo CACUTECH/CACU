@@ -140,6 +140,7 @@ export default function OnboardingPage() {
             const result = await generateOnboardingDocument({
                 employeeName: onb.employeeName,
                 jobTitle: onb.jobTitle,
+                businessName: 'CACU Technologies Limited',
                 department: onb.department,
                 salary: onb.salary,
                 startDate: onb.startDate,
@@ -286,7 +287,7 @@ export default function OnboardingPage() {
                                     </div>
                                     <div className="flex gap-2">
                                         <Clock className="h-4 w-4 text-amber-500 shrink-0" />
-                                        <p>3 employees have start dates within 48 hours but haven't completed IT access forms.</p>
+                                        <p>3 employees have start dates within 48 hours but haven&apos;t completed IT access forms.</p>
                                     </div>
                                 </CardContent>
                                 <CardFooter>
@@ -461,7 +462,7 @@ export default function OnboardingPage() {
                                                 <Sparkles className="h-3 w-3 text-primary" />
                                                 <span className="text-[10px] uppercase font-bold text-primary">AI Suggested Reply:</span>
                                                 <p className="text-[10px] text-muted-foreground italic flex-1 truncate">
-                                                    We offer a choice between a 14" MacBook Pro or a high-spec Dell Latitude.
+                                                    We offer a choice between a 14&quot; MacBook Pro or a high-spec Dell Latitude.
                                                 </p>
                                                 <Button variant="ghost" size="sm" className="h-6 text-[10px] font-bold">Apply</Button>
                                             </div>

@@ -367,7 +367,7 @@ export default function AppointmentsPage() {
                         <CardHeader>
                             <CardTitle className="text-sm font-bold flex items-center gap-2">
                                 <CalendarClock className="h-4 w-4 text-primary" />
-                                Today's Summary
+                                Today&apos;s Summary
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">

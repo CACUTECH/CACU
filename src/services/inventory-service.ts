@@ -25,7 +25,7 @@ export class InventoryService extends BaseService {
       .order('name');
 
     if (type) {
-      query = query.eq('type', type);
+      query = query.eq('item_type', type);
     }
 
     if (search) {
@@ -42,13 +42,18 @@ export class InventoryService extends BaseService {
   async upsertItem(item: any) {
     const { supabase, businessId, role } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
-    if (role === 'Viewer') throw new Error('Insufficient permissions');
+    if (role === 'viewer') throw new Error('Insufficient permissions');
 
-    const data = {
-      ...item,
+    const { type, price, quantity, status, ...rest } = item;
+    const data: Record<string, unknown> = {
+      ...rest,
       business_id: businessId,
       updated_at: new Date().toISOString()
     };
+    if (type !== undefined) data.item_type = type;
+    if (price !== undefined) data.unit_price = price;
+    if (quantity !== undefined) data.stock_quantity = quantity;
+    if (status !== undefined) data.is_active = status === 'Active';
 
     const { data: result, error } = await supabase
       .from('catalog_items')
@@ -62,7 +67,7 @@ export class InventoryService extends BaseService {
 
   async deleteItem(id: string) {
     const { supabase, businessId, role } = await this.getContext();
-    if (role !== 'Owner' && role !== 'Admin') throw new Error('Insufficient permissions');
+    if (role !== 'owner' && role !== 'admin') throw new Error('Insufficient permissions');
 
     const { error } = await supabase
       .from('catalog_items')

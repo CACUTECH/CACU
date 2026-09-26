@@ -94,7 +94,7 @@ export default function CreditPage() {
             <div className="text-center max-w-2xl mx-auto space-y-2">
                 <h1 className="font-headline text-3xl sm:text-4xl font-bold tracking-tight">Credit Access & Offers</h1>
                 <p className="text-lg text-muted-foreground italic">
-                    Unlock capital to scale your business. We match your financial data with Nigeria's leading lenders.
+                    Unlock capital to scale your business. We match your financial data with Nigeria&apos;s leading lenders.
                 </p>
             </div>
 

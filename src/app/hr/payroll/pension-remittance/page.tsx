@@ -51,7 +51,7 @@ export default function PensionRemittancePage() {
         setIsExporting(true);
         try {
             const { default: jsPDF } = await import('jspdf');
-            require('jspdf-autotable');
+            await import('jspdf-autotable');
             const doc = new jsPDF();
 
             doc.setFontSize(20);
@@ -159,7 +159,7 @@ export default function PensionRemittancePage() {
                     <CardTitle className="text-sm">Accounting Integration Note</CardTitle>
                 </CardHeader>
                 <CardContent className="text-xs text-muted-foreground">
-                    These figures have been automatically reconciled with your current payroll batch. Ensure the "Employer (10%)" portion is reflected as a business expense in your Profit & Loss statement.
+                    These figures have been automatically reconciled with your current payroll batch. Ensure the &quot;Employer (10%)&quot; portion is reflected as a business expense in your Profit & Loss statement.
                 </CardContent>
             </Card>
         </div>

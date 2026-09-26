@@ -101,7 +101,7 @@ export function AIAssistant() {
                 <div className="space-y-4">
                   <div className="bg-muted/50 rounded-2xl p-4 text-sm text-muted-foreground border border-border/50 shadow-inner">
                     <p className="font-medium text-foreground mb-1">Hello! 👋</p>
-                    I've analyzed the data on your current page. How can I help you grow your business today?
+                    I&apos;ve analyzed the data on your current page. How can I help you grow your business today?
                   </div>
                   <div className="grid gap-2">
                     <Button 

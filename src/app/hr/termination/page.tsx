@@ -153,6 +153,7 @@ export default function TerminationPage() {
             const result = await generateHRLetter({
                 employeeName: exit.employeeName,
                 jobTitle: exit.jobTitle,
+                businessName: 'CACU Technologies Limited',
                 exitType: exit.exitType,
                 lastWorkingDay: exit.lastWorkingDay,
                 reason: exit.reason,

@@ -51,7 +51,7 @@ export default function TaxSchedulePage() {
         setIsExporting(true);
         try {
             const { default: jsPDF } = await import('jspdf');
-            require('jspdf-autotable');
+            await import('jspdf-autotable');
             const doc = new jsPDF();
 
             doc.setFontSize(20);

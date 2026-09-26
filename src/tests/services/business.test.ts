@@ -41,6 +41,6 @@ describe('BusinessService', () => {
     });
 
     // Check if membership insert was called
-    expect(mockSupabase.from).toHaveBeenCalledWith('business_members');
+    expect(mockSupabase.from).toHaveBeenCalledWith('memberships');
   });
 });

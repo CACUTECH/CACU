@@ -27,11 +27,11 @@ export class BusinessService extends BaseService {
         sector: input.sector,
         address: input.address,
         email: input.email,
-        phone: input.phone,
+        phone_number: input.phone,
         bank_name: input.bank_name,
-        account_number: input.account_number,
-        account_name: input.account_name,
-        owner_uid: user.id
+        bank_account_number: input.account_number,
+        bank_account_name: input.account_name,
+        created_by: user.id
       })
       .select()
       .single();
@@ -45,11 +45,11 @@ export class BusinessService extends BaseService {
     });
 
     const { error: memberError } = await supabase
-      .from('business_members')
+      .from('memberships')
       .insert({
         business_id: business.id,
         user_id: user.id,
-        role: 'Owner',
+        role: 'owner',
       });
 
     if (memberError) throw new Error(`Membership Initialization Failed: ${memberError.message}`);
@@ -59,8 +59,8 @@ export class BusinessService extends BaseService {
       business_id: business.id,
       user_id: user.id,
       title: 'Welcome to CACU',
-      message: 'Your production workspace has been launched. Start by adding your team or catalog items.',
-      type: 'WELCOME'
+      body: 'Your production workspace has been launched. Start by adding your team or catalog items.',
+      event_type: 'WELCOME'
     });
 
     return business;
@@ -69,11 +69,18 @@ export class BusinessService extends BaseService {
   async updateBusiness(id: string, data: Partial<CreateBusinessInput>) {
     const { supabase, businessId, role } = await this.getContext();
     if (!businessId || id !== businessId) throw new Error('Unauthorized');
-    if (role !== 'Owner' && role !== 'Admin') throw new Error('Insufficient permissions');
+    if (role !== 'owner' && role !== 'admin') throw new Error('Insufficient permissions');
+
+    const { phone, account_number, account_name, type, ...rest } = data;
+    const payload: Record<string, unknown> = { ...rest };
+    if (phone !== undefined) payload.phone_number = phone;
+    if (account_number !== undefined) payload.bank_account_number = account_number;
+    if (account_name !== undefined) payload.bank_account_name = account_name;
+    if (type !== undefined) payload.business_type = type;
 
     const { data: updated, error } = await supabase
       .from('businesses')
-      .update(data)
+      .update(payload)
       .eq('id', id)
       .select()
       .single();

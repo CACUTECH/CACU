@@ -18,6 +18,10 @@ interface DataChartProps {
 }
 
 export function DataChart({ type, data, config, dataKeys, index, layout = 'horizontal', variant, curveType = 'monotone' }: DataChartProps) {
+    const totalValue = React.useMemo(() => {
+        return data.reduce((acc, curr) => acc + curr[dataKeys[0]], 0)
+    }, [data, dataKeys])
+
     if (type === 'pie' && variant === 'donut') {
          const chartConfig = Object.keys(config).reduce((acc, key) => {
             const item = data.find(d => d[index] === key);
@@ -29,10 +33,6 @@ export function DataChart({ type, data, config, dataKeys, index, layout = 'horiz
             }
             return acc;
         }, {} as ChartConfig);
-
-        const totalValue = React.useMemo(() => {
-            return data.reduce((acc, curr) => acc + curr[dataKeys[0]], 0)
-        }, [data, dataKeys])
 
         return (
             <ChartContainer

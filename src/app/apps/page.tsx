@@ -283,7 +283,7 @@ export default function AppsPage() {
                 <CardHeader>
                     <CardTitle className="text-xl">Request a Custom Integration</CardTitle>
                     <CardDescription className="text-primary-foreground/80">
-                        Can't find the tool you use? Let our engineering team build a custom connector for your business.
+                        Can&apos;t find the tool you use? Let our engineering team build a custom connector for your business.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

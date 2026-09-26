@@ -256,7 +256,7 @@ export default function CommunityPage() {
                                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                         <span className="text-sm font-bold">Top Contributor</span>
                                     </div>
-                                    <p className="text-sm italic">"Don't worry about the clearing delays at Apapa, there's a workaround using the Bonded Terminal system..."</p>
+                                    <p className="text-sm italic">&quot;Don&apos;t worry about the clearing delays at Apapa, there&apos;s a workaround using the Bonded Terminal system...&quot;</p>
                                     <div className="mt-3 flex items-center gap-2">
                                         <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">BO</div>
                                         <span className="text-xs font-medium">Bayo O. (Retail Expert)</span>
@@ -267,7 +267,7 @@ export default function CommunityPage() {
                                         <TrendingUp className="w-4 h-4 text-green-500" />
                                         <span className="text-sm font-bold">Trending Question</span>
                                     </div>
-                                    <p className="text-sm">"How are you guys handling the diesel price hike for your factory generators?"</p>
+                                    <p className="text-sm">&quot;How are you guys handling the diesel price hike for your factory generators?&quot;</p>
                                     <Button variant="link" size="sm" className="px-0 h-auto mt-2" onClick={() => toast({ title: "Redirecting...", description: "Joining the conversation on Energy Management." })}>Join Conversation</Button>
                                 </div>
                             </div>
