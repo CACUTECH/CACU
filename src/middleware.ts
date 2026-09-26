@@ -52,12 +52,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Pinned explicitly: this middleware only uses standard Web APIs
-  // (Request/Response, cookies) and @supabase/ssr's Edge-targeted client,
-  // so it must run on the Edge runtime, not the Node.js runtime that
-  // became stable in Next.js 15.5 - the implicit default silently
-  // changed to a broken Node.js bundling path in production.
-  runtime: 'experimental-edge',
+  // Vercel's own current guidance for Routing Middleware recommends the
+  // Node.js runtime (stable since Next.js 15.5) over Edge.
+  runtime: 'nodejs',
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
