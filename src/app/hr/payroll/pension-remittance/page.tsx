@@ -51,7 +51,7 @@ export default function PensionRemittancePage() {
         setIsExporting(true);
         try {
             const { default: jsPDF } = await import('jspdf');
-            await import('jspdf-autotable');
+            const { default: autoTable } = await import('jspdf-autotable');
             const doc = new jsPDF();
 
             doc.setFontSize(20);
@@ -70,7 +70,7 @@ export default function PensionRemittancePage() {
                 `₦${d.total.toLocaleString()}`
             ]);
 
-            ;(doc as any).autoTable({
+            autoTable(doc, {
                 startY: 50,
                 head: [['Employee', 'RSA ID', 'Employee (8%)', 'Employer (10%)', 'Total']],
                 body: tableRows,

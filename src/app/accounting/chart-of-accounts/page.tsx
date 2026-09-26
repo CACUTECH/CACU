@@ -124,7 +124,7 @@ export default function ChartOfAccountsPage() {
         setIsExporting(true)
         try {
             const { default: jsPDF } = await import('jspdf')
-            await import('jspdf-autotable')
+            const { default: autoTable } = await import('jspdf-autotable')
             const doc = new jsPDF()
 
             doc.setFontSize(20)
@@ -142,7 +142,7 @@ export default function ChartOfAccountsPage() {
                 acc.status
             ])
 
-            ;(doc as any).autoTable({
+            autoTable(doc, {
                 startY: 45,
                 head: [['Code', 'Account Name', 'Type', 'Balance', 'Status']],
                 body: tableRows,

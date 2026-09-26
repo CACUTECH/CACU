@@ -51,7 +51,7 @@ export default function TaxSchedulePage() {
         setIsExporting(true);
         try {
             const { default: jsPDF } = await import('jspdf');
-            await import('jspdf-autotable');
+            const { default: autoTable } = await import('jspdf-autotable');
             const doc = new jsPDF();
 
             doc.setFontSize(20);
@@ -69,7 +69,7 @@ export default function TaxSchedulePage() {
                 `₦${d.tax.toLocaleString()}`
             ]);
 
-            ;(doc as any).autoTable({
+            autoTable(doc, {
                 startY: 45,
                 head: [['Employee', 'ID', 'Gross Pay', 'Taxable', 'PAYE Tax']],
                 body: tableRows,

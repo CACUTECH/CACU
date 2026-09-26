@@ -20,7 +20,6 @@ import {
   Loader2,
 } from "lucide-react"
 import type jsPDF from "jspdf"
-import "jspdf-autotable"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -103,7 +102,6 @@ type Invoice = {
 
 const downloadPdf = async (invoice: Invoice) => {
     const { default: jsPDF } = await import('jspdf');
-    await import('jspdf-autotable');
     const doc = new jsPDF();
     const typeLabel = invoice.type === 'CreditMemo' ? 'Credit Memo' : invoice.type;
 

@@ -66,7 +66,7 @@ export default function TrialBalancePage() {
 
     const exportToPdf = async () => {
         const { default: jsPDF } = await import('jspdf')
-        await import('jspdf-autotable')
+        const { default: autoTable } = await import('jspdf-autotable')
         const doc = new jsPDF()
 
         doc.setFontSize(18)
@@ -91,7 +91,7 @@ export default function TrialBalancePage() {
             `₦${totalCredit.toLocaleString()}`
         ])
 
-        ;(doc as any).autoTable({
+        autoTable(doc, {
             startY: 40,
             head: [['Account Code', 'Account Description', 'Debit (₦)', 'Credit (₦)']],
             body: tableRows,

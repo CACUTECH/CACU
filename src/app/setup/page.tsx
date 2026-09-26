@@ -37,6 +37,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { createBusinessAction } from "./actions";
 import { useSupabaseUser } from "@/hooks/use-supabase-user";
+import { useBusiness } from "@/components/business-provider";
 
 const formSchema = z.object({
   businessName: z.string().min(1, "Business name is required"),
@@ -56,6 +57,7 @@ export default function SetupPage() {
   const { toast } = useToast();
   const router = useRouter();
   const { user, loading: userLoading } = useSupabaseUser();
+  const { refresh: refreshBusiness } = useBusiness();
   const [isLoading, setIsLoading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -115,6 +117,7 @@ export default function SetupPage() {
           title: "Business Launched",
           description: `Security profile initialized for ${values.businessName}.`,
         });
+        await refreshBusiness();
         router.push("/");
       }
     } catch (error: any) {
