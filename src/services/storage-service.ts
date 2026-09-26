@@ -12,9 +12,15 @@ export class StorageService extends BaseService {
    * Sanitizes path to prevent directory traversal attacks (SEC-03 Fix)
    */
   private sanitizePath(path: string): string {
-    // Remove any relative path segments like ../ or ./
-    // and keep only alphanumeric, hyphens, and slashes
-    return path.replace(/\.\.+\//g, '').replace(/[^a-zA-Z0-9\/\-_]/g, '-');
+    // Normalize separators, remove traversal/current-directory segments,
+    // then keep only safe characters per segment.
+    const normalized = path.replace(/\\/g, '/');
+    const safeSegments = normalized
+      .split('/')
+      .filter((segment) => segment.length > 0 && segment !== '.' && segment !== '..')
+      .map((segment) => segment.replace(/[^a-zA-Z0-9\-_]/g, '-'));
+
+    return safeSegments.join('/');
   }
 
   async uploadFile(path: string, file: File | Blob) {
