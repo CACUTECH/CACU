@@ -78,11 +78,11 @@ function NavItem({ item, pathname }: { item: any, pathname: string }) {
                             className="justify-between"
                         >
                             <div className="cursor-pointer">
-                                <div className="flex items-center gap-2">
-                                    <item.icon className="h-4 w-4" />
-                                    <span>{item.label}</span>
+                                <div className="flex items-center gap-3">
+                                    <item.icon className="h-5 w-5" />
+                                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                                 </div>
-                                <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", "[&[data-state=open]]:-rotate-180")} />
+                                <ChevronDown className={cn("h-4 w-4 text-muted-foreground/70 transition-transform duration-200 group-data-[collapsible=icon]:hidden", "[&[data-state=open]]:-rotate-180")} />
                             </div>
                         </SidebarMenuButton>
                     </CollapsibleTrigger>
@@ -115,7 +115,7 @@ function NavItem({ item, pathname }: { item: any, pathname: string }) {
                 onClick={handleLinkClick}
             >
               <Link href={item.href}>
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-5 w-5" />
                 <span>{item.label}</span>
               </Link>
             </SidebarMenuButton>
@@ -253,15 +253,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon" className="hidden lg:flex">
+      <Sidebar collapsible="icon" variant="floating" className="hidden lg:flex">
         <SidebarHeader>
-            <div className="flex items-center gap-2 p-2">
+            <div className="flex items-center gap-3 p-2">
                 {businessProfile?.logoUrl ? (
-                    <Image src={businessProfile.logoUrl} alt="Logo" width={32} height={32} className="size-8 shrink-0 rounded-sm object-contain" />
+                    <Image src={businessProfile.logoUrl} alt="Logo" width={36} height={36} className="size-9 shrink-0 rounded-lg object-contain" />
                 ) : (
-                    <Logo className="size-8 shrink-0" />
+                    <Logo className="size-9 shrink-0" />
                 )}
-                <span className="font-headline text-2xl font-semibold truncate group-data-[state=collapsed]:hidden text-primary">
+                <span className="font-headline text-xl font-semibold truncate group-data-[state=collapsed]:hidden text-primary">
                     {businessProfile?.name || 'CACU'}
                 </span>
             </div>
@@ -278,20 +278,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Settings">
                     <Link href="/settings">
-                        <Settings className="h-4 w-4" />
+                        <Settings className="h-5 w-5" />
                         <span>Settings</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Logout" onClick={handleLogout} className="text-destructive hover:text-destructive hover:bg-destructive/5">
-                    <LogOut className="h-4 w-4" />
+                    <LogOut className="h-5 w-5" />
                     <span>Logout</span>
                 </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-          <div className="flex items-center gap-3 p-2 mt-2 border-t">
-            <Avatar className="size-8 border-2 border-primary/20">
+          <div className="flex items-center gap-3 p-2.5 mt-1 rounded-xl bg-sidebar-accent/40 border border-sidebar-border">
+            <Avatar className="size-9 border-2 border-primary/20 shrink-0">
               <AvatarImage src={user?.user_metadata?.avatar_url || "https://placehold.co/40x40"} alt="User" />
               <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
             </Avatar>
