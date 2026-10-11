@@ -14,6 +14,8 @@ entrypoint = "app:app"
 dev = ["pytest==9.1.1", "hypothesis==6.131.9"]
 
 [tool.uv]
+# CACU uses SQLAlchemy with psycopg 3; upstream legacy drivers are unused.
+exclude-dependencies = ["mysqlclient", "psycopg2"]
 constraint-dependencies = [
   "Pillow==12.3.0",
   "annotated-doc==0.0.5",
@@ -30,13 +32,11 @@ constraint-dependencies = [
   "hypothesis==6.131.9",
   "idna==3.20",
   "iniconfig==2.3.1",
-  "mysqlclient==2.3.0",
   "opentelemetry-api==1.45.1",
   "packaging==26.3",
   "pluggy==1.6.0",
   "psycopg==3.2.9",
   "psycopg-binary==3.2.9",
-  "psycopg2==2.9.13",
   "pydantic==2.11.4",
   "pydantic_core==2.33.2",
   "Pygments==2.21.0",
