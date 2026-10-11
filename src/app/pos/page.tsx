@@ -38,12 +38,15 @@ type CatalogItem = {
     status: string;
 }
 
+import { getAccountingModeAction } from '@/app/accounting/cash-flow/actions';
+
 type CartItem = CatalogItem & { cartQuantity: number }
 
 export default function POSPage() {
     const supabase = createClient();
     const { toast } = useToast()
     
+    const [taxRate, setTaxRate] = React.useState<number | null>(null)
     const [searchTerm, setSearchTerm] = React.useState("")
     const [cart, setCart] = React.useState<CartItem[]>([])
     const [inventory, setInventory] = React.useState<CatalogItem[]>([])
@@ -55,10 +58,11 @@ export default function POSPage() {
     const fetchInventory = React.useCallback(async () => {
         try {
         setLoading(true);
+        setTaxRate(await getAccountingModeAction() ? 0 : 0.075);
         const { data, error } = await supabase
             .from('catalog_items')
             .select('*, type:item_type, price:unit_price, quantity:stock_quantity').eq('business_id', await getActiveBusinessIdAction())
-            .eq('item_type', 'Product')
+            .eq('item_type', 'PRODUCT')
             .order('name');
         
         if (!error) setInventory(data || []);
@@ -108,13 +112,16 @@ export default function POSPage() {
     }
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.cartQuantity), 0)
-    const tax = subtotal * 0.075 
+    const tax = subtotal * (taxRate ?? 0)
     const total = subtotal + tax
 
+    const checkoutKey = React.useRef(crypto.randomUUID());
     const handleCheckout = async () => {
+        if (taxRate === null) return;
         setIsProcessing(true);
         
         const saleData = {
+            requestKey: checkoutKey.current,
             items: cart.map(item => ({ id: item.id, quantity: item.cartQuantity, price: item.price })),
             paymentMethod,
             totalAmount: total
@@ -124,6 +131,7 @@ export default function POSPage() {
 
         if (result.success) {
             toast({ title: "Sale Recorded", description: `Receipt #${result.saleId.substring(0,8)} generated.` });
+            checkoutKey.current = crypto.randomUUID();
             setCart([]);
             setIsCheckoutOpen(false);
             fetchInventory();

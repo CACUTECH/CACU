@@ -24,7 +24,7 @@ def authorized_transaction(user_id: UUID, business_id: UUID, write: bool = False
                     raise HTTPException(503, "Runtime must not own public tables")
                 cursor.execute("SELECT set_config('request.jwt.claims', %s, true), set_config('cacu.business_id', %s, true), set_config('statement_timeout', '10000', true)",
                                (json.dumps({"sub": str(user_id), "role": "authenticated"}), str(business_id)))
-                cursor.execute("SELECT role::text FROM public.memberships WHERE business_id = %s AND user_id = %s FOR SHARE", (business_id, user_id))
+                cursor.execute("SELECT accounting.lock_membership(%s, %s)", (business_id, user_id))
                 membership = cursor.fetchone()
                 if not membership or membership[0] not in {"owner", "admin", "editor", "viewer"}:
                     raise HTTPException(403, "Business membership required")

@@ -1,3 +1,5 @@
+> Historical foundation checkpoint. For current native library integration, PostgreSQL/browser evidence and remaining release gates, see [python-accounting-cash-flow.md](python-accounting-cash-flow.md).
+
 # Implementation checkpoint — 2026-10-11 (Africa/Lagos)
 
 ## Scope and provenance

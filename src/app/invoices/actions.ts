@@ -39,3 +39,9 @@ export async function updateInvoiceStatusAction(id: string, status: string) {
     return { success: false, error: error.message };
   }
 }
+
+export async function getInvoiceBalancesAction() {
+  const { accountingRequest, usesPythonAccounting } = await import('@/lib/accounting-client');
+  if (!(await usesPythonAccounting())) return [];
+  return accountingRequest<{ id: string; total: string; outstanding: string }[]>('invoices/balances');
+}

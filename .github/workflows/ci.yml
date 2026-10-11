@@ -34,11 +34,27 @@ jobs:
         env:
           SKIP_ENV_VALIDATION: true
 
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+
       - name: Validate Build
         run: npm run build
 
   python:
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: cacu_accounting_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      CACU_TEST_DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/cacu_accounting_test
     defaults:
       run:
         working-directory: backend
@@ -47,5 +63,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y pkg-config default-libmysqlclient-dev libpq-dev
+        working-directory: .
       - run: pip install -r requirements.lock
       - run: python -m pytest

@@ -1,8 +1,8 @@
-# Python setup and deployment
+# Python accounting setup and deployment
 
-Checkpoint only: validation API implemented, financial posting not implemented. Do not cut over production. The accounts.is_active lookup is a proposed schema requirement and must be reconciled to the actual accounts table before using this endpoint.
+See [integration, mappings, policies and release gates](python-accounting-cash-flow.md). The backend now uses native python-accounting 1.0.1 and exposes posting/report APIs; each business requires an explicitly reconciled cutover before using them. No startup DDL or production activation occurs.
 
-Local commands (Python 3.12):
+Python 3.12 local setup:
 
 ```powershell
 cd C:\Users\olayiwolao\CACU_NEW\backend
@@ -12,10 +12,12 @@ python -m venv .venv
 .venv\Scripts\python.exe -m uvicorn app:app --port 8000
 ```
 
-Use .env.example placeholders through secure process/deployment environment configuration; the app does not automatically read .env files. /health confirms process availability only, not database readiness. No migration runs at startup. OpenAPI is at /openapi.json; backend/openapi.json is the reviewed generation source for src/lib/accounting-contract.ts. Regenerate with pinned openapi-typescript 7.10.1 after changing schemas.
+For real integration tests, set CACU_TEST_DATABASE_URL to a disposable localhost PostgreSQL database ending _test. The tests replace its public/accounting schemas and never use CACU_DATABASE_URL for that purpose. GitHub CI supplies a disposable service. Browser checks: npm run test:browser after npx playwright install chromium.
 
-Target deployment: existing Next.js project root remains repository root; create a separately confirmed Python project with root backend/. app.py exports app and pyproject declares the entrypoint. Current official guide: https://vercel.com/docs/frameworks/backend/fastapi . No preview was deployed; existing cacu project inspect is denied in both MCP and explicitly scoped CLI. Do not use an unrelated account or change www.usecacu.com.
+Provide SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, CACU_DATABASE_URL and PGSSLROOTCERT securely. The app does not load .env files automatically. Runtime DSN must log in as cacu_runtime with the installed role/RLS boundary; production never permits postgres, owner or BYPASSRLS credentials. Set Next's CACU_ACCOUNTING_API_URL to the confirmed HTTPS backend endpoint. Next is still rooted at the repository root; Python is a separate backend project rooted at backend/.
 
-Supabase Auth URL and publishable key go to Python, plus a restricted cacu_runtime DSN. This role must not be postgres/service_role, own tables or bypass RLS. Separate migration credentials. Schema/policy provisioning remains a release gate. Set PGSSLROOTCERT to the reviewed CA file and use sslmode=verify-full. psycopg uses one connection per request and prepare_threshold=None, matching transaction pooler constraints (https://supabase.com/docs/guides/database/connecting-to-postgres). Transaction-local claim/tenant settings do not themselves enforce RLS: reviewed policies and grants are still required. Connection-reuse and tenant-isolation tests remain pending against a real database.
+/health only checks process availability. OpenAPI is /openapi.json. Regenerate committed backend/openapi.json from app.openapi(), then generate src/lib/accounting-contract.ts using openapi-typescript 7.10.1.
 
-Python accepts bearer authentication only, no auth cookies or credentialed CORS. The server-only Next adapter validates getUser, resolves active membership, then forwards the current access token from getSession. Python revalidates the token against Supabase Auth and membership from Postgres. Supabase SSR refresh cookies through the existing cookie adapter; test expired sessions on preview before deployment. Existing Server Actions retain Next origin protection. No frontend call site switches financial writes to Python yet.
+Vercel preview remains blocked: connector project inspection returned 403 for team_1wa2SWkcHaqsq59sLpjnQI1x/cacu; the CLI has no credentials. Native mysqlclient/psycopg2 dependencies also need a verified Linux build environment. Do not claim preview compatibility, alter an unrelated team/project, or change existing production domains. The target architecture remains Next.js + separate FastAPI + existing Supabase; see [Vercel FastAPI](https://vercel.com/docs/frameworks/backend/fastapi) and [Supabase connection guidance](https://supabase.com/docs/guides/database/connecting-to-postgres).
+
+Vercel recognizes the committed `pyproject.toml` + `uv.lock`. All resolved dependencies are constrained to the versions tested in `requirements.lock`; `uv lock --check` verifies consistency. See [Vercel Python dependency support](https://vercel.com/docs/functions/runtimes/python) and [uv constraints](https://docs.astral.sh/uv/reference/settings/#constraint-dependencies). Linux native compilation and deployment remain unverified until preview access is restored.

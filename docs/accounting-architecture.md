@@ -1,3 +1,5 @@
+> This foundation architecture is historical. The current private library schema, canonical ledger and release gates are described in [python-accounting-cash-flow.md](python-accounting-cash-flow.md).
+
 # Accounting architecture decision (2026-10-11)
 
 Status: accepted direction; Phase 1 implementation in progress, no production cutover.

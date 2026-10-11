@@ -1,4 +1,5 @@
 
+import { getAccountingSummary, usesPythonAccounting } from '@/lib/accounting-client';
 import { BaseService } from './base-service';
 
 /**
@@ -11,8 +12,11 @@ export class ReportService extends BaseService {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context required');
 
+    const migrated = await usesPythonAccounting();
+    const summary = migrated ? await getAccountingSummary(startDate, endDate) : null;
+    // Operational counts continue using Supabase; financial amounts use the canonical ledger.
     // 1. Core Financials
-    const { data: kpi, error: kpiError } = await supabase.rpc('get_business_kpis', {
+    const { data: kpi, error: kpiError } = summary ? { data: [{ total_income: summary.income, total_expense: summary.expenses, net_profit: summary.net_profit, transaction_count: summary.transaction_count }], error: null } : await supabase.rpc('get_business_kpis', {
       p_business_id: businessId,
       p_start_date: startDate,
       p_end_date: endDate
@@ -46,6 +50,15 @@ export class ReportService extends BaseService {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) return [];
 
+    if (await usesPythonAccounting()) {
+      const data = await getAccountingSummary(startDate, endDate);
+      const grouped = new Map<string, number>();
+      for (const row of data.revenue_trend) {
+        const period = interval === 'month' ? row.period.slice(0, 7) : row.period;
+        grouped.set(period, (grouped.get(period) || 0) + Number(row.income));
+      }
+      return [...grouped].map(([period, income]) => ({ period, income }));
+    }
     const { data, error } = await supabase.rpc('get_revenue_trend', {
       p_business_id: businessId,
       p_start_date: startDate,
@@ -86,74 +99,18 @@ export class ReportService extends BaseService {
   }
 
   async getProfitAndLoss(startDate: string, endDate: string) {
-    const { financials } = await this.getDashboardStats(startDate, endDate);
-    
-    // Categorized breakdown
-    const { supabase, businessId } = await this.getContext();
-    const { data: categories } = await supabase
-      .from('financial_transactions')
-      .select('category, type, amount')
-      .eq('business_id', businessId)
-      .gte('date', startDate)
-      .lte('date', endDate);
+    const data = await getAccountingSummary(startDate, endDate);
+    return { income: data.income, expenses: data.expenses, netProfit: data.net_profit, categories: {} };
 
-    const breakdown: Record<string, number> = {};
-    categories?.forEach(c => {
-      if (!breakdown[c.category]) breakdown[c.category] = 0;
-      breakdown[c.category] += (c.type === 'Income' ? 1 : -1) * Number(c.amount);
-    });
-
-    return {
-      income: financials.total_income,
-      expenses: financials.total_expense,
-      netProfit: financials.net_profit,
-      categories: breakdown
-    };
   }
 
   /**
-   * Simplified balance sheet: no liabilities are tracked in this schema,
-   * so equity is derived entirely from cumulative cash + inventory value.
+   * Balance sheet comes from posted accounts, including actual liabilities and equity.
    */
   async getBalanceSheet() {
-    const { supabase, businessId } = await this.getContext();
-    if (!businessId) {
-      return { assets: { cash: 0, inventory: 0, total: 0 }, equity: { retainedEarnings: 0, total: 0 } };
-    }
+    const end = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date());
+    const data = await getAccountingSummary(`${end.slice(0, 4)}-01-01`, end);
+    return { assets: data.assets, liabilities: data.liabilities, equity: data.equity, difference: data.balance_sheet_difference };
 
-    const { data: transactions, error: txError } = await supabase
-      .from('financial_transactions')
-      .select('type, amount')
-      .eq('business_id', businessId);
-
-    if (txError) throw txError;
-
-    const cash = (transactions || []).reduce(
-      (sum, t) => sum + (t.type === 'Income' ? 1 : -1) * Number(t.amount),
-      0
-    );
-
-    const { data: items, error: invError } = await supabase
-      .from('catalog_items')
-      .select('unit_price, stock_quantity')
-      .eq('business_id', businessId)
-      .eq('item_type', 'PRODUCT');
-
-    if (invError) throw invError;
-
-    const inventory = (items || []).reduce(
-      (sum, item) => sum + Number(item.unit_price) * Number(item.stock_quantity),
-      0
-    );
-
-    const totalAssets = cash + inventory;
-
-    return {
-      assets: { cash, inventory, total: totalAssets },
-      // No liabilities are tracked in this schema, so equity balances the sheet:
-      // total equity = total assets. Retained earnings isolates the P&L-derived
-      // (cash) component from inventory value for display purposes.
-      equity: { retainedEarnings: cash, total: totalAssets }
-    };
   }
 }

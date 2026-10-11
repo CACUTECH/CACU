@@ -77,6 +77,7 @@ export default function DashboardPage() {
   const { business, loading: businessLoading } = useBusiness();
   const [loading, setLoading] = React.useState(true);
   const [stats, setStats] = React.useState<any>(null);
+  const [reportError, setReportError] = React.useState('');
   const [trendData, setTrendData] = React.useState<any[]>([]);
   const [granularity, setGranularity] = React.useState<'day' | 'week' | 'month'>('month');
 
@@ -92,14 +93,15 @@ export default function DashboardPage() {
       return;
     }
     setLoading(true);
-    const start = startOfMonth(new Date()).toISOString();
-    const end = endOfMonth(new Date()).toISOString();
+    const start = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+    const end = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
     const [statsRes, trendRes] = await Promise.all([
       getDashboardStatsAction(start, end),
       getRevenueTrendAction(start, end, granularity)
     ]);
 
+    setReportError(!statsRes.success ? statsRes.error : !trendRes.success ? trendRes.error : '');
     if (statsRes.success) setStats(statsRes.data);
     if (trendRes.success) setTrendData(trendRes.data);
     setLoading(false);
@@ -109,6 +111,7 @@ export default function DashboardPage() {
     fetchData();
   }, [fetchData]);
 
+  if (reportError) return <div className="space-y-4"><h1 className="text-3xl font-bold">Dashboard</h1><p role="alert">{reportError}</p><Button onClick={() => void fetchData()}>Retry</Button></div>;
   if (businessLoading || (loading && !stats) || !business) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
 
   return (
@@ -213,7 +216,7 @@ export default function DashboardPage() {
                 <div className="max-w-xl space-y-4 text-center md:text-left">
                     <h2 className="text-3xl font-bold font-headline">Operational Efficiency</h2>
                     <p className="text-white/80 leading-relaxed text-sm">
-                        Your relational ledger is now fully synchronized with PostgreSQL. Reporting and analytics are calculated server-side, ensuring sub-second response times even as your data scales.
+                        Financial totals use the selected business’s accounting configuration. Review reconciliation warnings before relying on reports.
                     </p>
                 </div>
             </div>
