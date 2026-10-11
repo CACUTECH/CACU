@@ -2,7 +2,7 @@
 name = "cacu-accounting"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
-dependencies = ["fastapi==0.143.0", "pydantic==2.11.4", "httpx==0.28.1", "psycopg[binary]==3.2.9", "uvicorn==0.34.2", "python-accounting==1.0.1", "SQLAlchemy==2.1.4"]
+dependencies = ["fastapi==0.143.0", "pydantic==2.11.4", "httpx==0.28.1", "psycopg[binary]==3.2.9", "uvicorn==0.34.2", "python-accounting==1.0.1", "SQLAlchemy==2.1.4", "Pillow==12.3.0"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -15,6 +15,7 @@ dev = ["pytest==9.1.1", "hypothesis==6.131.9"]
 
 [tool.uv]
 constraint-dependencies = [
+  "Pillow==12.3.0",
   "annotated-doc==0.0.5",
   "annotated-types==0.8.0",
   "anyio==4.15.1",

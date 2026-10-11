@@ -65,7 +65,7 @@ export default function StagingCheckPage() {
 
         // 4. Storage Test
         updateStatus('storage', 'running');
-        const { error: storeErr } = await supabase.storage.from('business-assets').list();
+        const { error: storeErr } = await supabase.from('upload_records').select('id').eq('business_id', businessId).limit(1);
         updateStatus('storage', storeErr ? 'fail' : 'pass', storeErr?.message);
 
         // 5. Reports Test
