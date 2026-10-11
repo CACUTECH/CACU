@@ -62,24 +62,24 @@ export default function CashFlowStatement({ embedded = false }: { embedded?: boo
   const valid = !!start && !!end && start <= end;
   return <div className="space-y-6">
     {!embedded && <><Link href="/reports" className="text-primary underline">Reports</Link><h1 className="text-3xl font-bold">Statement of Cash Flows</h1></>}
-    <p className="text-muted-foreground">Indirect method Â· NGN Â· Posted accounting ledger</p>
+    <p className="text-muted-foreground">Indirect method · NGN · Posted accounting ledger</p>
     <form className="flex flex-wrap items-end gap-4 rounded-xl border bg-muted/30 p-4" onSubmit={event => { event.preventDefault(); void load(); }}>
       <label>Start date<Input type="date" value={start} onChange={event => { requestVersion.current++; setLoading(false); setStart(event.target.value); setReport(null); setPrior(null); }} required /></label>
       <label>End date<Input type="date" value={end} onChange={event => { requestVersion.current++; setLoading(false); setEnd(event.target.value); setReport(null); setPrior(null); }} required /></label>
       <label className="flex gap-2 items-center pb-2"><input type="checkbox" checked={compare} onChange={event => { requestVersion.current++; setLoading(false); setCompare(event.target.checked); setReport(null); setPrior(null); }} />Compare previous equal period</label>
-      <Button disabled={loading || !valid} type="submit">{loading ? 'Loadingâ€¦' : 'Run report'}</Button>
+      <Button disabled={loading || !valid} type="submit">{loading ? 'Loading…' : 'Run report'}</Button>
     </form>
     {error && <p role="alert" className="text-destructive">{error}</p>}
     {!report && !loading && !error && <p>Select a reporting period and run the report.</p>}
     {report && <>
-      <p>{report.start_date} to {report.end_date} Â· Company timezone: {report.timezone}</p>
+      <p>{report.start_date} to {report.end_date} · Company timezone: {report.timezone}</p>
       {prior && <p>Comparison: {prior.start_date} to {prior.end_date}</p>}
       {report.empty && <p>No posted movements in this period. Opening balances are retained.</p>}
       {(!report.reconciled || (prior && !prior.reconciled)) && <p role="alert" className="text-destructive">Cash does not reconcile. Review the supporting transactions before using this report.</p>}
       <div className="flex flex-wrap gap-2"><Button onClick={() => void exportFile('csv')}>CSV</Button><Button onClick={() => void exportFile('excel')}>Excel</Button><Button onClick={() => void exportFile('pdf')}>PDF</Button></div>
       {report.sections.map(section => <Card key={section.key}><CardHeader><CardTitle className="capitalize">{section.key} activities</CardTitle></CardHeader><CardContent>
         <div className="overflow-x-auto"><table className="w-full min-w-[480px]"><thead><tr><th className="text-left">Description</th><th className="text-right">Current (NGN)</th>{prior && <th className="text-right">Prior (NGN)</th>}</tr></thead><tbody>
-          {comparisonLines(section).map(line => <tr key={line.label}><td className="py-3"><details><summary className="cursor-pointer">{line.label}</summary><ul>{line.details.map((detail, index) => <li key={`${detail.ledger_id}-${index}`} className="text-sm py-1">{detail.date} Â· {detail.transaction_no} Â· {detail.account_name} Â· {detail.description} Â· {formatNgn(detail.amount)}</li>)}</ul></details></td><td className="text-right">{formatNgn(line.amount)}</td>{prior && <td className="text-right">{formatNgn(prior.sections.find(s => s.key === section.key)?.lines.find(l => l.label === line.label)?.amount || '0.00')}</td>}</tr>)}
+          {comparisonLines(section).map(line => <tr key={line.label}><td className="py-3"><details><summary className="cursor-pointer">{line.label}</summary><ul>{line.details.map((detail, index) => <li key={`${detail.ledger_id}-${index}`} className="text-sm py-1">{detail.date} · {detail.transaction_no} · {detail.account_name} · {detail.description} · {formatNgn(detail.amount)}</li>)}</ul></details></td><td className="text-right">{formatNgn(line.amount)}</td>{prior && <td className="text-right">{formatNgn(prior.sections.find(s => s.key === section.key)?.lines.find(l => l.label === line.label)?.amount || '0.00')}</td>}</tr>)}
           <tr className="border-t font-bold"><td>Total {section.key}</td><td className="text-right">{formatNgn(section.total)}</td>{prior && <td className="text-right">{formatNgn(prior.sections.find(s => s.key === section.key)?.total || '0.00')}</td>}</tr>
         </tbody></table></div>
       </CardContent></Card>)}
