@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = "==3.12.*"
 
 [manifest]
@@ -18,14 +18,12 @@ constraints = [
     { name = "hypothesis", specifier = "==6.131.9" },
     { name = "idna", specifier = "==3.20" },
     { name = "iniconfig", specifier = "==2.3.1" },
-    { name = "mysqlclient", specifier = "==2.3.0" },
     { name = "opentelemetry-api", specifier = "==1.45.1" },
     { name = "packaging", specifier = "==26.3" },
     { name = "pillow", specifier = "==12.3.0" },
     { name = "pluggy", specifier = "==1.6.0" },
     { name = "psycopg", specifier = "==3.2.9" },
     { name = "psycopg-binary", specifier = "==3.2.9" },
-    { name = "psycopg2", specifier = "==2.9.13" },
     { name = "pydantic", specifier = "==2.11.4" },
     { name = "pydantic-core", specifier = "==2.33.2" },
     { name = "pygments", specifier = "==2.21.0" },
@@ -42,6 +40,10 @@ constraints = [
     { name = "typing-inspection", specifier = "==0.4.4" },
     { name = "tzdata", specifier = "==2026.5" },
     { name = "uvicorn", specifier = "==0.34.2" },
+]
+excludes = [
+    "mysqlclient",
+    "psycopg2",
 ]
 
 [[package]]
@@ -236,16 +238,6 @@ wheels = [
 ]
 
 [[package]]
-name = "mysqlclient"
-version = "2.3.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ef/8f/b9488795d21a76c1520905feba5afb6233f16510797a28b51f2b2688c93e/mysqlclient-2.3.0.tar.gz", hash = "sha256:bea8294964266f6486f1ca514ccfcdbc54d4fe0d32882b38c1d4594df870be8b", size = 102185, upload-time = "2026-09-14T15:38:30.784Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/48/5474ffb47d1f27600737ae6b4860fc4bbc17b7e7f1dec9b8b765a75d66e5/mysqlclient-2.3.0-cp312-cp312-win_amd64.whl", hash = "sha256:effb81eb6d1f1df6c1d95f63f117bec5007e9c64487e9fa17d5696f2a5338358", size = 217531, upload-time = "2026-09-14T15:38:17.871Z" },
-    { url = "https://files.pythonhosted.org/packages/a3/37/9205f687a60196e77d9bc4dd94fdb3c88a24b5cb920fdaf1acf363791bdd/mysqlclient-2.3.0-cp312-cp312-win_arm64.whl", hash = "sha256:7c3c4b3edcc7dc50d23fb5634e0e82bce8ab7de5b83d03fddc1c9979c18607a4", size = 208548, upload-time = "2026-09-14T15:38:18.884Z" },
-]
-
-[[package]]
 name = "opentelemetry-api"
 version = "1.45.1"
 source = { registry = "https://pypi.org/simple" }
@@ -329,15 +321,6 @@ wheels = [
 ]
 
 [[package]]
-name = "psycopg2"
-version = "2.9.13"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/91/81/6ea19b8b28feb9405c8c87a307776614d6e404bdb98467d1ce10a39d2c1d/psycopg2-2.9.13.tar.gz", hash = "sha256:d36784fc2dae69523ba4b79c7d1d1b4d6e83e87836874f111262f4db940b16a6", size = 378068, upload-time = "2026-09-09T23:56:21.749Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/8a/820b2f5ec521db28b5f113d7d64b0264f775fef611265039ba0cb5101858/psycopg2-2.9.13-cp312-cp312-win_amd64.whl", hash = "sha256:10f7408b34412e8c0d4f8b1565541f1d651b1d00447857e5d8561b38f5c1a738", size = 2767613, upload-time = "2026-09-09T23:53:56.076Z" },
-]
-
-[[package]]
 name = "pydantic"
 version = "2.11.4"
 source = { registry = "https://pypi.org/simple" }
@@ -407,8 +390,6 @@ name = "python-accounting"
 version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "mysqlclient" },
-    { name = "psycopg2" },
     { name = "python-dateutil" },
     { name = "sqlalchemy" },
     { name = "strenum" },
