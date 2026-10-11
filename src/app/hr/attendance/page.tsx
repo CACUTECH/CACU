@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast"
 import { format, parseISO, differenceInMinutes } from "date-fns"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { logAttendanceAction } from "./actions"
 
@@ -64,17 +65,22 @@ export default function AttendancePage() {
     const [searchTerm, setSearchTerm] = React.useState("");
 
     const fetchData = React.useCallback(async () => {
+        try {
         setLoading(true);
         const today = new Date().toISOString().split('T')[0];
         
         const [attRes, staffRes] = await Promise.all([
-            supabase.from('attendance').select('*, employees(name:full_name, role:job_title)').gte('check_in', `${today}T00:00:00`),
-            supabase.from('employees').select('id, name:full_name, role:job_title').eq('employment_status', 'Active')
+            supabase.from('attendance').select('*, employees(name:full_name, role:job_title)').eq('business_id', await getActiveBusinessIdAction()).eq('employees.business_id', await getActiveBusinessIdAction()).gte('check_in', `${today}T00:00:00`),
+            supabase.from('employees').select('id, name:full_name, role:job_title').eq('business_id', await getActiveBusinessIdAction()).eq('employment_status', 'Active')
         ]);
 
         if (!attRes.error) setRecords(attRes.data || []);
         if (!staffRes.error) setStaffList(staffRes.data || []);
         setLoading(false);
+        } catch {
+            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            setLoading(false);
+        }
     }, [supabase]);
 
     React.useEffect(() => {

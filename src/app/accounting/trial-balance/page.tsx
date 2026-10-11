@@ -12,19 +12,7 @@ import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import * as XLSX from 'xlsx'
 
-const trialBalanceData = [
-    { code: '1000', name: 'Cash and Bank', debit: 1240000, credit: 0 },
-    { code: '1200', name: 'Accounts Receivable', debit: 500000, credit: 0 },
-    { code: '1300', name: 'Inventory', debit: 850000, credit: 0 },
-    { code: '2000', name: 'Accounts Payable', debit: 0, credit: 350000 },
-    { code: '2200', name: 'Business Loan', debit: 0, credit: 5000000 },
-    { code: '3000', name: 'Share Capital', debit: 0, credit: 30000000 },
-    { code: '3200', name: 'Retained Earnings', debit: 0, credit: 1322500 },
-    { code: '4000', name: 'Sales Revenue', debit: 0, credit: 1250000 },
-    { code: '5000', name: 'Office Supplies', debit: 15000, credit: 0 },
-    { code: '5100', name: 'Marketing', debit: 30000, credit: 0 },
-    { code: '9999', name: 'Suspense Account', debit: 35287500, credit: 0 }, // For demo balancing
-]
+const trialBalanceData: { code: string; name: string; debit: number; credit: number }[] = []
 
 export default function TrialBalancePage() {
     const [date, setDate] = React.useState<Date | undefined>(new Date())
@@ -128,7 +116,7 @@ export default function TrialBalancePage() {
     }
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6"><p role="status">Trial balance unavailable until the posted journal query is connected. Empty values below are not a financial report.</p>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-headline text-3xl font-bold tracking-tight">Trial Balance</h1>
@@ -146,11 +134,11 @@ export default function TrialBalancePage() {
                             <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
                         </PopoverContent>
                     </Popover>
-                    <Button variant="outline" size="sm" onClick={handlePrint}>
+                    <Button variant="outline" size="sm" disabled onClick={handlePrint}>
                         <Printer className="mr-2 h-4 w-4" />
                         Print Report
                     </Button>
-                    <Button variant="outline" size="sm" onClick={exportToExcel}>
+                    <Button variant="outline" size="sm" disabled onClick={exportToExcel}>
                         <Download className="mr-2 h-4 w-4" />
                         Export
                     </Button>
@@ -219,11 +207,11 @@ export default function TrialBalancePage() {
                 </Card>
                 <Card className="p-6 flex flex-col justify-center gap-4">
                     <div className="space-y-1">
-                        <h3 className="font-headline text-xl font-bold">Audit Ready Reports</h3>
+                        <h3 className="font-headline text-xl font-bold">Ledger reports unavailable</h3>
                         <p className="text-muted-foreground text-sm">Download your Trial Balance, General Ledger, and sub-ledgers for your tax accountant or external auditors.</p>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={handleDownloadAuditPack}>
+                        <Button variant="outline" size="sm" disabled onClick={handleDownloadAuditPack}>
                             <FileArchive className="mr-2 h-4 w-4" />
                             Download Audit Pack
                         </Button>

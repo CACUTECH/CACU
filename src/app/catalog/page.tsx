@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { useBusiness } from "@/components/business-provider"
 import { saveCatalogItemAction, deleteCatalogItemAction } from "./actions"
@@ -62,10 +63,11 @@ export default function CatalogPage() {
     })
 
     const fetchItems = React.useCallback(async () => {
+        try {
         setLoading(true);
         let query = supabase
             .from('catalog_items')
-            .select('*, type:item_type, price:unit_price, quantity:stock_quantity', { count: 'exact' })
+            .select('*, type:item_type, price:unit_price, quantity:stock_quantity', { count: 'exact' }).eq('business_id', await getActiveBusinessIdAction())
             .order('name');
         
         if (filter !== 'All') query = query.eq('item_type', filter);
@@ -80,6 +82,10 @@ export default function CatalogPage() {
             setTotal(count || 0);
         }
         setLoading(false);
+        } catch {
+            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            setLoading(false);
+        }
     }, [supabase, toast, page, filter, searchTerm]);
 
     React.useEffect(() => {

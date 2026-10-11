@@ -74,26 +74,8 @@ export default function JournalEntriesPage() {
     const isBalanced = totalDebit === totalCredit && totalDebit > 0
 
     const handleSave = () => {
-        if (!isBalanced) {
-            toast({
-                variant: "destructive",
-                title: "Journal Out of Balance",
-                description: `Debits (₦${totalDebit.toLocaleString()}) must equal Credits (₦${totalCredit.toLocaleString()}).`,
-            })
-            return
-        }
-
-        toast({
-            title: "Journal Adjustment Saved",
-            description: `Entry recorded for ${format(date!, "PPP")}. Ledger balances updated.`,
-        })
-
-        // Reset
-        setMemo("")
-        setLines([
-            { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
-            { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
-        ])
+        toast({ variant: "destructive", title: "Posting unavailable",
+            description: "Journal posting is awaiting verified database integration. This draft has not been saved." })
     }
 
     if (!mounted) return null

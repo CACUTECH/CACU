@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { addEmployeeAction } from "./actions"
 
@@ -48,10 +49,11 @@ export default function EmployeesPage() {
     const [loading, setLoading] = React.useState(true);
 
     const fetchStaff = React.useCallback(async () => {
+        try {
         setLoading(true);
         const { data, error } = await supabase
             .from('employees')
-            .select('*, name:full_name, role:job_title, status:employment_status, base_salary:monthly_salary')
+            .select('*, name:full_name, role:job_title, status:employment_status, base_salary:monthly_salary').eq('business_id', await getActiveBusinessIdAction())
             .order('full_name');
         
         if (error) {
@@ -60,6 +62,10 @@ export default function EmployeesPage() {
             setEmployees(data || []);
         }
         setLoading(false);
+        } catch {
+            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            setLoading(false);
+        }
     }, [supabase, toast]);
 
     React.useEffect(() => {

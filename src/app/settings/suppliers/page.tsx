@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PlusCircle, Phone, Loader2, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { useSupabaseUser } from "@/hooks/use-supabase-user";
 import { saveSupplierAction, deleteSupplierAction } from "./actions";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
@@ -34,10 +35,11 @@ export default function SuppliersSettingsPage() {
     const [loading, setLoading] = React.useState(true);
 
     const fetchSuppliers = React.useCallback(async () => {
+        try {
         setLoading(true);
         const { data, error } = await supabase
             .from('suppliers')
-            .select('*')
+            .select('*').eq('business_id', await getActiveBusinessIdAction())
             .order('name');
         
         if (error) {
@@ -46,6 +48,10 @@ export default function SuppliersSettingsPage() {
             setSuppliers(data || []);
         }
         setLoading(false);
+        } catch {
+            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            setLoading(false);
+        }
     }, [supabase, toast]);
 
     React.useEffect(() => {

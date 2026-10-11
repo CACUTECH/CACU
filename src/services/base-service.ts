@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
+import { cookies } from 'next/headers';
+import { ACTIVE_BUSINESS_COOKIE, selectMembership } from '@/lib/business-selection';
 
 /**
  * @fileOverview Base class for all backend services.
@@ -25,17 +27,20 @@ export abstract class BaseService {
       throw new Error('Authentication required');
     }
 
-    const { data: membership, error: memberError } = await supabase
-      .from('memberships')
-      .select('business_id, role')
-      .eq('user_id', user.id)
-      .limit(1)
-      .single();
-
-    if (memberError || !membership) {
-      return { user, supabase, businessId: null, role: null };
+    const selected = (await cookies()).get(ACTIVE_BUSINESS_COOKIE)?.value;
+    let membership;
+    if (selected) {
+      const { data, error } = await supabase.from('memberships').select('business_id, role')
+        .eq('user_id', user.id).eq('business_id', selected).single();
+      if (error || !data) throw new Error('Selected business membership is no longer valid');
+      membership = data;
+    } else {
+      const { data, error } = await supabase.from('memberships').select('business_id, role')
+        .eq('user_id', user.id).limit(2);
+      if (error) throw new Error('Unable to load business memberships');
+      membership = selectMembership(data ?? []);
     }
-
+    if (!membership) return { user, supabase, businessId: null, role: null };
     const duration = Date.now() - startTime;
     logger.perf('Get Context', duration, { businessId: membership.business_id }, this.serviceName);
 

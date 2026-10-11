@@ -1,3 +1,5 @@
+-- HISTORICAL REFERENCE ONLY: conflicts with current memberships/catalog schema.
+-- Do not execute against production. See schema-reconciliation.md for the baseline gate.
 
 -- CACU Production Relational Schema (PostgreSQL)
 -- Optimized for scale (1M+ Users)

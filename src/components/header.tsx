@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { createClient } from '@/lib/supabase/client';
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -44,17 +45,19 @@ function NotificationBell() {
   const supabase = createClient();
 
   const fetchNotifications = React.useCallback(async () => {
+    try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { data } = await supabase
       .from('notifications')
-      .select('*, type:event_type, message:body')
+      .select('*, type:event_type, message:body').eq('business_id', await getActiveBusinessIdAction())
       .eq('user_id', user.id)
       .is('read_at', null)
       .order('created_at', { ascending: false });
     
     setNotifications(data || []);
+    } catch { setNotifications([]); }
   }, [supabase]);
 
   React.useEffect(() => {
@@ -78,7 +81,7 @@ function NotificationBell() {
   }, [supabase, fetchNotifications]);
 
   const markAsRead = async (id: string) => {
-    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
+    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('business_id', await getActiveBusinessIdAction());
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 

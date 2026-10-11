@@ -17,6 +17,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -32,14 +33,15 @@ export default function StagingCheckPage() {
     const supabase = createClient();
     const [results, setResults] = React.useState<TestResult[]>([
         { id: 'auth', name: 'Identity & Session', status: 'pending' },
-        { id: 'rls', name: 'Multi-Tenant RLS Policy', status: 'pending' },
-        { id: 'atomic', name: 'Financial Atomic RPCs', status: 'pending' },
-        { id: 'storage', name: 'Secure Storage Isolation', status: 'pending' },
+        { id: 'rls', name: 'Business read connectivity (not isolation proof)', status: 'pending' },
+        { id: 'atomic', name: 'RPC connectivity (not atomicity proof)', status: 'pending' },
+        { id: 'storage', name: 'Storage connectivity (not isolation proof)', status: 'pending' },
         { id: 'reports', name: 'Server-Side Aggregations', status: 'pending' },
     ]);
 
     const runTests = async () => {
-        toast({ title: "Regression Started", description: "Executing full suite against Staging infrastructure..." });
+        const businessId = await getActiveBusinessIdAction();
+        toast({ title: "Regression Started", description: "Checking connectivity only; real security and accounting tests run separately." });
         
         // 1. Auth Test
         updateStatus('auth', 'running');
@@ -48,7 +50,7 @@ export default function StagingCheckPage() {
 
         // 2. RLS Test (Simple count check)
         updateStatus('rls', 'running');
-        const { error: rlsErr } = await supabase.from('businesses').select('id').limit(1);
+        const { error: rlsErr } = await supabase.from('businesses').select('id').eq('id', businessId).limit(1);
         updateStatus('rls', rlsErr ? 'fail' : 'pass', rlsErr?.message);
 
         // 3. Atomic Test (Call a safe RPC)
@@ -68,7 +70,7 @@ export default function StagingCheckPage() {
 
         // 5. Reports Test
         updateStatus('reports', 'running');
-        const { error: viewErr } = await supabase.from('view_inventory_valuation').select('*').limit(1);
+        const { error: viewErr } = await supabase.from('view_inventory_valuation').select('*').eq('business_id', businessId).limit(1);
         updateStatus('reports', viewErr ? 'fail' : 'pass', viewErr?.message);
 
         toast({ title: "Regression Complete", description: "Check results for any Staging environment issues." });

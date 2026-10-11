@@ -13,6 +13,7 @@ export class InvoiceService extends BaseService {
     const { data, error } = await supabase
       .from('invoices')
       .select('*, customers(name)')
+      .eq('customers.business_id', businessId)
       .eq('business_id', businessId)
       .order('created_at', { ascending: false });
 
