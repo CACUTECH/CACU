@@ -14,9 +14,6 @@ import {
     Plus, 
     Minus, 
     Trash2, 
-    CreditCard, 
-    Banknote, 
-    ArrowRightLeft, 
     CheckCircle2, 
     Package,
     Loader2,
@@ -38,12 +35,14 @@ type CatalogItem = {
     status: string;
 }
 
-import { getAccountingModeAction } from '@/app/accounting/cash-flow/actions';
+import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
+import type { CollectionAccounts } from '@/lib/collection-accounts';
+import { CollectionAccountPicker } from '@/components/collection-account-picker';
 
 type CartItem = CatalogItem & { cartQuantity: number }
 
 export default function POSPage() {
-    const supabase = createClient();
+    const [supabase] = React.useState(() => createClient());
     const { toast } = useToast()
     
     const [taxRate, setTaxRate] = React.useState<number | null>(null)
@@ -51,14 +50,19 @@ export default function POSPage() {
     const [cart, setCart] = React.useState<CartItem[]>([])
     const [inventory, setInventory] = React.useState<CatalogItem[]>([])
     const [loading, setLoading] = React.useState(true)
-    const [paymentMethod, setPaymentMethod] = React.useState<"Cash" | "Card" | "Transfer">("Cash")
+    const [collectionChoices, setCollectionChoices] = React.useState<CollectionAccounts | null>(null);
+    const [bankAccountId, setBankAccountId] = React.useState('');
+    const [paymentMethod, setPaymentMethod] = React.useState<"Cash" | "Transfer">("Cash")
     const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false)
     const [isProcessing, setIsProcessing] = React.useState(false)
 
     const fetchInventory = React.useCallback(async () => {
         try {
         setLoading(true);
-        setTaxRate(await getAccountingModeAction() ? 0 : 0.075);
+        setCollectionChoices(null);
+        const choices = await getCollectionAccountsAction();
+        setCollectionChoices(choices);
+        setTaxRate(choices.native ? 0 : 0.075);
         const { data, error } = await supabase
             .from('catalog_items')
             .select('*, type:item_type, price:unit_price, quantity:stock_quantity').eq('business_id', await getActiveBusinessIdAction())
@@ -71,7 +75,7 @@ export default function POSPage() {
             toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
             setLoading(false);
         }
-    }, [supabase]);
+    }, [supabase, toast]);
 
     React.useEffect(() => {
         fetchInventory();
@@ -117,13 +121,17 @@ export default function POSPage() {
 
     const checkoutKey = React.useRef(crypto.randomUUID());
     const handleCheckout = async () => {
-        if (taxRate === null) return;
+        if (taxRate === null || !collectionChoices || isProcessing) return;
+        if (collectionChoices.native && paymentMethod === 'Transfer' && !collectionChoices.accounts.some(account => account.id === bankAccountId)) {
+            toast({ variant: 'destructive', title: 'Select an available receiving bank account' }); return;
+        }
         setIsProcessing(true);
         
         const saleData = {
             requestKey: checkoutKey.current,
             items: cart.map(item => ({ id: item.id, quantity: item.cartQuantity, price: item.price })),
             paymentMethod,
+            bankAccountId: collectionChoices.native && paymentMethod === 'Transfer' ? bankAccountId : undefined,
             totalAmount: total
         };
 
@@ -242,7 +250,7 @@ export default function POSPage() {
                             </div>
                         </div>
 
-                        <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+                        <Dialog open={isCheckoutOpen} onOpenChange={open => { if (!isProcessing) setIsCheckoutOpen(open); }}>
                             <DialogTrigger asChild>
                                 <Button className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/20" disabled={cart.length === 0}>
                                     Complete Checkout
@@ -254,17 +262,8 @@ export default function POSPage() {
                                     <DialogDescription>Finalize the sale and sync records.</DialogDescription>
                                 </DialogHeader>
                                 <div className="grid gap-6 py-4">
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <Button variant={paymentMethod === 'Cash' ? 'default' : 'outline'} className="flex flex-col gap-2 h-20" onClick={() => setPaymentMethod('Cash')}>
-                                            <Banknote className="h-5 w-5" /><span>Cash</span>
-                                        </Button>
-                                        <Button variant={paymentMethod === 'Card' ? 'default' : 'outline'} className="flex flex-col gap-2 h-20" onClick={() => setPaymentMethod('Card')}>
-                                            <CreditCard className="h-5 w-5" /><span>Card</span>
-                                        </Button>
-                                        <Button variant={paymentMethod === 'Transfer' ? 'default' : 'outline'} className="flex flex-col gap-2 h-20" onClick={() => setPaymentMethod('Transfer')}>
-                                            <ArrowRightLeft className="h-5 w-5" /><span>Transfer</span>
-                                        </Button>
-                                    </div>
+                                    {collectionChoices ? <CollectionAccountPicker method={paymentMethod} bankAccountId={bankAccountId} choices={collectionChoices}
+                                      onMethodChange={setPaymentMethod} onBankChange={setBankAccountId} disabled={isProcessing} /> : <p role="alert">Payment accounts unavailable. Refresh to retry.</p>}
                                     <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-between font-bold">
                                         <span>Payable Amount</span>
                                         <span className="text-xl text-primary">₦{total.toLocaleString()}</span>
@@ -274,7 +273,7 @@ export default function POSPage() {
                                     </p>
                                 </div>
                                 <DialogFooter>
-                                    <Button className="w-full h-12 text-lg" onClick={handleCheckout} disabled={isProcessing}>
+                                    <Button className="w-full h-12 text-lg" onClick={handleCheckout} disabled={isProcessing || !collectionChoices || (collectionChoices.native && paymentMethod === 'Transfer' && !bankAccountId)}>
                                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Confirm & Record Sale"}
                                     </Button>
                                 </DialogFooter>

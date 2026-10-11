@@ -21,7 +21,7 @@ Manually verify checkout, refresh-after-timeout, partial/full receipts and tenan
 
 ## Remaining limits
 
-This legacy path accepts manual Cash/Transfer only and catalogue-price sales without tax/discount overrides. Card collection requires a verified gateway workflow. Native Transfer still needs a selected authorized bank account in the next slice. Invoice creation, direct invoice status changes and direct Data API write policies need separate hardening; this RPC change is not a complete financial write boundary. Balance/list reads remain unpaginated and need bounded reporting work. No commercial pricing, Hybrid eligibility, quotas or permissions bundles were introduced.
+This legacy path accepts manual Cash/Transfer only and catalogue-price sales without tax/discount overrides. Card collection requires a verified gateway workflow. [Native bank collection](native-bank-collection.md) has a prepared follow-up implementation; migration, reviewed bank mappings and staging acceptance remain pending rollout. Invoice creation, direct invoice status changes and direct Data API write policies need separate hardening; this RPC change is not a complete financial write boundary. Balance/list reads remain unpaginated and need bounded reporting work. No commercial pricing, Hybrid eligibility, quotas or permissions bundles were introduced.
 
 ## Validation
 

@@ -36,7 +36,7 @@ def database():
           CREATE TABLE public.invoices(id uuid primary key,business_id uuid,customer_id uuid,total numeric(19,4),tax numeric(19,4),status text,updated_at timestamptz,invoice_number text,issue_date date,due_date date,subtotal numeric(19,4),notes text,type text,vat_included boolean);
           CREATE TABLE public.invoice_items(id uuid primary key,business_id uuid,invoice_id uuid,catalog_item_id uuid,quantity numeric,line_total numeric,description text,unit_price numeric);
           CREATE TABLE public.payments(id uuid primary key,business_id uuid,reference text,purpose text,invoice_id uuid,amount numeric(19,4),currency text,status text,channel text,customer_email text,initialized_by uuid,customer_id uuid);
-          CREATE TABLE public.transactions(id uuid primary key,business_id uuid,customer_id uuid,created_by uuid,status text,payment_method text,total numeric(19,4),subtotal numeric(19,4));
+          CREATE TABLE public.transactions(id uuid primary key,business_id uuid,customer_id uuid,created_by uuid,status text,payment_method text CHECK(payment_method IN ('cash','transfer','card')),total numeric(19,4),subtotal numeric(19,4));
           CREATE TABLE public.transaction_items(id uuid primary key,business_id uuid,transaction_id uuid,catalog_item_id uuid,description text,quantity numeric,unit_price numeric,line_total numeric);
           CREATE TABLE public.financial_transactions(id uuid primary key,business_id uuid);
           CREATE TABLE public.journal_entries(id uuid primary key,business_id uuid);
@@ -47,6 +47,8 @@ def database():
         """)
         for p in sorted([*Path('../supabase/migrations').glob('2026101108*.sql'), *Path('../supabase/migrations').glob('20261011090*.sql')]):
             c.execute(p.read_text(encoding='utf-8-sig'))
+        for migration in Path('../supabase/migrations').glob('*_native_collection_account_lock.sql'):
+            c.execute(migration.read_text(encoding='utf-8'))
         for tab in ['memberships','accounts','customers','suppliers','catalog_items','invoices','invoice_items','payments','transactions','transaction_items']:
             c.execute(f'ALTER TABLE public.{tab} ENABLE ROW LEVEL SECURITY')
     engine=create_engine(DSN.replace('postgresql://','postgresql+psycopg://'),poolclass=NullPool)
@@ -83,6 +85,7 @@ def session_for(c,d):
 
 def command(d,kind,main,other,amount,**kw):
     _,_,_,_,accounts,party,year=d
+    if kind in {'receipt','pos'}:kw.setdefault('payment_method','Cash')
     return PostingCommand(request_key=uuid4(),kind=kind,source_id=uuid4(),main_account_id=accounts[main][0],
          entry_date=date(year,2,10),narration='Fixture',lines=[{'account_id':accounts[other][0],'amount':str(amount)}],**kw)
 
@@ -287,6 +290,10 @@ def test_api_to_real_postgres_and_membership_rejection(database,monkeypatch):
         client=TestClient(api.app)
         response=client.get(f'/api/v1/businesses/{d[1]}/reports/cash-flow',params={'start_date':f'{d[6]}-01-01','end_date':f'{d[6]}-12-31'})
         assert response.status_code==200 and response.json()['closing_cash']=='925000.00'
+        response=client.get(f'/api/v1/businesses/{d[1]}/collection-accounts')
+        assert response.status_code==200 and response.json()==[]
+        response=client.get(f'/api/v1/businesses/{uuid4()}/collection-accounts')
+        assert response.status_code==403
         response=client.get(f'/api/v1/businesses/{uuid4()}/reports/cash-flow',params={'start_date':f'{d[6]}-01-01','end_date':f'{d[6]}-12-31'})
         assert response.status_code==403
         response=client.get(f'/api/v1/businesses/{d[1]}/reports/cash-flow',params={'start_date':f'{d[6]}-12-31','end_date':f'{d[6]}-01-01'})
@@ -308,3 +315,165 @@ def test_cutover_guard_preserves_legacy_browser_writes(database):
         with d[0].begin() as c:
             c.exec_driver_sql('SET LOCAL ROLE authenticated')
             c.exec_driver_sql('INSERT INTO public.financial_transactions VALUES(%s,%s)',(str(uuid4()),str(d[1])))
+
+
+# Native collection-account regression fixtures run using the restricted runtime.
+def reviewed_bank(d):
+    with d[0].begin() as c:
+        c.exec_driver_sql("UPDATE accounting.account_map SET purpose='bank' WHERE account_id=%s",(str(d[4]['cash2'][0]),))
+    return d[4]['cash2'][0]
+
+
+def workflow(d,fn,data):
+    with d[0].begin() as c:
+        s=session_for(c,d)
+        try:return fn(s,d[2],data)
+        finally:s.close()
+
+
+def issued_service_invoice(d):
+    from cacu.accounting.workflows import InvoiceCreate,invoice_create
+    item=uuid4();key=uuid4()
+    with d[0].begin() as c:
+        s=session_for(c,d)
+        c.exec_driver_sql("INSERT INTO public.catalog_items(id,business_id,name,unit_price,item_type) VALUES(%s,%s,'Service',100,'SERVICE')",(str(item),str(d[1])))
+        s.close()
+    workflow(d,invoice_create,InvoiceCreate(request_key=key,customer_id=d[5],invoice_number=str(key),entry_date=date(d[6],2,10),items=[{'catalog_item_id':item,'quantity':1,'unit_price':'100.00'}]))
+    return key
+
+
+def cash_balance(c,library_id):
+    return c.exec_driver_sql("SELECT coalesce(sum(CASE WHEN entry_type='DEBIT' THEN amount ELSE -amount END),0) FROM accounting.ledger WHERE post_account_id=%s",(library_id,)).scalar()
+
+
+def test_transfer_receipt_posts_to_bank_and_replays_without_duplicate_income(database):
+    from cacu.accounting.workflows import ReceiptCreate,receipt_create,bank_accounts
+    d=database;bank=reviewed_bank(d);invoice=issued_service_invoice(d)
+    data=ReceiptCreate(request_key=uuid4(),invoice_id=invoice,amount='40.00',entry_date=date(d[6],2,11),method='Transfer',bank_account_id=bank)
+    result=workflow(d,receipt_create,data)
+    assert result['outstanding']=='60.00' and result['collection_account_id']==str(bank)
+    assert workflow(d,receipt_create,data)==result
+    with d[0].begin() as c:
+        s=session_for(c,d)
+        assert bank_accounts(s)==[{'id':str(bank),'name':'cash2'}]
+        assert cash_balance(c,d[4]['cash2'][1])==40 and cash_balance(c,d[4]['cash'][1])==0
+        assert c.exec_driver_sql('SELECT channel FROM public.payments').scalar()=='transfer'
+        assert c.exec_driver_sql("SELECT details->>'collection_account_id' FROM accounting.audit_event WHERE event='receipt'").scalar()==str(bank)
+        summary=financial_summary(s,date(d[6],1,1),date(d[6],12,31));report=cash_flow(s,date(d[6],1,1),date(d[6],12,31))
+        assert summary['net_profit']=='100.00' and summary['receivables']=='60.00'
+        assert summary['trial_balance_difference']=='0.00' and report['closing_cash']=='40.00' and report['reconciled']
+        s.close()
+    data.bank_account_id=d[4]['cash'][0]
+    with pytest.raises(HTTPException) as error:workflow(d,receipt_create,data)
+    assert error.value.status_code==409
+
+
+@pytest.mark.parametrize('variant',['missing','foreign','inactive','wrong_purpose','wrong_section','non_bank','deleted','cash_with_bank','card'])
+def test_invalid_collection_selection_rolls_back_receipt(database,variant):
+    from cacu.accounting.workflows import ReceiptCreate,receipt_create,bank_accounts
+    d=database;bank=reviewed_bank(d);invoice=issued_service_invoice(d)
+    chosen=bank;method='Transfer'
+    with d[0].begin() as c:
+        if variant=='missing':chosen=None
+        if variant=='foreign':
+            foreign=uuid4();chosen=uuid4()
+            c.exec_driver_sql('INSERT INTO public.businesses VALUES(%s,%s)',(str(foreign),'Foreign'))
+            c.exec_driver_sql('INSERT INTO public.accounts VALUES(%s,%s,%s,true)',(str(chosen),str(foreign),'Foreign bank'))
+        if variant=='inactive':c.exec_driver_sql('UPDATE public.accounts SET is_active=false WHERE id=%s',(str(bank),))
+        if variant=='wrong_purpose':c.exec_driver_sql("UPDATE accounting.account_map SET purpose='other' WHERE account_id=%s",(str(bank),))
+        if variant=='wrong_section':c.exec_driver_sql("UPDATE accounting.account_map SET flow_section='restricted' WHERE account_id=%s",(str(bank),))
+        if variant=='non_bank':c.exec_driver_sql("UPDATE accounting.account SET account_type='RECEIVABLE' WHERE id=%s",(d[4]['cash2'][1],))
+        if variant=='deleted':c.exec_driver_sql('UPDATE accounting.recyclable SET deleted_at=now() WHERE id=%s',(d[4]['cash2'][1],))
+        if variant=='cash_with_bank':method='Cash'
+        if variant=='card':method='Card';chosen=None
+    data=ReceiptCreate(request_key=uuid4(),invoice_id=invoice,amount='40.00',entry_date=date(d[6],2,11),method=method,bank_account_id=chosen)
+    with pytest.raises(HTTPException):workflow(d,receipt_create,data)
+    with d[0].begin() as c:
+        s=session_for(c,d)
+        assert c.exec_driver_sql('SELECT count(*) FROM public.payments').scalar()==0
+        assert cash_balance(c,d[4]['cash'][1])==cash_balance(c,d[4]['cash2'][1])==0
+        assert c.exec_driver_sql("SELECT count(*) FROM accounting.audit_event WHERE event='receipt'").scalar()==0
+        if variant in {'foreign','missing','cash_with_bank','card'}:assert len(bank_accounts(s))==1
+        else:assert bank_accounts(s)==[]
+        s.close()
+
+
+@pytest.mark.parametrize('method',['Cash','Transfer'])
+def test_pos_uses_selected_collection_account_and_lowercase_source_method(database,method):
+    from cacu.accounting.workflows import SaleCreate,sale_create
+    d=database;bank=reviewed_bank(d);item=uuid4()
+    with d[0].begin() as c:
+        s=session_for(c,d)
+        c.exec_driver_sql("INSERT INTO public.catalog_items(id,business_id,name,unit_price,cost_price,stock_quantity,item_type) VALUES(%s,%s,'Goods',100,30,10,'PRODUCT')",(str(item),str(d[1])))
+        s.close()
+    data=SaleCreate(request_key=uuid4(),items=[{'item_id':item,'quantity':1}],entry_date=date(d[6],2,10),method=method,quoted_total='100.00',bank_account_id=bank if method=='Transfer' else None)
+    result=workflow(d,sale_create,data);assert workflow(d,sale_create,data)==result
+    with d[0].begin() as c:
+        s=session_for(c,d)
+        assert cash_balance(c,d[4]['cash2'][1])==(100 if method=='Transfer' else 0)
+        assert cash_balance(c,d[4]['cash'][1])==(100 if method=='Cash' else 0)
+        assert c.exec_driver_sql('SELECT payment_method FROM public.transactions').scalar()==method.lower()
+        assert c.exec_driver_sql('SELECT stock_quantity FROM public.catalog_items').scalar()==9
+        assert c.exec_driver_sql('SELECT count(*) FROM public.transactions').scalar()==1
+        s.close()
+
+
+def test_collection_lock_blocks_deactivation_until_commit_and_hides_foreign_scope(database):
+    from cacu.accounting.workflows import collection_account
+    d=database;bank=reviewed_bank(d)
+    from sqlalchemy.exc import OperationalError,ProgrammingError
+    with d[0].begin() as locked:
+        s=session_for(locked,d)
+        assert collection_account(s,'Transfer',bank)==bank
+        with pytest.raises(OperationalError):
+            with d[0].begin() as c:
+                c.exec_driver_sql("SET LOCAL lock_timeout='100ms'")
+                c.exec_driver_sql('UPDATE public.accounts SET is_active=false WHERE id=%s',(str(bank),))
+        s.close()
+    with d[0].begin() as c:
+        c.exec_driver_sql('UPDATE public.accounts SET is_active=false WHERE id=%s',(str(bank),))
+    with d[0].begin() as c:
+        s=session_for(c,d)
+        with pytest.raises(ProgrammingError):c.exec_driver_sql('SELECT accounting.lock_collection_account(%s,%s,%s)',(str(uuid4()),str(bank),'bank'))
+        s.close()
+
+
+def test_collection_lock_rejects_viewer_and_has_no_browser_execution_grant(database):
+    from sqlalchemy.exc import ProgrammingError
+    d=database;bank=reviewed_bank(d)
+    with d[0].begin() as c:
+        assert not c.exec_driver_sql("SELECT has_function_privilege('authenticated','accounting.lock_collection_account(uuid,uuid,text)','EXECUTE')").scalar()
+        c.exec_driver_sql("UPDATE public.memberships SET role='viewer'")
+    with pytest.raises(ProgrammingError):
+        with d[0].begin() as c:
+            s=session_for(c,d)
+            try:c.exec_driver_sql('SELECT accounting.lock_collection_account(%s,%s,%s)',(str(d[1]),str(bank),'bank'))
+            finally:s.close()
+
+
+def test_existing_cash_workflow_hash_replays_after_additive_bank_field(database):
+    from cacu.accounting.workflows import ReceiptCreate,receipt_create
+    import hashlib
+    d=database;invoice=issued_service_invoice(d)
+    data=ReceiptCreate(request_key=uuid4(),invoice_id=invoice,amount='40.00',entry_date=date(d[6],2,11),method='Cash')
+    # Hash captured from the old API contract, which had no bank_account_id field.
+    previous=data.model_dump(mode='json');previous.pop('bank_account_id')
+    digest=hashlib.sha256(('receipt'+json.dumps(previous,sort_keys=True,separators=(',',':'))).encode()).hexdigest()
+    original={'source_id':str(data.request_key),'outstanding':'60.00'}
+    with d[0].begin() as c:
+        s=session_for(c,d)
+        c.exec_driver_sql('INSERT INTO accounting.workflow_request VALUES(%s,%s,%s,%s::jsonb)',(str(d[1]),str(data.request_key),digest,json.dumps(original)))
+        s.close()
+    assert workflow(d,receipt_create,data)==original
+    with d[0].begin() as c:assert c.exec_driver_sql('SELECT count(*) FROM public.payments').scalar()==0
+
+
+@pytest.mark.parametrize('variant',['missing_method','cash_bank_mismatch'])
+def test_direct_posting_cannot_bypass_collection_classification(database,variant):
+    d=database;bank=reviewed_bank(d);invoice=issued_service_invoice(d)
+    data=command(d,'receipt','ar','cash2','40',target_id=invoice,counterparty_id=d[5],payment_method=None if variant=='missing_method' else 'Cash')
+    with pytest.raises(HTTPException) as error:post(d,data)
+    assert error.value.status_code==422
+    with d[0].begin() as c:
+        assert c.exec_driver_sql('SELECT count(*) FROM public.payments').scalar()==0
+        assert cash_balance(c,d[4]['cash2'][1])==0

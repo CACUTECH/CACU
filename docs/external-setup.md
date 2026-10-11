@@ -54,3 +54,7 @@ Create database and object backups, rehearse restoring them and reconcile cash, 
 Set Supabase Auth site URL/allowlisted recovery and callback URLs to the confirmed frontend domains, configure verified email delivery, and test sign-in/recovery/revocation end to end. Review commercial packaging, permission bundles, mode transitions, privacy/retention and provider use with the owners of those decisions. Confirm supported tax-free NGN pilot businesses and have an accountant sign opening cash/bank/AR/AP/stock reconciliation before native activation.
 
 Billing providers, AI context, online collections, payroll, taxable transactions and weighted-average costing are separate capabilities requiring implementation and validation; dashboard configuration alone cannot enable them safely.
+
+## Reviewed native bank collection
+
+Follow [native bank collection setup](native-bank-collection.md) before deploying that follow-up. Apply the private locking migration in staging before the backend, review separate cash/bank mappings and opening reconciliation, then deploy Next.js and verify selected-bank postings. Existing cash accounts must not be silently reclassified to rewrite past Transfer mistakes. Live bank feeds and automatic settlement verification remain unconnected.
