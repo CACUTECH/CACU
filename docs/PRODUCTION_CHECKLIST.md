@@ -1,28 +1,21 @@
-# CACU Production Deployment Checklist
+# CACU release checklist
 
-### 1. Staging Verification (MANDATORY)
-- [ ] **Smoke Test**: All green on `/admin/staging`.
-- [ ] **Auth**: New user registration and Google OAuth verified.
-- [ ] **Ledger**: Record a ₦1 transaction and verify no RLS leakage.
-- [ ] **Inventory**: Atomic stock decrement tested via POS.
-- [ ] **Storage**: File upload/download (Logo/Receipts) working with Signed URLs.
+All items require evidence for the target environment; previous checked claims were unverified.
 
-### 2. Database & Security
-- [x] **Supabase RLS**: All tables have `tenant_isolation` policies enabled.
-- [x] **Hardened RPCs**: Financial functions verify membership internally.
-- [x] **Audit Logging**: `record_audit` is active for manual ledger entries.
-- [x] **Encryption**: All connections forced to HTTPS.
+- [ ] Current dependencies reviewed; npm security backlog resolved or specifically assessed.
+- [ ] Next lint, independent typecheck, Jest and build pass without build bypasses.
+- [ ] Python lock audit and tests pass; generated contracts match OpenAPI.
+- [ ] Reviewed schema-only baseline and additive upgrades reproduce fresh/existing installs.
+- [ ] Membership revocation, multi-business selection, direct privileged RPC calls and viewer writes tested against real SQL.
+- [ ] Tenant-consistent foreign keys, grants, RLS and fixed function search paths verified live.
+- [ ] Canonical journals balance at database boundary; immutable posted entries and closed periods enforced.
+- [ ] Document/journal/audit/stock effects roll back atomically; idempotency and concurrency tests pass.
+- [ ] Invoice partial payments do not recognize revenue again; AR/AP/stock reconcile to control accounts.
+- [ ] Deterministic NGN fixture and failure rollback tests produce required totals against Postgres.
+- [ ] Storage SELECT/INSERT/UPDATE permits only authorized business-assets replacements.
+- [ ] Browser flows, expiry, downloads, pagination and empty/error states verified on both previews.
+- [ ] Provider status, payroll/tax/compliance and scale claims supported independently.
+- [ ] Exact Vercel team/projects/environments confirmed; existing production domain preserved.
+- [ ] Backups restored in isolation; historical reconciliation and release rollback reviewed.
 
-### 3. Infrastructure (Vercel)
-- [x] **CI/CD**: GitHub Actions blocking PRs on test failure.
-- [x] **Security Headers**: HSTS, CSP, and XFO configured in `vercel.json`.
-- [x] **Secrets**: Env variables separated between Staging and Production.
-
-### 4. Application Health
-- [x] **Observability**: `StructuredLogger` active in production environment.
-- [x] **Error Handling**: Global `ErrorBoundary` configured with log ingestion.
-- [x] **Performance**: B-Tree and GIN indexes applied to high-traffic columns.
-
-### 5. Compliance (Nigeria)
-- [x] **FIRS/LIRS**: PAYE tax tables verified for 2024 standards.
-- [x] **Data Privacy**: Redaction policy active for PII in logs.
+See implementation-checkpoint.md for actual observed results. Mock tests do not complete database gates.

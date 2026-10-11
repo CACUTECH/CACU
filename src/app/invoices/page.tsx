@@ -60,6 +60,7 @@ import { format } from "date-fns"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { createInvoiceAction, markAsPaidAction, updateInvoiceStatusAction } from "./actions"
 
 type Customer = {
@@ -132,13 +133,16 @@ export default function InvoicesPage() {
   const [loading, setLoading] = React.useState(true);
 
   const fetchData = React.useCallback(async () => {
+        try {
     setLoading(true);
+    const businessId = await getActiveBusinessIdAction();
     const [invRes, custRes, itemRes] = await Promise.all([
-        supabase.from('invoices').select('*, date:issue_date, customers(name)').order('created_at', { ascending: false }),
-        supabase.from('customers').select('id, name').order('name'),
-        supabase.from('catalog_items').select('id, name, price:unit_price').order('name')
+        supabase.from('invoices').select('*, date:issue_date, customers(name)').eq('business_id', businessId).eq('customers.business_id', businessId).order('created_at', { ascending: false }),
+        supabase.from('customers').select('id, name').eq('business_id', businessId).order('name'),
+        supabase.from('catalog_items').select('id, name, price:unit_price').eq('business_id', businessId).order('name')
     ]);
 
+    if (invRes.error || custRes.error || itemRes.error) throw new Error("Invoice data unavailable");
     if (!invRes.error) {
         setDocs(invRes.data.map(d => ({
             ...d,
@@ -148,7 +152,11 @@ export default function InvoicesPage() {
     if (!custRes.error) setCustomers(custRes.data);
     if (!itemRes.error) setItems(itemRes.data);
     setLoading(false);
-  }, [supabase]);
+        } catch {
+            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            setLoading(false);
+        }
+  }, [supabase, toast]);
 
   React.useEffect(() => {
     fetchData();

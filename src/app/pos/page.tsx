@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { processCheckoutAction } from "./actions"
 
 type CatalogItem = {
@@ -52,15 +53,20 @@ export default function POSPage() {
     const [isProcessing, setIsProcessing] = React.useState(false)
 
     const fetchInventory = React.useCallback(async () => {
+        try {
         setLoading(true);
         const { data, error } = await supabase
             .from('catalog_items')
-            .select('*, type:item_type, price:unit_price, quantity:stock_quantity')
+            .select('*, type:item_type, price:unit_price, quantity:stock_quantity').eq('business_id', await getActiveBusinessIdAction())
             .eq('item_type', 'Product')
             .order('name');
         
         if (!error) setInventory(data || []);
         setLoading(false);
+        } catch {
+            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            setLoading(false);
+        }
     }, [supabase]);
 
     React.useEffect(() => {

@@ -57,6 +57,7 @@ export class SalesService extends BaseService {
         .from('catalog_items')
         .select('name, stock_quantity, reorder_level')
         .eq('id', item.id)
+        .eq('business_id', businessId)
         .single();
 
       if (updatedItem && updatedItem.stock_quantity <= updatedItem.reorder_level) {
@@ -77,6 +78,7 @@ export class SalesService extends BaseService {
     const { data, error } = await supabase
       .from('transactions')
       .select('*, customers(name)')
+      .eq('customers.business_id', businessId)
       .eq('business_id', businessId)
       .order('created_at', { ascending: false })
       .limit(50);

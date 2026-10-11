@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/card"
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { saveCatalogItemAction, deleteCatalogItemAction } from '../catalog/actions';
 import Link from 'next/link';
@@ -45,10 +46,11 @@ export default function InventoryPage() {
     const [loading, setLoading] = React.useState(true);
 
     const fetchItems = React.useCallback(async () => {
+        try {
         setLoading(true);
         const { data, error } = await supabase
             .from('catalog_items')
-            .select('*, type:item_type, price:unit_price, quantity:stock_quantity')
+            .select('*, type:item_type, price:unit_price, quantity:stock_quantity').eq('business_id', await getActiveBusinessIdAction())
             .eq('item_type', 'Product')
             .order('name');
         
@@ -58,6 +60,10 @@ export default function InventoryPage() {
             setItems(data || []);
         }
         setLoading(false);
+        } catch {
+            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            setLoading(false);
+        }
     }, [supabase, toast]);
 
     React.useEffect(() => {

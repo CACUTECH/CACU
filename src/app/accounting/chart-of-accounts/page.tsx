@@ -24,18 +24,7 @@ type Account = {
     status: 'Active' | 'Inactive';
 }
 
-const initialAccounts: Account[] = [
-    { code: '1000', name: 'Cash and Bank', type: 'Asset', balance: 1240000, status: 'Active' },
-    { code: '1200', name: 'Accounts Receivable', type: 'Asset', balance: 500000, status: 'Active' },
-    { code: '1300', name: 'Inventory', type: 'Asset', balance: 850000, status: 'Active' },
-    { code: '2000', name: 'Accounts Payable', type: 'Liability', balance: 350000, status: 'Active' },
-    { code: '2200', name: 'Business Loan', type: 'Liability', balance: 5000000, status: 'Active' },
-    { code: '3000', name: 'Share Capital', type: 'Equity', balance: 30000000, status: 'Active' },
-    { code: '3200', name: 'Retained Earnings', type: 'Equity', balance: 1322500, status: 'Active' },
-    { code: '4000', name: 'Sales Revenue', type: 'Income', balance: 1250000, status: 'Active' },
-    { code: '5000', name: 'Office Supplies', type: 'Expense', balance: 15000, status: 'Active' },
-    { code: '5100', name: 'Marketing', type: 'Expense', balance: 30000, status: 'Active' },
-]
+const initialAccounts: Account[] = []
 
 export default function ChartOfAccountsPage() {
     const { toast } = useToast()
@@ -174,18 +163,18 @@ export default function ChartOfAccountsPage() {
     }
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6"><p role="status">Chart of accounts is awaiting database integration. Sample balances have been removed; account changes are unavailable.</p>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-headline text-3xl font-bold tracking-tight">Chart of Accounts</h1>
                     <p className="text-muted-foreground mt-1">Organize your business finances with a structured ledger.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={exportToPdf} disabled={isExporting}>
+                    <Button variant="outline" size="sm" onClick={exportToPdf} disabled>
                         {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                         Export PDF
                     </Button>
-                    <Button variant="outline" size="sm" onClick={exportToExcel}>
+                    <Button variant="outline" size="sm" disabled onClick={exportToExcel}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" />
                         Excel
                     </Button>
@@ -207,7 +196,7 @@ export default function ChartOfAccountsPage() {
                                 <DialogClose asChild>
                                     <Button variant="outline">Cancel</Button>
                                 </DialogClose>
-                                <Button onClick={handleAddAccount}>Create Account</Button>
+                                <Button disabled onClick={handleAddAccount}>Create Account</Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
@@ -283,7 +272,7 @@ export default function ChartOfAccountsPage() {
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem 
                                                         className="text-destructive" 
-                                                        onClick={() => handleDeleteAccount(account.code)}
+                                                        disabled onClick={() => handleDeleteAccount(account.code)}
                                                     >
                                                         <Trash2 className="h-4 w-4 mr-2" /> Deactivate
                                                     </DropdownMenuItem>
@@ -309,7 +298,7 @@ export default function ChartOfAccountsPage() {
                         <DialogClose asChild>
                             <Button variant="outline">Cancel</Button>
                         </DialogClose>
-                        <Button onClick={handleEditAccount}>Save Changes</Button>
+                        <Button disabled onClick={handleEditAccount}>Save Changes</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -56,6 +56,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { saveCustomerAction, deleteCustomerAction } from "./actions"
 
 type Customer = {
@@ -78,10 +79,11 @@ export default function CustomersPage() {
     const supabase = createClient();
     
     const fetchCustomers = React.useCallback(async () => {
+        try {
         setLoading(true);
         const { data, error } = await supabase
             .from('customers')
-            .select('*, phone:phone_number')
+            .select('*, phone:phone_number').eq('business_id', await getActiveBusinessIdAction())
             .order('name');
         
         if (error) {
@@ -90,6 +92,10 @@ export default function CustomersPage() {
             setCustomers(data || []);
         }
         setLoading(false);
+        } catch {
+            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            setLoading(false);
+        }
     }, [supabase, toast]);
 
     React.useEffect(() => {

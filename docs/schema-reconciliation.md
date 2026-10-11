@@ -1,0 +1,11 @@
+# Schema reconciliation checkpoint
+
+Tracked supabase/migrations/0001_init.sql is an additive migration, not a fresh-install baseline. It assumes businesses, memberships, membership_role, accounts, journal_entries, journal_lines, invoices/items, payments, transactions/items, employees, notifications and two membership helpers. docs/supabase_schema.sql instead uses business_members, sales/sale_items, price/quantity; do not execute it against production.
+
+Live read-only inspection attempted on the sole connected project CACU Tech (fnkdzuolcbtckuvqcuai): SQL and migration listing both fail PostgreSQL 28P01. Existing schema ownership, policies, foreign keys, function bodies/grants, search paths and storage grants cannot be asserted. No migration applied. No local Postgres/Docker/Supabase CLI is installed at this checkpoint.
+
+Before implementation of production SQL: recover a schema-only dump through authorized access; omit users, keys and application data. Review all existing journal columns/types. Check pg_proc, pg_policies, information_schema constraints/grants, pg_roles, exposed PostgREST schemas, migration history and storage policies. Build disposable fresh-install and representative-upgrade databases. Record drift and unresolved historical data separately. Fail on conflicting existing tables rather than swallowing errors with IF NOT EXISTS.
+
+Required boundary tests: hostile customer/catalog/invoice/account IDs; revoked membership; viewer mutation; balanced two-line journals; finite positive amounts; archived accounts; closed periods; posted immutability; atomic audit rollback; idempotency payload conflicts; concurrent payments/stock; return original cost; stock and control account reconciliation. Mock Jest tests are not proof of these SQL properties.
+
+Target relationships (to verify against recovered schema): businesses -> memberships/accounts/journal_entries/customers/catalog_items/invoices; journal_entries -> journal_lines -> accounts; invoices -> invoice_items/payment allocations -> payments. All tenant child references require business_id plus ID composite constraints. This is a target model, not a verified live ERD.

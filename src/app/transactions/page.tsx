@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
+import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { recordLedgerEntryAction } from './actions';
 
@@ -55,10 +56,11 @@ export default function TransactionsPage() {
     })
 
     const fetchTX = React.useCallback(async () => {
+        try {
         setLoading(true);
         const { data, error } = await supabase
             .from('financial_transactions')
-            .select('*')
+            .select('*').eq('business_id', await getActiveBusinessIdAction())
             .order('date', { ascending: false });
         
         if (error) {
@@ -67,6 +69,10 @@ export default function TransactionsPage() {
             setTransactions(data || []);
         }
         setLoading(false);
+        } catch {
+            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            setLoading(false);
+        }
     }, [supabase, toast]);
 
     React.useEffect(() => {

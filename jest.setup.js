@@ -34,13 +34,13 @@ jest.mock('@/lib/supabase/server', () => ({
   createClient: jest.fn(() => mockSupabaseClient),
 }));
 
+const mockCookieStore = {
+  get: jest.fn(() => ({ value: 'biz-123' })), set: jest.fn(), getAll: jest.fn(() => []),
+};
+
 // Mock Next.js Headers
 jest.mock('next/headers', () => ({
-  cookies: jest.fn(() => ({
-    get: jest.fn(),
-    set: jest.fn(),
-    getAll: jest.fn(() => []),
-  })),
+  cookies: jest.fn(() => mockCookieStore),
 }));
 
 // Mock ResizeObserver for UI components

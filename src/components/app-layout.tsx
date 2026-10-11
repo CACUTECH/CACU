@@ -54,6 +54,7 @@ import { AIAssistant } from './ai-assistant';
 import type { BusinessType } from '@/lib/data';
 import { MobileNav } from './mobile-nav';
 import { createClient } from '@/lib/supabase/client';
+import { useBusiness } from '@/components/business-provider';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 
 function NavItem({ item, pathname }: { item: any, pathname: string }) {
@@ -129,6 +130,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const { user, loading: userLoading } = useSupabaseUser();
   
+  const { business: activeBusiness } = useBusiness();
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const [businessLoading, setBusinessLoading] = useState(true);
   const [businessType, setBusinessType] = useState<BusinessType>('HYBRID');
@@ -148,12 +150,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (user) {
       const fetchProfile = async () => {
         try {
-          const { data } = await supabase
-            .from('memberships')
-            .select('role, businesses (*)')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          
+          const data = activeBusiness ? { businesses: activeBusiness, role: activeBusiness.userRole } : null;
           if (data) {
             const business: any = Array.isArray(data.businesses) ? data.businesses[0] : data.businesses;
             setBusinessProfile({
@@ -174,7 +171,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     } else {
       setBusinessLoading(false);
     }
-  }, [user, supabase]);
+  }, [user, supabase, activeBusiness]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
