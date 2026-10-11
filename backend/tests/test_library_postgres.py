@@ -45,7 +45,7 @@ def database():
           CREATE FUNCTION public.is_business_member(tenant uuid) RETURNS boolean LANGUAGE sql AS $$
           SELECT EXISTS(SELECT FROM public.memberships WHERE business_id=tenant AND user_id=(current_setting('request.jwt.claims')::jsonb->>'sub')::uuid); $$;
         """)
-        for p in sorted(Path('../supabase/migrations').glob('20261011*.sql')):
+        for p in sorted([*Path('../supabase/migrations').glob('2026101108*.sql'), *Path('../supabase/migrations').glob('20261011090*.sql')]):
             c.execute(p.read_text(encoding='utf-8-sig'))
         for tab in ['memberships','accounts','customers','suppliers','catalog_items','invoices','invoice_items','payments','transactions','transaction_items']:
             c.execute(f'ALTER TABLE public.{tab} ENABLE ROW LEVEL SECURITY')

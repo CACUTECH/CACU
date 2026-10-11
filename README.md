@@ -27,3 +27,5 @@ Do not run docs/supabase_schema.sql as a production schema: it is a historical r
 
 Keep Next.js, TypeScript, React, Tailwind, shadcn/Radix, Recharts, theme behavior, URLs, functioning exports and useful Genkit flows. HR/payroll/credit/storefront features must be assessed individually before making persistence, provider or statutory claims. No benchmark supports a million-user or constant-time authorization guarantee.
 The staged python-accounting integration and Statement of Cash Flows are documented in [docs/python-accounting-cash-flow.md](docs/python-accounting-cash-flow.md). Production cutover and Vercel preview remain gated; see the documented limits and verification evidence.
+
+Secure uploads: see [upload paths, migration, configuration and verification](docs/secure-uploads.md). New uploads require the reviewed private Storage migration and Python-only Storage credentials. Existing objects are preserved for revalidation.

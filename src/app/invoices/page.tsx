@@ -1,6 +1,7 @@
 
 "use client"
 
+import { FileAttachments } from "@/components/file-attachments";
 import * as React from "react"
 import {
   MoreHorizontal,
@@ -129,6 +130,7 @@ const downloadPdf = async (invoice: Invoice) => {
 export default function InvoicesPage() {
   const supabase = createClient();
   const { toast } = useToast();
+  const [attachmentDocument, setAttachmentDocument] = React.useState<Invoice | null>(null);
   const [docs, setDocs] = React.useState<Invoice[]>([]);
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [items, setItems] = React.useState<CatalogItem[]>([]);
@@ -226,6 +228,7 @@ export default function InvoicesPage() {
             </div>
         </div>
 
+        <Dialog open={!!attachmentDocument} onOpenChange={open=>{if(!open)setAttachmentDocument(null);}}><DialogContent><DialogHeader><DialogTitle>Document attachments</DialogTitle><DialogDescription>{attachmentDocument?.invoice_number}</DialogDescription></DialogHeader>{attachmentDocument && <FileAttachments key={attachmentDocument.id} purpose="invoice_attachment" resourceId={attachmentDocument.id} />}</DialogContent></Dialog>
         <Tabs defaultValue="invoices" onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full lg:w-max h-auto p-1 bg-primary/5 border border-primary/10 rounded-xl">
                 <TabsTrigger value="invoices" className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Invoices</TabsTrigger>
@@ -271,6 +274,7 @@ export default function InvoicesPage() {
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                 <DropdownMenuItem onClick={() => downloadPdf(inv)}>Download PDF</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => setAttachmentDocument(inv)}>Attachments</DropdownMenuItem>
                                                 {inv.type === 'Estimate' && inv.status !== 'Accepted' && (
                                                     <DropdownMenuItem onClick={() => handleAction('convert', inv)} className="text-primary"><CheckCircle2 className="mr-2 h-4 w-4" /> Accept Quote</DropdownMenuItem>
                                                 )}

@@ -1,6 +1,8 @@
 
 "use client";
 
+import { FileAttachments } from "@/components/file-attachments";
+import { useBusiness } from "@/components/business-provider";
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +15,7 @@ import { cn } from '@/lib/utils';
 import type { BusinessType } from '@/lib/data';
 
 export default function BusinessSettingsPage() {
+    const { business } = useBusiness();
     const { toast } = useToast();
     const [businessType, setBusinessType] = React.useState<BusinessType>('HYBRID');
     const [mounted, setMounted] = React.useState(false);
@@ -76,6 +79,8 @@ export default function BusinessSettingsPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {business?.id && <Card><CardHeader><CardTitle>Business Logo</CardTitle><CardDescription>Upload or manage your business logo.</CardDescription></CardHeader><CardContent><FileAttachments purpose="logo" resourceId={business.id} /></CardContent></Card>}
 
             <Card>
                 <CardHeader>

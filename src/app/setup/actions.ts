@@ -3,7 +3,7 @@
 
 import { z } from "zod";
 import { BusinessService } from "@/services/business-service";
-import { StorageService } from "@/services/storage-service";
+import { selectBusinessAction } from "@/app/business-actions";
 import { createClient } from "@/lib/supabase/server";
 
 const businessSchema = z.object({
@@ -16,7 +16,6 @@ const businessSchema = z.object({
   bank_name: z.string(),
   account_number: z.string(),
   account_name: z.string(),
-  logo_data_url: z.string().optional(),
 });
 
 export async function createBusinessAction(data: z.infer<typeof businessSchema>) {
@@ -53,21 +52,7 @@ export async function createBusinessAction(data: z.infer<typeof businessSchema>)
       account_name: validated.account_name,
     });
 
-    // 2. Logo upload with path protection
-    if (validated.logo_data_url) {
-      try {
-        const storage = new StorageService();
-        const res = await fetch(validated.logo_data_url);
-        const blob = await res.blob();
-        
-        // This will be stored at {businessId}/branding/logo.png via StorageService logic
-        const logoUrl = await storage.uploadFile(`branding/logo-${Date.now()}`, blob);
-        
-        await service.updateBusiness(business.id, { logo_url: logoUrl } as any);
-      } catch (uploadError) {
-        console.warn('Non-critical: Logo upload failed, but business was provisioned.', uploadError);
-      }
-    }
+    await selectBusinessAction(business.id);
 
     return { success: true, businessId: business.id };
   } catch (error: any) {

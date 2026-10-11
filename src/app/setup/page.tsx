@@ -35,6 +35,7 @@ import { Loader2, UploadCloud, Briefcase, Package, Sparkles } from "lucide-react
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { checkUploadHint, imageAccept, uploadHint } from "@/lib/upload-policy";
 import { createBusinessAction } from "./actions";
 import { useSupabaseUser } from "@/hooks/use-supabase-user";
 import { useBusiness } from "@/components/business-provider";
@@ -59,6 +60,7 @@ export default function SetupPage() {
   const { user, loading: userLoading } = useSupabaseUser();
   const { refresh: refreshBusiness } = useBusiness();
   const [isLoading, setIsLoading] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,6 +87,9 @@ export default function SetupPage() {
   const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      try { checkUploadHint(file, "logo"); }
+      catch (error) { setLogoFile(null); setLogoPreview(null); event.target.value = ""; toast({ variant: "destructive", title: "Invalid logo", description: error instanceof Error ? error.message : uploadHint("logo") }); return; }
+      setLogoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setLogoPreview(reader.result as string);
@@ -108,14 +113,26 @@ export default function SetupPage() {
         phone: values.phoneNumber,
         bank_name: values.bankName,
         account_number: values.accountNumber,
-        account_name: values.accountName,
-        logo_data_url: logoPreview || undefined
+        account_name: values.accountName
       });
 
       if (result.success) {
+        let logoWarning: string | undefined;
+        if (logoFile) {
+          try {
+            const response = await fetch(`/api/files?${new URLSearchParams({purpose:'logo',resource_id:result.businessId})}`, {
+              method:'POST',body:logoFile,headers:{'Content-Type':logoFile.type,'X-Upload-Filename':encodeURIComponent(logoFile.name)},
+            });
+            const upload = await response.json();
+            if (!response.ok) throw new Error(upload.error || 'Logo upload failed');
+          } catch (error) {
+            logoWarning = error instanceof Error ? error.message : 'Please retry your logo from business settings.';
+          }
+        }
         toast({
-          title: "Business Launched",
-          description: `Security profile initialized for ${values.businessName}.`,
+          variant: logoWarning ? "destructive" : undefined,
+          title: logoWarning ? "Business created; logo not saved" : "Business Launched",
+          description: logoWarning ? `${logoWarning} Retry from Business Settings.` : `Security profile initialized for ${values.businessName}.`,
         });
         await refreshBusiness();
         router.push("/");
@@ -155,11 +172,11 @@ export default function SetupPage() {
                       )}
                     </div>
                     <div className="flex-1">
-                      <Input id="logo-upload" type="file" onChange={handleLogoChange} accept="image/*" className="hidden" />
+                      <Input id="logo-upload" type="file" onChange={handleLogoChange} accept={imageAccept} className="hidden" />
                       <Button type="button" variant="outline" onClick={() => document.getElementById('logo-upload')?.click()}>
                         Upload Identity
                       </Button>
-                      <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold tracking-widest">PNG or JPG. Max 2MB.</p>
+                      <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold tracking-widest">{uploadHint("logo")}</p>
                     </div>
                   </div>
                 </div>

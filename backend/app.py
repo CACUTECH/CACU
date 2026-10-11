@@ -24,13 +24,16 @@ class BodyLimit:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["method"] not in {"POST", "PUT", "PATCH"}:
             return await self.application(scope, receive, send)
+        # Upload routes use bounded binary bodies; other API requests retain their original limit.
+        import re
+        maximum = 3145728 if scope['method']=='POST' and re.fullmatch(r'/api/v1/businesses/[0-9a-fA-F-]{36}/files', scope['path']) else self.max_bytes
         messages, size = [], 0
         while True:
             message = await receive()
             if message["type"] == "http.disconnect":
                 return
             size += len(message.get("body", b""))
-            if size > self.max_bytes:
+            if size > maximum:
                 return await JSONResponse(status_code=413, content={"detail": "Request too large"})(scope, receive, send)
             messages.append(message)
             if not message.get("more_body", False):
@@ -143,3 +146,6 @@ def invoice_balances(business_id:UUID,user_id:UUID=Depends(current_user)):
             transaction=session.get(Transaction,row.transaction_id)
             result.append({'id':str(row.source_id),'total':format(transaction.amount,'.2f'),'outstanding':format(transaction.amount-transaction.cleared(session),'.2f')})
         return result
+
+from cacu.uploads.routes import upload_router
+app.include_router(upload_router(current_user, bearer))
