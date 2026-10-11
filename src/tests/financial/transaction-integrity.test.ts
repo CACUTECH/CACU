@@ -23,7 +23,7 @@ describe('Financial Integrity Tests', () => {
         totalAmount: 10
     });
 
-    expect(mockSupabase.rpc).toHaveBeenCalledWith('process_sale', expect.any(Object));
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('process_sale_safe', expect.any(Object));
   });
 
   it('should trigger low stock notifications after valid checkout', async () => {

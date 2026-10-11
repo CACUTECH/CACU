@@ -24,17 +24,18 @@ export class SalesService extends BaseService {
       quoted_total: decimalInput(input.totalAmount), method: input.paymentMethod,
       entry_date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()),
     } });
-    const { data, error } = await supabase.rpc('process_sale', {
+    const { data, error } = await supabase.rpc('process_sale_safe', {
       p_business_id: businessId,
       p_customer_id: input.customerId || null,
       p_items: input.items.map(item => ({
         id: item.id,
         name: item.name,
         quantity: item.quantity,
-        price: item.price
+        price: decimalInput(item.price)
       })),
       p_payment_method: input.paymentMethod,
-      p_total_amount: input.totalAmount
+      p_total_amount: decimalInput(input.totalAmount),
+      p_request_key: input.requestKey || randomUUID()
     });
 
     const duration = Date.now() - startTime;
@@ -51,7 +52,7 @@ export class SalesService extends BaseService {
     this.logInfo('Sale Processed Successfully', { saleId: data, businessId });
 
     // Post-Sale Operations
-    this.checkInventoryThresholds(input.items);
+    void this.checkInventoryThresholds(input.items).catch(() => this.logInfo('Post-sale notification unavailable', { businessId }));
 
     return { saleId: data };
   }

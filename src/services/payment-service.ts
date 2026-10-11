@@ -31,9 +31,9 @@ export class PaymentService extends BaseService {
       p_business_id: businessId,
       p_invoice_id: paymentData.invoiceId,
       p_customer_id: paymentData.customerId || null,
-      p_amount: paymentData.amount,
+      p_amount: decimalInput(paymentData.amount),
       p_payment_method: paymentData.method,
-      p_reference: paymentData.reference || null
+      p_reference: paymentData.reference || `CACU-${paymentData.requestKey || randomUUID()}`
     });
 
     if (error) {
@@ -47,7 +47,7 @@ export class PaymentService extends BaseService {
       message: `₦${paymentData.amount.toLocaleString()} received via ${paymentData.method}.`,
       type: 'PAYMENT_RECEIVED',
       metadata: { paymentId, invoiceId: paymentData.invoiceId }
-    });
+    }).catch(() => this.logInfo('Post-payment notification unavailable', { businessId, paymentId }));
 
     return { paymentId };
   }

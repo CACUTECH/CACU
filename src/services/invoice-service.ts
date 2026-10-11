@@ -23,6 +23,14 @@ export class InvoiceService extends BaseService {
     return data;
   }
 
+  async listBalances(): Promise<{ id: string; total: string; outstanding: string }[]> {
+    const { supabase, businessId } = await this.getContext();
+    if (!businessId) return [];
+    const { data, error } = await supabase.rpc('legacy_invoice_balances', { p_business_id: businessId });
+    if (error) throw error;
+    return data || [];
+  }
+
   async createInvoice(invoiceData: any, items: any[]) {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
