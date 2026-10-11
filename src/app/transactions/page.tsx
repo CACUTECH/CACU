@@ -1,6 +1,7 @@
 
 "use client"
 
+import { FileAttachments } from '@/components/file-attachments';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ export default function TransactionsPage() {
     const { user } = useSupabaseUser();
     const supabase = createClient();
     const { toast } = useToast();
+    const [receiptResource, setReceiptResource] = React.useState<string | null>(null);
     const [transactions, setTransactions] = React.useState<Transaction[]>([]);
     const [loading, setLoading] = React.useState(true);
 
@@ -130,13 +132,14 @@ export default function TransactionsPage() {
                 </Dialog>
             </div>
 
+            <Dialog open={!!receiptResource} onOpenChange={open=>{if(!open)setReceiptResource(null);}}><DialogContent><DialogHeader><DialogTitle>Transaction receipts</DialogTitle></DialogHeader>{receiptResource&&<FileAttachments key={receiptResource} purpose="receipt" resourceId={receiptResource} />}</DialogContent></Dialog>
             <Card className="shadow-xl border-primary/5">
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader className="bg-muted/50">
                             <TableRow>
                                 <TableHead className="pl-6">Description</TableHead>
-                                <TableHead>Category</TableHead>
+                                <TableHead>Receipts</TableHead><TableHead>Category</TableHead>
                                 <TableHead>Date</TableHead>
                                 <TableHead className="text-right pr-6">Amount</TableHead>
                             </TableRow>
@@ -150,6 +153,7 @@ export default function TransactionsPage() {
                                             <span className="font-bold">{tx.description}</span>
                                         </div>
                                     </TableCell>
+                                    <TableCell><Button variant="outline" size="sm" onClick={()=>setReceiptResource(tx.id)}>Receipts</Button></TableCell>
                                     <TableCell><Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-tighter">{tx.category}</Badge></TableCell>
                                     <TableCell className="text-xs text-muted-foreground">{tx.date}</TableCell>
                                     <TableCell className="text-right pr-6 font-mono font-bold">

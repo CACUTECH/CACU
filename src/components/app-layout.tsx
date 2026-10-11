@@ -1,4 +1,5 @@
 'use client';
+import { isApprovedPreview } from "@/lib/upload-policy";
 
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -253,8 +254,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar collapsible="icon" variant="floating" className="hidden lg:flex">
         <SidebarHeader>
             <div className="flex items-center gap-3 p-2">
-                {businessProfile?.logoUrl ? (
-                    <Image src={businessProfile.logoUrl} alt="Logo" width={36} height={36} className="size-9 shrink-0 rounded-lg object-contain" />
+                {isApprovedPreview(businessProfile?.logo_url) ? (
+                    <Image unoptimized src={businessProfile.logo_url} alt="Logo" width={36} height={36} className="size-9 shrink-0 rounded-lg object-contain" />
                 ) : (
                     <Logo className="size-9 shrink-0" />
                 )}

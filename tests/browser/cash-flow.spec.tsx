@@ -9,8 +9,10 @@ test('shows reconciled ledger figures, transaction drill-down and exact CSV', as
   const component = await mount(<CashFlowPage />);
   await component.getByLabel('Start date').fill(fixture.start_date);
   await component.getByLabel('End date').fill(fixture.end_date);
+  await page.evaluate(() => { (window as Window & { __holdCashFlow?: boolean }).__holdCashFlow = true; });
   await component.getByRole('button', { name: 'Run report' }).click();
   await expect(component.getByRole('button', { name: 'Loading…' })).toBeVisible();
+  await page.evaluate(() => { (window as Window & { __holdCashFlow?: boolean }).__holdCashFlow = false; });
   await expect(component.getByText('Reconciled', { exact: true })).toBeVisible();
   await expect(component.getByText('-₦75,000.00', { exact: true })).toBeVisible();
   await expect(component.getByText('₦925,000.00', { exact: true }).first()).toBeVisible();

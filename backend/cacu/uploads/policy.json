@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "purposes": {
+    "logo": {
+      "max_bytes": 2097152,
+      "max_dimension": 2048,
+      "max_pixels": 1048576,
+      "roles": [
+        "owner",
+        "admin"
+      ]
+    },
+    "receipt": {
+      "max_bytes": 3145728,
+      "max_dimension": 4096,
+      "max_pixels": 4194304,
+      "roles": [
+        "owner",
+        "admin",
+        "editor"
+      ]
+    },
+    "invoice_attachment": {
+      "max_bytes": 3145728,
+      "max_dimension": 4096,
+      "max_pixels": 4194304,
+      "roles": [
+        "owner",
+        "admin",
+        "editor"
+      ]
+    }
+  },
+  "formats": {
+    "png": {
+      "extensions": [
+        "png"
+      ],
+      "mime": "image/png",
+      "parser": "PNG"
+    },
+    "jpg": {
+      "extensions": [
+        "jpg",
+        "jpeg"
+      ],
+      "mime": "image/jpeg",
+      "parser": "JPEG"
+    }
+  },
+  "quota_bytes": 52428800,
+  "quota_files": 100,
+  "max_pending": 10
+}

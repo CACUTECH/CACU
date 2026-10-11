@@ -64,3 +64,5 @@ backend/scratch_*.py
 /playwright/.cache/
 /test-results/
 /playwright-report/
+
+/supabase/.temp/
