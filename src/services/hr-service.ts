@@ -7,7 +7,8 @@ import { BaseService } from './base-service';
  */
 export class HRService extends BaseService {
   async listEmployees() {
-    const { supabase, businessId } = await this.getContext();
+    const { supabase, businessId, role: actorRole } = await this.getContext();
+    if (actorRole !== 'owner' && actorRole !== 'admin') throw new Error('HR access is restricted to owners and administrators');
     if (!businessId) return [];
 
     const { data, error } = await supabase
@@ -21,7 +22,8 @@ export class HRService extends BaseService {
   }
 
   async addEmployee(employee: any) {
-    const { supabase, businessId } = await this.getContext();
+    const { supabase, businessId, role: actorRole } = await this.getContext();
+    if (actorRole !== 'owner' && actorRole !== 'admin') throw new Error('HR access is restricted to owners and administrators');
     if (!businessId) throw new Error('Business context missing');
 
     const { name, role, base_salary, status, ...rest } = employee;
@@ -46,7 +48,8 @@ export class HRService extends BaseService {
   }
 
   async getAttendanceToday() {
-    const { supabase, businessId } = await this.getContext();
+    const { supabase, businessId, role: actorRole } = await this.getContext();
+    if (actorRole !== 'owner' && actorRole !== 'admin') throw new Error('HR access is restricted to owners and administrators');
     if (!businessId) return [];
 
     const today = new Date().toISOString().split('T')[0];
@@ -63,8 +66,13 @@ export class HRService extends BaseService {
   }
 
   async logAttendance(employeeId: string, type: 'IN' | 'OUT') {
-    const { supabase, businessId } = await this.getContext();
+    const { supabase, businessId, role: actorRole } = await this.getContext();
+    if (actorRole !== 'owner' && actorRole !== 'admin') throw new Error('HR access is restricted to owners and administrators');
     if (!businessId) throw new Error('Business context missing');
+
+    const { data: employee, error: employeeError } = await supabase.from('employees')
+      .select('id').eq('business_id', businessId).eq('id', employeeId).single();
+    if (employeeError || !employee) throw new Error('Employee unavailable in this business');
 
     const now = new Date().toISOString();
 

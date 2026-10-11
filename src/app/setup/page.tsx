@@ -73,7 +73,7 @@ export default function SetupPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       businessName: "",
-      businessType: 'HYBRID',
+      businessType: 'PRODUCT',
       businessSector: "",
       businessAddress: "",
       businessEmail: "",

@@ -27,13 +27,14 @@ export async function createBusinessAction(data: z.infer<typeof businessSchema>)
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    const { data: existingMember } = await supabase
+    const { data: existingMembers, error: membershipError } = await supabase
       .from('memberships')
       .select('id')
       .eq('user_id', user.id)
-      .maybeSingle();
+      .limit(1);
+    if (membershipError) throw new Error('Unable to verify business memberships');
     
-    if (existingMember) {
+    if (existingMembers && existingMembers.length > 0) {
       throw new Error('User is already registered with a business. Multiple business ownership is restricted in this plan.');
     }
 
