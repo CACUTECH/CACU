@@ -54,6 +54,7 @@ export default function AccountingPage() {
             </div>
             
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <FeatureCard icon={Wallet} title="Cash Flow Statement" description="Indirect operating, investing and financing cash flows with ledger reconciliation." href="/accounting/cash-flow" />
                 {/* Core Ledger */}
                 <FeatureCard
                     icon={BookText}

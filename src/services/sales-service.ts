@@ -1,3 +1,5 @@
+import { accountingRequest, decimalInput, usesPythonAccounting } from '@/lib/accounting-client';
+import { randomUUID } from 'node:crypto';
 import { BaseService } from './base-service';
 import { NotificationService } from './notification-service';
 import { logger } from '@/lib/logger';
@@ -11,11 +13,17 @@ export class SalesService extends BaseService {
     paymentMethod: 'Cash' | 'Card' | 'Transfer';
     totalAmount: number;
     customerId?: string;
+    requestKey?: string;
   }) {
     const startTime = Date.now();
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
 
+    if (await usesPythonAccounting()) return accountingRequest<{ saleId: string }>('sales', { method: 'POST', body: {
+      request_key: input.requestKey || randomUUID(), items: input.items.map(item => ({ item_id: item.id, quantity: item.quantity })),
+      quoted_total: decimalInput(input.totalAmount), method: input.paymentMethod,
+      entry_date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()),
+    } });
     const { data, error } = await supabase.rpc('process_sale', {
       p_business_id: businessId,
       p_customer_id: input.customerId || null,

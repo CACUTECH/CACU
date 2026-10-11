@@ -57,3 +57,10 @@ baseline-*.log
 baseline-audit.json
 updated-*.log
 .venv-lock/
+
+backend/.local-postgres/
+backend/scratch_*.py
+
+/playwright/.cache/
+/test-results/
+/playwright-report/

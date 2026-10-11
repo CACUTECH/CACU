@@ -1,0 +1,149 @@
+{
+  "business_id": "afd68541-d85e-486b-b6cb-d9c3c6f9f66f",
+  "method": "indirect",
+  "currency": "NGN",
+  "timezone": "Africa/Lagos",
+  "start_date": "2026-01-01",
+  "end_date": "2026-12-31",
+  "sections": [
+    {
+      "key": "operating",
+      "lines": [
+        {
+          "label": "Inventory",
+          "amount": "-70000.00",
+          "details": [
+            {
+              "ledger_id": 22,
+              "transaction_id": 19,
+              "transaction_no": "JN01/0002",
+              "date": "2026-02-10",
+              "account_id": "f402de2b-dc90-40c9-ab0f-32ffdcb0e5eb",
+              "account_name": "Inventory",
+              "description": "Fixture",
+              "amount": "-100000.00"
+            },
+            {
+              "ledger_id": 29,
+              "transaction_id": 27,
+              "transaction_no": "JN01/0003",
+              "date": "2026-02-10",
+              "account_id": "f402de2b-dc90-40c9-ab0f-32ffdcb0e5eb",
+              "account_name": "Inventory",
+              "description": "Fixture",
+              "amount": "30000.00"
+            }
+          ]
+        },
+        {
+          "label": "Ar",
+          "amount": "-30000.00",
+          "details": [
+            {
+              "ledger_id": 25,
+              "transaction_id": 23,
+              "transaction_no": "IN01/0001",
+              "date": "2026-02-10",
+              "account_id": "54c12e7f-7794-46fc-bd77-161b16553b40",
+              "account_name": "Ar",
+              "description": "Fixture",
+              "amount": "-60000.00"
+            },
+            {
+              "ledger_id": 33,
+              "transaction_id": 31,
+              "transaction_no": "RC01/0001",
+              "date": "2026-02-10",
+              "account_id": "54c12e7f-7794-46fc-bd77-161b16553b40",
+              "account_name": "Ar",
+              "description": "Fixture",
+              "amount": "30000.00"
+            }
+          ]
+        },
+        {
+          "label": "Net profit",
+          "amount": "25000.00",
+          "details": [
+            {
+              "ledger_id": 26,
+              "transaction_id": 23,
+              "transaction_no": "IN01/0001",
+              "date": "2026-02-10",
+              "account_id": "44887d45-0c08-4cc5-9e86-68f8667a9323",
+              "account_name": "Revenue",
+              "description": "Fixture",
+              "amount": "60000.00"
+            },
+            {
+              "ledger_id": 30,
+              "transaction_id": 27,
+              "transaction_no": "JN01/0003",
+              "date": "2026-02-10",
+              "account_id": "66a19578-5851-49cf-9503-5cf8a417d8f9",
+              "account_name": "Cogs",
+              "description": "Fixture",
+              "amount": "-30000.00"
+            },
+            {
+              "ledger_id": 38,
+              "transaction_id": 35,
+              "transaction_no": "CP01/0001",
+              "date": "2026-02-10",
+              "account_id": "b7b01cf0-2ce2-4754-bc3c-c588e0fcef15",
+              "account_name": "Expense",
+              "description": "Fixture",
+              "amount": "-5000.00"
+            }
+          ]
+        }
+      ],
+      "total": "-75000.00"
+    },
+    {
+      "key": "investing",
+      "lines": [],
+      "total": "0.00"
+    },
+    {
+      "key": "financing",
+      "lines": [
+        {
+          "label": "Equity",
+          "amount": "1000000.00",
+          "details": [
+            {
+              "ledger_id": 17,
+              "transaction_id": 15,
+              "transaction_no": "JN01/0001",
+              "date": "2026-02-10",
+              "account_id": "edf61e6d-dc5e-4bed-a75b-99824af0e950",
+              "account_name": "Equity",
+              "description": "Fixture",
+              "amount": "1000000.00"
+            }
+          ]
+        }
+      ],
+      "total": "1000000.00"
+    }
+  ],
+  "net_change": "925000.00",
+  "opening_cash": "0.00",
+  "fx_effect": "0.00",
+  "closing_cash": "925000.00",
+  "ledger_cash": "925000.00",
+  "difference": "0.00",
+  "reconciled": true,
+  "empty": false,
+  "library_totals": {
+    "OPERATING_CASH_FLOW": "-75000.00",
+    "INVESTMENT_CASH_FLOW": "0.00",
+    "FINANCING_CASH_FLOW": "1000000.00",
+    "NET_CASH_FLOW": "925000.00"
+  },
+  "library_results": {
+    "END_CASH_BALANCE": "925000.00",
+    "CASHBOOK_BALANCE": "925000.00"
+  }
+}

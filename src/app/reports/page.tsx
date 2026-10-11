@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Download, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import React from 'react';
 import { format, startOfMonth, endOfMonth } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
@@ -14,19 +15,21 @@ import { getProfitAndLossAction, getBalanceSheetAction } from "./actions"
 export default function ReportsPage() {
     const [loading, setLoading] = React.useState(true);
     const [pnlData, setPnlData] = React.useState<any>(null);
+    const [error, setError] = React.useState('');
     const [balanceData, setBalanceData] = React.useState<any>(null);
     const { toast } = useToast();
 
     const fetchData = React.useCallback(async () => {
         setLoading(true);
-        const start = startOfMonth(new Date()).toISOString();
-        const end = endOfMonth(new Date()).toISOString();
+        const start = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+        const end = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
         const [pnlRes, balRes] = await Promise.all([
             getProfitAndLossAction(start, end),
             getBalanceSheetAction()
         ]);
 
+        setError(!pnlRes.success ? pnlRes.error : !balRes.success ? balRes.error : '');
         if (pnlRes.success) setPnlData(pnlRes.data);
         if (balRes.success) setBalanceData(balRes.data);
         setLoading(false);
@@ -38,11 +41,13 @@ export default function ReportsPage() {
 
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
+    if (error) return <div className="space-y-4"><h1 className="text-3xl font-bold">Financial Reports</h1><p role="alert">{error}</p><Link href="/accounting/cash-flow" className="text-primary underline">Cash Flow Statement</Link><Button onClick={() => void fetchData()}>Retry</Button></div>;
     return (
         <div className="flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-headline text-3xl font-bold">Financial Intelligence</h1>
+                    <Link href="/accounting/cash-flow" className="text-primary underline">Cash Flow Statement</Link>
                     <p className="text-muted-foreground">Real-time reports derived from your relational ledger.</p>
                 </div>
             </div>
@@ -91,7 +96,10 @@ export default function ReportsPage() {
                                     <div className="flex justify-between font-bold pt-2 border-t"><span>Total Assets</span><span>₦{balanceData?.assets.total.toLocaleString()}</span></div>
                                 </div>
                                 <div className="space-y-4">
-                                    <h3 className="font-bold text-lg border-b pb-2">Equity</h3>
+                                    <h3 className="font-bold text-lg border-b pb-2">Liabilities and Equity</h3>
+                                    <div className="flex justify-between"><span>Total Liabilities</span><span>{balanceData?.liabilities.total}</span></div>
+                                    <div className="flex justify-between"><span>Capital</span><span>{balanceData?.equity.capital}</span></div>
+                                    <div className="flex justify-between"><span>Reconciliation difference</span><span>{balanceData?.difference}</span></div>
                                     <div className="flex justify-between"><span>Retained Earnings</span><span className="font-mono">₦{balanceData?.equity.retainedEarnings.toLocaleString()}</span></div>
                                     <div className="flex justify-between font-bold pt-2 border-t"><span>Total Equity</span><span>₦{balanceData?.equity.total.toLocaleString()}</span></div>
                                 </div>

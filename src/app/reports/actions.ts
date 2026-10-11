@@ -49,3 +49,10 @@ export async function getProductPerformanceAction() {
     return { success: false, error: error.message };
   }
 }
+
+export async function getAccountingSummaryAction(start: string, end: string) {
+  try {
+    const { getAccountingSummary } = await import('@/lib/accounting-client');
+    return { success: true as const, data: await getAccountingSummary(start, end) };
+  } catch (error) { return { success: false as const, error: error instanceof Error ? error.message : 'Accounting report unavailable' }; }
+}

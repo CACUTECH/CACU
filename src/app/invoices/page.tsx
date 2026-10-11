@@ -61,7 +61,9 @@ import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { getActiveBusinessIdAction } from '@/app/business-actions';
-import { createInvoiceAction, markAsPaidAction, updateInvoiceStatusAction } from "./actions"
+import { createInvoiceAction, markAsPaidAction, updateInvoiceStatusAction, getInvoiceBalancesAction } from "./actions"
+
+import { getAccountingModeAction } from '@/app/accounting/cash-flow/actions';
 
 type Customer = {
     id: string;
@@ -91,6 +93,7 @@ type Invoice = {
     type: InvoiceType;
     status: "Paid" | "Pending" | "Unpaid" | "Accepted" | "Refunded" | "Draft" | "Cancelled";
     total: number;
+    outstanding?: string;
     subtotal: number;
     tax: number;
     customer_id?: string;
@@ -142,11 +145,15 @@ export default function InvoicesPage() {
         supabase.from('catalog_items').select('id, name, price:unit_price').eq('business_id', businessId).order('name')
     ]);
 
+    const balances = await getInvoiceBalancesAction();
+    const remaining = new Map(balances.map(row => [row.id, row.outstanding]));
     if (invRes.error || custRes.error || itemRes.error) throw new Error("Invoice data unavailable");
     if (!invRes.error) {
         setDocs(invRes.data.map(d => ({
             ...d,
-            customer_name: d.customers?.name
+            customer_name: d.customers?.name,
+            outstanding: remaining.get(d.id),
+            status: ({ paid: 'Paid', draft: 'Draft', sent: 'Unpaid', overdue: 'Unpaid', void: 'Cancelled' } as Record<string, Invoice['status']>)[d.status] || d.status
         })));
     }
     if (!custRes.error) setCustomers(custRes.data);
@@ -162,16 +169,23 @@ export default function InvoicesPage() {
     fetchData();
   }, [fetchData]);
 
+  const paymentKeys = React.useRef(new Map<string, string>());
   const handleAction = async (action: string, inv: Invoice) => {
     if (action === 'pay') {
+        const amount = window.prompt('Payment amount (NGN)', inv.outstanding || String(inv.total));
+        if (amount === null) return;
+        if (!/^\d{1,13}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) { toast({ variant: 'destructive', title: 'Enter a positive payment amount with at most two decimal places' }); return; }
+        if (!paymentKeys.current.has(inv.id)) paymentKeys.current.set(inv.id, crypto.randomUUID());
         const res = await markAsPaidAction({
+            requestKey: paymentKeys.current.get(inv.id),
             invoiceId: inv.id,
             customerId: inv.customer_id,
-            amount: inv.total,
+            amount,
             method: 'Cash'
         });
         if (res.success) {
-            toast({ title: "Payment Recorded", description: "Invoiced settled and ledger updated." });
+            toast({ title: "Payment Recorded", description: "Payment allocated and outstanding balance updated." });
+            paymentKeys.current.delete(inv.id);
             fetchData();
         } else {
             toast({ variant: "destructive", title: "Payment Failed", description: res.error });
@@ -325,17 +339,24 @@ function CreateDocumentDialog({
     ]);
     const [notes, setNotes] = React.useState('');
     const [includeVat, setIncludeVat] = React.useState(true);
+    const [accountingTaxDisabled, setAccountingTaxDisabled] = React.useState<boolean | null>(null);
+    React.useEffect(() => {
+        void getAccountingModeAction().then(migrated => { setAccountingTaxDisabled(migrated); if (migrated) setIncludeVat(false); }).catch(() => setAccountingTaxDisabled(null));
+    }, []);
     const [isOpen, setIsOpen] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
+    const requestKey = React.useRef(crypto.randomUUID());
 
     const subtotal = lineItems.reduce((acc, item) => acc + item.total, 0);
     const tax = includeVat ? subtotal * 0.075 : 0;
     const total = subtotal + tax;
 
     const handleSave = async () => {
+        if (accountingTaxDisabled === null) { alert("Business tax configuration unavailable"); return; }
         setIsSaving(true);
         const prefix = type === 'Invoice' ? 'INV' : type === 'Estimate' ? 'EST' : type === 'CreditMemo' ? 'MEMO' : 'RCPT';
         const res = await createInvoiceAction({
+            requestKey: requestKey.current,
             invoice_number: `${prefix}${Date.now().toString().slice(-6)}`,
             type,
             status: type === 'Receipt' ? 'Paid' : 'Pending',
@@ -350,6 +371,7 @@ function CreateDocumentDialog({
         }, lineItems);
 
         if (res.success) {
+            requestKey.current = crypto.randomUUID();
             onSave();
             setIsOpen(false);
         } else {
@@ -426,7 +448,7 @@ function CreateDocumentDialog({
                     <Button variant="outline" size="sm" onClick={() => setLineItems([...lineItems, { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }])}>Add Item</Button>
 
                     <div className="flex justify-end gap-12">
-                        <div className="flex items-center space-x-2"><Switch checked={includeVat} onCheckedChange={setIncludeVat} /><Label>VAT (7.5%)</Label></div>
+                        <div className="flex items-center space-x-2"><Switch checked={includeVat} onCheckedChange={setIncludeVat} disabled={accountingTaxDisabled !== false} /><Label>{accountingTaxDisabled ? "Tax disabled for this business" : "VAT (7.5%)"}</Label></div>
                         <div className="w-48 space-y-2">
                             <div className="flex justify-between text-sm"><span>Subtotal</span><span>₦{subtotal.toLocaleString()}</span></div>
                             <div className="flex justify-between font-bold text-lg"><span>Total</span><span>₦{total.toLocaleString()}</span></div>

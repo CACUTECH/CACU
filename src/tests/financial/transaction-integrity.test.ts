@@ -1,6 +1,8 @@
 import { SalesService } from '@/services/sales-service';
 import { createClient } from '@/lib/supabase/server';
 
+jest.mock('@/lib/accounting-client', () => ({ usesPythonAccounting: jest.fn().mockResolvedValue(false), accountingRequest: jest.fn(), decimalInput: (value: number) => value.toFixed(2) }));
+
 describe('Financial Integrity Tests', () => {
   let service: SalesService;
 

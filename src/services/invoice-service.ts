@@ -1,4 +1,6 @@
 
+import { accountingRequest, decimalInput, usesPythonAccounting } from '@/lib/accounting-client';
+import { randomUUID } from 'node:crypto';
 import { BaseService } from './base-service';
 
 /**
@@ -25,6 +27,15 @@ export class InvoiceService extends BaseService {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
 
+    if (await usesPythonAccounting()) {
+      if (invoiceData.type !== 'Invoice') throw new Error('Use the issued-invoice allocation workflow for receipts and credit notes');
+      return accountingRequest<{ id: string }>('invoices', { method: 'POST', body: {
+        request_key: invoiceData.requestKey || randomUUID(), customer_id: invoiceData.customer_id,
+        invoice_number: invoiceData.invoice_number, entry_date: invoiceData.date, due_date: invoiceData.due_date || null,
+        notes: invoiceData.notes || '', tax: decimalInput(invoiceData.tax || 0), issue: invoiceData.status !== 'Draft',
+        items: items.map(item => ({ catalog_item_id: item.catalog_item_id, quantity: item.quantity, unit_price: decimalInput(item.price) })),
+      } });
+    }
     // Use the atomic RPC to ensure header and items are created together
     const { data: invoiceId, error } = await supabase.rpc('create_invoice_atomic', {
       p_business_id: businessId,
@@ -59,6 +70,7 @@ export class InvoiceService extends BaseService {
   async updateInvoiceStatus(id: string, status: string) {
     const { supabase, businessId } = await this.getContext();
     
+    if (await usesPythonAccounting()) throw new Error('Posted invoices require payment allocation or audited credit notes; direct status changes are disabled');
     const { data, error } = await supabase
       .from('invoices')
       .update({ status, updated_at: new Date().toISOString() })

@@ -1,4 +1,5 @@
 
+import { usesPythonAccounting } from '@/lib/accounting-client';
 import { BaseService } from './base-service';
 
 /**
@@ -33,9 +34,11 @@ export class LedgerService extends BaseService {
       category: string;
       date?: string;
   }) {
-    const { supabase, businessId, user } = await this.getContext();
+    const { supabase, businessId, user, role } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
 
+    if (!['owner', 'admin', 'editor'].includes(role)) throw new Error('Insufficient permissions');
+    if (await usesPythonAccounting()) throw new Error('Use balanced accounting postings with reviewed account mappings; single-entry records are disabled after cutover');
     // Server-side validation of financial values
     if (entry.amount === 0) throw new Error('Transaction amount cannot be zero');
 

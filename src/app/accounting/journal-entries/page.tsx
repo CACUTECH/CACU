@@ -15,6 +15,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 
+import { getPostingAccountsAction, postJournalAction } from './actions';
+
 type JournalLine = {
     id: string;
     accountId: string;
@@ -23,17 +25,12 @@ type JournalLine = {
     credit: number;
 }
 
-const accounts = [
-    { id: '1000', name: 'Cash and Bank' },
-    { id: '1200', name: 'Accounts Receivable' },
-    { id: '2000', name: 'Accounts Payable' },
-    { id: '3200', name: 'Retained Earnings' },
-    { id: '4000', name: 'Sales Revenue' },
-    { id: '5000', name: 'Office Supplies' },
-]
 
 export default function JournalEntriesPage() {
     const { toast } = useToast()
+    const [accounts, setAccounts] = React.useState<{ id: string; name: string }[]>([])
+    const [saving, setSaving] = React.useState(false)
+    const requestKey = React.useRef<string | null>(null)
     const [date, setDate] = React.useState<Date | undefined>(new Date())
     const [memo, setMemo] = React.useState("")
     const [lines, setLines] = React.useState<JournalLine[]>([])
@@ -41,6 +38,8 @@ export default function JournalEntriesPage() {
 
     // Fix Hydration Mismatch by generating IDs only on client
     React.useEffect(() => {
+        requestKey.current = crypto.randomUUID()
+        void getPostingAccountsAction().then(setAccounts).catch(() => toast({ variant: 'destructive', title: 'Accounts unavailable' }))
         setMounted(true)
         setLines([
             { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
@@ -73,9 +72,16 @@ export default function JournalEntriesPage() {
     const totalCredit = lines.reduce((acc, curr) => acc + (Number(curr.credit) || 0), 0)
     const isBalanced = totalDebit === totalCredit && totalDebit > 0
 
-    const handleSave = () => {
-        toast({ variant: "destructive", title: "Posting unavailable",
-            description: "Journal posting is awaiting verified database integration. This draft has not been saved." })
+    const handleSave = async () => {
+        if (!requestKey.current || !date || !isBalanced || !memo) return;
+        setSaving(true);
+        const result = await postJournalAction({ request_key: requestKey.current, date: format(date, 'yyyy-MM-dd'), memo,
+            lines: lines.map(line => ({ account_id: line.accountId, description: line.description, debit: line.debit.toFixed(2), credit: line.credit.toFixed(2) })) });
+        if (result.success) {
+            toast({ title: 'Journal posted', description: 'The balanced entry and audit event were committed.' });
+            requestKey.current = crypto.randomUUID(); setMemo(''); setLines([]);
+        } else toast({ variant: 'destructive', title: 'Posting failed', description: result.error });
+        setSaving(false);
     }
 
     if (!mounted) return null
@@ -205,7 +211,7 @@ export default function JournalEntriesPage() {
                                 <ArrowRightLeft className="h-3 w-3" /> Entry Out of Balance
                              </div>
                         )}
-                        <Button className="w-full md:w-48 h-12 rounded-xl shadow-lg shadow-primary/20" disabled={!isBalanced} onClick={handleSave}>
+                        <Button className="w-full md:w-48 h-12 rounded-xl shadow-lg shadow-primary/20" disabled={!isBalanced || saving || !memo || lines.some(line => !line.accountId)} onClick={handleSave}>
                             <Save className="mr-2 h-4 w-4" />
                             Post Adjustment
                         </Button>

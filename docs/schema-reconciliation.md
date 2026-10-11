@@ -1,3 +1,5 @@
+> The initial access failure below is historical. Read-only live schema access worked on 2026-10-11, and an isolated PostgreSQL cluster now runs integration tests. See [current mappings and release gates](python-accounting-cash-flow.md). No production migration has been applied.
+
 # Schema reconciliation checkpoint
 
 Tracked supabase/migrations/0001_init.sql is an additive migration, not a fresh-install baseline. It assumes businesses, memberships, membership_role, accounts, journal_entries, journal_lines, invoices/items, payments, transactions/items, employees, notifications and two membership helpers. docs/supabase_schema.sql instead uses business_members, sales/sale_items, price/quantity; do not execute it against production.

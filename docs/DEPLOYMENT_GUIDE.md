@@ -1,6 +1,6 @@
 # CACU deployment guide
 
-No preview or production deployment has been verified for this branch. The connected Vercel project named cacu exists, but details and explicitly scoped CLI inspection are denied for team_1wa2SWkcHaqsq59sLpjnQI1x. Project-to-repository/domain relationship remains unverified. Supabase project listing works; SQL and migration inspection fail password authentication. Resolve access through platform configuration, never share secrets in chat.
+No preview or production deployment has been verified. Vercel project inspection returns 403 for team_1wa2SWkcHaqsq59sLpjnQI1x/cacu, and the CLI has no credentials. Read-only Supabase SQL metadata inspection now works for fnkdzuolcbtckuvqcuai; no production migrations have been applied. Native Python dependency build support, staged schema/cutover and the deployed authenticated flow remain release gates. See [current integration and evidence](python-accounting-cash-flow.md).
 
 Preserve the existing root Next.js deployment and www.usecacu.com. Python's separate project root is backend/. Follow [Python deployment](python-deployment.md). Confirm team/project/environment before creating previews. Use isolated test databases and non-secret fixtures; no production credentials in PR builds or npm install.
 

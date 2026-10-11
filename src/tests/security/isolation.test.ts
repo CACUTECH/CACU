@@ -2,6 +2,8 @@ import { LedgerService } from '@/services/ledger-service';
 import { CustomerService } from '@/services/customer-service';
 import { createClient } from '@/lib/supabase/server';
 
+jest.mock('@/lib/accounting-client', () => ({ usesPythonAccounting: jest.fn().mockResolvedValue(false) }));
+
 describe('Multi-Tenant Isolation Security Tests', () => {
   let service: LedgerService;
 
@@ -9,13 +11,14 @@ describe('Multi-Tenant Isolation Security Tests', () => {
     service = new LedgerService();
   });
 
-  it('CRITICAL: Should refuse transactions for businesses user is not a member of', async () => {
+  it('injects the authenticated business context into legacy transactions', async () => {
     const mockSupabase = await (createClient as jest.Mock)();
     
     // Simulating a mismatch between session and request
     (service as any).getContext = jest.fn().mockResolvedValue({
       supabase: mockSupabase,
       businessId: 'BUSINESS_A',
+      role: 'owner',
       user: { id: 'USER_1' }
     });
 
