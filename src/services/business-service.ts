@@ -70,7 +70,7 @@ export class BusinessService extends BaseService {
       business_id: business.id,
       user_id: user.id,
       title: 'Welcome to CACU',
-      body: 'Your production workspace has been launched. Start by adding your team or catalog items.',
+      body: 'Your workspace has been created. Start by adding your catalog items.',
       event_type: 'WELCOME'
     });
 

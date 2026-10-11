@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { getBusinessSelectionAction, selectBusinessAction } from '@/app/business-actions';
 import { Button } from '@/components/ui/button';
@@ -18,20 +18,33 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const [selection, setSelection] = useState<Selection>({ memberships: [], active: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const requestVersion = useRef(0);
   const refresh = useCallback(async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
-    try { setSelection(await getBusinessSelectionAction()); setError(''); }
-    catch { setSelection({ memberships: [], active: null }); setError('Unable to load business memberships. Please retry.'); }
-    finally { setLoading(false); }
+    setSelection({ memberships: [], active: null });
+    try {
+      const next = await getBusinessSelectionAction();
+      if (version !== requestVersion.current) return;
+      setSelection(next); setError('');
+    } catch {
+      if (version === requestVersion.current) setError('Unable to load business memberships. Please retry.');
+    } finally { if (version === requestVersion.current) setLoading(false); }
   }, []);
-  useEffect(() => { void refresh(); }, [refresh, pathname]);
+  useEffect(() => {
+    const pendingVersion = requestVersion;
+    void refresh();
+    return () => { pendingVersion.current++; };
+  }, [refresh, pathname]);
   const member = selection.active;
   const record = member && (Array.isArray(member.businesses) ? member.businesses[0] : member.businesses);
   const business = record ? { ...record, userRole: member?.role } : null;
   const publicRoute = ['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password'].includes(pathname);
   const choose = async (id: string) => {
+    requestVersion.current++;
+    setLoading(true);
     try { await selectBusinessAction(id); window.location.reload(); }
-    catch { setError('Unable to select this business. Refresh your memberships and retry.'); }
+    catch { setLoading(false); setError('Unable to select this business. Refresh your memberships and retry.'); }
   };
   return (
     <BusinessContext.Provider value={{ business, loading, refresh }}>
@@ -54,7 +67,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
              })}
            </select>
          </div>}
-         {children}
+         <div key={`${member?.business_id ?? 'public'}:${member?.role ?? 'none'}`}>{children}</div>
        </>}
     </BusinessContext.Provider>
   );

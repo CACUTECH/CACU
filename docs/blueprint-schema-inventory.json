@@ -1,0 +1,511 @@
+{
+  "review_date": "2026-10-11",
+  "project_id": "fnkdzuolcbtckuvqcuai",
+  "scope": "Read-only table, role, function and migration metadata; no row data",
+  "tables": [
+    {
+      "rls": true,
+      "table": "businesses",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "memberships",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "customers",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "transactions",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "catalog_items",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "accounts",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "invoices",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "invoice_items",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "journal_entries",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "employees",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "journal_lines",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "payroll_runs",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "payslips",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "appointments",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "payments",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "jobs",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "storefront_settings",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "payment_status_history",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "payment_events",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "user_devices",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "notification_preferences",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "notifications",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "notification_logs",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "profiles",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "financial_transactions",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "suppliers",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "attendance",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "audit_logs",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "upload_records",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "upload_events",
+      "schema": "public",
+      "forced_rls": false
+    },
+    {
+      "rls": true,
+      "table": "recyclable",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "currency",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "user",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "recycled",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "reporting_period",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "entity",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "account",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "category",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "line_item",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "transaction",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "tax",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "business_map",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "account_map",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "document_map",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "posting_requests",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "audit_event",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "ledger",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "party_map",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "reversal_map",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "stock_event",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "balance",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "workflow_request",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "assignment",
+      "schema": "accounting",
+      "forced_rls": true
+    },
+    {
+      "rls": true,
+      "table": "transaction_items",
+      "schema": "public",
+      "forced_rls": false
+    }
+  ],
+  "migrations": [
+    "0001",
+    "20261011030324",
+    "20261011085900",
+    "20261011090000",
+    "20261011090100",
+    "20261011090200"
+  ],
+  "security_definer_functions": [
+    {
+      "schema": "public",
+      "function": "can_read_upload",
+      "search_path": [
+        "search_path=pg_catalog, public, upload_private"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "accounting",
+      "function": "lock_membership",
+      "search_path": [
+        "search_path=pg_catalog, public"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "is_business_member",
+      "search_path": [
+        "search_path=public"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "has_business_role",
+      "search_path": [
+        "search_path=public"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "handle_new_business",
+      "search_path": [
+        "search_path=public"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "prevent_last_owner_loss",
+      "search_path": [
+        "search_path=public"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "process_sale",
+      "search_path": null,
+      "public_execute": true
+    },
+    {
+      "schema": "public",
+      "function": "get_business_kpis",
+      "search_path": null,
+      "public_execute": true
+    },
+    {
+      "schema": "public",
+      "function": "get_revenue_trend",
+      "search_path": null,
+      "public_execute": true
+    },
+    {
+      "schema": "public",
+      "function": "record_audit",
+      "search_path": null,
+      "public_execute": true
+    },
+    {
+      "schema": "public",
+      "function": "adjust_inventory_stock",
+      "search_path": null,
+      "public_execute": true
+    },
+    {
+      "schema": "public",
+      "function": "create_invoice_atomic",
+      "search_path": null,
+      "public_execute": true
+    },
+    {
+      "schema": "public",
+      "function": "record_payment_atomic",
+      "search_path": null,
+      "public_execute": true
+    },
+    {
+      "schema": "upload_private",
+      "function": "resource_valid",
+      "search_path": [
+        "search_path=pg_catalog, public"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "reserve_upload",
+      "search_path": [
+        "search_path=pg_catalog, public, upload_private"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "prepare_upload",
+      "search_path": [
+        "search_path=pg_catalog, public, upload_private"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "approve_upload",
+      "search_path": [
+        "search_path=pg_catalog, public, upload_private"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "request_upload_delete",
+      "search_path": [
+        "search_path=pg_catalog, public"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "finish_upload_cleanup",
+      "search_path": [
+        "search_path=pg_catalog, public"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "claim_upload_orphans",
+      "search_path": [
+        "search_path=pg_catalog, public, upload_private"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "accounting",
+      "function": "active",
+      "search_path": [
+        "search_path=pg_catalog, accounting"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "public",
+      "function": "accounting_mode",
+      "search_path": [
+        "search_path=pg_catalog, public, accounting"
+      ],
+      "public_execute": false
+    },
+    {
+      "schema": "accounting",
+      "function": "legacy_guard",
+      "search_path": [
+        "search_path=pg_catalog, accounting"
+      ],
+      "public_execute": false
+    }
+  ]
+}

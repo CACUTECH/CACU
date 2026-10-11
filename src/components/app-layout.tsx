@@ -31,7 +31,6 @@ import {
     AppWindow, 
     Settings, 
     LogOut, 
-    Briefcase, 
     Receipt, 
     ChevronDown, 
     Store, 
@@ -39,12 +38,10 @@ import {
     BookText, 
     Wrench,
     CalendarClock,
-    UserX,
     BarChart3,
     UserPlus,
     Loader2
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
@@ -132,9 +129,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: userLoading } = useSupabaseUser();
   
   const { business: activeBusiness } = useBusiness();
-  const [businessProfile, setBusinessProfile] = useState<any>(null);
-  const [businessLoading, setBusinessLoading] = useState(true);
-  const [businessType, setBusinessType] = useState<BusinessType>('HYBRID');
+  const businessProfile = activeBusiness ? { ...activeBusiness, role: activeBusiness.userRole } : null;
+  const businessType: BusinessType = activeBusiness?.business_type ?? 'PRODUCT';
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -142,37 +138,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup'].includes(pathname)) {
+    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password'].includes(pathname)) {
         router.push('/login');
     }
   }, [user, userLoading, pathname, router]);
-
-  useEffect(() => {
-    if (user) {
-      const fetchProfile = async () => {
-        try {
-          const data = activeBusiness ? { businesses: activeBusiness, role: activeBusiness.userRole } : null;
-          if (data) {
-            const business: any = Array.isArray(data.businesses) ? data.businesses[0] : data.businesses;
-            setBusinessProfile({
-              ...business,
-              role: data.role
-            });
-            if (business?.business_type) {
-              setBusinessType(business.business_type as BusinessType);
-            }
-          }
-        } catch (error) {
-          console.error("Profile fetch error:", error);
-        } finally {
-          setBusinessLoading(false);
-        }
-      };
-      fetchProfile();
-    } else {
-      setBusinessLoading(false);
-    }
-  }, [user, supabase, activeBusiness]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -236,11 +205,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   // Auth page check must happen before loader check
-  if (pathname === '/setup' || pathname === '/login' || pathname === '/signup' || pathname === '/verify-email') {
+  if (['/setup', '/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'].includes(pathname)) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 
-  if (!mounted || userLoading || (user && businessLoading)) {
+  if (!mounted || userLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -266,7 +235,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {navItems.map((item) => (
+            {navItems.filter(item => !['/credit', '/hr', '/community', '/apps', '/storefront'].includes(item.href)).map((item) => (
               <NavItem key={item.label} item={item} pathname={pathname} />
             ))}
           </SidebarMenu>

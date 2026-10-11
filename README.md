@@ -29,3 +29,7 @@ Keep Next.js, TypeScript, React, Tailwind, shadcn/Radix, Recharts, theme behavio
 The staged python-accounting integration and Statement of Cash Flows are documented in [docs/python-accounting-cash-flow.md](docs/python-accounting-cash-flow.md). Production cutover and Vercel preview remain gated; see the documented limits and verification evidence.
 
 Secure uploads: see [upload paths, migration, configuration and verification](docs/secure-uploads.md). New uploads require the reviewed private Storage migration and Python-only Storage credentials. Existing objects are preserved for revalidation.
+
+## Blueprint review
+
+See [reviewed defects, changes and requirement status](docs/blueprint-review.md), [external setup](docs/external-setup.md), and the [supplied blueprint references](docs/blueprint/implementation-roadmap.md). Commercial rules remain pending review; the access-hardening migration is staged for review, not applied to hosted Supabase.

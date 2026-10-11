@@ -41,13 +41,13 @@ export default function SettingsPage() {
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 <SettingCard icon={User} title="Profile" description="Update your personal account information and preferences." href="/settings/profile" />
                 <SettingCard icon={Briefcase} title="Business" description="Configure your core business details, products, and services." href="/settings/business" />
-                <SettingCard icon={CreditCard} title="Subscription & Billing" description="Manage your plan, invoices, and payment settlement accounts." href="/settings/billing" />
+                <SettingCard icon={CreditCard} title="Subscription & Billing" description="Check the availability of subscriptions and online billing." href="/settings/billing" />
                 <SettingCard icon={BookText} title="Chart of Accounts" description="Manage your structured ledger, account types, and codes." href="/accounting/chart-of-accounts" />
-                <SettingCard icon={Users} title="User Management" description="Invite and manage team members and their permissions." href="/settings/users" />
+                <SettingCard icon={Users} title="User Management" description="View saved members and roles for your selected business." href="/settings/users" />
                 <SettingCard icon={Globe} title="Language & Currency" description="Set your preferred language and default currency for reports." href="/settings/locale" />
                 <SettingCard icon={Palette} title="Appearance" description="Customize the look and feel of the application." href="/settings/appearance" />
                 <SettingCard icon={Bell} title="Notifications" description="Configure how you receive alerts and updates." href="/settings/notifications" />
-                <SettingCard icon={Power} title="Offline Settings" description="Configure how the app behaves when you're not connected." href="/settings/offline" />
+                <SettingCard icon={Power} title="Offline Settings" description="Check current connectivity requirements and offline availability." href="/settings/offline" />
                 <SettingCard icon={Banknote} title="Bank Linking" description="Connect and manage your bank accounts securely." href="/settings/banks" />
                 <SettingCard icon={FileText} title="Tax Settings" description="Configure tax rates and settings for accurate calculations." href="/settings/taxes" />
                 <SettingCard icon={Truck} title="Suppliers" description="Manage supplier details and set up low-stock alerts." href="/settings/suppliers" />
