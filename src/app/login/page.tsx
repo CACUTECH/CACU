@@ -28,6 +28,8 @@ import { useState, useEffect } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+import { safeAuthReturn } from '@/lib/auth-return';
+
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -69,7 +71,7 @@ export default function LoginPage() {
         title: "Login Successful",
         description: "Welcome back to CACU.",
       });
-      router.push("/");
+      router.push(safeAuthReturn(new URLSearchParams(window.location.search).get("next")));
       router.refresh();
     } catch (error: any) {
       toast({
@@ -85,11 +87,12 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
+      const next = safeAuthReturn(new URLSearchParams(window.location.search).get('next'));
+      const callback = new URL('/auth/callback', window.location.origin);
+      if (next !== '/') callback.searchParams.set('next', next);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
+        options: { redirectTo: callback.toString() },
       });
       if (error) throw error;
     } catch (error: any) {
