@@ -52,7 +52,7 @@ Status is source/metadata evidence, not a claim of deployed end-to-end acceptanc
 | 018 Statements | P&L/balance/cash-flow tabs and reconciliation fixtures exist | Hosted parity, bounded reports, transfer/noncash fixtures, field-level report permission |
 | 019 Dashboard | Operational/report services exist | Trusted totals, freshness/error behavior, bounded queries and role projection |
 | 020 Offline | Misleading settings replaced | IndexedDB pending drafts, reauthentication, stable retry keys and conflict UI |
-| 021 AI insights | Generic Genkit flow exists | Current provider, verified identity/quotas, permission-filtered facts and evaluations |
+| 021 AI insights | Unsafe prototype generation retired; verified direct-call guards and truthful unavailable UI | Current provider, verified identity/quotas, permission-filtered facts and evaluations |
 | 022 AI drafts | Not implemented | User/tenant/payload-bound proposal review; no autonomous posting |
 | 023 Attachments | Private buckets/migrations and image validation exist | Hosted auth flow, scheduled orphan cleanup, operator alerting and restore proof |
 | 024 Integrations | Notifications/export helpers partly exist; prototypes unavailable | Durable outbox, signed provider events, consent, CSV safety and expiring exports |
@@ -65,7 +65,7 @@ Status is source/metadata evidence, not a claim of deployed end-to-end acceptanc
 2. [Native bank collection](native-bank-collection.md) now has a reviewed implementation: Transfer requires an explicit authorized bank account, Cash retains its separate mapping, and ledger/retry/lock fixtures pass. The additive locking migration, actual bank mappings and hosted acceptance remain pending staging review and rollout.
 3. [Atomic business setup](atomic-business-setup.md) now has a draft implementation ready for review: identity-bound creation, owner membership verification, concurrent setup serialization and durable replay. Post-commit selection failures can recover using the original key. The migration and hosted acceptance remain pending; the existing setup restriction is preserved while commercial rules await review. A recovered baseline is still required.
 4. The standalone fresh-install baseline is still missing. Old docs/supabase_schema.sql has conflicting entity names; 0001 requires preexisting tables/helpers. The targeted migration's function-upgrade fixture is not a full schema restore test.
-5. AI server entrypoints and prototype operational settings need auth/quota, truthful persistence and provider checks. Navigation visibility does not secure direct calls. Report/financial list pagination and read-lock contention remain to be measured.
+5. [AI prototype boundaries](ai-prototype-boundaries.md) has a draft defect fix: three generation entrypoints verify identity/membership and remain unavailable, page-text forwarding is removed, and policy/HR document screens no longer claim working persistence. Provider activation, permission-filtered facts, operational abuse controls and commercial quota review remain pending. Report/financial list pagination and read-lock contention remain to be measured.
 
 ## Decisions for your review
 
