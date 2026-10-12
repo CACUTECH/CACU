@@ -42,6 +42,7 @@ class PostingCommand(BaseModel):
     lines:list[PostingLine]=Field(min_length=1,max_length=100)
     stock:list[StockLine]=Field(default_factory=list,max_length=100)
     counterparty_id:UUID|None=None
+    payment_method:Literal['Cash','Transfer']|None=None
 
 CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'supplier_payment':SupplierPayment,
          'expense':CashPurchase,'pos':CashSale,'adjustment':JournalEntry,'credit_note':CreditNote,
@@ -77,7 +78,9 @@ def native_post(session,cls,main,lines,entry_date,narration,credited=None,main_a
     return tx
 
 def post_command(session,actor:UUID,command:PostingCommand):
-    payload=json.dumps(command.model_dump(mode='json'),sort_keys=True,separators=(',',':'))
+    serialized=command.model_dump(mode='json')
+    if serialized.get('payment_method') is None:serialized.pop('payment_method',None)
+    payload=json.dumps(serialized,sort_keys=True,separators=(',',':'))
     digest=hashlib.sha256(payload.encode()).hexdigest()
     tenant=str(session.business_id)
     replay=raw(session,'SELECT payload_hash,result FROM accounting.posting_requests WHERE business_id=%s AND request_key=%s',(tenant,str(command.request_key))).first()
@@ -132,6 +135,15 @@ def post_command(session,actor:UUID,command:PostingCommand):
         lines=[(session.get(Account,l.account_id),l.amount*l.quantity,not l.credited) for l in original.line_items]
         command.credited=not original.credited
         amount=original.amount
+    if command.kind in {'receipt','pos'} and command.payment_method is None:
+        raise HTTPException(422,'Cash or Transfer collection method required')
+    if command.payment_method:
+        if command.kind not in {'receipt','pos'} or (command.kind=='receipt' and len(command.lines)!=1):
+            raise HTTPException(422,'Collection method requires a single sale or receipt collection account')
+        from cacu.accounting.workflows import collection_account
+        selected=command.main_account_id if command.kind=='pos' else command.lines[0].account_id
+        reviewed=collection_account(session,command.payment_method,selected if command.payment_method=='Transfer' else None)
+        if str(reviewed)!=str(selected):raise HTTPException(422,'Collection method/account mismatch')
     tx=native_post(session,CLASSES[command.kind],main,lines,command.entry_date,command.narration,
                    command.credited if command.kind in {'adjustment','reversal'} else None,
                    Decimal(command.main_amount) if command.main_amount is not None else None)
@@ -145,8 +157,8 @@ def post_command(session,actor:UUID,command:PostingCommand):
         # Manual receipts are recorded explicitly as offline payments. Gateway
         # verification remains separate; this never promotes a pending gateway row.
         raw(session,"""INSERT INTO public.payments(id,business_id,reference,purpose,invoice_id,amount,currency,status,channel,customer_email,initialized_by,customer_id)
-         VALUES(%s,%s,%s,'invoice',%s,%s,'NGN','success','offline','',%s,%s)""",
-         (str(command.source_id),tenant,'offline-'+str(command.source_id),str(command.target_id),amount,str(actor),str(command.counterparty_id) if command.counterparty_id else None))
+         VALUES(%s,%s,%s,'invoice',%s,%s,'NGN','success',%s,'',%s,%s)""",
+         (str(command.source_id),tenant,'offline-'+str(command.source_id),str(command.target_id),amount,command.payment_method.lower() if command.payment_method else 'offline',str(actor),str(command.counterparty_id) if command.counterparty_id else None))
         remaining=target.amount-target.cleared(session)
         raw(session,"UPDATE public.invoices SET status=%s,updated_at=now() WHERE id=%s AND business_id=%s",('paid' if remaining==0 else 'sent',str(command.target_id),tenant))
     if command.kind=='reversal':
@@ -186,6 +198,8 @@ def post_command(session,actor:UUID,command:PostingCommand):
     raw(session,'INSERT INTO accounting.document_map(business_id,source_type,source_id,transaction_id) VALUES(%s,%s,%s,%s)',(tenant,command.kind,str(command.source_id),tx.id))
     result={'source_id':str(command.source_id),'transaction_id':tx.id,'transaction_no':tx.transaction_no,
             'amount':format(amount,'.2f'),'supporting_transaction_ids':secondary_transactions,'outstanding':format(target.amount-target.cleared(session),'.2f') if target else None}
+    if command.payment_method:
+        result.update(payment_method=command.payment_method,collection_account_id=str(command.main_account_id if command.kind=='pos' else command.lines[0].account_id))
     raw(session,'INSERT INTO accounting.posting_requests(business_id,request_key,payload_hash,result,created_by) VALUES(%s,%s,%s,%s::jsonb,%s)',
         (tenant,str(command.request_key),digest,json.dumps(result),str(actor)))
     raw(session,'INSERT INTO accounting.audit_event(business_id,actor_id,request_key,event,details) VALUES(%s,%s,%s,%s,%s::jsonb)',

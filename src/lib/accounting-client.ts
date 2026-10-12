@@ -3,6 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
 import type { CashFlowReport } from '@/lib/cash-flow';
 
+export class AccountingRequestError extends Error {
+  constructor(message: string, public readonly status: number) { super(message); this.name = 'AccountingRequestError'; }
+}
+
 export async function accountingRequest<T>(path: string, options?: { method: 'POST'; body: unknown }): Promise<T> {
   const base = process.env.CACU_ACCOUNTING_API_URL;
   if (!base) throw new Error('Accounting API is not configured');
@@ -21,9 +25,9 @@ export async function accountingRequest<T>(path: string, options?: { method: 'PO
   if (!response.ok) {
     if (response.status >= 400 && response.status < 500) {
       const failure: { detail?: unknown } = await response.json().catch(() => ({}));
-      if (typeof failure.detail === 'string' && failure.detail.length <= 500) throw new Error(failure.detail);
+      if (typeof failure.detail === 'string' && failure.detail.length <= 500) throw new AccountingRequestError(failure.detail, response.status);
     }
-    throw new Error(`Accounting request failed (${response.status})`);
+    throw new AccountingRequestError(`Accounting request failed (${response.status})`, response.status);
   }
   return response.json() as Promise<T>;
 }

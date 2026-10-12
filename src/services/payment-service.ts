@@ -1,5 +1,5 @@
 
-import { accountingRequest, decimalInput, usesPythonAccounting } from '@/lib/accounting-client';
+import { AccountingRequestError, accountingRequest, decimalInput, usesPythonAccounting } from '@/lib/accounting-client';
 import { randomUUID } from 'node:crypto';
 import { BaseService } from './base-service';
 import { NotificationService } from './notification-service';
@@ -15,6 +15,7 @@ export class PaymentService extends BaseService {
     method: string;
     reference?: string;
     requestKey?: string;
+    bankAccountId?: string;
   }) {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
@@ -23,10 +24,12 @@ export class PaymentService extends BaseService {
       const result = await accountingRequest<{ source_id: string; outstanding: string }>('receipts', { method: 'POST', body: {
         request_key: paymentData.requestKey || randomUUID(), invoice_id: paymentData.invoiceId,
         amount: decimalInput(paymentData.amount), method: paymentData.method,
+        bank_account_id: paymentData.bankAccountId || null,
         entry_date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()),
       } });
       return { paymentId: result.source_id, outstanding: result.outstanding };
     }
+    if (paymentData.bankAccountId) throw new Error('Selected bank accounts require native accounting');
     const { data: paymentId, error } = await supabase.rpc('record_payment_atomic', {
       p_business_id: businessId,
       p_invoice_id: paymentData.invoiceId,
@@ -37,7 +40,10 @@ export class PaymentService extends BaseService {
     });
 
     if (error) {
-      throw new Error(`Payment Integrity Error: ${error.message || 'Transaction rolled back'}`);
+      const message = `Payment Integrity Error: ${error.message || 'Transaction rolled back'}`;
+      // Validation/constraint SQL failures roll back; transport failures may be ambiguous.
+      if (/^(22|23)/.test(error.code || '') || ['P0001', '42501'].includes(error.code)) throw new AccountingRequestError(message, 400);
+      throw new Error(message);
     }
 
     // Trigger Notification

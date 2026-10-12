@@ -1,6 +1,7 @@
 
 "use client"
 
+import { InvoicePaymentDialog } from '@/components/invoice-payment-dialog';
 import { FileAttachments } from "@/components/file-attachments";
 import * as React from "react"
 import {
@@ -62,7 +63,7 @@ import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { getActiveBusinessIdAction } from '@/app/business-actions';
-import { createInvoiceAction, markAsPaidAction, updateInvoiceStatusAction, getInvoiceBalancesAction } from "./actions"
+import { createInvoiceAction, updateInvoiceStatusAction, getInvoiceBalancesAction } from "./actions"
 
 import { getAccountingModeAction } from '@/app/accounting/cash-flow/actions';
 
@@ -128,8 +129,9 @@ const downloadPdf = async (invoice: Invoice) => {
 };
 
 export default function InvoicesPage() {
-  const supabase = createClient();
+  const [supabase] = React.useState(() => createClient());
   const { toast } = useToast();
+  const [paymentInvoice, setPaymentInvoice] = React.useState<Invoice | null>(null);
   const [attachmentDocument, setAttachmentDocument] = React.useState<Invoice | null>(null);
   const [docs, setDocs] = React.useState<Invoice[]>([]);
   const [customers, setCustomers] = React.useState<Customer[]>([]);
@@ -171,27 +173,9 @@ export default function InvoicesPage() {
     fetchData();
   }, [fetchData]);
 
-  const paymentKeys = React.useRef(new Map<string, string>());
   const handleAction = async (action: string, inv: Invoice) => {
     if (action === 'pay') {
-        const amount = window.prompt('Payment amount (NGN)', inv.outstanding || String(inv.total));
-        if (amount === null) return;
-        if (!/^\d{1,13}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) { toast({ variant: 'destructive', title: 'Enter a positive payment amount with at most two decimal places' }); return; }
-        if (!paymentKeys.current.has(inv.id)) paymentKeys.current.set(inv.id, crypto.randomUUID());
-        const res = await markAsPaidAction({
-            requestKey: paymentKeys.current.get(inv.id),
-            invoiceId: inv.id,
-            customerId: inv.customer_id,
-            amount,
-            method: 'Cash'
-        });
-        if (res.success) {
-            toast({ title: "Payment Recorded", description: "Payment allocated and outstanding balance updated." });
-            paymentKeys.current.delete(inv.id);
-            fetchData();
-        } else {
-            toast({ variant: "destructive", title: "Payment Failed", description: res.error });
-        }
+        setPaymentInvoice(inv);
     } else if (action === 'convert') {
         const res = await updateInvoiceStatusAction(inv.id, 'Accepted');
         if (res.success) {
@@ -228,6 +212,7 @@ export default function InvoicesPage() {
             </div>
         </div>
 
+        <InvoicePaymentDialog invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} onSaved={() => { toast({ title: "Payment recorded", description: "Outstanding balance updated." }); void fetchData(); }} />
         <Dialog open={!!attachmentDocument} onOpenChange={open=>{if(!open)setAttachmentDocument(null);}}><DialogContent><DialogHeader><DialogTitle>Document attachments</DialogTitle><DialogDescription>{attachmentDocument?.invoice_number}</DialogDescription></DialogHeader>{attachmentDocument && <FileAttachments key={attachmentDocument.id} purpose="invoice_attachment" resourceId={attachmentDocument.id} />}</DialogContent></Dialog>
         <Tabs defaultValue="invoices" onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full lg:w-max h-auto p-1 bg-primary/5 border border-primary/10 rounded-xl">

@@ -5,7 +5,8 @@ import hashlib,json
 from uuid import UUID,uuid5,NAMESPACE_URL
 from fastapi import HTTPException
 from pydantic import BaseModel,ConfigDict,Field
-from cacu.accounting.posting import PostingCommand,StockLine,post_command,raw
+from cacu.accounting.posting import PostingCommand,StockLine,post_command,raw,account
+from python_accounting.models import Account
 
 class InvoiceItem(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -32,6 +33,7 @@ class ReceiptCreate(BaseModel):
     amount:str=Field(pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
     entry_date:date
     method:str=Field(pattern=r'^(Cash|Transfer|Card)$')
+    bank_account_id:UUID|None=None
 
 class SaleCreate(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -39,6 +41,7 @@ class SaleCreate(BaseModel):
     items:list[StockLine]=Field(min_length=1,max_length=100)
     entry_date:date
     method:str=Field(pattern=r'^(Cash|Transfer|Card)$')
+    bank_account_id:UUID|None=None
     quoted_total:str=Field(pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
 
 
@@ -47,8 +50,41 @@ def purpose(session,name):
     if len(rows)!=1:raise HTTPException(409,f'One reviewed {name} account mapping required')
     return rows[0].account_id
 
+def collection_account(session,method,bank_account_id):
+    if method=='Card':raise HTTPException(409,'Card payments require verified gateway settlement')
+    if method=='Transfer':
+        if bank_account_id is None:raise HTTPException(422,'Select a bank account for Transfer payments')
+        selected=bank_account_id;expected='bank'
+    else:
+        if bank_account_id is not None:raise HTTPException(422,'Cash payments cannot select a bank account')
+        selected=purpose(session,'cash');expected='cash'
+    allowed=raw(session,'SELECT accounting.lock_collection_account(%s,%s,%s)',
+      (str(session.business_id),str(selected),expected)).scalar()
+    if not allowed:raise HTTPException(422,'Collection account unavailable for this business')
+    model=account(session,selected)
+    if model.deleted_at is not None or model.account_type!=Account.AccountType.BANK or model.currency_id!=session.entity.currency_id:
+        raise HTTPException(422,'Reviewed NGN bank or cash account required')
+    return selected
+
+
+def bank_accounts(session):
+    rows=raw(session,"""SELECT a.id,a.name FROM accounting.account_map m
+      JOIN public.accounts a ON a.id=m.account_id AND a.business_id=m.business_id
+      JOIN accounting.account n ON n.id=m.library_id AND n.business_id=m.business_id
+      JOIN accounting.recyclable r ON r.id=n.id AND r.business_id=n.business_id
+      WHERE m.business_id=%s AND m.purpose='bank' AND m.flow_section='cash'
+      AND a.is_active AND n.account_type='BANK' AND n.entity_id=%s
+      AND n.currency_id=%s AND r.deleted_at IS NULL
+      ORDER BY a.name,a.id LIMIT 101""",(str(session.business_id),session.entity.id,session.entity.currency_id)).all()
+    if len(rows)>100:raise HTTPException(409,'Too many bank accounts; refine the reviewed collection list')
+    return [{'id':str(row.id),'name':row.name} for row in rows]
+
+
 def durable(session,actor,kind,data,execute):
-    encoded=json.dumps(data.model_dump(mode='json'),sort_keys=True,separators=(',',':'))
+    payload=data.model_dump(mode='json')
+    # Preserve existing Cash workflow hashes across this additive API change.
+    if payload.get('bank_account_id') is None:payload.pop('bank_account_id',None)
+    encoded=json.dumps(payload,sort_keys=True,separators=(',',':'))
     digest=hashlib.sha256((kind+encoded).encode()).hexdigest();tenant=str(session.business_id)
     old=raw(session,'SELECT payload_hash,result FROM accounting.workflow_request WHERE business_id=%s AND request_key=%s',(tenant,str(data.request_key))).first()
     if old:
@@ -92,17 +128,17 @@ def receipt_create(session,actor,data:ReceiptCreate):
         row=raw(session,"SELECT i.customer_id,m.account_id FROM public.invoices i JOIN accounting.document_map d ON d.business_id=i.business_id AND d.source_id=i.id AND d.source_type='invoice' JOIN accounting.\"transaction\" t ON t.id=d.transaction_id AND t.business_id=d.business_id JOIN accounting.account_map m ON m.business_id=t.business_id AND m.library_id=t.account_id WHERE i.business_id=%s AND i.id=%s FOR UPDATE OF i",
                 (tenant,str(data.invoice_id))).first()
         if not row:raise HTTPException(409,'Invoice must be issued before payment')
-        if data.method=='Card':raise HTTPException(409,'Card payments require verified gateway settlement')
+        collection=collection_account(session,data.method,data.bank_account_id)
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='receipt',source_id=data.request_key,target_id=data.invoice_id,
-            main_account_id=row.account_id,counterparty_id=row.customer_id,entry_date=data.entry_date,narration='Offline '+data.method+' receipt',
-            lines=[{'account_id':purpose(session,'cash'),'amount':data.amount}])
+            main_account_id=row.account_id,counterparty_id=row.customer_id,entry_date=data.entry_date,narration='Manual '+data.method+' receipt',payment_method=data.method,
+            lines=[{'account_id':collection,'amount':data.amount}])
         return post_command(session,actor,cmd)
     return durable(session,actor,'receipt',data,execute)
 
 def sale_create(session,actor,data:SaleCreate):
     def execute():
         tenant=str(session.business_id)
-        if data.method=='Card':raise HTTPException(409,'Card sales require verified gateway settlement')
+        collection=collection_account(session,data.method,data.bank_account_id)
         if len({i.item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate sale item')
         total=Decimal('0');items=[];stock=[]
         for item in sorted(data.items,key=lambda x:str(x.item_id)):
@@ -111,12 +147,12 @@ def sale_create(session,actor,data:SaleCreate):
             value=row.unit_price*item.quantity;total+=value;items.append((item,row,value))
             if row.item_type=='PRODUCT':stock.append(item)
         if total!=Decimal(data.quoted_total):raise HTTPException(409,'Checkout total differs from authoritative tax-free prices')
-        raw(session,"INSERT INTO public.transactions(id,business_id,created_by,status,payment_method,total,subtotal) VALUES(%s,%s,%s,'completed',%s,%s,%s)",(str(data.request_key),tenant,str(actor),data.method,total,total))
+        raw(session,"INSERT INTO public.transactions(id,business_id,created_by,status,payment_method,total,subtotal) VALUES(%s,%s,%s,'completed',%s,%s,%s)",(str(data.request_key),tenant,str(actor),data.method.lower(),total,total))
         for item,row,value in items:
             raw(session,'INSERT INTO public.transaction_items(id,business_id,transaction_id,catalog_item_id,description,quantity,unit_price,line_total) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
                 (str(uuid5(data.request_key,str(item.item_id))),tenant,str(data.request_key),str(item.item_id),row.name,item.quantity,row.unit_price,value))
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='pos',source_id=data.request_key,
-            main_account_id=purpose(session,'cash'),entry_date=data.entry_date,narration='POS sale',
+            main_account_id=collection,entry_date=data.entry_date,narration='POS sale',payment_method=data.method,
             lines=[{'account_id':purpose(session,'revenue'),'amount':format(total,'.2f')}],stock=stock)
         return {'saleId':str(data.request_key),'posting':post_command(session,actor,cmd)}
     return durable(session,actor,'pos',data,execute)

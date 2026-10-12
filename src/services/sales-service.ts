@@ -14,6 +14,7 @@ export class SalesService extends BaseService {
     totalAmount: number;
     customerId?: string;
     requestKey?: string;
+    bankAccountId?: string;
   }) {
     const startTime = Date.now();
     const { supabase, businessId } = await this.getContext();
@@ -22,8 +23,10 @@ export class SalesService extends BaseService {
     if (await usesPythonAccounting()) return accountingRequest<{ saleId: string }>('sales', { method: 'POST', body: {
       request_key: input.requestKey || randomUUID(), items: input.items.map(item => ({ item_id: item.id, quantity: item.quantity })),
       quoted_total: decimalInput(input.totalAmount), method: input.paymentMethod,
+      bank_account_id: input.bankAccountId || null,
       entry_date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()),
     } });
+    if (input.bankAccountId) throw new Error('Selected bank accounts require native accounting');
     const { data, error } = await supabase.rpc('process_sale_safe', {
       p_business_id: businessId,
       p_customer_id: input.customerId || null,

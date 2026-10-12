@@ -3,6 +3,7 @@
 
 import { InvoiceService } from '@/services/invoice-service';
 import { PaymentService } from '@/services/payment-service';
+import { AccountingRequestError } from '@/lib/accounting-client';
 import { revalidatePath } from 'next/cache';
 
 export async function createInvoiceAction(invoiceData: any, items: any[]) {
@@ -25,7 +26,7 @@ export async function markAsPaidAction(paymentData: any) {
     revalidatePath('/transactions');
     return { success: true };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, retryable: !(error instanceof AccountingRequestError && error.status >= 400 && error.status < 500) };
   }
 }
 

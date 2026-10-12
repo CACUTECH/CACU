@@ -14,6 +14,10 @@ args=parser.parse_args();mapping=json.loads(args.mapping.read_text());business=U
 for item in mapping['accounts']:
     UUID(item['id']);Account.AccountType[item['account_type']]
     assert item['flow_section'] in {'cash','operating','investing','financing','restricted'}
+    if item['purpose'] in {'cash','bank'} and (item['account_type']!='BANK' or item['flow_section']!='cash'):
+        raise ValueError('Cash/bank collection mappings require BANK type and cash flow section')
+if len({item['id'] for item in mapping['accounts']})!=len(mapping['accounts']):raise ValueError('Duplicate source account mapping')
+if sum(item['purpose']=='cash' for item in mapping['accounts'])>1:raise ValueError('At most one reviewed cash collection mapping is supported')
 print('Validated mapping for business',business,'with',len(mapping['accounts']),'accounts. State will remain staged.')
 if not args.apply:raise SystemExit('Dry run. No database changes.')
 dsn=os.environ.get('CACU_MIGRATION_DATABASE_URL')

@@ -99,6 +99,12 @@ def accounting_posting(business_id:UUID,command:PostingCommand,user_id:UUID=Depe
 
 from cacu.accounting.workflows import InvoiceCreate,ReceiptCreate,SaleCreate,invoice_create,receipt_create,sale_create
 
+@app.get('/api/v1/businesses/{business_id}/collection-accounts')
+def collection_accounts(business_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.workflows import bank_accounts
+    with library_transaction(user_id,business_id) as session:
+        return bank_accounts(session)
+
 @app.post('/api/v1/businesses/{business_id}/invoices')
 def create_invoice(business_id:UUID,data:InvoiceCreate,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True) as session:

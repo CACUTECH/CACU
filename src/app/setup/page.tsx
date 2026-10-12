@@ -30,7 +30,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, UploadCloud, Briefcase, Package, Sparkles } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
@@ -41,17 +41,17 @@ import { useSupabaseUser } from "@/hooks/use-supabase-user";
 import { useBusiness } from "@/components/business-provider";
 
 const formSchema = z.object({
-  businessName: z.string().min(1, "Business name is required"),
+  businessName: z.string().trim().max(1000).min(1, "Business name is required"),
   businessType: z.enum(['PRODUCT', 'SERVICE', 'HYBRID'], {
     required_error: "Please select a business type",
   }),
-  businessSector: z.string().min(1, "Business sector is required"),
-  businessAddress: z.string().min(1, "Business address is required"),
-  businessEmail: z.string().email(),
-  phoneNumber: z.string().min(1, "Phone number is required"),
-  bankName: z.string().min(1, "Bank name is required"),
-  accountNumber: z.string().min(1, "Account number is required"),
-  accountName: z.string().min(1, "Account name is required"),
+  businessSector: z.string().trim().max(1000).min(1, "Business sector is required"),
+  businessAddress: z.string().trim().max(1000).min(1, "Business address is required"),
+  businessEmail: z.string().trim().email().max(1000),
+  phoneNumber: z.string().trim().max(1000).min(1, "Phone number is required"),
+  bankName: z.string().trim().max(1000).min(1, "Bank name is required"),
+  accountNumber: z.string().trim().max(1000).min(1, "Account number is required"),
+  accountName: z.string().trim().max(1000).min(1, "Account name is required"),
 });
 
 export default function SetupPage() {
@@ -59,6 +59,8 @@ export default function SetupPage() {
   const router = useRouter();
   const { user, loading: userLoading } = useSupabaseUser();
   const { refresh: refreshBusiness } = useBusiness();
+  const attempt = useRef<Parameters<typeof createBusinessAction>[0] | null>(null);
+  const [retryPending, setRetryPending] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -104,7 +106,8 @@ export default function SetupPage() {
     
     try {
       // Atomic provisioning via Supabase Server Action
-      const result = await createBusinessAction({
+      attempt.current ??= {
+        requestKey: crypto.randomUUID(),
         name: values.businessName,
         type: values.businessType,
         sector: values.businessSector,
@@ -114,9 +117,13 @@ export default function SetupPage() {
         bank_name: values.bankName,
         account_number: values.accountNumber,
         account_name: values.accountName
-      });
+      };
+      setRetryPending(true);
+      const result = await createBusinessAction(attempt.current);
+      if (result.selectionPending) throw new Error("Business created. Retry to select it before continuing.");
 
       if (result.success) {
+        await refreshBusiness();
         let logoWarning: string | undefined;
         if (logoFile) {
           try {
@@ -134,14 +141,13 @@ export default function SetupPage() {
           title: logoWarning ? "Business created; logo not saved" : "Business Launched",
           description: logoWarning ? `${logoWarning} Retry from Business Settings.` : `Security profile initialized for ${values.businessName}.`,
         });
-        await refreshBusiness();
         router.push("/");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: "destructive",
-        title: "Setup Failed",
-        description: error.message || "Failed to provision business tenant.",
+        title: "Setup needs attention",
+        description: error instanceof Error ? error.message : "Setup could not be confirmed. Retry with the same details.",
       });
     } finally {
       setIsLoading(false);
@@ -161,6 +167,8 @@ export default function SetupPage() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                {retryPending && <p role="status">Retry uses the same setup details. If you leave this page, select your existing business before starting setup again.</p>}
+                <fieldset disabled={isLoading || retryPending} className="space-y-8">
                  <div className="space-y-2">
                   <FormLabel>Business Logo</FormLabel>
                   <div className="flex items-center gap-6">
@@ -308,7 +316,7 @@ export default function SetupPage() {
                 <div className="space-y-4">
                     <div>
                         <h3 className="text-lg font-bold font-headline">Settlement Details</h3>
-                        <p className="text-xs text-muted-foreground">Bank info for invoices and online payouts.</p>
+                        <p className="text-xs text-muted-foreground">Bank details shown on invoices. Online payouts require separate setup.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -354,12 +362,14 @@ export default function SetupPage() {
                     />
                 </div>
 
+                </fieldset>
+                {retryPending && <Button type="button" variant="outline" onClick={() => router.push("/")}>Open existing business</Button>}
                 <Button 
                   type="submit" 
                   className="w-full h-14 text-lg rounded-xl shadow-xl shadow-primary/20"
                   disabled={isLoading}
                 >
-                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Launch Production Workspace"}
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : retryPending ? "Retry setup" : "Create business"}
                 </Button>
               </form>
             </Form>
