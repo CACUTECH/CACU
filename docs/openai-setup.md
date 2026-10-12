@@ -40,13 +40,11 @@ The explicit `--live` test sends one synthetic request, may incur API charges, a
 
 Requests use `store:false`, no provider conversation ID, tools, automatic actions or browser DOM text. This reduces Responses application-state storage; it does **not** establish Zero Data Retention or remove all provider abuse-monitoring retention. Review [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data) before authorizing business data.
 
-## Activation still required
+## General-guidance activation
 
-The transport is implemented and tested, but the public assistant/HR generation actions remain unavailable. Adding a key alone does not reopen them. The existing user/membership and HR role guards remain intact. No live connection was tested here because `.env` has neither OpenAI configuration variable.
+A follow-up now connects the transport to an authenticated general-guidance action with shared PostgreSQL request limits and an isolated chat UI. Follow [guarded AI chat staging setup](guarded-ai-chat.md) for the migration, database approved-model/enabled setting, server `CACU_AI_ENABLED` switch and acceptance tests. Missing credentials or database settings still prevent live use. No activation was performed here.
 
-Before enabling the assistant, implement server-derived permission-filtered context and shared per-user/tenant request and spending controls, then verify Auth → current membership → allowed facts → OpenAI → validated response in staging. Define consent/data scope, privacy/logging/retention and prompt-injection evaluations. Restore the chat UI only through that authorized service; never call the transport directly from a public action without these checks. HR documents and accounting-policy drafts still need their real record/approval workflows. Commercial AI quotas and paid eligibility remain pending review.
-
-See [the previous AI boundary review](ai-prototype-boundaries.md). Provider selection is complete; feature activation is a separate implementation step after the account setup above.
+Only the verified business category is supplied as tenant context. No financial or employee records or page text are read, and each question is independent. HR documents and accounting-policy drafts remain unavailable; financial analysis, commercial AI quotas and paid eligibility remain pending separate review. Provider selection and chat code are implemented, while live account/setup/acceptance and rollout still require the external steps above.
 
 Sources: [OpenAI developer quickstart](https://developers.openai.com/api/docs/quickstart), [text generation](https://developers.openai.com/api/docs/guides/text), [production setup](https://developers.openai.com/api/docs/guides/production-best-practices).
 

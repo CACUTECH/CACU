@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main, "fix/**" ]
+    branches: [ main, "fix/**", "feat/**" ]
 
 permissions:
   contents: read
@@ -54,6 +54,7 @@ jobs:
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
     env:
+      CACU_AI_TEST_DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/cacu_ai_test
       CACU_SETUP_TEST_DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/cacu_setup_test
       CACU_TEST_DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/cacu_accounting_test
     defaults:
@@ -69,9 +70,10 @@ jobs:
           version: "0.10.11"
       - run: uv lock --check
       - run: uv sync --frozen --no-editable
-      - name: Create isolated setup test database
+      - name: Create isolated setup and AI test databases
         run: >-
           uv run --frozen python -c "import os, psycopg;
           connection = psycopg.connect(os.environ['CACU_TEST_DATABASE_URL'], autocommit=True);
-          connection.execute('CREATE DATABASE cacu_setup_test'); connection.close()"
+          connection.execute('CREATE DATABASE cacu_setup_test');
+          connection.execute('CREATE DATABASE cacu_ai_test'); connection.close()"
       - run: uv run --frozen python -m pytest

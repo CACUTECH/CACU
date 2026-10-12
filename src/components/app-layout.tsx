@@ -275,7 +275,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <MobileNav />
-        <AIAssistant />
+        <AIAssistant key={`${user?.id ?? "signed-out"}:${activeBusiness?.id ?? "no-business"}:${activeBusiness?.userRole ?? "no-role"}`} businessId={activeBusiness?.id} />
       </SidebarInset>
     </SidebarProvider>
   );
