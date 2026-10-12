@@ -33,7 +33,7 @@ Configure only the relevant variables per project:
 | Python backend | CACU_STORAGE_SERVICE_ROLE_KEY | Authorized Storage service-role key, confined to Python Storage operations |
 | Future enabled AI server | Approved provider key/model settings | Provision only after identity/quota/provider validation; not a browser key |
 
-Local .env is your requested source, but Vercel project environment settings must be populated explicitly. NEXT_PUBLIC names are publicly bundled. SUPABASE_ACCESS_TOKEN is a CLI management credential, not an application runtime variable. CLAUDE_MODEL/ANTHROPIC_API_KEY are not used by the existing Google Genkit adapter just because they exist in .env. Do not copy every local variable into both projects. .env and .env.local remain ignored.
+Local .env is your requested source, but Vercel project environment settings must be populated explicitly. NEXT_PUBLIC names are publicly bundled. SUPABASE_ACCESS_TOKEN is a CLI management credential, not an application runtime variable. AI generation entrypoints are currently unavailable; GEMINI_API_KEY, CLAUDE_MODEL and ANTHROPIC_API_KEY do not activate them. The legacy Genkit adapter is inactive. Do not copy every local variable into both projects. .env and .env.local remain ignored.
 
 After deployment, GET /health proves process availability only. Exercise login, authorized report requests, and private uploads with real memberships; verify foreign business and revoked/viewer failures. A 409 for unreconciled accounting is a deliberate release gate, not a reason to use privileged credentials.
 
@@ -62,3 +62,7 @@ Follow [native bank collection setup](native-bank-collection.md) before deployin
 ## Reviewed atomic business setup
 
 Follow [atomic business setup](atomic-business-setup.md) for the new setup migration and coordinated frontend rollout. Test the existing owner trigger, same-key retries and selection recovery on staging before production review. Browser direct business inserts will be revoked; update other setup clients before rollout. No commercial limits or native activation are introduced.
+
+## Reviewed AI prototype boundaries
+
+Follow [AI prototype access and availability](ai-prototype-boundaries.md) for staging direct-call checks and future provider/data-access requirements. This slice requires a reviewed frontend rollout, no new database migration, and no AI provider credentials. Commercial AI quotas remain pending.
