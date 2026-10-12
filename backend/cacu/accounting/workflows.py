@@ -105,10 +105,10 @@ def invoice_create(session,actor,data:InvoiceCreate):
         if not ar:raise HTTPException(409,'Reviewed customer receivable mapping required')
         total=Decimal('0');items=[];stock=[]
         for item in sorted(data.items,key=lambda x:str(x.catalog_item_id)):
-            row=raw(session,'SELECT name,item_type,unit_price FROM public.catalog_items WHERE business_id=%s AND id=%s AND is_active FOR UPDATE',(tenant,str(item.catalog_item_id))).first()
+            row=raw(session,"SELECT name,item_type,unit_price,coalesce((to_jsonb(catalog_items)->>'track_stock')::boolean,true) AS track_stock FROM public.catalog_items WHERE business_id=%s AND id=%s AND is_active FOR UPDATE",(tenant,str(item.catalog_item_id))).first()
             if not row or row.unit_price!=Decimal(item.unit_price) or row.unit_price<=0:raise HTTPException(409,'Invoice price differs from authoritative catalog')
             line_total=row.unit_price*item.quantity;total+=line_total;items.append((item,row.name,line_total))
-            if row.item_type=='PRODUCT':stock.append({'item_id':item.catalog_item_id,'quantity':item.quantity})
+            if row.item_type=='PRODUCT' and row.track_stock:stock.append({'item_id':item.catalog_item_id,'quantity':item.quantity})
         raw(session,"INSERT INTO public.invoices(id,business_id,customer_id,invoice_number,status,issue_date,due_date,subtotal,total,tax,notes,type,vat_included) VALUES(%s,%s,%s,%s,'draft',%s,%s,%s,%s,0,%s,'Invoice',false)",
             (str(data.request_key),tenant,str(data.customer_id),data.invoice_number,data.entry_date,data.due_date,total,total,data.notes))
         for item,name,value in items:
@@ -142,10 +142,10 @@ def sale_create(session,actor,data:SaleCreate):
         if len({i.item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate sale item')
         total=Decimal('0');items=[];stock=[]
         for item in sorted(data.items,key=lambda x:str(x.item_id)):
-            row=raw(session,'SELECT name,unit_price,item_type FROM public.catalog_items WHERE id=%s AND business_id=%s AND is_active FOR UPDATE',(str(item.item_id),tenant)).first()
+            row=raw(session,"SELECT name,unit_price,item_type,coalesce((to_jsonb(catalog_items)->>'track_stock')::boolean,true) AS track_stock FROM public.catalog_items WHERE id=%s AND business_id=%s AND is_active FOR UPDATE",(str(item.item_id),tenant)).first()
             if not row or row.unit_price<=0:raise HTTPException(409,'Sale item unavailable')
             value=row.unit_price*item.quantity;total+=value;items.append((item,row,value))
-            if row.item_type=='PRODUCT':stock.append(item)
+            if row.item_type=='PRODUCT' and row.track_stock:stock.append(item)
         if total!=Decimal(data.quoted_total):raise HTTPException(409,'Checkout total differs from authoritative tax-free prices')
         raw(session,"INSERT INTO public.transactions(id,business_id,created_by,status,payment_method,total,subtotal) VALUES(%s,%s,%s,'completed',%s,%s,%s)",(str(data.request_key),tenant,str(actor),data.method.lower(),total,total))
         for item,row,value in items:

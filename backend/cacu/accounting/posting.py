@@ -166,7 +166,7 @@ def post_command(session,actor:UUID,command:PostingCommand):
     if command.kind in {'invoice','pos'}:
         table='invoice_items' if command.kind=='invoice' else 'transaction_items'
         fk='invoice_id' if command.kind=='invoice' else 'transaction_id'
-        actual_stock=raw(session,f"SELECT i.catalog_item_id,sum(i.quantity) quantity FROM public.{table} i JOIN public.catalog_items c ON c.id=i.catalog_item_id AND c.business_id=i.business_id WHERE i.business_id=%s AND i.{fk}=%s AND c.item_type='PRODUCT' GROUP BY i.catalog_item_id",(tenant,str(command.source_id))).all()
+        actual_stock=raw(session,f"SELECT i.catalog_item_id,sum(i.quantity) quantity FROM public.{table} i JOIN public.catalog_items c ON c.id=i.catalog_item_id AND c.business_id=i.business_id WHERE i.business_id=%s AND i.{fk}=%s AND c.item_type='PRODUCT' AND coalesce((to_jsonb(c)->>'track_stock')::boolean,true) GROUP BY i.catalog_item_id",(tenant,str(command.source_id))).all()
         expected={r.catalog_item_id:int(r.quantity) for r in actual_stock}
         if any(Decimal(r.quantity)!=int(r.quantity) for r in actual_stock) or {s.item_id:s.quantity for s in command.stock}!=expected:
             raise HTTPException(422,'Fulfillment must match authoritative document items')

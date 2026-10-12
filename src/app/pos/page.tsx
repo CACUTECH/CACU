@@ -32,6 +32,8 @@ type CatalogItem = {
     price: number;
     sku?: string;
     quantity?: number;
+    type?: string;
+    track_stock?: boolean;
     status: string;
 }
 
@@ -66,7 +68,7 @@ export default function POSPage() {
         const { data, error } = await supabase
             .from('catalog_items')
             .select('*, type:item_type, price:unit_price, quantity:stock_quantity').eq('business_id', await getActiveBusinessIdAction())
-            .eq('item_type', 'PRODUCT')
+            .eq('is_active', true)
             .order('name');
         
         if (!error) setInventory(data || []);
@@ -87,7 +89,7 @@ export default function POSPage() {
     )
 
     const addToCart = (item: CatalogItem) => {
-        if ((item.quantity || 0) <= 0) {
+        if (item.type === 'PRODUCT' && item.track_stock !== false && (item.quantity || 0) <= 0) {
             toast({ variant: "destructive", title: "Out of Stock" });
             return;
         }
@@ -95,7 +97,7 @@ export default function POSPage() {
         setCart(prev => {
             const existing = prev.find(i => i.id === item.id)
             if (existing) {
-                if (existing.cartQuantity >= (item.quantity || 0)) {
+                if (item.type === 'PRODUCT' && item.track_stock !== false && existing.cartQuantity >= (item.quantity || 0)) {
                     toast({ variant: "destructive", title: "Limit Reached" });
                     return prev;
                 }
@@ -108,7 +110,7 @@ export default function POSPage() {
     const updateCartQuantity = (id: string, delta: number) => {
         setCart(prev => prev.map(item => {
             if (item.id === id) {
-                const max = item.quantity || 0;
+                const max = item.type === 'PRODUCT' && item.track_stock !== false ? item.quantity || 0 : 1000000;
                 return { ...item, cartQuantity: Math.max(1, Math.min(item.cartQuantity + delta, max)) }
             }
             return item
@@ -182,12 +184,12 @@ export default function POSPage() {
                                         onClick={() => addToCart(item)}
                                         className={cn(
                                             "group p-4 rounded-2xl border transition-all text-left flex flex-col gap-2 relative overflow-hidden",
-                                            (item.quantity || 0) > 0 ? "hover:border-primary hover:shadow-lg bg-card" : "bg-muted/50 opacity-60 cursor-not-allowed"
+                                            (item.type !== 'PRODUCT' || item.track_stock === false || (item.quantity || 0) > 0) ? "hover:border-primary hover:shadow-lg bg-card" : "bg-muted/50 opacity-60 cursor-not-allowed"
                                         )}
                                     >
                                         <div className="flex justify-between items-start">
                                             <Badge variant={item.quantity && item.quantity > 5 ? 'secondary' : 'destructive'} className="text-[10px]">
-                                                {item.quantity && item.quantity > 0 ? `${item.quantity} In Stock` : 'Out of Stock'}
+                                                {item.type !== 'PRODUCT' ? 'Service' : item.track_stock === false ? 'Stock not tracked' : item.quantity && item.quantity > 0 ? `${item.quantity} In Stock` : 'Out of Stock'}
                                             </Badge>
                                         </div>
                                         <div>

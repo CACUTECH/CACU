@@ -24,6 +24,7 @@ test('revalidates selected membership against the authenticated user', async () 
   expect(context.businessId).toBe('B');
   expect(context.role).toBe('viewer');
   expect(query.eq).toHaveBeenCalledWith('user_id', 'test-user-id');
+  expect(query.eq).toHaveBeenCalledWith('is_active', true);
   expect(query.eq).toHaveBeenCalledWith('business_id', 'B');
 });
 
