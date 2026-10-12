@@ -15,3 +15,5 @@ export async function mutateWorkspaceAction(input: unknown) { try {
 catch {
     return { success: false as const, error: 'Response unavailable. Retry the original request.', uncertain: true };
 } }
+
+export async function acceptInvitationAction() { throw new Error('Live acceptance is disabled in browser tests'); }

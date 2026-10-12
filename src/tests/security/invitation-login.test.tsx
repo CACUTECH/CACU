@@ -1,0 +1,14 @@
+import {render,screen,fireEvent,waitFor} from '@testing-library/react';
+import LoginPage from '@/app/login/page';
+const mockPush=jest.fn(),mockRefresh=jest.fn(),mockPassword=jest.fn(),mockOAuth=jest.fn();
+jest.mock('lucide-react',()=>({Loader2:()=>null,AlertCircle:()=>null}));
+jest.mock('next/navigation',()=>({useRouter:()=>({push:mockPush,refresh:mockRefresh})}));
+jest.mock('@/lib/supabase/client',()=>({createClient:()=>({auth:{signInWithPassword:mockPassword,signInWithOAuth:mockOAuth}})}));
+jest.mock('@/hooks/use-toast',()=>({useToast:()=>({toast:jest.fn()})}));
+const next='/join?invitation=11111111-1111-4111-8111-111111111111';
+const original=process.env.NEXT_PUBLIC_SUPABASE_URL;
+beforeEach(()=>{jest.clearAllMocks();process.env.NEXT_PUBLIC_SUPABASE_URL='https://supabase.test';mockPassword.mockResolvedValue({error:null});mockOAuth.mockResolvedValue({error:null});window.history.replaceState({},'', '/login?'+new URLSearchParams({next}));});
+afterEach(()=>{if(original===undefined)delete process.env.NEXT_PUBLIC_SUPABASE_URL;else process.env.NEXT_PUBLIC_SUPABASE_URL=original;});
+test('password sign-in returns to the saved invitation',async()=>{render(<LoginPage/>);fireEvent.change(screen.getByLabelText('Email'),{target:{value:'member@example.com'}});fireEvent.change(screen.getByLabelText('Password'),{target:{value:'fixture-password'}});fireEvent.click(screen.getByRole('button',{name:'Login to CACU'}));await waitFor(()=>expect(mockPush).toHaveBeenCalledWith(next));expect(mockRefresh).toHaveBeenCalled();});
+test('Google sign-in carries the local return destination in the existing callback',async()=>{render(<LoginPage/>);fireEvent.click(screen.getByRole('button',{name:'Login with Google'}));await waitFor(()=>expect(mockOAuth).toHaveBeenCalled());const url=new URL(mockOAuth.mock.calls[0][0].options.redirectTo);expect(url.origin).toBe(window.location.origin);expect(url.pathname).toBe('/auth/callback');expect(url.searchParams.get('next')).toBe(next);});
+test('Google sign-in ignores an external return destination',async()=>{window.history.replaceState({},'','/login?next=https%3A%2F%2Fevil.example');render(<LoginPage/>);fireEvent.click(screen.getByRole('button',{name:'Login with Google'}));await waitFor(()=>expect(mockOAuth).toHaveBeenCalled());expect(new URL(mockOAuth.mock.calls[0][0].options.redirectTo).searchParams.get('next')).toBeNull();});

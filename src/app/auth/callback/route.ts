@@ -1,31 +1,26 @@
+import { createClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
+import { safeAuthReturn } from '@/lib/auth-return';
 
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-
-/**
- * @fileOverview Auth callback route for Supabase PKCE flow.
- * 
- * Handles token exchange for:
- * - Email verification links
- * - Magic links
- * - Password reset links
- * - OAuth redirects (Google)
- */
+/** Finish the existing PKCE flow and return only to a local application path. */
 export async function GET(request: Request) {
-  const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get('code')
-  const next = requestUrl.searchParams.get('next') ?? '/'
-
+  const url = new URL(request.url);
+  const next = safeAuthReturn(url.searchParams.get('next'));
+  const code = url.searchParams.get('code');
   if (code) {
-    const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
-    if (!error) {
-      // Successful login/verification
-      return NextResponse.redirect(new URL(next, request.url))
-    }
+    try {
+      const supabase = await createClient();
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!error) return redirect(new URL(next, url.origin));
+    } catch { /* Failed exchanges return to login without forwarding codes or provider details. */ }
   }
+  const login = new URL('/login', url.origin);
+  if (next !== '/') login.searchParams.set('next', next);
+  return redirect(login);
+}
 
-  // Fallback to home if no code or error
-  return NextResponse.redirect(new URL('/login', request.url))
+function redirect(url: URL) {
+  const response = NextResponse.redirect(url);
+  response.headers.set('Cache-Control', 'private, no-store');
+  return response;
 }

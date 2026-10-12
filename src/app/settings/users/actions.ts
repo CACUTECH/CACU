@@ -13,8 +13,8 @@ export async function mutateWorkspaceAction(input: ManagementMutation) {
         if (!['member.save', 'member.status', 'team.save', 'team.add', 'team.remove', 'location.save', 'invitation.create', 'invitation.resend', 'invitation.cancel'].includes(input.operation))
             throw new Error('Unsupported workspace operation');
         const data = await new ManagementService().write(input);
-        // Email delivery remains disabled until the user reviews external SMTP/Auth setup.
-        const warning = ['invitation.create', 'invitation.resend'].includes(input.operation) ? 'Invitation saved. Email delivery is disabled pending setup review. Share the invitation link with the intended recipient.' : undefined;
+        // Email delivery remains unimplemented, as requested by the user.
+        const warning = ['invitation.create', 'invitation.resend'].includes(input.operation) ? 'Invitation saved. Email delivery is unimplemented. Share the invitation link with the intended recipient.' : undefined;
         revalidatePath('/settings/users');
         return { success: true as const, data, warning };
     }
