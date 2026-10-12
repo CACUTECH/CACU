@@ -22,3 +22,7 @@ Direct action regressions cover all three exports: missing identity, authenticat
 Current Supabase guidance was checked against the [SSR client documentation](https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs) and [changelog](https://supabase.com/changelog). No SDK migration or new Supabase feature was needed for this slice.
 
 Validation results: 85 Jest tests passed; all ten unique Chromium cases passed (the policy locator was corrected and its two availability cases rerun); TypeScript, focused lint and the production build using local .env passed. Repository lint has zero errors and 261 remaining warnings. Backend/accounting code was not changed, so the existing 142-test Python result from the preceding slice was not rerun or claimed as new validation here.
+
+## OpenAI follow-up
+
+OpenAI was subsequently selected by the user. The Google default module is replaced by the server-only OpenAI adapter; retired public actions remain closed. Follow [OpenAI setup](openai-setup.md) for API project configuration and the connection check.
