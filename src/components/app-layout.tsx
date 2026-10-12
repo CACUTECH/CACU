@@ -138,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password'].includes(pathname)) {
+    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname)) {
         router.push('/login');
     }
   }, [user, userLoading, pathname, router]);
@@ -205,7 +205,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   // Auth page check must happen before loader check
-  if (['/setup', '/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'].includes(pathname)) {
+  if (['/setup', '/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/join'].includes(pathname)) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 

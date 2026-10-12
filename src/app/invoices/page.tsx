@@ -146,7 +146,7 @@ export default function InvoicesPage() {
     const [invRes, custRes, itemRes] = await Promise.all([
         supabase.from('invoices').select('*, date:issue_date, customers(name)').eq('business_id', businessId).eq('customers.business_id', businessId).order('created_at', { ascending: false }),
         supabase.from('customers').select('id, name').eq('business_id', businessId).order('name'),
-        supabase.from('catalog_items').select('id, name, price:unit_price').eq('business_id', businessId).order('name')
+        supabase.from('catalog_items').select('id, name, price:unit_price').eq('business_id', businessId).eq('is_active', true).order('name')
     ]);
 
     const balances = await getInvoiceBalancesAction();

@@ -9,7 +9,7 @@ export async function getBusinessSelectionAction() {
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return { memberships: [], active: null };
   const { data, error: membershipError } = await supabase.from('memberships')
-    .select('business_id, role, businesses (*)').eq('user_id', user.id);
+    .select('business_id, role, businesses (*)').eq('user_id', user.id).eq('is_active', true);
   if (membershipError) throw new Error('Unable to load business memberships');
   const memberships = data ?? [];
   const selected = (await cookies()).get(ACTIVE_BUSINESS_COOKIE)?.value;
@@ -23,7 +23,7 @@ export async function selectBusinessAction(businessId: string) {
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) throw new Error('Authentication required');
   const { data, error: membershipError } = await supabase.from('memberships')
-    .select('business_id, role').eq('user_id', user.id).eq('business_id', businessId).single();
+    .select('business_id, role').eq('user_id', user.id).eq('is_active', true).eq('business_id', businessId).single();
   if (membershipError || !data) throw new Error('Business membership required');
   (await cookies()).set(ACTIVE_BUSINESS_COOKIE, data.business_id, {
     httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30,

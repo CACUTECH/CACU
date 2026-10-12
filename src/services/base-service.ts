@@ -31,12 +31,12 @@ export abstract class BaseService {
     let membership;
     if (selected) {
       const { data, error } = await supabase.from('memberships').select('business_id, role')
-        .eq('user_id', user.id).eq('business_id', selected).single();
+        .eq('user_id', user.id).eq('is_active', true).eq('business_id', selected).single();
       if (error || !data) throw new Error('Selected business membership is no longer valid');
       membership = data;
     } else {
       const { data, error } = await supabase.from('memberships').select('business_id, role')
-        .eq('user_id', user.id).limit(2);
+        .eq('user_id', user.id).eq('is_active', true).limit(2);
       if (error) throw new Error('Unable to load business memberships');
       membership = selectMembership(data ?? []);
     }
