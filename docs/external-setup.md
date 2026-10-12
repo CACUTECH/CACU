@@ -58,3 +58,7 @@ Billing providers, AI context, online collections, payroll, taxable transactions
 ## Reviewed native bank collection
 
 Follow [native bank collection setup](native-bank-collection.md) before deploying that follow-up. Apply the private locking migration in staging before the backend, review separate cash/bank mappings and opening reconciliation, then deploy Next.js and verify selected-bank postings. Existing cash accounts must not be silently reclassified to rewrite past Transfer mistakes. Live bank feeds and automatic settlement verification remain unconnected.
+
+## Reviewed atomic business setup
+
+Follow [atomic business setup](atomic-business-setup.md) for the new setup migration and coordinated frontend rollout. Test the existing owner trigger, same-key retries and selection recovery on staging before production review. Browser direct business inserts will be revoked; update other setup clients before rollout. No commercial limits or native activation are introduced.

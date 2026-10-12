@@ -1,0 +1,31 @@
+import React from 'react';
+import { test, expect } from '@playwright/experimental-ct-react';
+import SetupPage from '../../src/app/setup/page';
+
+test('mobile setup freezes original details and retries creation and selection with one key', async ({ mount, page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mount(<SetupPage />);
+  await page.getByLabel('Legal Business Name').fill('Test business');
+  await page.getByRole('combobox').click();
+  await page.getByRole('option', { name: 'Retail & Shop' }).click();
+  await page.getByLabel('Business Phone').fill('123');
+  await page.getByLabel('Public Business Email').fill('test@example.com');
+  await page.getByLabel('Physical Address').fill('Test address');
+  await page.getByPlaceholder('e.g. Sterling Bank').fill('Test bank');
+  await page.getByPlaceholder('0123456789').fill('1234567890');
+  await page.getByLabel('Beneficiary Name').fill('Test business');
+  await page.getByRole('button', { name: 'Create business', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry setup', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Legal Business Name')).toBeDisabled();
+  await page.getByRole('button', { name: 'Retry setup', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.setupAttempts?.length)).toBe(2);
+  await expect(page.getByRole('button', { name: 'Retry setup', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Retry setup', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.setupRoute)).toBe('/');
+  const attempts = await page.evaluate(() => window.setupAttempts!);
+  expect(attempts).toHaveLength(3);
+  expect(attempts[0].requestKey).toMatch(/^[0-9a-f-]{36}$/);
+  expect(attempts[1]).toEqual(attempts[0]);
+  expect(attempts[2]).toEqual(attempts[0]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
