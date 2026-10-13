@@ -70,3 +70,7 @@ Follow [AI prototype access and availability](ai-prototype-boundaries.md) for st
 ## OpenAI provider selection
 
 OpenAI is now the selected AI provider. Follow [OpenAI setup](openai-setup.md) for the project/API billing, server-only key/model configuration and synthetic connection test. The adapter is implemented; public AI generation remains unavailable until tenant data and operational controls are connected. No commercial quotas were activated.
+
+## Guarded general-guidance chat
+
+Follow [guarded AI chat staging setup](guarded-ai-chat.md) for the metadata-only request-control migration, approved model and disabled-by-default pilot settings, frontend environment switch and hosted end-to-end checks. Review operational caps and retention before enabling it. No financial/employee records are supplied; no commercial quotas or production activation were applied.
