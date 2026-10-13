@@ -1,3 +1,5 @@
+> For the current implementation review and outstanding setup, see [implementation-status.md](../implementation-status.md). This blueprint remains the proposed target, subject to user decisions.
+
 > Blueprint v1 · 11 October 2026 · Repository baseline `71ba8d08dc677f69e5bf0d18a3f00b6c6b22db65`. Source audit and proposed target design; no production activation is implied.
 
 # Phased implementation roadmap and delivery plan

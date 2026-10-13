@@ -92,3 +92,76 @@ test('recorded inventory history locks structure controls while normal edits rem
  await expect(page.getByLabel('Name',{exact:true})).toBeEnabled();await expect(page.getByLabel('Selling price (NGN)',{exact:true})).toBeEnabled();
  await expect(page.getByText('Type, stock unit and tracking are locked once stock, adjustments or document references exist.')).toBeVisible();
 });
+
+for (const action of [
+    { operation: 'member.status', label: 'Deactivate', status: 'active' },
+    { operation: 'invitation.resend', label: 'Renew invitation', status: 'invited' },
+    { operation: 'invitation.cancel', label: 'Cancel', status: 'invited' },
+]) {
+    test(`${action.label} retries an uncertain response with the original key and version`, async ({ mount, page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.route('**/test/workspace/*', route => route.fulfill({ json: { total: 1, locations: [], data: [{ id: 'member', name: 'Existing member', email: 'member@example.com', role: 'editor', status: action.status, version: 3, all_locations: true, created_at: '2026-10-12T00:00:00Z' }] } }));
+        const attempts: Record<string, unknown>[] = [];
+        await page.route('**/test/workspace-mutation', async route => {
+            attempts.push(route.request().postDataJSON());
+            if (attempts.length === 1) return route.fulfill({ status: 502, contentType: 'text/plain', body: 'Upstream response unavailable' });
+            return route.fulfill({ json: { success: true, data: {} } });
+        });
+        page.on('dialog', dialog => dialog.accept());
+        await mount(<UserManagement />);
+        await page.getByRole('button', { name: action.label, exact: true }).click();
+        await expect(page.getByRole('alert')).toContainText('Response unavailable');
+        await expect(page.getByRole('button', { name: action.label, exact: true })).toBeDisabled();
+        await expect(page.getByRole('button', { name: 'Invite user', exact: true })).toBeDisabled();
+        await page.getByRole('button', { name: 'Retry original request', exact: true }).click();
+        await expect(page.getByRole('status')).toContainText('Changes saved');
+        await expect(page.getByRole('button', { name: 'Retry original request', exact: true })).not.toBeVisible();
+        await expect(page.getByRole('button', { name: action.label, exact: true })).toBeEnabled();
+        expect(attempts).toHaveLength(2);
+        expect(attempts[1]).toEqual(attempts[0]);
+        expect(attempts[0]).toMatchObject({ operation: action.operation, item_id: 'member', expected_version: 3, request_key: expect.any(String) });
+    });
+}
+
+test('confirmed user update rejection releases the original request for a corrected attempt', async ({ mount, page }) => {
+    await page.route('**/test/workspace/*', route => route.fulfill({ json: { total: 1, locations: [], data: [{ id: 'member', name: 'Existing member', email: 'member@example.com', role: 'editor', status: 'active', version: 3, all_locations: true, created_at: '2026-10-12T00:00:00Z' }] } }));
+    const attempts: Record<string, unknown>[] = [];
+    await page.route('**/test/workspace-mutation', route => {
+        attempts.push(route.request().postDataJSON());
+        return route.fulfill({ json: attempts.length === 1 ? { success: false, uncertain: false, error: 'Review the current member before changing access' } : { success: true, data: {} } });
+    });
+    page.on('dialog', dialog => dialog.accept());
+    await mount(<UserManagement />);
+    await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('Review the current member');
+    await expect(page.getByRole('button', { name: 'Deactivate', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Retry original request', exact: true })).not.toBeVisible();
+    await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Changes saved');
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1].request_key).not.toEqual(attempts[0].request_key);
+});
+
+test('user edit form retains its unconfirmed payload after closing and reopening', async ({ mount, page }) => {
+    await page.route('**/test/workspace/*', route => route.fulfill({ json: { total: 1, locations: [], data: [{ id: 'member', name: 'Existing member', email: 'member@example.com', role: 'editor', status: 'active', version: 3, all_locations: true, created_at: '2026-10-12T00:00:00Z' }] } }));
+    const attempts: Record<string, unknown>[] = [];
+    await page.route('**/test/workspace-mutation', route => {
+        attempts.push(route.request().postDataJSON());
+        if (attempts.length === 1) return route.fulfill({ status: 502, contentType: 'text/plain', body: 'Upstream response unavailable' });
+        return route.fulfill({ json: { success: true, data: {} } });
+    });
+    await mount(<UserManagement />);
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page.getByLabel('Name', { exact: true }).fill('Reviewed member name');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Response unavailable');
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
+    await page.getByRole('dialog').getByRole('button', { name: 'Retry original request', exact: true }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(page.getByRole('status')).toContainText('Changes saved');
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]).toEqual(attempts[0]);
+    expect(attempts[0]).toMatchObject({ operation: 'member.save', expected_version: 3, details: { name: 'Reviewed member name' } });
+});
