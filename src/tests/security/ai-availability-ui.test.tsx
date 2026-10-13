@@ -1,3 +1,4 @@
+jest.mock('@/app/ai/actions', () => ({ getAIChatStatusAction: jest.fn(), askAIQuestionAction: jest.fn() }));
 jest.mock('lucide-react', () => ({ Sparkles: () => null, X: () => null }));
 import { fireEvent, render, screen } from '@testing-library/react';
 import { AIAssistant } from '@/components/ai-assistant';
