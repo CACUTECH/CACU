@@ -15,3 +15,5 @@ export async function mutateWorkspaceAction(input: unknown) { try {
 catch {
     return { success: false as const, error: 'Response unavailable. Retry the original request.', uncertain: true };
 } }
+
+export async function readAdjustmentHistoryAction(itemId:string,page=0){const response=await fetch('/test/stock-history?'+new URLSearchParams({item:itemId,page:String(page)}));if(!response.ok)throw new Error('History unavailable');return response.json();}
