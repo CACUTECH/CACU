@@ -49,7 +49,20 @@ test('services have rates and billing units without product stock inputs', async
 
 test('user management displays real directory rows and deactivates with a version', async ({ mount, page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.route('**/test/workspace/*', route => route.fulfill({ json: { total: 1, locations: [], data: [{ id: 'member', name: 'Existing member', email: 'member@example.com', role: 'editor', status: 'active', version: 3, all_locations: true, created_at: '2026-10-12T00:00:00Z' }] } }));
+    await page.route('**/test/workspace/*', route => route.fulfill({
+        json: {
+            total: 1,
+            locations: [],
+            data: [{
+                id: 'member',
+                name: 'Existing member',
+                email: 'member@example.com',
+                role: 'editor',
+                status: 'active',
+                version: 3,
+            }],
+        },
+    }));
     const requests: unknown[] = [];
     await page.route('**/test/workspace-mutation', route => { requests.push(route.request().postDataJSON()); return route.fulfill({ json: { success: true, data: {} } }); });
     await mount(<UserManagement />);
