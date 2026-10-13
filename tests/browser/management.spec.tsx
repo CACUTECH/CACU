@@ -12,7 +12,8 @@ test('mobile product creation retries the original opening stock request', async
         attempts.push(body);
 
         if (attempts.length === 1) {
-            await route.abort();
+            // A non-JSON gateway response deterministically exercises the uncertain-result path.
+            await route.fulfill({ status: 502, contentType: 'text/plain', body: 'Upstream response unavailable' });
             return;
         }
 
