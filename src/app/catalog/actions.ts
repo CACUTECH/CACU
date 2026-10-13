@@ -40,3 +40,5 @@ export async function deleteCatalogItemAction(id: string, version?: number, requ
         return { success: false, error: error instanceof Error ? error.message : 'Archive failed' };
     }
 }
+
+export async function readAdjustmentHistoryAction(itemId: string, page = 0) { return new InventoryService().adjustmentHistory(itemId, page); }
