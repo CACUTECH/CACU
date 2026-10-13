@@ -16,6 +16,7 @@ test('owner reads only the active business and safe membership fields', async ()
   client.from.mockReturnValueOnce(context('owner')).mockReturnValueOnce(query);
   expect((await new MembershipService().listActiveBusinessMembers()).total).toBe(1);
   expect(query.eq).toHaveBeenCalledWith('business_id', 'B');
+  expect(query.eq).toHaveBeenCalledWith('is_active', true);
   expect(query.select).toHaveBeenCalledWith('user_id, role', { count: 'exact' });
 });
 

@@ -39,7 +39,7 @@ describe('Financial Integrity Tests', () => {
     // against `memberships`, so it needs its own queued response too.
     mockSupabase.from().single
         .mockResolvedValueOnce({
-            data: { name: 'Running Low', stock_quantity: 2, reorder_level: 5 },
+            data: { name: 'Running Low', item_type: 'PRODUCT', track_stock: true, is_active: true, stock_quantity: 2, reorder_level: 5 },
             error: null
         })
         .mockResolvedValueOnce({

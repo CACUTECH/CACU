@@ -39,7 +39,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const member = selection.active;
   const record = member && (Array.isArray(member.businesses) ? member.businesses[0] : member.businesses);
   const business = record ? { ...record, userRole: member?.role } : null;
-  const publicRoute = ['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password'].includes(pathname);
+  const publicRoute = ['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname);
   const choose = async (id: string) => {
     requestVersion.current++;
     setLoading(true);

@@ -47,7 +47,7 @@ class UploadGateway:
 
     def authorize_upload(self, business, actor, purpose):
         if purpose not in POLICY['purposes']: raise HTTPException(422,'Unknown upload purpose')
-        response = self.request('GET','/rest/v1/memberships',params={'select':'role','business_id':'eq.'+str(business),'user_id':'eq.'+str(actor)})
+        response = self.request('GET','/rest/v1/memberships',params={'select':'role','is_active':'eq.true','business_id':'eq.'+str(business),'user_id':'eq.'+str(actor)})
         rows = response.json()
         if len(rows)!=1 or rows[0]['role'] not in POLICY['purposes'][purpose]['roles']:
             raise HTTPException(403,'Upload permission required')

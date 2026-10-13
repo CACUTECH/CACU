@@ -155,3 +155,22 @@ def invoice_balances(business_id:UUID,user_id:UUID=Depends(current_user)):
 
 from cacu.uploads.routes import upload_router
 app.include_router(upload_router(current_user, bearer))
+
+from cacu.accounting.catalog import CatalogMutation,catalog_mutate
+
+@app.post('/api/v1/businesses/{business_id}/catalog')
+def save_catalog(business_id:UUID,data:CatalogMutation,user_id:UUID=Depends(current_user)):
+    try:
+        with library_transaction(user_id,business_id,write=True) as session:
+            return catalog_mutate(session,user_id,data)
+    except SQLAlchemyError as exc:
+        code=getattr(exc.orig,'sqlstate',None)
+        if code in {'P0001','23505','23514','22P02','22003','22007','22008','42501'}:
+            known={'VERSION_CONFLICT':'Item changed. Refresh before editing.', 'DUPLICATE_CODE':'Code already exists in this business.',
+                'ITEM_STRUCTURE_LOCKED':'Referenced item type, stock unit and tracking cannot change.',
+                'COST_REVALUATION_REQUIRED':'On-hand inventory cost changes require a reviewed revaluation.',
+                'INVALID_STOCK_ADJUSTMENT':'Check the quantity, reason, date and available stock.',
+                'CATEGORY_INVALID':'Select an active category for this item type.', 'SUPPLIER_INVALID':'Select a supplier in this business.'}
+            reason=str(exc.orig).splitlines()[0]
+            raise HTTPException(403 if code=='42501' else 409,known.get(reason,'Catalog update rejected. Check your values and refresh the item.')) from None
+        raise

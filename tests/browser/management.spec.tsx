@@ -1,0 +1,56 @@
+import React from 'react';
+import { test, expect } from '@playwright/experimental-ct-react';
+import { CatalogWorkspace } from '../../src/components/catalog-workspace';
+import { UserManagement } from '../../src/components/user-management';
+test('mobile product creation retries the original opening stock request', async ({ mount, page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route('**/test/catalog?*', route => route.fulfill({ json: { data: [], total: 0 } }));
+    const attempts: unknown[] = [];
+    await page.route('**/test/catalog-mutation', route => { attempts.push(route.request().postDataJSON()); return attempts.length === 1 ? route.abort() : route.fulfill({ json: { success: true, data: { id: 'item' } } }); });
+    await mount(<CatalogWorkspace />);
+    await page.getByRole('button', { name: 'Add product', exact: true }).click();
+    await page.getByLabel('Name', { exact: true }).fill('Real product');
+    await page.getByLabel('Selling price (NGN)').fill('150.50');
+    await page.getByLabel('Opening quantity').fill('5');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Response unavailable');
+    await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('button', { name: 'Add product', exact: true }).click();
+    await page.getByRole('button', { name: 'Retry original request' }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]).toEqual(attempts[0]);
+    expect(attempts[0]).toMatchObject({ operation: 'item.save', details: { opening_quantity: 5, unit_price: '150.50' } });
+});
+test('services have rates and billing units without product stock inputs', async ({ mount, page }) => {
+    await page.route('**/test/catalog?*', route => route.fulfill({ json: { data: [], total: 0 } }));
+    await mount(<CatalogWorkspace />);
+    await page.getByRole('tab', { name: 'Services', exact: true }).click();
+    await page.getByRole('button', { name: 'Add service', exact: true }).click();
+    await expect(page.getByLabel('Rate (NGN)')).toBeVisible();
+    await expect(page.getByLabel('Billing unit')).toBeVisible();
+    await expect(page.getByLabel('Opening quantity')).toHaveCount(0);
+    await expect(page.getByLabel('Track stock')).toHaveCount(0);
+});
+test('user management displays real directory rows and deactivates with a version', async ({ mount, page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route('**/test/workspace/*', route => route.fulfill({ json: { total: 1, locations: [], data: [{ id: 'member', name: 'Existing member', email: 'member@example.com', role: 'editor', status: 'active', version: 3, all_locations: true, created_at: '2026-10-12T00:00:00Z' }] } }));
+    const requests: unknown[] = [];
+    await page.route('**/test/workspace-mutation', route => { requests.push(route.request().postDataJSON()); return route.fulfill({ json: { success: true, data: {} } }); });
+    await mount(<UserManagement />);
+    await expect(page.getByText('member@example.com')).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Teams', exact: true })).toBeVisible();
+    page.on('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Changes saved');
+    expect(requests[0]).toMatchObject({ operation: 'member.status', item_id: 'member', expected_version: 3, details: { is_active: false } });
+});
+
+
+test('editing a legacy item does not replace an unknown cost with zero',async({mount,page})=>{
+ await page.route('**/test/catalog?*',route=>route.fulfill({json:{total:1,data:[{id:'old',name:'Original',item_type:'PRODUCT',sku:'old-code',category_id:null,category:'Uncategorized',unit_price:'100.00',cost_price:null,version:1,stock_quantity:2,reorder_level:0,is_active:true,track_stock:true,unit_of_measure:'piece',billing_unit:'service',tax_code:'none',duration:0,created_at:'2026-01-01',updated_at:'2026-01-01'}]}}));
+ const requests:Record<string,unknown>[]=[];await page.route('**/test/catalog-mutation',route=>{requests.push(route.request().postDataJSON());return route.fulfill({json:{success:true,data:{id:'old'}}});});
+ await mount(<CatalogWorkspace/>);await page.getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Name',{exact:true}).fill('Renamed');await page.getByRole('button',{name:'Save',exact:true}).click();await expect(page.getByRole('dialog')).not.toBeVisible();
+ expect(requests).toHaveLength(1);expect(requests[0].details).not.toHaveProperty('cost_price');expect(requests[0].details).not.toHaveProperty('opening_quantity');
+});

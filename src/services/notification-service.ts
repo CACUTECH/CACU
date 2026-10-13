@@ -27,7 +27,7 @@ export class NotificationService extends BaseService {
       const { data: admins } = await supabase
         .from('memberships')
         .select('user_id')
-        .eq('business_id', businessId)
+        .eq('business_id', businessId).eq('is_active', true)
         .in('role', ['owner', 'admin']);
 
       targetUserIds = admins?.map(a => a.user_id) || [];

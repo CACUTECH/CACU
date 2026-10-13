@@ -8,7 +8,7 @@ export class MembershipService extends BaseService {
     }
     // No email, salary, profile metadata, or memberships of other businesses.
     const { data, error, count } = await supabase.from('memberships')
-      .select('user_id, role', { count: 'exact' }).eq('business_id', businessId)
+      .select('user_id, role', { count: 'exact' }).eq('business_id', businessId).eq('is_active', true)
       .order('user_id').limit(100);
     if (error) throw new Error('Unable to load business members');
     return { members: data ?? [], total: count ?? 0 };
