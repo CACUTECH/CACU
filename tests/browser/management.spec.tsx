@@ -71,7 +71,7 @@ test('user management displays real directory rows and deactivates with a versio
     await expect(page.getByRole('tab', { name: 'Teams', exact: true })).toBeVisible();
     page.on('dialog', dialog => dialog.accept());
     await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('Changes saved');
+    await expect(page.getByRole('status').filter({ hasText: 'Changes saved' })).toContainText('Changes saved');
     expect(requests[0]).toMatchObject({ operation: 'member.status', item_id: 'member', expected_version: 3, details: { is_active: false } });
 });
 
@@ -114,7 +114,7 @@ for (const action of [
         await expect(page.getByRole('button', { name: action.label, exact: true })).toBeDisabled();
         await expect(page.getByRole('button', { name: 'Invite user', exact: true })).toBeDisabled();
         await page.getByRole('button', { name: 'Retry original request', exact: true }).click();
-        await expect(page.getByRole('status')).toContainText('Changes saved');
+        await expect(page.getByRole('status').filter({ hasText: 'Changes saved' })).toContainText('Changes saved');
         await expect(page.getByRole('button', { name: 'Retry original request', exact: true })).not.toBeVisible();
         await expect(page.getByRole('button', { name: action.label, exact: true })).toBeEnabled();
         expect(attempts).toHaveLength(2);
@@ -137,7 +137,7 @@ test('confirmed user update rejection releases the original request for a correc
     await expect(page.getByRole('button', { name: 'Deactivate', exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Retry original request', exact: true })).not.toBeVisible();
     await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('Changes saved');
+    await expect(page.getByRole('status').filter({ hasText: 'Changes saved' })).toContainText('Changes saved');
     expect(attempts).toHaveLength(2);
     expect(attempts[1].request_key).not.toEqual(attempts[0].request_key);
 });
@@ -160,7 +160,7 @@ test('user edit form retains its unconfirmed payload after closing and reopening
     await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
     await page.getByRole('dialog').getByRole('button', { name: 'Retry original request', exact: true }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
-    await expect(page.getByRole('status')).toContainText('Changes saved');
+    await expect(page.getByRole('status').filter({ hasText: 'Changes saved' })).toContainText('Changes saved');
     expect(attempts).toHaveLength(2);
     expect(attempts[1]).toEqual(attempts[0]);
     expect(attempts[0]).toMatchObject({ operation: 'member.save', expected_version: 3, details: { name: 'Reviewed member name' } });

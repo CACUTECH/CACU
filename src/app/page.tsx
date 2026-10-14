@@ -78,6 +78,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = React.useState(true);
   const [stats, setStats] = React.useState<any>(null);
   const [reportError, setReportError] = React.useState('');
+  const generation = React.useRef(0);
   const [trendData, setTrendData] = React.useState<any[]>([]);
   const [granularity, setGranularity] = React.useState<'day' | 'week' | 'month'>('month');
 
@@ -88,27 +89,37 @@ export default function DashboardPage() {
   }, [businessLoading, business, router]);
 
   const fetchData = React.useCallback(async () => {
-    if (!business) {
-      setLoading(false);
-      return;
-    }
+    const token = ++generation.current;
+    setStats(null);
+    setTrendData([]);
+    setReportError('');
+    if (!business) { setLoading(false); return; }
     setLoading(true);
     const start = format(startOfMonth(new Date()), 'yyyy-MM-dd');
     const end = format(endOfMonth(new Date()), 'yyyy-MM-dd');
-
-    const [statsRes, trendRes] = await Promise.all([
-      getDashboardStatsAction(start, end),
-      getRevenueTrendAction(start, end, granularity)
-    ]);
-
-    setReportError(!statsRes.success ? statsRes.error : !trendRes.success ? trendRes.error : '');
-    if (statsRes.success) setStats(statsRes.data);
-    if (trendRes.success) setTrendData(trendRes.data);
-    setLoading(false);
+    try {
+      const [statsRes, trendRes] = await Promise.all([
+        getDashboardStatsAction(start, end),
+        getRevenueTrendAction(start, end, granularity)
+      ]);
+      if (token !== generation.current) return;
+      if (!statsRes.success || !trendRes.success) {
+        setReportError(!statsRes.success ? statsRes.error : trendRes.error);
+        return;
+      }
+      setStats(statsRes.data);
+      setTrendData(trendRes.data);
+    } catch {
+      if (token === generation.current) setReportError('Dashboard unavailable. Please retry.');
+    } finally {
+      if (token === generation.current) setLoading(false);
+    }
   }, [business, granularity]);
 
   React.useEffect(() => {
-    fetchData();
+    const requests = generation;
+    void fetchData();
+    return () => { requests.current++; };
   }, [fetchData]);
 
   if (reportError) return <div className="space-y-4"><h1 className="text-3xl font-bold">Dashboard</h1><p role="alert">{reportError}</p><Button onClick={() => void fetchData()}>Retry</Button></div>;

@@ -14,3 +14,7 @@ export async function recordLedgerEntryAction(data: any) {
     return { success: false, error: error.message };
   }
 }
+
+export async function readLedgerPageAction(page = 0) {
+  return new LedgerService().listTransactionsPage(page);
+}

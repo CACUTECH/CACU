@@ -1,3 +1,5 @@
+> See [14 October technical completion review](technical-completion-20261014.md) for delivered follow-up fixes and remaining external blockers.
+
 # Implementation review — 13 October 2026
 
 Reviewed current main against the six blueprint documents, the implementation checkpoint, inventory/user management notes, upload rollout and external setup requirements. Earlier checkpoints describe their dated baselines; they are not current completion claims. Commercial rules remain proposals and email delivery remains unimplemented by the user's decision.

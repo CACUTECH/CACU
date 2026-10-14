@@ -27,10 +27,9 @@ import {
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { createClient } from '@/lib/supabase/client';
-import { getActiveBusinessIdAction } from '@/app/business-actions';
+import { useBusiness } from '@/components/business-provider';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
-import { recordLedgerEntryAction } from './actions';
+import { recordLedgerEntryAction, readLedgerPageAction } from './actions';
 
 type Transaction = {
     id: string;
@@ -44,11 +43,13 @@ type Transaction = {
 
 export default function TransactionsPage() {
     const { user } = useSupabaseUser();
-    const supabase = createClient();
+    const { business } = useBusiness();
     const { toast } = useToast();
     const [receiptResource, setReceiptResource] = React.useState<string | null>(null);
     const [transactions, setTransactions] = React.useState<Transaction[]>([]);
     const [loading, setLoading] = React.useState(true);
+    const [page, setPage] = React.useState(0), [total, setTotal] = React.useState(0), [error, setError] = React.useState('');
+    const generation = React.useRef(0);
 
     const [formData, setFormData] = React.useState<Partial<Transaction>>({
         description: '',
@@ -58,28 +59,30 @@ export default function TransactionsPage() {
     })
 
     const fetchTX = React.useCallback(async () => {
-        try {
+        const token = ++generation.current;
         setLoading(true);
-        const { data, error } = await supabase
-            .from('financial_transactions')
-            .select('*').eq('business_id', await getActiveBusinessIdAction())
-            .order('date', { ascending: false });
-        
-        if (error) {
-            toast({ variant: 'destructive', title: 'Ledger Error', description: error.message });
-        } else {
-            setTransactions(data || []);
-        }
-        setLoading(false);
+        setTransactions([]);
+        setTotal(0);
+        setError('');
+        try {
+            const result = await readLedgerPageAction(page);
+            if (token === generation.current) {
+                setTransactions(result.data);
+                setTotal(result.total);
+            }
         } catch {
-            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
-            setLoading(false);
+            if (token === generation.current) setError('Ledger records unavailable. Retry this page.');
+        } finally {
+            if (token === generation.current) setLoading(false);
         }
-    }, [supabase, toast]);
+    }, [page]);
 
     React.useEffect(() => {
-        if (user) fetchTX();
-    }, [user, fetchTX]);
+        const requests = generation;
+        if (user?.id) void fetchTX();
+        else { setTransactions([]); setTotal(0); setLoading(false); }
+        return () => { requests.current++; };
+    }, [user?.id, business?.id, fetchTX]);
 
     const handleAddTransaction = async () => {
         const result = await recordLedgerEntryAction(formData);
@@ -87,23 +90,23 @@ export default function TransactionsPage() {
             toast({ variant: 'destructive', title: 'Post Failed', description: result.error });
         } else {
             toast({ title: "Transaction Posted" });
-            fetchTX();
+            if (page) setPage(0); else void fetchTX();
             setFormData({ description: '', amount: 0, type: 'Income', category: 'Services' });
         }
     }
 
-    if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    if (loading) return <div role="status" aria-label="Loading ledger records" className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="font-headline text-3xl font-bold">Financial Ledger</h1>
-                    <p className="text-muted-foreground text-sm">Strict multi-tenant records managed by LedgerService.</p>
+                    <p className="text-muted-foreground text-sm">Saved operational income and expense records. Posted financial statements remain available in Reports.</p>
                 </div>
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button><PlusCircle className="mr-2 h-4 w-4" /> Record Entry</Button>
+                        <Button disabled={!business || !['owner', 'admin', 'editor'].includes(business.userRole || '')}><PlusCircle className="mr-2 h-4 w-4" /> Record Entry</Button>
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader><DialogTitle>Manual Journal Entry</DialogTitle></DialogHeader>
@@ -133,6 +136,7 @@ export default function TransactionsPage() {
             </div>
 
             <Dialog open={!!receiptResource} onOpenChange={open=>{if(!open)setReceiptResource(null);}}><DialogContent><DialogHeader><DialogTitle>Transaction receipts</DialogTitle></DialogHeader>{receiptResource&&<FileAttachments key={receiptResource} purpose="receipt" resourceId={receiptResource} />}</DialogContent></Dialog>
+            {error && <div className="space-y-2"><p role="alert">{error}</p><Button variant="outline" onClick={() => void fetchTX()}>Retry this page</Button></div>}
             <Card className="shadow-xl border-primary/5">
                 <CardContent className="p-0">
                     <Table>
@@ -165,8 +169,10 @@ export default function TransactionsPage() {
                             ))}
                         </TableBody>
                     </Table>
+                    {!transactions.length && !error && <p className="p-6">No recorded transactions on this page.</p>}
                 </CardContent>
             </Card>
+            <div className="flex flex-wrap items-center justify-between gap-3"><p>Page {page + 1} · {total} records</p><div className="flex gap-2"><Button variant="outline" disabled={!page || loading} onClick={() => setPage(p => p - 1)}>Previous</Button><Button variant="outline" disabled={loading || !!error || (page + 1) * 20 >= total} onClick={() => setPage(p => p + 1)}>Next</Button></div></div>
         </div>
     );
 }
