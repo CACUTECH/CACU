@@ -24,6 +24,19 @@ export class LedgerService extends BaseService {
     return data;
   }
 
+  async listTransactionsPage(page = 0) {
+    if (!Number.isSafeInteger(page) || page < 0 || page > 100000) throw new Error('Invalid ledger page');
+    const { supabase, businessId } = await this.getContext();
+    if (!businessId) throw new Error('Select an authorized business');
+    const { data, count, error } = await supabase.from('financial_transactions')
+      .select('id,date,description,amount,type,category,business_id', { count: 'exact' })
+      .eq('business_id', businessId)
+      .order('date', { ascending: false }).order('id', { ascending: false })
+      .range(page * 20, page * 20 + 19);
+    if (error) throw new Error('Ledger records unavailable');
+    return { data: data || [], total: count || 0 };
+  }
+
   /**
    * Records a manual ledger entry with audit logging.
    */

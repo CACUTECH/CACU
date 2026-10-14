@@ -1,0 +1,446 @@
+{
+  "captured_on": "2026-10-14",
+  "tables": [
+    {
+      "rls": true,
+      "name": "sale_requests",
+      "schema": "legacy_private"
+    },
+    {
+      "rls": true,
+      "name": "businesses",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "customers",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "transactions",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "accounts",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "invoices",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "invoice_items",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "journal_entries",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "employees",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "journal_lines",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "payroll_runs",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "legacy_category_associations",
+      "schema": "management_private"
+    },
+    {
+      "rls": true,
+      "name": "requests",
+      "schema": "management_private"
+    },
+    {
+      "rls": true,
+      "name": "audit",
+      "schema": "management_private"
+    },
+    {
+      "rls": true,
+      "name": "catalog_categories",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "payslips",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "appointments",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "payments",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "jobs",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "storefront_settings",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "business_locations",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "payment_status_history",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "business_teams",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "payment_events",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "business_team_members",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "business_invitations",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "catalog_items",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "user_devices",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "notification_preferences",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "memberships",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "inventory_movements",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "notifications",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "notification_logs",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "profiles",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "financial_transactions",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "suppliers",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "attendance",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "audit_logs",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "upload_records",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "upload_events",
+      "schema": "public"
+    },
+    {
+      "rls": true,
+      "name": "recyclable",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "currency",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "user",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "recycled",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "reporting_period",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "entity",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "account",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "category",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "line_item",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "transaction",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "tax",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "business_map",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "account_map",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "document_map",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "posting_requests",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "audit_event",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "ledger",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "party_map",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "reversal_map",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "stock_event",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "balance",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "workflow_request",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "assignment",
+      "schema": "accounting"
+    },
+    {
+      "rls": true,
+      "name": "transaction_items",
+      "schema": "public"
+    }
+  ],
+  "policy_counts": {
+    "public.businesses": 4,
+    "public.memberships": 5,
+    "public.catalog_items": 7,
+    "public.customers": 5,
+    "public.transactions": 6,
+    "public.transaction_items": 5,
+    "public.invoices": 7,
+    "public.invoice_items": 7,
+    "public.accounts": 5,
+    "public.journal_entries": 3,
+    "public.journal_lines": 2,
+    "public.employees": 4,
+    "public.appointments": 4,
+    "public.payroll_runs": 3,
+    "public.payslips": 2,
+    "public.jobs": 4,
+    "public.storefront_settings": 4,
+    "public.payment_status_history": 1,
+    "public.payment_events": 1,
+    "public.payments": 4,
+    "public.user_devices": 4,
+    "public.notification_preferences": 4,
+    "public.notifications": 3,
+    "public.notification_logs": 1,
+    "public.profiles": 3,
+    "public.suppliers": 5,
+    "public.financial_transactions": 4,
+    "public.attendance": 4,
+    "public.audit_logs": 1,
+    "public.upload_records": 1,
+    "accounting.recyclable": 3,
+    "accounting.currency": 3,
+    "accounting.user": 3,
+    "accounting.recycled": 3,
+    "accounting.reporting_period": 3,
+    "accounting.entity": 3,
+    "accounting.account": 3,
+    "accounting.category": 3,
+    "accounting.line_item": 3,
+    "accounting.transaction": 3,
+    "accounting.tax": 3,
+    "accounting.assignment": 3,
+    "accounting.business_map": 3,
+    "accounting.account_map": 3,
+    "accounting.document_map": 3,
+    "accounting.posting_requests": 3,
+    "accounting.audit_event": 3,
+    "accounting.ledger": 3,
+    "accounting.party_map": 3,
+    "accounting.reversal_map": 3,
+    "accounting.stock_event": 3,
+    "accounting.balance": 3,
+    "accounting.workflow_request": 3,
+    "public.business_teams": 1,
+    "public.catalog_categories": 1,
+    "public.inventory_movements": 2,
+    "public.business_locations": 1,
+    "public.business_team_members": 1,
+    "public.business_invitations": 1
+  },
+  "runtime_role": {
+    "name": "cacu_runtime",
+    "login": false,
+    "superuser": false,
+    "bypass_rls": false
+  },
+  "migrations": [
+    {
+      "name": "init",
+      "version": "0001"
+    },
+    {
+      "name": "secure_file_uploads",
+      "version": "20261011030324"
+    },
+    {
+      "name": "accounting_role",
+      "version": "20261011085900"
+    },
+    {
+      "name": "python_accounting_schema",
+      "version": "20261011090000"
+    },
+    {
+      "name": "accounting_boundary",
+      "version": "20261011090100"
+    },
+    {
+      "name": "accounting_cutover_guards",
+      "version": "20261011090200"
+    },
+    {
+      "name": "harden_legacy_function_access",
+      "version": "20261011102406"
+    },
+    {
+      "name": "legacy_financial_integrity",
+      "version": "20261011110551"
+    },
+    {
+      "name": "native_collection_account_lock",
+      "version": "20261011113113"
+    },
+    {
+      "name": "atomic_business_setup",
+      "version": "20261011143320"
+    },
+    {
+      "name": "inventory_user_management",
+      "version": "20261012140639"
+    },
+    {
+      "name": "guarded_ai_chat",
+      "version": "20261012132427"
+    },
+    {
+      "name": "inventory_history_structure_lock",
+      "version": "20261013073115"
+    }
+  ]
+}

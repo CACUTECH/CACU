@@ -1,0 +1,45 @@
+name: Managed upload cleanup
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Remove expired managed uploads (approved production operation)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: managed-upload-cleanup
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: github.event_name == 'workflow_dispatch' || vars.CACU_UPLOAD_CLEANUP_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: upload-operations
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.11'
+      - run: uv sync --frozen --no-editable
+      - name: Clean expired managed uploads or dry run
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          CACU_STORAGE_SERVICE_ROLE_KEY: ${{ secrets.CACU_STORAGE_SERVICE_ROLE_KEY }}
+          APPLY_CLEANUP: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          if [ "$APPLY_CLEANUP" = "true" ]; then
+            uv run --frozen python -m tools.cleanup_uploads --apply --json
+          else
+            uv run --frozen python -m tools.cleanup_uploads --json
+          fi

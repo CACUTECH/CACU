@@ -25,19 +25,23 @@ export class ReportService extends BaseService {
     if (kpiError) throw kpiError;
 
     // 2. Inventory Context
-    const { data: inv } = await supabase
+    const { data: inv, error: inventoryError } = await supabase
       .from('view_inventory_valuation')
       .select('*')
       .eq('business_id', businessId)
       .maybeSingle();
 
+    if (inventoryError) throw new Error('Inventory summary unavailable');
+
     // 3. Operational Context (Jobs)
-    const { count: activeJobs } = await supabase
+    const { count: activeJobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*', { count: 'exact', head: true })
       .eq('business_id', businessId)
       .neq('status', 'Completed')
       .neq('status', 'Cancelled');
+
+    if (jobsError) throw new Error('Job summary unavailable');
 
     return {
       financials: kpi[0] || { total_income: 0, total_expense: 0, net_profit: 0, transaction_count: 0 },
@@ -47,6 +51,7 @@ export class ReportService extends BaseService {
   }
 
   async getRevenueTrend(startDate: string, endDate: string, interval: 'day' | 'week' | 'month' = 'month') {
+    if (!['day','week','month'].includes(interval)) throw new Error('Invalid revenue interval');
     const { supabase, businessId } = await this.getContext();
     if (!businessId) return [];
 
@@ -54,7 +59,13 @@ export class ReportService extends BaseService {
       const data = await getAccountingSummary(startDate, endDate);
       const grouped = new Map<string, number>();
       for (const row of data.revenue_trend) {
-        const period = interval === 'month' ? row.period.slice(0, 7) : row.period;
+        let period = interval === 'month' ? row.period.slice(0, 7) : row.period;
+        if (interval === 'week') {
+          const day = new Date(`${row.period}T00:00:00Z`);
+          if (!Number.isFinite(day.getTime())) throw new Error('Revenue dates unavailable');
+          day.setUTCDate(day.getUTCDate() - (day.getUTCDay() + 6) % 7);
+          period = day.toISOString().slice(0, 10);
+        }
         grouped.set(period, (grouped.get(period) || 0) + Number(row.income));
       }
       return [...grouped].map(([period, income]) => ({ period, income }));
