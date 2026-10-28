@@ -18,6 +18,20 @@ Mode is a workspace layout choice, not a permission boundary: server actions kee
 
 Validation: 216 unit tests (45 new mode cases), 26 browser regressions, TypeScript, changed-file ESLint (0 errors) and the production build passed. No schema, policy, dependency or hosted data changed; hosted acceptance of the businesses update policy for Admin members remains to be confirmed.
 
+## Dependency security update (28 October)
+
+Targeted upgrades for open advisories; no blanket upgrades:
+
+- `next` 15.5.27 → 15.5.28 (with `eslint-config-next` and `@next/eslint-plugin-next`): unauthenticated RCE in the image optimization API with SVG files (critical) and a Server Actions DoS (high).
+- `dompurify` 3.4.16 → 3.4.17 (via `jspdf`): sanitizer bypasses (critical/high/low).
+- `postcss-selector-parser` 6.1.4 → 6.1.5: quadratic parsing CPU exhaustion (moderate).
+- `zod` 3.25.76 → 4.6.7 with `@hookform/resolvers` 4.1.3 → 5.9.1: memory exhaustion on oversized constrained collections (high). There is no patched 3.x release. Current schemas validate only strings, enums and objects; the setup form's `required_error` moved to the v4 `error` option.
+- Backend `Pillow` 12.3.0 → 13.0.0 (38 advisories; the upload worker decodes user images) and `certifi` 2026.7.22 → 2026.10.19.
+
+Remaining: 7 low-severity npm findings come from `deepmerge` 4.3.1 under Jest. They are dev-only test tooling, and no patched `deepmerge` release exists. Re-check when one is published rather than downgrading Jest as `npm audit fix --force` suggests.
+
+Validation: TypeScript, 216 unit tests, 26 browser regressions and the production build passed. 60 backend tests passed, including all 30 upload-sanitizer tests on Pillow 13. 142 PostgreSQL-dependent backend tests skipped without a disposable database. Alerts on the default branch close once this branch is merged.
+
 ## Required next steps
 
 - Review this directory change and the existing technical-completion change before deployment. This patch currently depends on the reviewed work in feat/technical-completion.

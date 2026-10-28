@@ -16,7 +16,7 @@
     "ai:check": "node scripts/check-openai.mjs"
   },
   "dependencies": {
-    "@hookform/resolvers": "^4.1.3",
+    "@hookform/resolvers": "^5.9.1",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-avatar": "^1.1.3",
@@ -48,7 +48,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.475.0",
-    "next": "15.5.27",
+    "next": "15.5.28",
     "openai": "7.32.0",
     "patch-package": "^8.0.0",
     "react": "19.2.1",
@@ -59,11 +59,11 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^3.24.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
-    "@next/eslint-plugin-next": "15.5.27",
+    "@next/eslint-plugin-next": "15.5.28",
     "@playwright/experimental-ct-react": "1.62.1",
     "@playwright/test": "1.62.1",
     "@testing-library/jest-dom": "^6.6.3",
@@ -75,7 +75,7 @@
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "eslint": "^9.35.0",
-    "eslint-config-next": "15.5.27",
+    "eslint-config-next": "15.5.28",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8",

@@ -43,7 +43,7 @@ import { useBusiness } from "@/components/business-provider";
 const formSchema = z.object({
   businessName: z.string().trim().max(1000).min(1, "Business name is required"),
   businessType: z.enum(['PRODUCT', 'SERVICE', 'HYBRID'], {
-    required_error: "Please select a business type",
+    error: "Please select a business type",
   }),
   businessSector: z.string().trim().max(1000).min(1, "Business sector is required"),
   businessAddress: z.string().trim().max(1000).min(1, "Business address is required"),

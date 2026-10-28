@@ -2,7 +2,7 @@
 name = "cacu-accounting"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
-dependencies = ["fastapi==0.143.0", "pydantic==2.11.4", "httpx==0.28.1", "psycopg[binary]==3.2.9", "uvicorn==0.34.2", "python-accounting==1.0.1", "SQLAlchemy==2.1.4", "Pillow==12.3.0"]
+dependencies = ["fastapi==0.143.0", "pydantic==2.11.4", "httpx==0.28.1", "psycopg[binary]==3.2.9", "uvicorn==0.34.2", "python-accounting==1.0.1", "SQLAlchemy==2.1.4", "Pillow==13.0.0"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -17,12 +17,12 @@ dev = ["pytest==9.1.1", "hypothesis==6.131.9"]
 # CACU uses SQLAlchemy with psycopg 3; upstream legacy drivers are unused.
 exclude-dependencies = ["mysqlclient", "psycopg2"]
 constraint-dependencies = [
-  "Pillow==12.3.0",
+  "Pillow==13.0.0",
   "annotated-doc==0.0.5",
   "annotated-types==0.8.0",
   "anyio==4.15.1",
   "attrs==26.1.0",
-  "certifi==2026.7.22",
+  "certifi==2026.10.19",
   "click==8.5.0",
   "colorama==0.4.6",
   "fastapi==0.143.0",
