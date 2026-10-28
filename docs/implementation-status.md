@@ -1,3 +1,5 @@
+> See [production feature readiness](production-feature-readiness-20261014.md) for the HR directory implementation and remaining activation requirements.
+
 > See [14 October technical completion review](technical-completion-20261014.md) for delivered follow-up fixes and remaining external blockers.
 
 # Implementation review — 13 October 2026
