@@ -6,6 +6,24 @@ import { BaseService } from './base-service';
  * Enforces business context and role-based access for workforce data.
  */
 export class HRService extends BaseService {
+  /** Personnel directory deliberately excludes salary and bank details. */
+  async listEmployeeDirectory(page = 0) {
+    if (!Number.isSafeInteger(page) || page < 0 || page > 100000) {
+      throw new Error('Invalid employee page');
+    }
+    const { supabase, businessId, role } = await this.getContext();
+    if (!businessId || (role !== 'owner' && role !== 'admin')) {
+      throw new Error('HR access is restricted to owners and administrators');
+    }
+    const { data, error, count } = await supabase.from('employees')
+      .select('id,full_name,job_title,department,employment_status', { count: 'exact' })
+      .eq('business_id', businessId)
+      .order('full_name', { ascending: true }).order('id', { ascending: true })
+      .range(page * 20, page * 20 + 19);
+    if (error || data === null || count === null) throw new Error('Employee records unavailable');
+    return { data, total: count };
+  }
+
   async listEmployees() {
     const { supabase, businessId, role: actorRole } = await this.getContext();
     if (actorRole !== 'owner' && actorRole !== 'admin') throw new Error('HR access is restricted to owners and administrators');

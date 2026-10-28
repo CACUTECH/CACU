@@ -1,4 +1,12 @@
-import { FeatureUnavailable } from '@/components/feature-unavailable';
-export default function Layout() {
-  return <FeatureUnavailable title="HR & workforce" description="Workforce and payroll tools are not available for this release. Salary access, approvals and payroll calculations need verification before use." />;
+import type { ReactNode } from 'react';
+import { getBusinessSelectionAction } from '@/app/business-actions';
+
+export default async function HRLayout({ children }: { children: ReactNode }) {
+  let allowed = false;
+  try {
+    const { active } = await getBusinessSelectionAction();
+    allowed = active?.role === 'owner' || active?.role === 'admin';
+  } catch { /* Fail closed when membership cannot be verified. */ }
+  if (!allowed) return <div role="alert">HR access requires an active Owner or Admin membership. Select an authorized business and retry.</div>;
+  return <>{children}</>;
 }
