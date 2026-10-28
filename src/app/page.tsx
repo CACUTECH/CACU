@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useRouter } from 'next/navigation';
 import { useBusiness } from '@/components/business-provider';
 import { getDashboardStatsAction, getRevenueTrendAction } from './reports/actions';
+import { isRouteAvailableInMode } from '@/lib/business-mode';
 
 function StatCard({ title, value, subtext, icon: Icon, trend, variant = 'default' }: any) {
     return (
@@ -180,7 +181,7 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 overflow-x-auto">
                 <QuickAction icon={Receipt} label="New Invoice" href="/invoices" color="bg-indigo-600" />
                 <QuickAction icon={ArrowLeftRight} label="Transaction" href="/transactions" color="bg-emerald-600" />
-                <QuickAction icon={MonitorSpeaker} label="POS Sale" href="/pos" color="bg-violet-600" />
+                {isRouteAvailableInMode('/pos', business?.business_type) && <QuickAction icon={MonitorSpeaker} label="POS Sale" href="/pos" color="bg-violet-600" />}
                 <QuickAction icon={Users} label="Customer" href="/customers" color="bg-blue-600" />
                 <QuickAction icon={PlusCircle} label="Add Item" href="/catalog" color="bg-rose-600" />
             </div>

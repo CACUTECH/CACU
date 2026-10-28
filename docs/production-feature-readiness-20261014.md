@@ -10,6 +10,14 @@ The previous HR layout blocked every child page. It is replaced with the role gu
 
 Live read-only schema inspection confirmed the directory columns and employee SELECT/INSERT/UPDATE/DELETE policies are restricted to active Owner/Admin memberships. No hosted rows, migrations, grants or policies were changed by this implementation. No application deployment was made.
 
+## Business mode (28 October)
+
+Owners and Admins choose Product, Service or Hybrid mode in Business Settings. The choice is saved on the business row, so it applies on every device. The previous settings card saved only to browser storage and never changed the workspace. Saves compare against the mode the user saw, so a change made elsewhere is not overwritten. Retrying after a lost response is safe, and the selector keeps the exact change for retry until the result is confirmed. POS is hidden in Service mode; appointments and work orders are hidden in Product mode. The sidebar, mobile navigation, dashboard quick actions and server-rendered route layouts follow the saved mode. Existing records are never deleted when the mode changes.
+
+Mode is a workspace layout choice, not a permission boundary: server actions keep their existing role and tenant checks. Unused demo-tenant visibility code containing a hardcoded business ID was removed before commit. Core identity fields on Business Settings are not persisted and are now shown as read-only rather than presenting a save that did nothing. The legacy payroll screen still reads the old browser-stored value, but it remains behind the unavailable payroll layout.
+
+Validation: 216 unit tests (45 new mode cases), 26 browser regressions, TypeScript, changed-file ESLint (0 errors) and the production build passed. No schema, policy, dependency or hosted data changed; hosted acceptance of the businesses update policy for Admin members remains to be confirmed.
+
 ## Required next steps
 
 - Review this directory change and the existing technical-completion change before deployment. This patch currently depends on the reviewed work in feat/technical-completion.
