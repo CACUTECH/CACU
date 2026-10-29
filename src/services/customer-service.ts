@@ -52,6 +52,8 @@ export class CustomerService extends BaseService {
       .eq('id', id)
       .eq('business_id', businessId);
 
+    // 23503: referenced by records that must be kept (composite tenant keys, Doc 07 DB-004).
+    if (error?.code === '23503') throw new Error('This customer has invoices, sales or payments, so they cannot be removed. Their history is kept.');
     if (error) throw error;
     return true;
   }

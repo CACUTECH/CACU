@@ -53,6 +53,8 @@ export class SupplierService extends BaseService {
       .eq('id', id)
       .eq('business_id', businessId);
 
+    // 23503: referenced by records that must be kept (composite tenant keys, Doc 07 DB-004).
+    if (error?.code === '23503') throw new Error('This supplier is linked to catalogue items, so they cannot be removed. Change those items first.');
     if (error) throw error;
     return true;
   }
