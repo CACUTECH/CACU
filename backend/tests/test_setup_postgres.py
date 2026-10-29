@@ -140,3 +140,17 @@ def test_browser_privileges():
         c.execute("SET LOCAL ROLE authenticated")
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             c.execute("SELECT public.create_business_safe(%s,%s)", (uuid4(),Jsonb(DETAILS)))
+
+
+def test_atomic_setup_and_retry_after_business_retention():
+    migration = Path(__file__).resolve().parents[2] / 'supabase/migrations/20261029143527_retain_business_history.sql'
+    with psycopg.connect(URL) as c:
+        if not c.execute("SELECT 1 FROM pg_roles WHERE rolname='cacu_runtime'").fetchone():
+            c.execute('CREATE ROLE cacu_runtime NOLOGIN')
+        c.execute(migration.read_text(encoding='utf-8'))
+    actor,key=user(),uuid4()
+    first=create(actor,key)
+    assert create(actor,key)==dict(id=first['id'],replayed=True)
+    with psycopg.connect(URL) as c:
+        assert c.execute('SELECT business_id::text,role FROM memberships WHERE user_id=%s',(actor,)).fetchone()==(first['id'],'owner')
+        assert c.execute("SELECT count(*) FROM pg_constraint WHERE confrelid='public.businesses'::regclass AND confdeltype='c'").fetchone()[0]==0
