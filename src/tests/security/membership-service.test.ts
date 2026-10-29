@@ -22,6 +22,6 @@ test('owner reads only the active business and safe membership fields', async ()
 
 test.each(['viewer', 'editor'])('%s cannot retrieve salary-bearing HR records', async role => {
   const client = await (createClient as jest.Mock)(); client.from.mockReturnValueOnce(context(role));
-  await expect(new HRService().listEmployees()).rejects.toThrow('HR access');
+  await expect(new HRService().getEmployee('00000000-0000-4000-8000-000000000001')).rejects.toThrow('HR access');
   expect(client.from).toHaveBeenCalledTimes(1);
 });

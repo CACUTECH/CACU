@@ -38,7 +38,6 @@ import {
     BookText, 
     Wrench,
     CalendarClock,
-    BarChart3,
     UserPlus,
     Loader2
 } from 'lucide-react';
@@ -192,11 +191,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       label: 'HR',
       icon: Users2,
       children: [
-        { href: '/hr/onboarding', label: 'Onboarding', icon: UserPlus },
+        { href: '/hr/employees/new', label: 'Add Employee', icon: UserPlus },
         { href: '/hr/employees', label: 'Employees' },
         { href: '/hr/attendance', label: 'Attendance' },
         { href: '/hr/payroll', label: 'Payroll' },
-        { href: '/hr/payroll/reports', label: 'Workforce Analytics', icon: BarChart3 },
+        { href: '/hr/payroll/rules', label: 'Payroll Rules' },
         { href: '/hr/termination', label: 'Exits & Termination' },
       ],
     },
