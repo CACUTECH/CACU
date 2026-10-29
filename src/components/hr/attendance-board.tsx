@@ -2,6 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { statusLabel } from '@/lib/hr';
 import { useHRMutation } from './use-hr-mutation';
 import { MutationFeedback } from './mutation-feedback';
 
@@ -21,11 +22,11 @@ export function AttendanceBoard({ staff, records, open, isToday }: { staff: Staf
         {staff.map(person => {
           const shift = open.find(s => s.employee_id === person.id);
           const day = records.filter(r => r.employee_id === person.id);
-          const active = person.employment_status === 'Active';
+          const active = person.employment_status === 'active';
           return <TableRow key={person.id}>
             <TableCell><span className="font-medium">{person.full_name}</span><span className="block text-xs text-muted-foreground">{person.job_title || '—'}</span></TableCell>
             <TableCell>{day.length ? day.map(r => <span key={r.id} className="block">{time(r.check_in)} – {r.check_out ? time(r.check_out) : 'open'}{r.note ? ` (${r.note})` : ''}</span>) : '—'}</TableCell>
-            <TableCell>{!active ? <Badge variant="outline">{person.employment_status}</Badge>
+            <TableCell>{!active ? <Badge variant="outline">{statusLabel(person.employment_status)}</Badge>
               : shift ? <Badge>{shift.work_date && records.every(r => r.id !== shift.id) ? `Open since ${shift.work_date}` : 'Checked in'}</Badge>
               : <Badge variant="secondary">Not checked in</Badge>}</TableCell>
             <TableCell>{shift ? <Button size="sm" variant="outline" disabled={locked}

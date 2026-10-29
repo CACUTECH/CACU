@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { HRService } from '@/services/hr-service';
+import { statusLabel } from '@/lib/hr';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -30,7 +31,7 @@ export default async function EmployeesPage({ searchParams }: {
           <TableCell><Link className="font-medium underline-offset-4 hover:underline" href={`/hr/employees/${employee.id}`}>{employee.full_name || 'Unnamed employee'}</Link></TableCell>
           <TableCell>{employee.job_title || '—'}</TableCell>
           <TableCell>{employee.department || '—'}</TableCell>
-          <TableCell>{employee.employment_status || 'Unspecified'}</TableCell>
+          <TableCell>{statusLabel(employee.employment_status)}</TableCell>
         </TableRow>)}
         {records.data.length === 0 && <TableRow><TableCell colSpan={4} className="py-8 text-center">
           {page === 0 ? 'No employees registered in this business.' : 'No employees on this page.'}

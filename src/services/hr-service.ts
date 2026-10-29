@@ -61,7 +61,7 @@ export class HRService extends BaseService {
     const { supabase, businessId } = await this.managerContext();
     const [staff, records, open] = await Promise.all([
       supabase.from('employees').select('id,full_name,job_title,employment_status').eq('business_id', businessId)
-        .in('employment_status', ['Active', 'On leave', 'Suspended']).order('full_name').order('id').limit(500),
+        .in('employment_status', ['active', 'on_leave', 'suspended']).order('full_name').order('id').limit(500),
       supabase.from('attendance').select('id,employee_id,check_in,check_out,note,work_date').eq('business_id', businessId)
         .eq('work_date', day).order('check_in').limit(2000),
       supabase.from('attendance').select('id,employee_id,check_in,work_date').eq('business_id', businessId).is('check_out', null).limit(500),

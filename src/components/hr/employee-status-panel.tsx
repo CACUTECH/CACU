@@ -5,19 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { isIsoDate, type EmployeeRecord } from '@/lib/hr';
+import { isIsoDate, statusLabel, type EmployeeRecord, type EmployeeStatus } from '@/lib/hr';
 import { useHRMutation } from './use-hr-mutation';
 import { MutationFeedback } from './mutation-feedback';
 
 export function EmployeeStatusPanel({ employee, today }: { employee: EmployeeRecord; today: string }) {
-  const status = employee.employment_status || 'Unspecified';
-  const departed = status === 'Departed';
+  const status = employee.employment_status;
+  const departed = status === 'exited';
   const [endDate, setEndDate] = useState(today);
   const [reason, setReason] = useState('');
   const [confirming, setConfirming] = useState(false);
   const { run, retry, busy, uncertain, error, message, setError } = useHRMutation();
   const locked = busy || uncertain;
-  const options = departed ? ['Active'] : ['Active', 'On leave', 'Suspended'].filter(s => s !== status);
+  const options: EmployeeStatus[] = departed ? ['active'] : (['active', 'on_leave', 'suspended'] as const).filter(s => s !== status);
 
   function depart(event: React.FormEvent) {
     event.preventDefault();
@@ -28,13 +28,13 @@ export function EmployeeStatusPanel({ employee, today }: { employee: EmployeeRec
   }
 
   return <Card><CardHeader>
-    <CardTitle className="flex items-center gap-3">Employment status <Badge variant={status === 'Active' ? 'secondary' : 'outline'}>{status}</Badge></CardTitle>
+    <CardTitle className="flex items-center gap-3">Employment status <Badge variant={status === 'active' ? 'secondary' : 'outline'}>{statusLabel(status)}</Badge></CardTitle>
     {departed && <CardDescription>Left on {employee.end_date || 'an unrecorded date'}{employee.departure_reason ? `: ${employee.departure_reason}` : ''}</CardDescription>}
   </CardHeader><CardContent className="space-y-4">
     <div className="flex flex-wrap gap-2">
       {options.map(next => <Button key={next} variant="outline" size="sm" disabled={locked}
-        onClick={() => void run('employee.status', { status: next }, { recordId: employee.id, version: employee.version, success: `Status changed to ${next}.` })}>
-        {departed ? 'Rehire as active' : `Mark ${next.toLowerCase()}`}</Button>)}
+        onClick={() => void run('employee.status', { status: next }, { recordId: employee.id, version: employee.version, success: `Status changed to ${statusLabel(next)}.` })}>
+        {departed ? 'Rehire as active' : `Mark ${statusLabel(next).toLowerCase()}`}</Button>)}
     </div>
     {!departed && <form className="space-y-3 rounded-md border p-3" onSubmit={depart}>
       <h3 className="font-medium">Record departure</h3>

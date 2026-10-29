@@ -1,5 +1,10 @@
 /** Shared HR types, labels and safe error messages. Safe to import from client components. */
-export const EMPLOYEE_STATUSES = ['Active', 'On leave', 'Suspended', 'Departed'] as const;
+/** Stored status codes (employees_employment_status_check) and the labels shown to people. */
+export const EMPLOYEE_STATUS_LABELS = { active: 'Active', on_leave: 'On leave', suspended: 'Suspended', exited: 'Departed' } as const;
+export type EmployeeStatus = keyof typeof EMPLOYEE_STATUS_LABELS;
+export function statusLabel(status: string | null | undefined) {
+  return (status && EMPLOYEE_STATUS_LABELS[status as EmployeeStatus]) || status || 'Unspecified';
+}
 export const HR_OPERATIONS = ['employee.save', 'employee.status', 'employee.depart', 'attendance.check_in', 'attendance.check_out',
   'payroll.rules', 'payroll.create', 'payroll.approve', 'payroll.cancel'] as const;
 export type HROperation = typeof HR_OPERATIONS[number];
