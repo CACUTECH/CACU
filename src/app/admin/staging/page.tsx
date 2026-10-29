@@ -1,20 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ShieldCheck, 
-  Database, 
-  Lock, 
-  FileText, 
-  CheckCircle2, 
-  XCircle, 
-  Loader2, 
+import {
+  Database,
+  Lock,
+  CheckCircle2,
+  XCircle,
+  Loader2,
   Activity,
   PlayCircle,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { getActiveBusinessIdAction } from '@/app/business-actions';

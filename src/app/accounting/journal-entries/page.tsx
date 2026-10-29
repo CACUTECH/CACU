@@ -1,14 +1,13 @@
 "use client"
 
 import * as React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Plus, Trash2, Calendar as CalendarIcon, Save, ArrowRightLeft, FilePenLine } from "lucide-react"
+import { Plus, Trash2, Calendar as CalendarIcon, Save, ArrowRightLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -45,7 +44,7 @@ export default function JournalEntriesPage() {
             { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
             { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
         ])
-    }, [])
+    }, [toast])
 
     const addLine = () => {
         setLines([...lines, { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 }])
@@ -56,12 +55,12 @@ export default function JournalEntriesPage() {
         setLines(lines.filter(l => l.id !== id))
     }
 
-    const updateLine = (id: string, field: keyof JournalLine, value: any) => {
+    const updateLine = <K extends keyof JournalLine>(id: string, field: K, value: JournalLine[K]) => {
         setLines(lines.map(line => {
             if (line.id === id) {
                 // When entering debit, clear credit and vice versa
-                if (field === 'debit' && value > 0) return { ...line, [field]: value, credit: 0 }
-                if (field === 'credit' && value > 0) return { ...line, [field]: value, debit: 0 }
+                if (field === 'debit' && Number(value) > 0) return { ...line, [field]: value, credit: 0 }
+                if (field === 'credit' && Number(value) > 0) return { ...line, [field]: value, debit: 0 }
                 return { ...line, [field]: value }
             }
             return line

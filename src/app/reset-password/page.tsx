@@ -60,11 +60,11 @@ export default function ResetPasswordPage() {
         description: "Your password has been changed successfully.",
       });
       router.push("/login");
-    } catch (error: any) {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Update Failed",
-        description: error.message || "Failed to update password.",
+        description: (error instanceof Error && error.message) || "Failed to update password.",
       });
     } finally {
       setIsLoading(false);

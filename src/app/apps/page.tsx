@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Smartphone, Banknote, Terminal, Mail, FileSpreadsheet, Bot, CheckCircle2, AlertCircle, PlusCircle, ArrowRight } from 'lucide-react';
+import { Smartphone, Banknote, Terminal, Mail, FileSpreadsheet, Bot, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from "@/components/ui/dialog";

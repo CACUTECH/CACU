@@ -1,6 +1,9 @@
 
 import { BaseService } from './base-service';
 
+/** Customer columns from the form; `phone` is stored as `phone_number`. */
+export type CustomerInput = Record<string, unknown> & { phone?: string };
+
 export class CustomerService extends BaseService {
   async listCustomers() {
     const { supabase, businessId } = await this.getContext();
@@ -16,7 +19,7 @@ export class CustomerService extends BaseService {
     return data;
   }
 
-  async upsertCustomer(customer: any) {
+  async upsertCustomer(customer: CustomerInput) {
     const { supabase, businessId, role } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
     if (role === 'viewer') throw new Error('Insufficient permissions');

@@ -10,8 +10,8 @@ interface LogPayload {
   message: string;
   level: LogLevel;
   service?: string;
-  context?: Record<string, any>;
-  error?: Error | any;
+  context?: Record<string, unknown>;
+  error?: unknown;
   duration?: number; // For PERF logs
 }
 
@@ -20,9 +20,9 @@ const REDACTED_FIELDS = ['password', 'token', 'secret', 'key', 'accountNumber'];
 class Logger {
   private environment = process.env.NODE_ENV || 'development';
 
-  private redact(obj: any): any {
+  private redact(obj?: Record<string, unknown>) {
     if (!obj || typeof obj !== 'object') return obj;
-    const result = { ...obj };
+    const result: Record<string, unknown> = { ...obj };
     for (const field of REDACTED_FIELDS) {
       if (field in result) result[field] = '[REDACTED]';
     }
@@ -53,23 +53,23 @@ class Logger {
     }
   }
 
-  info(message: string, context?: any, service = 'App') {
+  info(message: string, context?: Record<string, unknown>, service = 'App') {
     this.log({ message, level: 'INFO', context, service });
   }
 
-  warn(message: string, context?: any, service = 'App') {
+  warn(message: string, context?: Record<string, unknown>, service = 'App') {
     this.log({ message, level: 'WARN', context, service });
   }
 
-  error(message: string, error?: any, context?: any, service = 'App') {
+  error(message: string, error?: unknown, context?: Record<string, unknown>, service = 'App') {
     this.log({ message, level: 'ERROR', error, context, service });
   }
 
-  security(message: string, context?: any, service = 'Auth') {
+  security(message: string, context?: Record<string, unknown>, service = 'Auth') {
     this.log({ message, level: 'SECURITY', context, service });
   }
 
-  perf(message: string, duration: number, context?: any, service = 'DB') {
+  perf(message: string, duration: number, context?: Record<string, unknown>, service = 'DB') {
     if (duration > 500) {
       this.log({ message: `SLOW QUERY: ${message}`, level: 'PERF', duration, context, service });
     }

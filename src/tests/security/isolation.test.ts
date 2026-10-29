@@ -15,7 +15,7 @@ describe('Multi-Tenant Isolation Security Tests', () => {
     const mockSupabase = await (createClient as jest.Mock)();
     
     // Simulating a mismatch between session and request
-    (service as any).getContext = jest.fn().mockResolvedValue({
+    service['getContext'] = jest.fn().mockResolvedValue({
       supabase: mockSupabase,
       businessId: 'BUSINESS_A',
       role: 'owner',
@@ -40,7 +40,7 @@ describe('Multi-Tenant Isolation Security Tests', () => {
 
   it('HIGH: Should block Viewer role from modifying ledger', async () => {
      const mockSupabase = await (createClient as jest.Mock)();
-     (service as any).getContext = jest.fn().mockResolvedValue({
+     service['getContext'] = jest.fn().mockResolvedValue({
         supabase: mockSupabase,
         businessId: 'biz-1',
         role: 'viewer'
@@ -50,7 +50,7 @@ describe('Multi-Tenant Isolation Security Tests', () => {
      // but we can add one in ledger-service.ts later if needed.
      // For now we test existing CustomerService which has the check
      const customerService = new CustomerService();
-     (customerService as any).getContext = jest.fn().mockResolvedValue({
+     customerService['getContext'] = jest.fn().mockResolvedValue({
         supabase: mockSupabase,
         businessId: 'biz-1',
         role: 'viewer'

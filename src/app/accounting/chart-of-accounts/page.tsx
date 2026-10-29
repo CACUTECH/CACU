@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -69,7 +69,7 @@ export default function ChartOfAccountsPage() {
         const newAccount: Account = {
             code: formData.code,
             name: formData.name,
-            type: formData.type as any,
+            type: formData.type ?? 'Asset',
             balance: formData.balance || 0,
             status: 'Active'
         }
@@ -141,7 +141,7 @@ export default function ChartOfAccountsPage() {
 
             doc.save(`Chart_of_Accounts_${format(new Date(), 'yyyyMMdd')}.pdf`)
             toast({ title: "PDF Exported", description: "Your report is ready." })
-        } catch (error) {
+        } catch {
             toast({ variant: "destructive", title: "Export Failed", description: "Could not generate PDF." })
         } finally {
             setIsExporting(false)
@@ -306,7 +306,7 @@ export default function ChartOfAccountsPage() {
     )
 }
 
-function AccountForm({ data, setData, isEdit }: { data: Partial<Account>, setData: (d: any) => void, isEdit?: boolean }) {
+function AccountForm({ data, setData, isEdit }: { data: Partial<Account>, setData: (d: Partial<Account>) => void, isEdit?: boolean }) {
     return (
         <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -325,7 +325,7 @@ function AccountForm({ data, setData, isEdit }: { data: Partial<Account>, setDat
                     <Label htmlFor="type">Account Type</Label>
                     <Select 
                         value={data.type} 
-                        onValueChange={(val: any) => setData({ ...data, type: val })}
+                        onValueChange={(val) => setData({ ...data, type: val as Account['type'] })}
                     >
                         <SelectTrigger id="type">
                             <SelectValue />

@@ -41,7 +41,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
 };
 
 function NotificationBell() {
-  const [notifications, setNotifications] = React.useState<any[]>([]);
+  const [notifications, setNotifications] = React.useState<{ id: string; type: string; title: string; message: string; created_at: string }[]>([]);
   const supabase = createClient();
 
   const fetchNotifications = React.useCallback(async () => {

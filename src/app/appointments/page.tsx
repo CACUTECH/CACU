@@ -1,27 +1,22 @@
 "use client"
 
 import * as React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { 
-    CalendarClock, 
-    PlusCircle, 
-    ChevronLeft, 
-    ChevronRight, 
-    User, 
-    Clock, 
-    Video, 
-    MapPin,
-    Search,
-    ListFilter,
-    MoreHorizontal,
-    Phone,
-    Mail,
-    CheckCircle2,
-    XCircle,
-    Calendar as CalendarIcon
+import {
+  CalendarClock,
+  PlusCircle,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  Clock,
+  ListFilter,
+  Phone,
+  CheckCircle2,
+  XCircle,
+  Calendar as CalendarIcon,
 } from "lucide-react"
 import { 
     Dialog, 
@@ -53,7 +48,7 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { appointments as initialAppointments, employees, catalogItems } from "@/lib/data"
 import type { Appointment } from "@/lib/data"
-import { format, startOfWeek, addDays, isSameDay, addHours, parseISO, startOfDay, endOfDay, isWithinInterval } from "date-fns"
+import { format, startOfWeek, addDays, isSameDay, addHours, parseISO } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 
@@ -62,7 +57,7 @@ export default function AppointmentsPage() {
     const [currentDate, setCurrentDate] = React.useState(new Date())
     const [view, setView] = React.useState<'Day' | 'Week' | 'Month'>('Week')
     const [appointments, setAppointments] = React.useState<Appointment[]>(initialAppointments)
-    const [selectedAppointment, setSelectedAppointment] = React.useState<Appointment | null>(null)
+    const [, setSelectedAppointment] = React.useState<Appointment | null>(null)
     const [isBookingOpen, setIsBookingOpen] = React.useState(false)
 
     // Form State for New Appointment
@@ -129,7 +124,7 @@ export default function AppointmentsPage() {
     }
 
     const todayAppointments = appointments.filter(app => isSameDay(parseISO(app.startTime), new Date()))
-    const billableHours = todayAppointments.reduce((acc, app) => acc + 1.5, 0) // Simplified: each appt is 1.5h for demo
+    const billableHours = todayAppointments.length * 1.5 // Simplified: each appt is 1.5h for demo
 
     return (
         <div className="flex flex-col gap-6 pb-12">
@@ -233,7 +228,7 @@ export default function AppointmentsPage() {
                     {['Day', 'Week', 'Month'].map((v) => (
                         <button
                             key={v}
-                            onClick={() => setView(v as any)}
+                            onClick={() => setView(v as typeof view)}
                             className={cn(
                                 "px-4 py-1.5 rounded-md text-xs font-bold transition-all uppercase tracking-widest",
                                 view === v ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"

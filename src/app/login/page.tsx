@@ -71,11 +71,11 @@ export default function LoginPage() {
       });
       router.push("/");
       router.refresh();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Authentication Failed",
-        description: error.message || "Invalid credentials.",
+        description: (error instanceof Error && error.message) || "Invalid credentials.",
       });
     } finally {
       setIsLoading(false);
@@ -92,11 +92,11 @@ export default function LoginPage() {
         },
       });
       if (error) throw error;
-    } catch (error: any) {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Google Login Failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Google sign-in failed.",
       });
       setIsLoading(false);
     }

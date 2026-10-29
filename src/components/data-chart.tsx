@@ -2,13 +2,15 @@
 "use client"
 
 import * as React from "react"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Pie, PieChart, Cell, ResponsiveContainer, Label, Legend } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell, Label } from "recharts"
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
 import type { CurveType } from "recharts/types/shape/Curve"
 
+export type ChartRow = Record<string, string | number>;
+
 interface DataChartProps {
     type: 'bar' | 'area' | 'pie';
-    data: any[];
+    data: ChartRow[];
     config: ChartConfig;
     dataKeys: string[];
     index: string;
@@ -17,9 +19,9 @@ interface DataChartProps {
     curveType?: CurveType;
 }
 
-export function DataChart({ type, data, config, dataKeys, index, layout = 'horizontal', variant, curveType = 'monotone' }: DataChartProps) {
+export function DataChart({ type, data, config, dataKeys, index, variant, curveType = 'monotone' }: DataChartProps) {
     const totalValue = React.useMemo(() => {
-        return data.reduce((acc, curr) => acc + curr[dataKeys[0]], 0)
+        return data.reduce((acc, curr) => acc + Number(curr[dataKeys[0]] ?? 0), 0)
     }, [data, dataKeys])
 
     if (type === 'pie' && variant === 'donut') {

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -109,7 +109,7 @@ export default function JobsPage() {
             customerName: newJob.customerName!,
             description: newJob.description || "",
             status: "Assigned",
-            priority: newJob.priority as any || "Medium",
+            priority: newJob.priority || "Medium",
             assignedStaffId: newJob.assignedStaffId,
             dueDate: newJob.dueDate!,
             createdAt: format(new Date(), "yyyy-MM-dd"),
@@ -179,7 +179,7 @@ export default function JobsPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label>Priority</Label>
-                                        <Select value={newJob.priority} onValueChange={(val) => setNewJob({...newJob, priority: val as any})}>
+                                        <Select value={newJob.priority} onValueChange={(val) => setNewJob({...newJob, priority: val as Job['priority']})}>
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="Low">Low</SelectItem>

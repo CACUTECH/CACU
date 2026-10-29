@@ -85,11 +85,11 @@ export default function SignupPage() {
         });
         router.push("/verify-email");
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Signup Failed",
-        description: error.message || "An unexpected error occurred.",
+        description: (error instanceof Error && error.message) || "An unexpected error occurred.",
       });
     } finally {
       setIsLoading(false);

@@ -7,14 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, PlusCircle, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { PlusCircle, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -51,7 +45,7 @@ export default function TransactionsPage() {
     const [page, setPage] = React.useState(0), [total, setTotal] = React.useState(0), [error, setError] = React.useState('');
     const generation = React.useRef(0);
 
-    const [formData, setFormData] = React.useState<Partial<Transaction>>({
+    const [formData, setFormData] = React.useState<Parameters<typeof recordLedgerEntryAction>[0]>({
         description: '',
         amount: 0,
         type: 'Income',
@@ -116,7 +110,7 @@ export default function TransactionsPage() {
                                 <div className="space-y-2"><Label>Amount (₦)</Label><Input type="number" value={formData.amount} onChange={(e) => setFormData({...formData, amount: parseFloat(e.target.value) || 0})} /></div>
                                 <div className="space-y-2">
                                     <Label>Type</Label>
-                                    <Select value={formData.type} onValueChange={(val: any) => setFormData({...formData, type: val})}>
+                                    <Select value={formData.type} onValueChange={(val) => setFormData({...formData, type: val as Transaction['type']})}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="Income">Income (+)</SelectItem>

@@ -7,29 +7,18 @@ import * as React from "react"
 import {
   MoreHorizontal,
   PlusCircle,
-  File,
   X,
-  Plus,
-  Calendar as CalendarIcon,
-  Download,
-  Printer,
-  UserPlus,
-  ArrowRightLeft,
-  RotateCcw,
   CheckCircle2,
   FileText,
   History,
   Loader2,
 } from "lucide-react"
-import type jsPDF from "jspdf"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -49,14 +38,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { Switch } from "@/components/ui/switch"
@@ -326,7 +312,7 @@ function CreateDocumentDialog({
     const [lineItems, setLineItems] = React.useState<LineItem[]>([
         { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }
     ]);
-    const [notes, setNotes] = React.useState('');
+    const [notes] = React.useState('');
     const [includeVat, setIncludeVat] = React.useState(true);
     const [accountingTaxDisabled, setAccountingTaxDisabled] = React.useState<boolean | null>(null);
     React.useEffect(() => {

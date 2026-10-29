@@ -281,7 +281,7 @@ export default function CommunityPage() {
                         {filteredAMAs.length === 0 ? (
                             <div className="col-span-full py-12 text-center text-muted-foreground italic">No upcoming sessions matching your criteria.</div>
                         ) : filteredAMAs.map(ama => {
-                            const image = (placeholders as any)[ama.imageKey];
+                            const image = placeholders[ama.imageKey as keyof typeof placeholders];
                             return (
                                 <Card key={ama.id} className="overflow-hidden">
                                     <CardHeader>

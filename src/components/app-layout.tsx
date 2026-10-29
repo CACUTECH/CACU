@@ -41,6 +41,7 @@ import {
     UserPlus,
     Loader2
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Header } from '@/components/header';
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
@@ -54,7 +55,9 @@ import { createClient } from '@/lib/supabase/client';
 import { useBusiness } from '@/components/business-provider';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 
-function NavItem({ item, pathname }: { item: any, pathname: string }) {
+type NavLink = { href: string; label: string; icon: LucideIcon; children?: { href: string; label: string; icon?: LucideIcon }[] };
+
+function NavItem({ item, pathname }: { item: NavLink, pathname: string }) {
     const { setOpenMobile, isMobile } = useSidebar();
     const isActive = item.children ? pathname.startsWith(item.href) : pathname === item.href;
 
@@ -87,7 +90,7 @@ function NavItem({ item, pathname }: { item: any, pathname: string }) {
                 </SidebarMenuItem>
                 <CollapsibleContent>
                     <SidebarMenuSub>
-                        {item.children.map((child: any) => (
+                        {item.children.map((child) => (
                              <SidebarMenuItem key={child.href}>
                                 <SidebarMenuSubButton 
                                     asChild 

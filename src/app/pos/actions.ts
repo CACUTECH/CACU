@@ -4,7 +4,7 @@
 import { SalesService } from '@/services/sales-service';
 import { revalidatePath } from 'next/cache';
 
-export async function processCheckoutAction(data: any) {
+export async function processCheckoutAction(data: Parameters<SalesService['processCheckout']>[0]) {
   try {
     const service = new SalesService();
     const result = await service.processCheckout(data);
@@ -16,7 +16,7 @@ export async function processCheckoutAction(data: any) {
     revalidatePath('/');
     
     return { success: true, saleId: result.saleId };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Checkout failed' };
   }
 }

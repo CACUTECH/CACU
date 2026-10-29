@@ -2,22 +2,19 @@
 "use client"
 
 import * as React from "react"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { 
-    Search, 
-    ShoppingCart, 
-    Plus, 
-    Minus, 
-    Trash2, 
-    CheckCircle2, 
-    Package,
-    Loader2,
-    UserCircle2
+import {
+  Search,
+  ShoppingCart,
+  Plus,
+  Minus,
+  Trash2,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -131,7 +128,7 @@ export default function POSPage() {
         
         const saleData = {
             requestKey: checkoutKey.current,
-            items: cart.map(item => ({ id: item.id, quantity: item.cartQuantity, price: item.price })),
+            items: cart.map(item => ({ id: item.id, quantity: item.cartQuantity, price: item.price, name: item.name })),
             paymentMethod,
             bankAccountId: collectionChoices.native && paymentMethod === 'Transfer' ? bankAccountId : undefined,
             totalAmount: total
