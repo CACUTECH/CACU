@@ -17,14 +17,17 @@ export default async function EmployeesPage({ searchParams }: {
     return <div role="alert">Employee records could not be loaded. <Link href={`/hr/employees?page=${page}`}>Retry</Link></div>;
   }
   return <div className="space-y-6">
-    <h1 className="font-headline text-3xl font-bold">Employee directory</h1>
-    <p className="text-muted-foreground">Personnel records for your active business. Salary and bank details are excluded from this directory.</p>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h1 className="font-headline text-3xl font-bold">Employee directory</h1>
+      <Button asChild><Link href="/hr/employees/new">Add employee</Link></Button>
+    </div>
+    <p className="text-muted-foreground">Personnel records for your active business. Salary and bank details are excluded from this directory. Open an employee to see pay details and history.</p>
     <div className="overflow-x-auto rounded-md border">
       <Table><TableHeader><TableRow>
         <TableHead>Name</TableHead><TableHead>Job title</TableHead><TableHead>Department</TableHead><TableHead>Status</TableHead>
       </TableRow></TableHeader><TableBody>
         {records.data.map(employee => <TableRow key={employee.id}>
-          <TableCell>{employee.full_name || 'Unnamed employee'}</TableCell>
+          <TableCell><Link className="font-medium underline-offset-4 hover:underline" href={`/hr/employees/${employee.id}`}>{employee.full_name || 'Unnamed employee'}</Link></TableCell>
           <TableCell>{employee.job_title || '—'}</TableCell>
           <TableCell>{employee.department || '—'}</TableCell>
           <TableCell>{employee.employment_status || 'Unspecified'}</TableCell>

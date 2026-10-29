@@ -32,11 +32,35 @@ Remaining: 7 low-severity npm findings come from `deepmerge` 4.3.1 under Jest. T
 
 Validation: TypeScript, 216 unit tests, 26 browser regressions and the production build passed. 60 backend tests passed, including all 30 upload-sanitizer tests on Pillow 13. 142 PostgreSQL-dependent backend tests skipped without a disposable database. Alerts on the default branch close once this branch is merged.
 
+## HR workflows (29 October)
+
+Owners and Admins can now add and edit employees, change status (Active, On leave, Suspended), record departures and rehire, check staff in and out, and run monthly payroll. Every change goes through `public.hr_write` (migration `20261029090000_hr_workflows.sql`). That command checks the active Owner/Admin membership, validates each field against an allowlist, compares versions, replays a retried request key without applying it twice, and writes a private audit row. Direct client writes to `employees` and `attendance` are revoked. Employee pages show who changed which fields and when; the values stay in the private audit.
+
+- **Attendance:** each employee can have one open shift; only Active staff can check in. Status changes and departures are refused while a shift is open. Dates follow the business timezone (Lagos by default), and existing rows were backfilled with a work date.
+- **Payroll:** pay is annualised, taxed in bands, then divided by 12, with each amount rounded to the kobo. Defaults:
+  - Nigeria Tax Act 2025 bands: ₦800k at 0%, then 15/18/21/23/25% up to ₦3m, ₦12m, ₦25m, ₦50m and above.
+  - Rent relief of 20% of declared rent, capped at ₦500k.
+  - Pension of 8% from the employee and 10% from the employer, on basic + housing + transport.
+  - NHF at 2.5% of basic, opt-in only.
+  - NHIS as a monthly amount set per employee.
+- **Excluded from the defaults:** a separate minimum-wage exemption, because sources disagree and the zero band covers most minimum-wage pay.
+- **Unreviewed defaults:** runs built on them can be created but not approved. An Owner or Admin must confirm the rules first, which records them as the reviewer. Each run keeps a copy of the rules it used.
+- **Run contents:** employees without basic pay and those who departed during the month are listed as not included, rather than paid.
+- **Approved payroll** is immutable (enforced by database triggers). It is not posted to accounting or paid out.
+- **Legacy screens removed:** the payroll config, loans, pension-remittance, reports and tax-schedule screens used sample data and have been deleted. Onboarding now redirects to Add employee, and departures are recorded on the employee record. AI letters remain unavailable.
+
+The legacy `payroll_runs`/`payslips` tables are untouched. New payroll data is stored in `hr_payroll_rules`, `hr_payroll_runs` and `hr_payslips`. The migration adds employee pay columns with `ADD COLUMN IF NOT EXISTS`; confirm that the hosted `employees` table has no conflicting column types before applying it.
+
+Validation:
+- Backend: 210 tests passed against local disposable PostgreSQL 17, including 24 new HR command, permission and payroll cases. Payroll was checked against a hand-worked example (₦500k gross: PAYE ₦62,420, net ₦401,580) and a case spanning all six bands. 16 tests skipped.
+- Frontend: 249 Jest tests (33 new HR cases), 26 browser regressions, TypeScript, changed-file ESLint (0 errors) and the production build all passed.
+- Not done: the migration has not been applied to hosted Supabase, and nothing was deployed.
+
 ## Required next steps
 
 - Review this directory change and the existing technical-completion change before deployment. This patch currently depends on the reviewed work in feat/technical-completion.
-- Implement employee mutation validation, replay and audit history, then attendance concurrency/date-window behavior. Review the pending attendance database guard before exposing attendance.
-- Implement payroll persistence, approvals, accounting posting and reviewed statutory rules. Sample computations are not production acceptance.
+- Apply `20261014083939_restrict_hr_data_access.sql`, then `20261029090000_hr_workflows.sql`, on staging and then hosted Supabase after review. Both depend on `20261012140639_inventory_user_management.sql`.
+- Have a tax adviser confirm the payroll defaults, including state-specific PAYE administration and whether a minimum-wage exemption applies, before the first approval. Payroll payment, remittance schedules and accounting posting are not implemented.
 - Privately configure the approved OpenAI key and model in the frontend Vercel project, then complete real-model evaluations and permission/context review before activation. A ChatGPT subscription is not an API credential.
 - Configure restricted accounting runtime login credentials and verified database TLS certificate; Owner/Admin must approve actual opening balances, bank/account-purpose mappings and reconciliation before accounting activation. Do not activate by inventing balances or changing a flag.
 - Storefront, provider integrations, community and offline access require their own production workflows, permissions and acceptance tests. They remain unimplemented, rather than account permission restrictions.
