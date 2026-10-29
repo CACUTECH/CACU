@@ -2,6 +2,17 @@
 import { usesPythonAccounting } from '@/lib/accounting-client';
 import { BaseService } from './base-service';
 
+/** Messages are reviewed and safe to show; `uncertain` means the entry may have been recorded. */
+export class LedgerEntryError extends Error {
+  constructor(message: string, public readonly uncertain: boolean) { super(message); this.name = 'LedgerEntryError'; }
+}
+const LEDGER_MESSAGES: Record<string, string> = {
+  ACCESS_DENIED: 'Only Owners, Admins and Editors can record ledger entries.',
+  INVALID_LEDGER_ENTRY: 'Enter a description, an amount above zero with at most two decimal places, and a date that is not in the future.',
+  USE_ACCOUNTING_POSTINGS: 'Use balanced accounting postings with reviewed account mappings; single-entry records are disabled after cutover',
+  REQUEST_KEY_REUSED: 'This entry was already submitted with different details. Refresh and try again.',
+};
+
 /**
  * @fileOverview LedgerService manages high-integrity financial records.
  * Provides the system of record for Profit & Loss reporting.
@@ -40,46 +51,37 @@ export class LedgerService extends BaseService {
   /**
    * Records a manual ledger entry with audit logging.
    */
+  /**
+   * Records a manual ledger entry through record_ledger_entry_safe, which writes the entry and its
+   * audit row together and replays a retried request key instead of posting twice.
+   */
   async recordEntry(entry: {
       description: string;
       amount: number;
       type: 'Income' | 'Expense';
       category: string;
       date?: string;
+      requestKey: string;
   }) {
-    const { supabase, businessId, user, role } = await this.getContext();
-    if (!businessId) throw new Error('Business context missing');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.requestKey || '')) {
+      throw new LedgerEntryError('The entry request was invalid. Refresh and try again.', false);
+    }
+    const { supabase, businessId, role } = await this.getContext();
+    if (!businessId) throw new LedgerEntryError('Business context missing', false);
+    if (!['owner', 'admin', 'editor'].includes(role)) throw new LedgerEntryError('Insufficient permissions', false);
+    if (await usesPythonAccounting()) throw new LedgerEntryError('Use balanced accounting postings with reviewed account mappings; single-entry records are disabled after cutover', false);
+    if (!Number.isFinite(entry.amount) || entry.amount <= 0) throw new LedgerEntryError('Enter an amount above zero.', false);
 
-    if (!['owner', 'admin', 'editor'].includes(role)) throw new Error('Insufficient permissions');
-    if (await usesPythonAccounting()) throw new Error('Use balanced accounting postings with reviewed account mappings; single-entry records are disabled after cutover');
-    // Server-side validation of financial values
-    if (entry.amount === 0) throw new Error('Transaction amount cannot be zero');
-
-    const data = {
-      ...entry,
-      business_id: businessId,
-      created_by: user.id,
-      date: entry.date || new Date().toISOString().split('T')[0]
-    };
-
-    const { data: result, error } = await supabase
-      .from('financial_transactions')
-      .insert(data)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Manual audit log for traceable manual adjustments
-    const { error: auditError } = await supabase.rpc('record_audit', {
-        p_business_id: businessId,
-        p_action: 'MANUAL_JOURNAL_ENTRY',
-        p_table: 'financial_transactions',
-        p_record_id: result.id,
-        p_details: { amount: entry.amount, type: entry.type }
+    const { data, error } = await supabase.rpc('record_ledger_entry_safe', {
+      p_business_id: businessId, p_request_key: entry.requestKey, p_description: entry.description,
+      p_amount: String(entry.amount), p_type: entry.type, p_category: entry.category, p_date: entry.date || null,
     });
-    if (auditError) console.warn('Audit logging failed, but transaction committed.', auditError);
-
-    return result;
+    if (error) {
+      const code = /^[A-Z_]+/.exec(error.message || '')?.[0] || '';
+      const definite = /^(22|23|42|P0001)/.test(error.code || '');
+      throw new LedgerEntryError(LEDGER_MESSAGES[code] || (definite ? 'The entry could not be recorded.' : 'The entry was not confirmed. Retry to check whether it was recorded.'), !definite);
+    }
+    if (!data) throw new LedgerEntryError('The entry was not confirmed. Retry to check whether it was recorded.', true);
+    return data;
   }
 }
