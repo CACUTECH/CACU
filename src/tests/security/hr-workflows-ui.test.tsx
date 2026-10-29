@@ -19,10 +19,10 @@ let keys = 0;
 Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () => `key-${++keys}` });
 beforeEach(() => jest.clearAllMocks());
 
-const staff = [{ id: 'e1', full_name: 'Ada Obi', job_title: 'Cashier', employment_status: 'Active' },
-  { id: 'e2', full_name: 'Bayo Ade', job_title: null, employment_status: 'On leave' }];
+const staff = [{ id: 'e1', full_name: 'Ada Obi', job_title: 'Cashier', employment_status: 'active' },
+  { id: 'e2', full_name: 'Bayo Ade', job_title: null, employment_status: 'on_leave' }];
 const employee: EmployeeRecord = { id: 'e1', version: 4, full_name: 'Ada Obi', job_title: 'Cashier', department: null, email: null, phone: null,
-  employment_status: 'Active', start_date: '2026-01-05', end_date: null, departure_reason: null, pay_basic: '300000.00', pay_housing: '100000.00',
+  employment_status: 'active', start_date: '2026-01-05', end_date: null, departure_reason: null, pay_basic: '300000.00', pay_housing: '100000.00',
   pay_transport: '50000.00', pay_other: '0.00', annual_rent: '0.00', pension_enrolled: true, nhf_enrolled: false, nhis_monthly: '0.00', tax_id: null, pension_pin: null };
 
 test('lost response keeps the original request key for retry', async () => {

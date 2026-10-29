@@ -19,8 +19,10 @@ def hr(managed):
     with psycopg.connect(URL) as c:
         c.execute("""DROP SCHEMA IF EXISTS hr_private CASCADE;
           CREATE TABLE public.employees(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),business_id uuid REFERENCES public.businesses(id),
-            full_name text NOT NULL,job_title text,department text,employment_status text DEFAULT 'Active',monthly_salary numeric,
-            bank_name text,bank_account_number text,email text,phone text,created_at timestamptz DEFAULT now());
+            full_name text NOT NULL CHECK(char_length(btrim(full_name))>0),job_title text,department text,
+            employment_status text NOT NULL DEFAULT 'active' CONSTRAINT employees_employment_status_check CHECK(employment_status IN ('active','on_leave','exited')),
+            start_date date,end_date date,monthly_salary numeric CHECK(monthly_salary>=0),bank_name text,bank_account_number text,bank_account_name text,
+            email text,phone text,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
           CREATE TABLE public.attendance(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),business_id uuid REFERENCES public.businesses(id),
             employee_id uuid REFERENCES public.employees(id) ON DELETE CASCADE,check_in timestamptz,check_out timestamptz,status text DEFAULT 'Present',created_at timestamptz DEFAULT now());
           ALTER TABLE employees ENABLE ROW LEVEL SECURITY; ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
@@ -32,6 +34,7 @@ def hr(managed):
         c.execute("INSERT INTO attendance(business_id,employee_id,check_in,check_out) VALUES(%s,%s,'2026-03-02T07:30:00Z','2026-03-02T16:00:00Z')", (d[1], legacy))
         c.execute(Path('../supabase/migrations/20261014083939_restrict_hr_data_access.sql').read_text())
         c.execute(Path('../supabase/migrations/20261029090000_hr_workflows.sql').read_text(encoding='utf-8'))
+        c.execute(Path('../supabase/migrations/20261030090000_hr_status_codes.sql').read_text(encoding='utf-8'))
         assert c.execute('SELECT work_date FROM attendance').fetchone()[0] == date(2026, 3, 2)
     return d, legacy
 
@@ -78,7 +81,7 @@ def test_create_is_replay_safe_and_key_reuse_is_refused(hr):
     first = write(d, 'employee.save', {'full_name': ' Ada Obi ', **PAY}, key=key)
     again = write(d, 'employee.save', {'full_name': ' Ada Obi ', **PAY}, key=key)
     assert first['replayed'] is False and again['replayed'] is True and again['id'] == first['id']
-    assert query(d, "SELECT full_name,monthly_salary,employment_status FROM employees WHERE id=%s", (first['id'],)) == [('Ada Obi', Decimal('500000'), 'Active')]
+    assert query(d, "SELECT full_name,monthly_salary,employment_status FROM employees WHERE id=%s", (first['id'],)) == [('Ada Obi', Decimal('500000'), 'active')]
     fails('REQUEST_KEY_REUSED', d, 'employee.save', {'full_name': 'Someone else'}, key=key)
 
 
@@ -129,11 +132,11 @@ def test_attendance_allows_one_open_shift_per_active_employee(hr):
     shift = write(d, 'attendance.check_in', id=hired['id'])
     assert shift['work_date'] == str(date.today()) or shift['work_date']
     fails('ALREADY_CHECKED_IN', d, 'attendance.check_in', id=hired['id'])
-    fails('OPEN_SHIFT', d, 'employee.status', {'status': 'Suspended'}, id=hired['id'], version=1)
+    fails('OPEN_SHIFT', d, 'employee.status', {'status': 'suspended'}, id=hired['id'], version=1)
     closed = write(d, 'attendance.check_out', {'note': 'Left early'}, id=hired['id'])
     assert closed['id'] == shift['id'] and closed['check_out'] is not None
     fails('NOT_CHECKED_IN', d, 'attendance.check_out', id=hired['id'])
-    write(d, 'employee.status', {'status': 'On leave'}, id=hired['id'], version=1)
+    write(d, 'employee.status', {'status': 'on_leave'}, id=hired['id'], version=1)
     fails('EMPLOYEE_NOT_ACTIVE', d, 'attendance.check_in', id=hired['id'])
 
 
@@ -143,10 +146,10 @@ def test_departure_and_rehire(hr):
     fails('INVALID_DEPARTURE', d, 'employee.depart', {'end_date': '2026-02-30', 'reason': 'x'}, id=hired['id'], version=1)
     fails('INVALID_DEPARTURE', d, 'employee.depart', {'end_date': '2026-05-01', 'reason': ' '}, id=hired['id'], version=1)
     gone = write(d, 'employee.depart', {'end_date': str(date.today()), 'reason': 'Resigned'}, id=hired['id'], version=1)
-    assert gone['employment_status'] == 'Departed'
+    assert gone['employment_status'] == 'exited'
     fails('ALREADY_DEPARTED', d, 'employee.depart', {'end_date': str(date.today()), 'reason': 'Again'}, id=hired['id'], version=2)
-    back = write(d, 'employee.status', {'status': 'Active'}, id=hired['id'], version=2)
-    assert back['employment_status'] == 'Active'
+    back = write(d, 'employee.status', {'status': 'active'}, id=hired['id'], version=2)
+    assert back['employment_status'] == 'active'
     assert query(d, 'SELECT end_date,departure_reason FROM employees WHERE id=%s', (hired['id'],)) == [(None, None)]
 
 
@@ -216,3 +219,13 @@ def test_departed_employees_are_listed_not_paid_and_payroll_is_manager_only(hr):
     editor = member(d, 'editor')
     assert query(d, 'SELECT count(*) FROM hr_payslips', actor=editor) == [(0,)]
     assert query(d, 'SELECT count(*) FROM hr_payslips') == [(1,)]
+
+
+def test_status_codes_match_the_hosted_constraint(hr):
+    d, legacy = hr
+    assert query(d, 'SELECT employment_status FROM employees WHERE id=%s', (legacy,)) == [('active',)]
+    fails('INVALID_STATUS', d, 'employee.status', {'status': 'Active'}, id=legacy, version=1)
+    write(d, 'employee.status', {'status': 'suspended'}, id=legacy, version=1)
+    with pytest.raises(psycopg.errors.CheckViolation):
+        with psycopg.connect(URL) as c:
+            c.execute("UPDATE employees SET employment_status='Departed' WHERE id=%s", (legacy,))
