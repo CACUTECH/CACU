@@ -42,3 +42,46 @@ test('legacy invoice balances preserve exact database decimals and fail on read 
   rpc.mockResolvedValue({ data: null, error: new Error('Read failed') });
   await expect(service.listBalances()).rejects.toThrow('Read failed');
 });
+
+describe('legacy invoice creation', () => {
+  const key = '11111111-2222-4333-8444-555555555555';
+  const header = { requestKey: key, customer_id: 'customer', invoice_number: 'client-number', type: 'Invoice', status: 'Paid',
+    date: '2026-10-29', subtotal: 1, tax: 0, total: 1, vat_included: false, notes: '' };
+  const line = { item: 'Rice', catalog_item_id: 'rice', quantity: 2, price: 1, total: 2 };
+
+  test('sends only item IDs and quantities; status, number, prices and totals come from the server', async () => {
+    const service = new InvoiceService();
+    const rpc = jest.fn().mockResolvedValue({ data: { id: 'invoice', status: 'sent' }, error: null });
+    context(service, rpc);
+    await expect(service.createInvoice(header, [line])).resolves.toEqual({ id: 'invoice' });
+    expect(rpc).toHaveBeenCalledWith('create_invoice_safe', {
+      p_business_id: 'business', p_request_key: key, p_type: 'Invoice', p_customer_id: 'customer', p_issue_date: '2026-10-29',
+      p_due_date: null, p_vat_included: false, p_notes: '', p_items: [{ catalog_item_id: 'rice', quantity: '2' }],
+    });
+  });
+
+  test.each(['Receipt', 'CreditMemo'])('%s cannot be created as a standalone document', async type => {
+    const service = new InvoiceService();
+    const rpc = jest.fn();
+    context(service, rpc);
+    await expect(service.createInvoice({ ...header, type }, [line])).rejects.toThrow('Record a payment on an invoice');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  test('database refusals show reviewed messages and other failures stay retryable', async () => {
+    const service = new InvoiceService();
+    const rpc = jest.fn().mockResolvedValue({ data: null, error: { message: 'CUSTOMER_REQUIRED', code: '22023' } });
+    context(service, rpc);
+    await expect(service.createInvoice(header, [line])).rejects.toThrow('Choose a customer for this invoice.');
+    rpc.mockResolvedValue({ data: null, error: { message: 'connection reset at 10.0.0.1', code: '08006' } });
+    await expect(service.createInvoice(header, [line])).rejects.toThrow('The invoice was not confirmed. Retry to check whether it was created.');
+  });
+
+  test('a malformed request key is refused before calling the database', async () => {
+    const service = new InvoiceService();
+    const rpc = jest.fn();
+    context(service, rpc);
+    await expect(service.createInvoice({ ...header, requestKey: 'retry-key' }, [line])).rejects.toThrow('The invoice request was invalid');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

@@ -21,6 +21,17 @@ const INVOICE_STATUS_MESSAGES: Record<string, string> = {
   INVOICE_HAS_PAYMENTS: 'An invoice with payments cannot be voided.',
   USE_ACCOUNTING_POSTINGS: 'Posted invoices require payment allocation or audited credit notes; direct status changes are disabled',
 };
+const INVOICE_CREATE_MESSAGES: Record<string, string> = {
+  ACCESS_DENIED: 'Only Owners, Admins and Editors can create invoices.',
+  UNSUPPORTED_DOCUMENT: 'Only invoices and estimates can be created here. Record a payment on an invoice to issue a receipt.',
+  TAX_NOT_CONFIGURED: 'Tax is not set up for this business yet. Create the invoice without VAT.',
+  CUSTOMER_REQUIRED: 'Choose a customer for this invoice.',
+  CUSTOMER_NOT_FOUND: 'This customer is not in your active business.',
+  ITEM_NOT_FOUND: 'One of the items is not in your active catalogue.',
+  INVALID_INVOICE: 'Add at least one item with a quantity above zero, and use an issue date that is not in the future and a due date on or after it.',
+  REQUEST_KEY_REUSED: 'This invoice was already submitted with different details. Close the form and try again.',
+  USE_ACCOUNTING_POSTINGS: 'Use the issued-invoice workflow for this business.',
+};
 
 export class InvoiceService extends BaseService {
   async listInvoices() {
@@ -59,35 +70,22 @@ export class InvoiceService extends BaseService {
         items: items.map(item => ({ catalog_item_id: item.catalog_item_id, quantity: item.quantity, unit_price: decimalInput(item.price) })),
       } });
     }
-    // Use the atomic RPC to ensure header and items are created together
-    const { data: invoiceId, error } = await supabase.rpc('create_invoice_atomic', {
-      p_business_id: businessId,
-      p_customer_id: invoiceData.customer_id,
-      p_invoice_number: invoiceData.invoice_number,
-      p_type: invoiceData.type,
-      p_status: invoiceData.status,
-      p_date: invoiceData.date,
-      p_due_date: invoiceData.due_date,
-      p_subtotal: invoiceData.subtotal,
-      p_tax: invoiceData.tax,
-      p_total: invoiceData.total,
-      p_vat_included: invoiceData.vat_included,
-      p_notes: invoiceData.notes,
-      p_items: items.map(item => ({
-        item_name: item.item,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.total,
-        catalog_item_id: item.catalog_item_id // Essential for inventory sync on payment
-      }))
-    });
-
-    if (error) {
-       console.error('Invoice Creation Failed:', error);
-       throw new Error(`Invoice Error: ${error.message}`);
+    if (invoiceData.type !== 'Invoice' && invoiceData.type !== 'Estimate') throw new Error(INVOICE_CREATE_MESSAGES.UNSUPPORTED_DOCUMENT);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(invoiceData.requestKey || '')) {
+      throw new Error('The invoice request was invalid. Refresh and try again.');
     }
-
-    return { id: invoiceId };
+    // create_invoice_safe sets status, number, prices and totals on the server; only item IDs and quantities are sent.
+    const { data, error } = await supabase.rpc('create_invoice_safe', {
+      p_business_id: businessId, p_request_key: invoiceData.requestKey, p_type: invoiceData.type,
+      p_customer_id: invoiceData.customer_id, p_issue_date: invoiceData.date || null, p_due_date: invoiceData.due_date || null,
+      p_vat_included: !!invoiceData.vat_included, p_notes: invoiceData.notes || '',
+      p_items: items.map(item => ({ catalog_item_id: item.catalog_item_id || null, quantity: String(item.quantity) })),
+    });
+    if (error) {
+      const code = /^[A-Z_]+/.exec(error.message || '')?.[0] || '';
+      throw new Error(INVOICE_CREATE_MESSAGES[code] || 'The invoice was not confirmed. Retry to check whether it was created.');
+    }
+    return { id: (data as { id: string }).id };
   }
 
   /** Only draft -> sent and unpaid -> void are allowed (update_invoice_status_safe); payments set paid. */

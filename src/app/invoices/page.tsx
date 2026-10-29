@@ -191,12 +191,18 @@ export default function InvoicesPage() {
                 <p className="text-muted-foreground">Manage quotes, invoices, receipts, and customer credits.</p>
             </div>
             <div className="flex items-center gap-2">
-                <CreateDocumentDialog 
-                    type={activeTab === 'estimates' ? 'Estimate' : activeTab === 'refunds' ? 'CreditMemo' : activeTab === 'receipts' ? 'Receipt' : 'Invoice'} 
-                    onSave={fetchData} 
-                    customers={customers} 
-                    catalogItems={items}
-                />
+                {activeTab === 'receipts' ? (
+                    <p className="text-sm text-muted-foreground">Receipts are issued when you record a payment on an invoice.</p>
+                ) : activeTab === 'refunds' ? (
+                    <p className="text-sm text-muted-foreground">Credit memos are not available yet.</p>
+                ) : (
+                    <CreateDocumentDialog 
+                        type={activeTab === 'estimates' ? 'Estimate' : 'Invoice'} 
+                        onSave={fetchData} 
+                        customers={customers} 
+                        catalogItems={items}
+                    />
+                )}
             </div>
         </div>
 
@@ -276,7 +282,7 @@ export default function InvoicesPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold font-headline">
-                        ₦{docs.filter(d => d.type === 'Estimate' && d.status === 'Pending').reduce((acc, d) => acc + d.total, 0).toLocaleString()}
+                        ₦{docs.filter(d => d.type === 'Estimate' && d.status === 'Draft').reduce((acc, d) => acc + d.total, 0).toLocaleString()}
                     </div>
                 </CardContent>
             </Card>
@@ -315,10 +321,11 @@ function CreateDocumentDialog({
         { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }
     ]);
     const [notes] = React.useState('');
-    const [includeVat, setIncludeVat] = React.useState(true);
+    // Tax stays off until it is configured for the business (Doc 09 ACC-015); the server refuses VAT.
+    const [includeVat, setIncludeVat] = React.useState(false);
     const [accountingTaxDisabled, setAccountingTaxDisabled] = React.useState<boolean | null>(null);
     React.useEffect(() => {
-        void getAccountingModeAction().then(migrated => { setAccountingTaxDisabled(migrated); if (migrated) setIncludeVat(false); }).catch(() => setAccountingTaxDisabled(null));
+        void getAccountingModeAction().then(migrated => { setAccountingTaxDisabled(migrated); setIncludeVat(false); }).catch(() => setAccountingTaxDisabled(null));
     }, []);
     const [isOpen, setIsOpen] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
@@ -366,7 +373,7 @@ function CreateDocumentDialog({
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl">
-                <DialogHeader><DialogTitle>Create {type}</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Create {type}</DialogTitle><DialogDescription>Prices come from your catalogue. The number is assigned when you save.</DialogDescription></DialogHeader>
                 <div className="grid gap-6 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
@@ -414,7 +421,7 @@ function CreateDocumentDialog({
                                             </Select>
                                         </TableCell>
                                         <TableCell><Input type="number" value={line.quantity} onChange={(e) => setLineItems(lineItems.map(l => l.id === line.id ? { ...l, quantity: parseInt(e.target.value), total: parseInt(e.target.value) * l.price } : l))} /></TableCell>
-                                        <TableCell><Input type="number" value={line.price} onChange={(e) => setLineItems(lineItems.map(l => l.id === line.id ? { ...l, price: parseFloat(e.target.value), total: l.quantity * parseFloat(e.target.value) } : l))} /></TableCell>
+                                        <TableCell className="tabular-nums">₦{line.price.toLocaleString()}</TableCell>
                                         <TableCell className="text-right">₦{line.total.toLocaleString()}</TableCell>
                                         <TableCell><Button variant="ghost" size="icon" onClick={() => setLineItems(lineItems.filter(l => l.id !== line.id))}><X className="h-4 w-4" /></Button></TableCell>
                                     </TableRow>
@@ -425,7 +432,7 @@ function CreateDocumentDialog({
                     <Button variant="outline" size="sm" onClick={() => setLineItems([...lineItems, { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }])}>Add Item</Button>
 
                     <div className="flex justify-end gap-12">
-                        <div className="flex items-center space-x-2"><Switch checked={includeVat} onCheckedChange={setIncludeVat} disabled={accountingTaxDisabled !== false} /><Label>{accountingTaxDisabled ? "Tax disabled for this business" : "VAT (7.5%)"}</Label></div>
+                        <div className="flex items-center space-x-2"><Switch checked={includeVat} onCheckedChange={setIncludeVat} disabled aria-label="VAT" /><Label>Tax not set up for this business</Label></div>
                         <div className="w-48 space-y-2">
                             <div className="flex justify-between text-sm"><span>Subtotal</span><span>₦{subtotal.toLocaleString()}</span></div>
                             <div className="flex justify-between font-bold text-lg"><span>Total</span><span>₦{total.toLocaleString()}</span></div>
