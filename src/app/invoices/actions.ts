@@ -1,32 +1,32 @@
 
 'use server';
 
-import { InvoiceService } from '@/services/invoice-service';
+import { InvoiceService, type InvoiceInput, type InvoiceLineInput } from '@/services/invoice-service';
 import { PaymentService } from '@/services/payment-service';
 import { AccountingRequestError } from '@/lib/accounting-client';
 import { revalidatePath } from 'next/cache';
 
-export async function createInvoiceAction(invoiceData: any, items: any[]) {
+export async function createInvoiceAction(invoiceData: InvoiceInput, items: InvoiceLineInput[]) {
   try {
     const service = new InvoiceService();
     await service.createInvoice(invoiceData, items);
     revalidatePath('/invoices');
     revalidatePath('/transactions');
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Invoice update failed' };
   }
 }
 
-export async function markAsPaidAction(paymentData: any) {
+export async function markAsPaidAction(paymentData: Parameters<PaymentService['recordPayment']>[0]) {
   try {
     const service = new PaymentService();
     await service.recordPayment(paymentData);
     revalidatePath('/invoices');
     revalidatePath('/transactions');
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message, retryable: !(error instanceof AccountingRequestError && error.status >= 400 && error.status < 500) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Payment failed', retryable: !(error instanceof AccountingRequestError && error.status >= 400 && error.status < 500) };
   }
 }
 
@@ -36,8 +36,8 @@ export async function updateInvoiceStatusAction(id: string, status: string) {
     await service.updateInvoiceStatus(id, status);
     revalidatePath('/invoices');
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Invoice update failed' };
   }
 }
 

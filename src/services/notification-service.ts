@@ -13,7 +13,7 @@ export class NotificationService extends BaseService {
     title: string;
     message: string;
     type: 'LOW_STOCK' | 'PAYMENT_RECEIVED' | 'INV_CREATED' | 'WELCOME' | 'SECURITY';
-    metadata?: any;
+    metadata?: Record<string, unknown>;
     channels?: ('IN_APP' | 'EMAIL' | 'SMS')[];
   }) {
     const { supabase, businessId } = await this.getContext();
@@ -48,7 +48,7 @@ export class NotificationService extends BaseService {
 
     // 3. External Channel Delivery (Placeholders)
     if (input.channels?.includes('EMAIL')) {
-      await this.sendEmailBatch(targetUserIds, input.title, input.message);
+      await this.sendEmailBatch(targetUserIds, input.title);
     }
   }
 
@@ -72,7 +72,7 @@ export class NotificationService extends BaseService {
       .eq('user_id', user.id);
   }
 
-  private async sendEmailBatch(userIds: string[], subject: string, body: string) {
+  private async sendEmailBatch(userIds: string[], subject: string) {
     // Integration logic for Resend, SendGrid, etc.
     // In a real prod environment, this would call a server-side API
     console.log(`[STUB] Sending email batch to ${userIds.length} users: ${subject}`);

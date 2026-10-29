@@ -1,5 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, FileText, Scale, Coins, ShoppingCart, BookUser, ArrowDown, ArrowUp, ArrowRight } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Target, FileText, Scale, Coins, ShoppingCart, BookUser, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 function FeatureCard({ icon: Icon, title, description, href }: { icon: React.ElementType, title: string, description: string, href: string }) {

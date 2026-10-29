@@ -1,34 +1,27 @@
 
 "use client"
 import * as React from "react"
-import { 
-    MoreHorizontal, 
-    PlusCircle, 
-    Search, 
-    Mail, 
-    Phone, 
-    Send, 
-    History, 
-    User, 
-    MapPin, 
-    Building2,
-    Calendar as CalendarIcon,
-    ArrowUpRight,
-    AlertCircle,
-    CheckCircle2,
-    Users,
-    Wallet,
-    TrendingUp,
-    Loader2
+import {
+  MoreHorizontal,
+  PlusCircle,
+  Search,
+  Mail,
+  Phone,
+  User,
+  MapPin,
+  CheckCircle2,
+  Users,
+  Wallet,
+  TrendingUp,
+  Loader2,
 } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -48,13 +41,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { saveCustomerAction, deleteCustomerAction } from "./actions"
@@ -241,7 +233,7 @@ export default function CustomersPage() {
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                        <CustomerDetailsSheet customer={customer} onSendReminder={handleSendReminder} />
+                                        <CustomerDetailsSheet customer={customer} />
                                     </Sheet>
                                 ))}
                             </TableBody>
@@ -253,7 +245,7 @@ export default function CustomersPage() {
     )
 }
 
-function CRMStatCard({ title, value, subtext, icon: Icon }: any) {
+function CRMStatCard({ title, value, subtext, icon: Icon }: { title: string; value: React.ReactNode; subtext: React.ReactNode; icon: LucideIcon }) {
     return (
         <Card className="bg-primary/5 border-primary/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -296,7 +288,7 @@ function AddCustomerDialog({ onSave }: { onSave: (newCustomer: Partial<Customer>
     );
 }
 
-function CustomerDetailsSheet({ customer, onSendReminder }: { customer: Customer, onSendReminder: (name: string) => void }) {
+function CustomerDetailsSheet({ customer }: { customer: Customer }) {
     return (
         <SheetContent className="sm:max-w-xl">
             <SheetHeader className="border-b pb-6">

@@ -12,7 +12,7 @@ describe('Financial Integrity Tests', () => {
 
   it('should use atomic process_sale RPC for checkouts', async () => {
     const mockSupabase = await (createClient as jest.Mock)();
-    (service as any).getContext = jest.fn().mockResolvedValue({
+    service['getContext'] = jest.fn().mockResolvedValue({
         supabase: mockSupabase,
         businessId: 'biz-123'
     });
@@ -28,7 +28,7 @@ describe('Financial Integrity Tests', () => {
 
   it('should trigger low stock notifications after valid checkout', async () => {
     const mockSupabase = await (createClient as jest.Mock)();
-    (service as any).getContext = jest.fn().mockResolvedValue({
+    service['getContext'] = jest.fn().mockResolvedValue({
         supabase: mockSupabase,
         businessId: 'biz-123'
     });
@@ -48,7 +48,7 @@ describe('Financial Integrity Tests', () => {
         });
 
     // Note: private method testing requires casting or public trigger
-    await (service as any).checkInventoryThresholds([{ id: '1' }]);
+    await service['checkInventoryThresholds']([{ id: '1' }]);
     
     // Verify notification insert was attempted
     expect(mockSupabase.from).toHaveBeenCalledWith('notifications');

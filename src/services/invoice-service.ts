@@ -3,6 +3,13 @@ import { accountingRequest, decimalInput, usesPythonAccounting } from '@/lib/acc
 import { randomUUID } from 'node:crypto';
 import { BaseService } from './base-service';
 
+export type InvoiceInput = {
+  requestKey?: string; customer_id: string | null; invoice_number: string; type: string; status: string;
+  date: string; due_date?: string; subtotal: number | string; tax?: number | string; total: number | string;
+  vat_included?: boolean; notes?: string;
+};
+export type InvoiceLineInput = { item: string; catalog_item_id?: string | null; quantity: number; price: number | string; total: number | string };
+
 /**
  * @fileOverview InvoiceService manages multi-tenant billing documents.
  * Ensures that headers and line items are created atomically.
@@ -31,7 +38,7 @@ export class InvoiceService extends BaseService {
     return data || [];
   }
 
-  async createInvoice(invoiceData: any, items: any[]) {
+  async createInvoice(invoiceData: InvoiceInput, items: InvoiceLineInput[]) {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
 

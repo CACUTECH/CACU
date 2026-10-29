@@ -4,27 +4,20 @@
 import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { DataChart } from "@/components/data-chart"
-import { 
-    ShoppingCart, 
-    TrendingUp, 
-    ArrowUpRight, 
-    ArrowDownRight, 
-    Loader2,
-    Package
-} from "lucide-react"
+import { ShoppingCart, TrendingUp, Loader2 } from "lucide-react"
 import { ChartConfig } from "@/components/ui/chart"
-import { cn } from "@/lib/utils"
 import { getProductPerformanceAction } from "@/app/reports/actions"
 
 const chartConfig = {
     total_revenue: { label: "Revenue (₦)", color: "hsl(var(--primary))" },
 } satisfies ChartConfig
 
+type ProductPerformance = { sku: string; product_name: string; units_sold: number; total_revenue: number | string };
+
 export default function TopSellingPage() {
     const [loading, setLoading] = React.useState(true);
-    const [data, setData] = React.useState<any[]>([]);
+    const [data, setData] = React.useState<ProductPerformance[]>([]);
 
     React.useEffect(() => {
         const fetch = async () => {

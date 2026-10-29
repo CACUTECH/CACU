@@ -60,7 +60,7 @@ export class SalesService extends BaseService {
     return { saleId: data };
   }
 
-  private async checkInventoryThresholds(soldItems: any[]) {
+  private async checkInventoryThresholds(soldItems: { id: string }[]) {
     const { supabase, businessId } = await this.getContext();
     const notificationService = new NotificationService();
 

@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server';
-import { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
 import { cookies } from 'next/headers';
 import { ACTIVE_BUSINESS_COOKIE, selectMembership } from '@/lib/business-selection';
@@ -9,11 +8,9 @@ import { ACTIVE_BUSINESS_COOKIE, selectMembership } from '@/lib/business-selecti
  * Provides common logic for auth context and structured logging integration.
  */
 export abstract class BaseService {
-  protected supabase: SupabaseClient;
   protected serviceName: string;
 
   constructor() {
-    this.supabase = null as any; 
     this.serviceName = this.constructor.name;
   }
 
@@ -47,11 +44,11 @@ export abstract class BaseService {
     return { user, supabase, businessId: membership.business_id, role: membership.role };
   }
 
-  protected logError(message: string, error: any, context?: any) {
+  protected logError(message: string, error: unknown, context?: Record<string, unknown>) {
     logger.error(message, error, context, this.serviceName);
   }
 
-  protected logInfo(message: string, context?: any) {
+  protected logInfo(message: string, context?: Record<string, unknown>) {
     logger.info(message, context, this.serviceName);
   }
 }

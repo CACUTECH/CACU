@@ -4,9 +4,15 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { usePathname } from 'next/navigation';
 import { getBusinessSelectionAction, selectBusinessAction } from '@/app/business-actions';
 import { Button } from '@/components/ui/button';
+import type { BusinessType } from '@/lib/data';
+
+/** The selected business row plus the signed-in member's role. */
+export type ActiveBusiness = {
+  id: string; name?: string | null; business_type?: BusinessType | null; logo_url?: string | null; userRole?: string;
+} & Record<string, unknown>;
 
 interface BusinessContextType {
-  business: any | null;
+  business: ActiveBusiness | null;
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -38,7 +44,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   }, [refresh, pathname]);
   const member = selection.active;
   const record = member && (Array.isArray(member.businesses) ? member.businesses[0] : member.businesses);
-  const business = record ? { ...record, userRole: member?.role } : null;
+  const business = record ? { ...record, userRole: member?.role } as ActiveBusiness : null;
   const publicRoute = ['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname);
   const choose = async (id: string) => {
     requestVersion.current++;

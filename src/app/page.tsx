@@ -2,21 +2,21 @@
 "use client"
 
 import * as React from 'react';
-import { 
-    TrendingUp, 
-    Clock, 
-    Wrench, 
-    Package, 
-    Activity, 
-    TrendingDown,
-    Receipt,
-    PlusCircle,
-    MonitorSpeaker,
-    ArrowLeftRight,
-    Users,
-    Calendar as CalendarIcon,
-    Loader2
+import {
+  TrendingUp,
+  Wrench,
+  Package,
+  Activity,
+  TrendingDown,
+  Receipt,
+  PlusCircle,
+  MonitorSpeaker,
+  ArrowLeftRight,
+  Users,
+  Loader2,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type { ChartRow } from '@/components/data-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DataChart } from '@/components/data-chart';
@@ -30,7 +30,15 @@ import { useBusiness } from '@/components/business-provider';
 import { getDashboardStatsAction, getRevenueTrendAction } from './reports/actions';
 import { isRouteAvailableInMode } from '@/lib/business-mode';
 
-function StatCard({ title, value, subtext, icon: Icon, trend, variant = 'default' }: any) {
+type DashboardStats = {
+  financials?: { total_income?: number | string; transaction_count?: number; net_profit?: number | string };
+  jobs?: { activeCount?: number };
+  inventory?: { total_items?: number; low_stock_count?: number };
+};
+
+function StatCard({ title, value, subtext, icon: Icon, trend, variant = 'default' }: {
+  title: string; value: React.ReactNode; subtext?: React.ReactNode; icon: LucideIcon; trend?: 'up' | 'down'; variant?: 'default' | 'primary';
+}) {
     return (
         <Card className={cn(
             "shadow-lg border-primary/5 transition-all hover:shadow-primary/10",
@@ -57,7 +65,7 @@ function StatCard({ title, value, subtext, icon: Icon, trend, variant = 'default
     )
 }
 
-function QuickAction({ icon: Icon, label, href, color = 'bg-primary' }: any) {
+function QuickAction({ icon: Icon, label, href, color = 'bg-primary' }: { icon: LucideIcon; label: string; href: string; color?: string }) {
     return (
         <Link href={href} className="flex flex-col items-center gap-2 group flex-1 min-w-[80px]">
             <div className={cn(
@@ -77,10 +85,10 @@ export default function DashboardPage() {
   const router = useRouter();
   const { business, loading: businessLoading } = useBusiness();
   const [loading, setLoading] = React.useState(true);
-  const [stats, setStats] = React.useState<any>(null);
+  const [stats, setStats] = React.useState<DashboardStats | null>(null);
   const [reportError, setReportError] = React.useState('');
   const generation = React.useRef(0);
-  const [trendData, setTrendData] = React.useState<any[]>([]);
+  const [trendData, setTrendData] = React.useState<ChartRow[]>([]);
   const [granularity, setGranularity] = React.useState<'day' | 'week' | 'month'>('month');
 
   React.useEffect(() => {
@@ -105,10 +113,10 @@ export default function DashboardPage() {
       ]);
       if (token !== generation.current) return;
       if (!statsRes.success || !trendRes.success) {
-        setReportError(!statsRes.success ? statsRes.error : trendRes.error);
+        setReportError((!statsRes.success ? statsRes.error : trendRes.error) ?? 'Report unavailable');
         return;
       }
-      setStats(statsRes.data);
+      setStats(statsRes.data ?? null);
       setTrendData(trendRes.data);
     } catch {
       if (token === generation.current) setReportError('Dashboard unavailable. Please retry.');
@@ -163,7 +171,7 @@ export default function DashboardPage() {
             title="Inventory Health" 
             value={`${stats?.inventory?.total_items || 0} units`} 
             subtext={`${stats?.inventory?.low_stock_count || 0} restock alerts`} 
-            trend={stats?.inventory?.low_stock_count > 0 ? "down" : "up"} 
+            trend={(stats?.inventory?.low_stock_count ?? 0) > 0 ? "down" : "up"} 
             icon={Package} 
         />
 
@@ -171,7 +179,7 @@ export default function DashboardPage() {
             title="Net Profit" 
             value={`₦${Number(stats?.financials?.net_profit || 0).toLocaleString()}`} 
             subtext="Current month position" 
-            trend={stats?.financials?.net_profit >= 0 ? "up" : "down"} 
+            trend={Number(stats?.financials?.net_profit ?? 0) >= 0 ? "up" : "down"} 
             icon={Activity} 
         />
       </div>
@@ -195,7 +203,7 @@ export default function DashboardPage() {
               <CardTitle className="font-headline text-xl">Financial Performance Trend</CardTitle>
               <CardDescription>Server-aggregated income vs. expense flow.</CardDescription>
             </div>
-            <Select value={granularity} onValueChange={(v: any) => setGranularity(v)}>
+            <Select value={granularity} onValueChange={(v) => setGranularity(v as typeof granularity)}>
                 <SelectTrigger className="w-[120px] h-8 text-xs rounded-xl">
                     <SelectValue />
                 </SelectTrigger>

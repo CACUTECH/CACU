@@ -11,5 +11,5 @@ test.each([
   [new Error('Response interrupted'), true],
 ])('payment action distinguishes definite rejection from ambiguous failure (%s)', async (error, retryable) => {
   mockRecord.mockRejectedValue(error);
-  await expect(markAsPaidAction({ invoiceId: 'invoice' })).resolves.toEqual({ success: false, error: error.message, retryable });
+  await expect(markAsPaidAction({ invoiceId: 'invoice', amount: '100', method: 'Cash' })).resolves.toEqual({ success: false, error: error.message, retryable });
 });

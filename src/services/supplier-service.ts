@@ -1,6 +1,8 @@
 
 import { BaseService } from './base-service';
 
+export type SupplierInput = Record<string, unknown>;
+
 /**
  * @fileOverview SupplierService handles procurement and vendor relations.
  * Enforces business context and role-based access for supply chain data.
@@ -20,7 +22,7 @@ export class SupplierService extends BaseService {
     return data;
   }
 
-  async upsertSupplier(supplier: any) {
+  async upsertSupplier(supplier: SupplierInput) {
     const { supabase, businessId, role } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
     if (role === 'viewer') throw new Error('Insufficient permissions');

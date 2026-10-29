@@ -54,11 +54,11 @@ export default function ForgotPasswordPage() {
         title: "Reset Email Sent",
         description: "Check your inbox for a password reset link.",
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to send reset email.",
+        description: (error instanceof Error && error.message) || "Failed to send reset email.",
       });
     } finally {
       setIsLoading(false);

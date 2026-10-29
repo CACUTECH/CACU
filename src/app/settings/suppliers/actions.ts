@@ -1,17 +1,17 @@
 
 'use server';
 
-import { SupplierService } from '@/services/supplier-service';
+import { SupplierService, type SupplierInput } from '@/services/supplier-service';
 import { revalidatePath } from 'next/cache';
 
-export async function saveSupplierAction(data: any) {
+export async function saveSupplierAction(data: SupplierInput) {
   try {
     const service = new SupplierService();
     await service.upsertSupplier(data);
     revalidatePath('/settings/suppliers');
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Supplier update failed' };
   }
 }
 
@@ -21,7 +21,7 @@ export async function deleteSupplierAction(id: string) {
     await service.deleteSupplier(id);
     revalidatePath('/settings/suppliers');
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Supplier update failed' };
   }
 }

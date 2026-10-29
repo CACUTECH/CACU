@@ -4,28 +4,24 @@ import * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-    Store, 
-    Globe, 
-    Palette, 
-    ShoppingCart, 
-    ExternalLink, 
-    Smartphone, 
-    Eye, 
-    TrendingUp, 
-    ArrowRight,
-    CircleCheck,
-    Settings,
-    Copy,
-    Share2,
-    Package,
-    MessageCircle,
-    LayoutDashboard,
-    Image as ImageIcon,
-    Truck,
-    CheckCircle2,
-    Loader2
+import {
+  Store,
+  Palette,
+  ShoppingCart,
+  ExternalLink,
+  Eye,
+  TrendingUp,
+  Settings,
+  Copy,
+  Share2,
+  Package,
+  MessageCircle,
+  LayoutDashboard,
+  Image as ImageIcon,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { Switch } from "@/components/ui/switch";
@@ -418,7 +414,7 @@ export default function StorefrontPage() {
     );
 }
 
-function SummaryCard({ title, value, subtext, icon: Icon }: { title: string, value: string, subtext: string, icon: any }) {
+function SummaryCard({ title, value, subtext, icon: Icon }: { title: string, value: string, subtext: string, icon: LucideIcon }) {
     return (
         <Card className="hover:shadow-md transition-shadow border-primary/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
