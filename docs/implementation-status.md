@@ -1,3 +1,5 @@
+> See [29 October suite execution review](suite/repository-review-20261029.md) for the new document comparison, R0 honest-state fixes and remaining review gates.
+
 > See [production feature readiness](production-feature-readiness-20261014.md) for the HR directory implementation and remaining activation requirements.
 
 > See [14 October technical completion review](technical-completion-20261014.md) for delivered follow-up fixes and remaining external blockers.

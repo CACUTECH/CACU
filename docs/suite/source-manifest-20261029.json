@@ -1,0 +1,326 @@
+{
+  "date": "2026-10-29",
+  "scope": "21 user-supplied main Markdown exports; referenced tabs and embedded diagrams are not included",
+  "documents": [
+    {
+      "file": "CACU Doc 01 — Product Vision & Strategy.md",
+      "sha256": "3c87d83aaf947590b3d296539606fed644924220ae8fbd073c2541b4afa20325",
+      "bytes": 22131,
+      "headings": [
+        "## Summary",
+        "## Problem and opportunity",
+        "## Target customers and personas",
+        "## Positioning and value proposition",
+        "## Competitive landscape",
+        "## Differentiation and product principles",
+        "## Product scope by release",
+        "## Plans and pricing",
+        "## Go-to-market assumptions",
+        "## Success metrics",
+        "## Decisions, assumptions, risks and open questions",
+        "## Sources"
+      ]
+    },
+    {
+      "file": "CACU Doc 02 — Business Requirements Document.md",
+      "sha256": "19979e49a8f0dd72a4a2107bff7551e2a19324e35d25ca785ded576d7f58d965",
+      "bytes": 13503,
+      "headings": [
+        "## Summary",
+        "## Business objectives",
+        "## Stakeholders and their requirements",
+        "## Core business processes",
+        "## Business rules",
+        "## Constraints, assumptions and dependencies",
+        "## Risks, open questions and related documents"
+      ]
+    },
+    {
+      "file": "CACU Doc 03 — Product Requirements Document.md",
+      "sha256": "4d9cde43edfaf672431c9d4ead14ba039a21b725ed5094ada9058206a3d65bb3",
+      "bytes": 7883,
+      "headings": [
+        "## Summary",
+        "## Conventions",
+        "## Epic overview",
+        "## Cross-cutting acceptance criteria",
+        "## Open questions and related documents"
+      ]
+    },
+    {
+      "file": "CACU Doc 04 — Software Requirements Specification.md",
+      "sha256": "1f720bcf70723aa674cba82c554c9a6bf05d9f37ff2cfa4dacbb375e36dda014",
+      "bytes": 12475,
+      "headings": [
+        "## Summary",
+        "## System context and external interfaces",
+        "## Non-functional requirements",
+        "## Technical requirements per epic",
+        "## Design constraints, environments and supported devices",
+        "## Verification and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 05 — Current-State Assessment & Gap Analysis.md",
+      "sha256": "1c353a6200f627707d100d5af3a80bf831992d4734e98678c75a069a1806ae9f",
+      "bytes": 34886,
+      "headings": [
+        "## Summary",
+        "## Scope, sources and evidence",
+        "## Architecture as built",
+        "## Module inventory",
+        "## Accounting and financial integrity",
+        "## Tenancy, security and access control",
+        "## Database and migration state",
+        "## Quality: tests, CI and dependencies",
+        "## Mobile prototype (CACU\\_)",
+        "## Gap analysis against the master brief",
+        "## Technical debt register",
+        "## Migration, backup, rollback and regression approach",
+        "## Risks and open questions",
+        "## Sources"
+      ]
+    },
+    {
+      "file": "CACU Doc 06 — Solution Architecture.md",
+      "sha256": "4cbcc352271a27eb8c74d9f3117a1ef1fa52872c81613fc8e59fe8edf1425439",
+      "bytes": 24645,
+      "headings": [
+        "## Summary",
+        "## Principles and constraints",
+        "## Target architecture",
+        "## Component decisions",
+        "## Key flows",
+        "## Installable web app and offline approach",
+        "## Background work, billing, payments and AI boundaries",
+        "## Environments and deployment",
+        "## Will Vercel and Supabase scale?",
+        "## Architecture decision records",
+        "## Risks, open questions and hosted items to verify",
+        "## Sources"
+      ]
+    },
+    {
+      "file": "CACU Doc 07 — Database Design & Data Dictionary.md",
+      "sha256": "7f81ea02c1db11969634e13b8b4a429200a4f78c83ee7ddf99015b8e540eb334",
+      "bytes": 16193,
+      "headings": [
+        "## Summary",
+        "## Design conventions and database requirements",
+        "## Core data model",
+        "## Schema map",
+        "## Integrity, immutability and deletion controls",
+        "## Indexing, partitioning and retention",
+        "## Migration strategy and plan",
+        "## Risks and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 08 — Multi-Tenancy & Access Control Design.md",
+      "sha256": "e7434a3fd4950b9e13b721fc55e0533a28ba41af073b99c921a951cd57c8f1a5",
+      "bytes": 25560,
+      "headings": [
+        "## Summary",
+        "## What isolation must prevent",
+        "## Tenant model",
+        "## Request authorisation flow",
+        "## Permission model",
+        "## How permissions are stored and enforced",
+        "## Preventing cross-tenant exposure in every channel",
+        "## Migration and gaps to close",
+        "## Requirements and isolation tests",
+        "## Risks and open questions",
+        "## Sources"
+      ]
+    },
+    {
+      "file": "CACU Doc 09 — Accounting Engine & Financial Reporting Specification.md",
+      "sha256": "53ad69d6ae6a8a380d7c42bbdd1b25cb2c80c5c1eaacc38e0672cca1ff17bd8c",
+      "bytes": 21886,
+      "headings": [
+        "## Summary",
+        "## Accounting requirements",
+        "## Transaction lifecycle",
+        "## Default chart of accounts",
+        "## Posting rules",
+        "## Periods, close, reconciliation and controls",
+        "## Financial statements and IFRS position",
+        "## Activation and cutover per business",
+        "## Tests, risks and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 10 — Module Functional Specifications.md",
+      "sha256": "46df06cda57d72de5dc429385527002463dc8042ffb3c8d1fdbd9123c2a0d534",
+      "bytes": 12538,
+      "headings": [
+        "## Summary",
+        "## Onboarding and setup",
+        "## POS checkout and payment reconciliation",
+        "## POS rules",
+        "## Inventory purchase-to-payment",
+        "## Inventory and purchasing rules",
+        "## Service booking-to-invoice",
+        "## Services, bookings and jobs rules",
+        "## CRM, HR and notifications",
+        "## Open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 11 — API & Integration Specification.md",
+      "sha256": "edc2e96a03cc8d9c6d982c84a5a995c40aac5d24db6c1d371767014f2c994fbf",
+      "bytes": 13051,
+      "headings": [
+        "## Summary",
+        "## API conventions",
+        "## Existing endpoints",
+        "## Planned endpoints",
+        "## Webhooks and events",
+        "## Provider adapters",
+        "## Tests and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 12 — UX UI Design Specification.md",
+      "sha256": "593ea4508b5210d9860cfb865ddb856ec8fb03af10f8ffa65331485d0d66c55d",
+      "bytes": 17177,
+      "headings": [
+        "## Summary",
+        "## Design principles",
+        "## Design system",
+        "## Information architecture",
+        "## Screen inventory",
+        "## Key user journeys",
+        "## Wireframe specifications",
+        "## States, language and accessibility"
+      ]
+    },
+    {
+      "file": "CACU Doc 13 — Offline & Synchronisation Specification.md",
+      "sha256": "63809f6f976561e8911ae9ca973a72ae43b93416ed9441aa98d8edf0bcaf63d5",
+      "bytes": 11287,
+      "headings": [
+        "## Summary",
+        "## Offline capability matrix and requirements",
+        "## Offline transaction synchronisation flow",
+        "## Local storage, encryption, device identity and numbering",
+        "## Sync protocol, conflicts and exceptions",
+        "## Sessions, stale data, recovery and cleanup",
+        "## Tests, risks and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 14 — Subscription & Billing Specification.md",
+      "sha256": "657088b7a9c7cce3eee9c0d540d81090b0bf154a3ec0970e528b4de9312144c8",
+      "bytes": 17195,
+      "headings": [
+        "## Summary",
+        "## Plan and entitlement matrix",
+        "## Subscription lifecycle",
+        "## Workflows",
+        "## Payment collection",
+        "## Entitlement enforcement and usage metering",
+        "## CACU's own billing records",
+        "## Cost sustainability",
+        "## Requirements, tests, risks and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 15 — AI Intelligence & Funding Readiness Specification.md",
+      "sha256": "e6a16a42df006f5eca29c7f259a7fc2d131efb2b1b3a74aed4fb5980ab8cbecd",
+      "bytes": 14027,
+      "headings": [
+        "## Summary",
+        "## AI query and response architecture",
+        "## AI tools, safety rules and requirements",
+        "## Evaluation, monitoring and cost controls",
+        "## Funding readiness assessment flow",
+        "## Funding readiness scoring",
+        "## Explanations, recommendations, governance and limits",
+        "## Risks and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 16 — Security, Privacy & Compliance Framework.md",
+      "sha256": "b315bba4de722ec7cf0c213c11dc53fb29c2b774d6b74a494a9edaf2e4377734",
+      "bytes": 18896,
+      "headings": [
+        "## Summary",
+        "## Threat model",
+        "## Security requirements",
+        "## Privacy",
+        "## Compliance register (Nigeria)",
+        "## Country module framework",
+        "## Incident response and vulnerability management",
+        "## Risks, open questions and sources"
+      ]
+    },
+    {
+      "file": "CACU Doc 17 — Infrastructure, DevOps & Disaster Recovery Plan.md",
+      "sha256": "0da429aefe443bc021ac1a773512087e55563cd0c2b96545d2ca7a543f64ed19",
+      "bytes": 10594,
+      "headings": [
+        "## Summary",
+        "## Deployment topology",
+        "## CI/CD and release workflow",
+        "## Pipeline stages, gates and rollback",
+        "## Monitoring, logging and alerting",
+        "## Backup, restore and disaster recovery",
+        "## Scaling triggers and operating cost",
+        "## Runbooks, ownership and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 18 — Development Roadmap & Implementation Backlog.md",
+      "sha256": "64254c27b00d1fd4a91250c84d7b630ff1565bba55a557b78508b7b961120c16",
+      "bytes": 8740,
+      "headings": [
+        "## Summary",
+        "## Roadmap timeline",
+        "## Phase plans",
+        "## Feature prioritisation matrix",
+        "## Release gates and capacity",
+        "## Backlog, risk register and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 19 — QA & Testing Master Plan.md",
+      "sha256": "d33386e2c0d540cb7edbf8a1df382b8c9a46bc83b1539efdca23cc0f15b5fe45",
+      "bytes": 21588,
+      "headings": [
+        "## Summary",
+        "## Test strategy",
+        "## Test catalogue",
+        "## NFR verification map",
+        "## Minimum release tests",
+        "## Release-readiness checklist",
+        "## Defects, pilot monitoring and open questions"
+      ]
+    },
+    {
+      "file": "CACU Doc 20 — AI Coding Agent Implementation Guide.md",
+      "sha256": "6f2056afc65b77bed619739d29dc28569cdd9dbabf4358d02a67c7c40e74b0de",
+      "bytes": 9850,
+      "headings": [
+        "## Summary",
+        "## Rules every agent follows",
+        "## Architecture summary for agents",
+        "## Workflow",
+        "## Review and release checklist"
+      ]
+    },
+    {
+      "file": "CACU — Executive Blueprint & Suite Index.md",
+      "sha256": "d3f0677eeaea497a2552274111a16087f43c96dbed10022ac6b5447bc4d8e767",
+      "bytes": 15742,
+      "headings": [
+        "## Executive blueprint",
+        "## Document index",
+        "## Requirements traceability matrix",
+        "## Architecture decision index",
+        "## Diagram and matrix index",
+        "## Decisions, open items and consistency notes"
+      ]
+    }
+  ]
+}
