@@ -167,6 +167,8 @@ export default function InvoicesPage() {
         if (res.success) {
             toast({ title: "Estimate Accepted" });
             fetchData();
+        } else {
+            toast({ variant: "destructive", title: "Estimate not accepted", description: res.error });
         }
     }
   };

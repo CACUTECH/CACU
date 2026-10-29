@@ -45,7 +45,9 @@ export default function TransactionsPage() {
     const [page, setPage] = React.useState(0), [total, setTotal] = React.useState(0), [error, setError] = React.useState('');
     const generation = React.useRef(0);
 
-    const [formData, setFormData] = React.useState<Parameters<typeof recordLedgerEntryAction>[0]>({
+    // Kept until the entry is confirmed or definitely refused, so a retry cannot post twice.
+    const entryKey = React.useRef('');
+    const [formData, setFormData] = React.useState<Omit<Parameters<typeof recordLedgerEntryAction>[0], 'requestKey'>>({
         description: '',
         amount: 0,
         type: 'Income',
@@ -79,10 +81,13 @@ export default function TransactionsPage() {
     }, [user?.id, business?.id, fetchTX]);
 
     const handleAddTransaction = async () => {
-        const result = await recordLedgerEntryAction(formData);
+        entryKey.current ||= crypto.randomUUID();
+        const result = await recordLedgerEntryAction({ ...formData, requestKey: entryKey.current });
         if (!result.success) {
-            toast({ variant: 'destructive', title: 'Post Failed', description: result.error });
+            if (!result.uncertain) entryKey.current = '';
+            toast({ variant: 'destructive', title: result.uncertain ? 'Post not confirmed' : 'Post Failed', description: result.error });
         } else {
+            entryKey.current = '';
             toast({ title: "Transaction Posted" });
             if (page) setPage(0); else void fetchTX();
             setFormData({ description: '', amount: 0, type: 'Income', category: 'Services' });
