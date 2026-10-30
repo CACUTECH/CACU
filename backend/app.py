@@ -90,6 +90,18 @@ def accounting_summary(business_id: UUID,start_date:date,end_date:date,user_id:U
     with library_transaction(user_id,business_id) as session:
         return financial_summary(session,start_date,end_date)
 
+@app.get('/api/v1/businesses/{business_id}/reports/trial-balance')
+def trial_balance_report(business_id:UUID,as_of:date,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.reports import trial_balance
+    with library_transaction(user_id,business_id) as session:
+        return trial_balance(session,as_of)
+
+@app.get('/api/v1/businesses/{business_id}/reports/general-ledger')
+def general_ledger_report(business_id:UUID,account_id:UUID,start_date:date,end_date:date,page:int=0,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.reports import general_ledger
+    with library_transaction(user_id,business_id) as session:
+        return general_ledger(session,account_id,start_date,end_date,page)
+
 from cacu.accounting.posting import PostingCommand,post_command
 
 @app.post('/api/v1/businesses/{business_id}/postings')

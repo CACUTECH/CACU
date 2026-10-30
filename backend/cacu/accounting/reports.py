@@ -44,9 +44,12 @@ def cash_flow(session,start:date,end:date):
         raise HTTPException(409,'Every posted account requires a reviewed cash-flow mapping')
     groups=defaultdict(lambda: {'amount':ZERO,'details':[]})
     opening=closing=ZERO
+    # The approved opening position is dated on the start date but is the position brought in,
+    # not activity: its cash is opening cash and its other legs are not flows of the period.
+    brought_in=opening_transactions(session)
     for row in rows:
         signed=row['amount']*(1 if row['entry_type']=='DEBIT' else -1)
-        before=row['transaction_date'].date()<start
+        before=row['transaction_date'].date()<start or row['transaction_id'] in brought_in
         if row['flow_section']=='cash':
             closing+=signed
             if before:opening+=signed
@@ -123,7 +126,7 @@ def cash_flow(session,start:date,end:date):
             'timezone':session.business_timezone,'start_date':start.isoformat(),'end_date':end.isoformat(),
             'sections':sections,'net_change':money(net),'opening_cash':money(opening),
             'fx_effect':money(ZERO),'closing_cash':money(calculated),'ledger_cash':money(closing),
-            'difference':money(difference),'reconciled':difference==ZERO,'empty':not any(not r['transaction_date'].date()<start for r in rows),
+            'difference':money(difference),'reconciled':difference==ZERO,'empty':not any(not r['transaction_date'].date()<start and r['transaction_id'] not in brought_in for r in rows),
             'library_totals':{str(k):money(v) for k,v in native.totals.items()},
             'library_results':{str(k):money(v) for k,v in native.result_amounts.items()}}
 
@@ -161,3 +164,93 @@ def financial_summary(session,start:date,end:date):
             'trial_balance':[{'account_id':k,'name':r['name'],'type':r['account_type'],
                 'debit':money(max(balances[k],ZERO)),'credit':money(max(-balances[k],ZERO))} for k,r in accounts.items()],
             'trial_balance_difference':money(sum(balances.values(),ZERO))}
+
+
+def opening_transactions(session):
+    """Transactions that carry the approved opening position: the opening journal and one entry per customer or supplier."""
+    evidence=session.connection().exec_driver_sql('SELECT reconciliation_evidence FROM accounting.business_map WHERE business_id=%s',
+        (str(session.business_id),)).scalar() or {}
+    ids={evidence.get('transaction_id')}|{d.get('transaction_id') for d in evidence.get('opening_documents',[])}
+    return {i for i in ids if i is not None}
+
+LABELS={'tier':'Management statements, not reviewed','basis':'Accrual','currency':'NGN'}
+
+def _generated(session):
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo(session.business_timezone)).isoformat(timespec='seconds')
+
+def _outstanding(session,source_type):
+    from python_accounting.models import Transaction
+    rows=session.connection().exec_driver_sql('SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type=%s',
+        (str(session.business_id),source_type)).all()
+    if len(rows)>5000:raise HTTPException(409,'Too many open documents to check in one report')
+    total=ZERO
+    for row in rows:
+        document=session.get(Transaction,row.transaction_id)
+        total+=document.amount-document.cleared(session)
+    return total
+
+def trial_balance(session,as_of:date):
+    """FR-143: every account's balance at the end of as_of, with the ACC-013 control checks at the top."""
+    rows=ledger_rows(session,as_of)
+    balances=defaultdict(lambda:ZERO);accounts={}
+    for row in rows:
+        key=str(row['source_account_id']);accounts[key]=row
+        balances[key]+=row['amount']*(1 if row['entry_type']=='DEBIT' else -1)
+    codes=dict(session.connection().exec_driver_sql('SELECT id::text,code FROM public.accounts WHERE business_id=%s',(str(session.business_id),)).all())
+    lines=[{'account_id':k,'code':codes.get(k),'name':r['name'],'type':r['account_type'],
+            'debit':money(max(balances[k],ZERO)),'credit':money(max(-balances[k],ZERO))}
+           for k,r in sorted(accounts.items(),key=lambda item:(codes.get(item[0]) or '',item[1]['name'])) if balances[k]!=ZERO]
+    debits=sum((Decimal(l['debit']) for l in lines),ZERO);credits=sum((Decimal(l['credit']) for l in lines),ZERO)
+    exceptions=[]
+    if debits!=credits:exceptions.append({'check':'trial_balance','message':'Debits and credits differ','difference':money(debits-credits)})
+    # Subledgers hold today's position, so the control checks run only for a report up to today.
+    today=datetime.fromisoformat(_generated(session)).date()
+    checked=as_of>=today
+    if checked:
+        def control(types):
+            return sum((balances[k] for k,r in accounts.items() if r['account_type'] in types),ZERO)
+        stock=session.connection().exec_driver_sql("""SELECT coalesce(sum(stock_quantity*coalesce(cost_price,0)),0) FROM public.catalog_items
+            WHERE business_id=%s AND item_type='PRODUCT' AND track_stock AND is_active AND stock_quantity>0""",(str(session.business_id),)).scalar()
+        for check,label,ledger,sub in (('receivables','Customer balances on open invoices',control({'RECEIVABLE'}),_outstanding(session,'invoice')),
+                                       ('payables','Supplier balances on open bills',-control({'PAYABLE'}),_outstanding(session,'bill')),
+                                       ('stock','Stock on hand at cost',control({'INVENTORY'}),Decimal(stock))):
+            if ledger!=sub:exceptions.append({'check':check,'message':f'{label} ({money(sub)}) differ from the ledger ({money(ledger)})','difference':money(ledger-sub)})
+    return {**LABELS,'as_of':as_of.isoformat(),'generated_at':_generated(session),'lines':lines,'total_debit':money(debits),
+            'total_credit':money(credits),'difference':money(debits-credits),'controls_checked':checked,'exceptions':exceptions}
+
+PAGE=100
+
+def general_ledger(session,account_id,start:date,end:date,page:int=0):
+    """FR-140: one account's entries for a period with opening, running and closing balances, 100 per page."""
+    validate_dates(start,end)
+    if page<0 or page>100000:raise HTTPException(422,'Invalid page')
+    tenant=str(session.business_id)
+    account=session.connection().exec_driver_sql("""SELECT a.code,a.name,m.library_id FROM accounting.account_map m
+        JOIN public.accounts a ON a.id=m.account_id AND a.business_id=m.business_id WHERE m.business_id=%s AND m.account_id=%s""",
+        (tenant,str(account_id))).first()
+    if not account:raise HTTPException(404,'Account not found in this business')
+    begin=datetime.combine(start,time.min);finish=datetime.combine(end+timedelta(days=1),time.min)
+    signed="CASE WHEN l.entry_type::text='DEBIT' THEN l.amount ELSE -l.amount END"
+    opening=session.connection().exec_driver_sql(f'SELECT coalesce(sum({signed}),0) FROM accounting.ledger l WHERE l.business_id=%s AND l.post_account_id=%s AND l.transaction_date<%s',
+        (tenant,account.library_id,begin)).scalar()
+    totals=session.connection().exec_driver_sql(f"""SELECT count(*),coalesce(sum(l.amount) FILTER (WHERE l.entry_type::text='DEBIT'),0),
+        coalesce(sum(l.amount) FILTER (WHERE l.entry_type::text='CREDIT'),0) FROM accounting.ledger l
+        WHERE l.business_id=%s AND l.post_account_id=%s AND l.transaction_date>=%s AND l.transaction_date<%s""",(tenant,account.library_id,begin,finish)).one()
+    rows=session.connection().exec_driver_sql(f"""SELECT * FROM (
+        SELECT l.id,l.transaction_date,t.transaction_no,t.narration,l.entry_type::text AS entry_type,l.amount,
+          coalesce(fa.code||' '||fa.name,fn.name) AS counter_account,
+          sum({signed}) OVER (ORDER BY l.transaction_date,l.id) AS running
+        FROM accounting.ledger l JOIN accounting."transaction" t ON t.id=l.transaction_id AND t.business_id=l.business_id
+        JOIN accounting.account fn ON fn.id=l.folio_account_id AND fn.business_id=l.business_id
+        LEFT JOIN accounting.account_map fm ON fm.library_id=l.folio_account_id AND fm.business_id=l.business_id
+        LEFT JOIN public.accounts fa ON fa.id=fm.account_id AND fa.business_id=fm.business_id
+        WHERE l.business_id=%s AND l.post_account_id=%s AND l.transaction_date>=%s AND l.transaction_date<%s) e
+        ORDER BY transaction_date,id LIMIT %s OFFSET %s""",(tenant,account.library_id,begin,finish,PAGE,page*PAGE)).all()
+    entries=[{'date':r.transaction_date.date().isoformat(),'number':r.transaction_no,'description':r.narration,'counter_account':r.counter_account,
+              'debit':money(r.amount if r.entry_type=='DEBIT' else ZERO),'credit':money(r.amount if r.entry_type=='CREDIT' else ZERO),
+              'balance':money(opening+r.running)} for r in rows]
+    return {**LABELS,'generated_at':_generated(session),'account':{'id':str(account_id),'code':account.code,'name':account.name},
+            'start_date':start.isoformat(),'end_date':end.isoformat(),'opening_balance':money(opening),
+            'total_debit':money(totals[1]),'total_credit':money(totals[2]),'closing_balance':money(opening+totals[1]-totals[2]),
+            'entries':entries,'page':page,'page_size':PAGE,'total_entries':totals[0]}

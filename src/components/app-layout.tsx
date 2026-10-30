@@ -173,6 +173,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/accounting/expenses', label: 'Expenses' },
         { href: '/accounting/journal-entries', label: 'Journal Adjustments' },
         { href: '/accounting/trial-balance', label: 'Trial Balance' },
+        { href: '/accounting/general-ledger', label: 'General Ledger' },
       ],
     },
     { href: '/reports', label: 'Reports', icon: FileText },
