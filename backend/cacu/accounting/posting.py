@@ -120,20 +120,28 @@ def post_command(session,actor:UUID,command:PostingCommand):
         if amount>target.amount-target.cleared(session):raise HTTPException(409,'Amount exceeds outstanding balance')
     if command.kind=='transfer' and (main.account_type!=Account.AccountType.BANK or any(entry[0].account_type!=Account.AccountType.BANK for entry in lines)):
         raise HTTPException(422,'Cash transfers require cash accounts')
+    compound=Decimal(command.main_amount) if command.main_amount is not None else None
     if command.kind=='reversal':
         # Reversal receives its own UUID and target is a posted document. Financial
         # legs are derived from the ledger, never supplied correction values.
+        # Only manual journals and expenses: stock journals are corrected by a stock
+        # adjustment (the quantity would otherwise disagree with the ledger), and
+        # invoices, bills and their payments by their credit-note workflow.
         if not command.target_id:raise HTTPException(422,'Reversal target required')
-        targetrow=raw(session,'SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_id=%s',(tenant,str(command.target_id))).first()
-        if not targetrow:raise HTTPException(422,'Posted reversal target required')
+        targetrow=raw(session,"""SELECT d.transaction_id FROM accounting.document_map d WHERE d.business_id=%s AND d.source_id=%s
+            AND d.source_type IN ('adjustment','expense') AND NOT EXISTS(SELECT FROM accounting.stock_event e WHERE e.business_id=d.business_id AND e.source_id=d.source_id)""",
+            (tenant,str(command.target_id))).first()
+        if not targetrow:raise HTTPException(422,'Only posted manual journals and expenses can be reversed')
         original=session.get(Transaction,targetrow.transaction_id)
         if raw(session,'SELECT 1 FROM accounting.reversal_map WHERE business_id=%s AND original_id=%s',(tenant,original.id)).first():
             raise HTTPException(409,'Document already reversed')
-        if original.transaction_type!=Transaction.TransactionType.JOURNAL_ENTRY or original.compound:
+        if original.transaction_type not in {Transaction.TransactionType.JOURNAL_ENTRY,Transaction.TransactionType.CASH_PURCHASE}:
             raise HTTPException(409,'Allocated/commercial documents require their credit-note workflow')
+        if command.entry_date<original.transaction_date.date():raise HTTPException(409,'A reversal cannot be dated before the original')
         main=session.get(Account,original.account_id)
         lines=[(session.get(Account,l.account_id),l.amount*l.quantity,not l.credited) for l in original.line_items]
         command.credited=not original.credited
+        compound=original.main_account_amount if original.compound else None
         amount=original.amount
     if command.kind in {'receipt','pos'} and command.payment_method is None:
         raise HTTPException(422,'Cash or Transfer collection method required')
@@ -145,8 +153,7 @@ def post_command(session,actor:UUID,command:PostingCommand):
         reviewed=collection_account(session,command.payment_method,selected if command.payment_method=='Transfer' else None)
         if str(reviewed)!=str(selected):raise HTTPException(422,'Collection method/account mismatch')
     tx=native_post(session,CLASSES[command.kind],main,lines,command.entry_date,command.narration,
-                   command.credited if command.kind in {'adjustment','reversal'} else None,
-                   Decimal(command.main_amount) if command.main_amount is not None else None)
+                   command.credited if command.kind in {'adjustment','reversal'} else None,compound)
     if target:
         assignment=Assignment(transaction_id=tx.id,assigned_id=target.id,assigned_type=target.__class__.__name__,
                               assignment_date=tx.transaction_date,amount=amount,entity_id=session.entity.id)

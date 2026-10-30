@@ -7,6 +7,7 @@ from uuid import uuid4
 import psycopg
 from psycopg.types.json import Jsonb
 import pytest
+from fastapi import HTTPException
 from test_library_postgres import database,session_for
 from cacu.accounting.catalog import CatalogMutation,catalog_mutate
 URL=os.getenv('CACU_TEST_DATABASE_URL')
@@ -47,6 +48,7 @@ def managed(database,request):
             c.execute('ALTER TABLE public.catalog_items ENABLE TRIGGER accounting_cutover_guard')
         c.execute(Path('../supabase/migrations/20261012140639_inventory_user_management.sql').read_text(encoding='utf-8-sig'))
         c.execute('CREATE TRIGGER memberships_prevent_last_owner_loss BEFORE UPDATE OR DELETE ON public.memberships FOR EACH ROW EXECUTE FUNCTION public.prevent_last_owner_loss()')
+        c.execute(Path('../supabase/migrations/20261101090000_stock_adjustment_approval.sql').read_text(encoding='utf-8'))
         c.execute('INSERT INTO auth.users VALUES(%s,%s,now())',(database[2],'owner@example.com'))
     return database
 
@@ -90,7 +92,7 @@ def test_native_opening_and_adjustment_are_balanced_and_retry_safe(managed):
         assert c.execute("SELECT sum(amount) FILTER(WHERE entry_type='DEBIT')-sum(amount) FILTER(WHERE entry_type='CREDIT') FROM accounting.ledger").fetchone()[0]==0
     adjusted=native(d,CatalogMutation(request_key=uuid4(),operation='stock.adjust',item_id=first['id'],expected_version=first['version'],details={'delta':-2,'reason':'Damaged goods','entry_date':f'{d[6]}-02-11'}))
     assert adjusted['stock_quantity']==3
-    with pytest.raises(SQLAlchemyError,match='INVALID_STOCK_ADJUSTMENT'):native(d,CatalogMutation(request_key=uuid4(),operation='stock.adjust',item_id=first['id'],expected_version=adjusted['version'],details={'delta':-4,'reason':'Too many','entry_date':f'{d[6]}-02-11'}))
+    with pytest.raises(HTTPException,match='would make it negative'):native(d,CatalogMutation(request_key=uuid4(),operation='stock.adjust',item_id=first['id'],expected_version=adjusted['version'],details={'delta':-4,'reason':'Too many','entry_date':f'{d[6]}-02-11'}))
     with psycopg.connect(URL) as c:assert c.execute('SELECT stock_quantity FROM catalog_items WHERE id=%s',(first['id'],)).fetchone()[0]==3
 
 @pytest.mark.parametrize('details',[{'name':'Bad','unit_price':'-1'},{'name':'Bad','unit_price':'1.001'},{'name':'Bad','unit_price':'1.00001'},{'name':'Bad','item_type':'SERVICE','opening_quantity':2},{'name':'Bad','supplier_id':str(uuid4())}])

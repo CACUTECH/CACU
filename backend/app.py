@@ -158,19 +158,85 @@ app.include_router(upload_router(current_user, bearer))
 
 from cacu.accounting.catalog import CatalogMutation,catalog_mutate
 
-@app.post('/api/v1/businesses/{business_id}/catalog')
-def save_catalog(business_id:UUID,data:CatalogMutation,user_id:UUID=Depends(current_user)):
+CATALOG_MESSAGES={'VERSION_CONFLICT':'Item changed. Refresh before editing.', 'DUPLICATE_CODE':'Code already exists in this business.',
+    'ITEM_STRUCTURE_LOCKED':'Referenced item type, stock unit and tracking cannot change.',
+    'COST_REVALUATION_REQUIRED':'On-hand inventory cost changes require a reviewed revaluation.',
+    'INVALID_STOCK_ADJUSTMENT':'Check the quantity, reason, date and available stock.',
+    'ADJUSTMENT_ALREADY_DECIDED':'This adjustment was already decided.',
+    'CATEGORY_INVALID':'Select an active category for this item type.', 'SUPPLIER_INVALID':'Select a supplier in this business.'}
+
+def catalog_write(business_id,user_id,work):
     try:
         with library_transaction(user_id,business_id,write=True) as session:
-            return catalog_mutate(session,user_id,data)
+            return work(session)
     except SQLAlchemyError as exc:
         code=getattr(exc.orig,'sqlstate',None)
         if code in {'P0001','23505','23514','22P02','22003','22007','22008','42501'}:
-            known={'VERSION_CONFLICT':'Item changed. Refresh before editing.', 'DUPLICATE_CODE':'Code already exists in this business.',
-                'ITEM_STRUCTURE_LOCKED':'Referenced item type, stock unit and tracking cannot change.',
-                'COST_REVALUATION_REQUIRED':'On-hand inventory cost changes require a reviewed revaluation.',
-                'INVALID_STOCK_ADJUSTMENT':'Check the quantity, reason, date and available stock.',
-                'CATEGORY_INVALID':'Select an active category for this item type.', 'SUPPLIER_INVALID':'Select a supplier in this business.'}
             reason=str(exc.orig).splitlines()[0]
-            raise HTTPException(403 if code=='42501' else 409,known.get(reason,'Catalog update rejected. Check your values and refresh the item.')) from None
+            raise HTTPException(403 if code=='42501' else 409,CATALOG_MESSAGES.get(reason,'Catalog update rejected. Check your values and refresh the item.')) from None
         raise
+
+@app.post('/api/v1/businesses/{business_id}/catalog')
+def save_catalog(business_id:UUID,data:CatalogMutation,user_id:UUID=Depends(current_user)):
+    return catalog_write(business_id,user_id,lambda session:catalog_mutate(session,user_id,data))
+
+from cacu.accounting.workflows import ExpenseCreate,ReversalCreate,expense_accounts,expense_create,recent_documents,reversal_create
+
+@app.get('/api/v1/businesses/{business_id}/expense-accounts')
+def list_expense_accounts(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        return expense_accounts(session)
+
+@app.get('/api/v1/businesses/{business_id}/expenses')
+def list_expenses(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        return recent_documents(session,'expense')
+
+@app.post('/api/v1/businesses/{business_id}/expenses')
+def create_expense(business_id:UUID,data:ExpenseCreate,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return expense_create(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/journals')
+def list_journals(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        return recent_documents(session,'adjustment')
+
+@app.post('/api/v1/businesses/{business_id}/journals/{journal_id}/reversal')
+def reverse_journal(business_id:UUID,journal_id:UUID,data:ReversalCreate,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return reversal_create(session,user_id,journal_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/expenses/{expense_id}/reversal')
+def reverse_expense(business_id:UUID,expense_id:UUID,data:ReversalCreate,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return reversal_create(session,user_id,expense_id,data)
+
+from cacu.accounting.stock import AdjustmentRequest,Decision,Policy,decide,list_adjustments,policy,request_adjustment,set_policy
+
+@app.get('/api/v1/businesses/{business_id}/stock/adjustments')
+def stock_adjustments(business_id:UUID,status:str|None=None,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        return list_adjustments(session,status,actor=user_id)
+
+@app.post('/api/v1/businesses/{business_id}/stock/adjustments')
+def request_stock_adjustment(business_id:UUID,data:AdjustmentRequest,user_id:UUID=Depends(current_user)):
+    return catalog_write(business_id,user_id,lambda session:request_adjustment(session,user_id,data))
+
+@app.post('/api/v1/businesses/{business_id}/stock/adjustments/{adjustment_id}/approve')
+def approve_stock_adjustment(business_id:UUID,adjustment_id:UUID,data:Decision,user_id:UUID=Depends(current_user)):
+    return catalog_write(business_id,user_id,lambda session:decide(session,user_id,adjustment_id,True,data))
+
+@app.post('/api/v1/businesses/{business_id}/stock/adjustments/{adjustment_id}/reject')
+def reject_stock_adjustment(business_id:UUID,adjustment_id:UUID,data:Decision,user_id:UUID=Depends(current_user)):
+    return catalog_write(business_id,user_id,lambda session:decide(session,user_id,adjustment_id,False,data))
+
+@app.get('/api/v1/businesses/{business_id}/approval-policy')
+def approval_policy(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        return policy(session)
+
+@app.post('/api/v1/businesses/{business_id}/approval-policy')
+def save_approval_policy(business_id:UUID,data:Policy,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return set_policy(session,user_id,data)

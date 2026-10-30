@@ -14,7 +14,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 
-import { getPostingAccountsAction, postJournalAction } from './actions';
+import { useBusiness } from '@/components/business-provider'
+import { PostedEntries } from '@/components/posted-entries'
+import type { PostedEntry } from '@/lib/corrections'
+import { getPostingAccountsAction, listJournalsAction, postJournalAction, reverseJournalAction } from './actions';
 
 type JournalLine = {
     id: string;
@@ -34,17 +37,24 @@ export default function JournalEntriesPage() {
     const [memo, setMemo] = React.useState("")
     const [lines, setLines] = React.useState<JournalLine[]>([])
     const [mounted, setMounted] = React.useState(false)
+    const { business } = useBusiness()
+    const [journals, setJournals] = React.useState<{ native: boolean; journals: PostedEntry[] } | null>(null)
+    const loadJournals = React.useCallback(async () => {
+        const result = await listJournalsAction()
+        if (result.success) setJournals(result.data)
+    }, [])
 
     // Fix Hydration Mismatch by generating IDs only on client
     React.useEffect(() => {
         requestKey.current = crypto.randomUUID()
         void getPostingAccountsAction().then(setAccounts).catch(() => toast({ variant: 'destructive', title: 'Accounts unavailable' }))
         setMounted(true)
+        void loadJournals()
         setLines([
             { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
             { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 },
         ])
-    }, [toast])
+    }, [toast, loadJournals])
 
     const addLine = () => {
         setLines([...lines, { id: crypto.randomUUID(), accountId: "", description: "", debit: 0, credit: 0 }])
@@ -78,7 +88,7 @@ export default function JournalEntriesPage() {
             lines: lines.map(line => ({ account_id: line.accountId, description: line.description, debit: line.debit.toFixed(2), credit: line.credit.toFixed(2) })) });
         if (result.success) {
             toast({ title: 'Journal posted', description: 'The balanced entry and audit event were committed.' });
-            requestKey.current = crypto.randomUUID(); setMemo(''); setLines([]);
+            requestKey.current = crypto.randomUUID(); setMemo(''); setLines([]); void loadJournals();
         } else toast({ variant: 'destructive', title: 'Posting failed', description: result.error });
         setSaving(false);
     }
@@ -217,6 +227,8 @@ export default function JournalEntriesPage() {
                     </div>
                 </CardFooter>
             </Card>
+            {journals?.native && <PostedEntries title="Posted journals" entries={journals.journals} canReverse={['owner', 'admin'].includes(business?.userRole ?? '')}
+                empty="No manual journals posted yet." onReverse={reverseJournalAction} onReversed={() => void loadJournals()} />}
         </div>
     )
 }
