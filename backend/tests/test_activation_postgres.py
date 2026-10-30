@@ -56,7 +56,7 @@ def test_approved_journal_is_posted_exactly_and_the_books_go_live(books):
         expected = {}
         for line in position['journal']['lines']:
             expected[line['account_id']] = expected.get(line['account_id'], 0) + Decimal(line['amount']) * (1 if line['side'] == 'debit' else -1)
-        assert posted == expected
+        assert {k: v for k, v in posted.items() if v} == expected  # 3900 bridges party balances and nets to zero
         assert c.execute("SELECT count(*) FROM accounting.document_map WHERE business_id=%s AND source_type='opening_balance'", (legacy,)).fetchone() == (1,)
         assert c.execute("SELECT count(*) FROM audit_logs WHERE business_id=%s AND action='BOOKS_ACTIVATED'", (legacy,)).fetchone() == (1,)
         narrations = {r[0] for r in c.execute('SELECT narration FROM accounting.line_item WHERE business_id=%s', (legacy,))}
@@ -185,3 +185,59 @@ def test_dry_run_proves_every_check_then_leaves_nothing_behind(books):
     with psycopg.connect(URL) as c:
         assert c.execute('SELECT count(*) FROM accounting.ledger WHERE business_id=%s', (legacy,)).fetchone() == (0,)
     assert turn_on(books)['opening_version'] == 1  # the real run still works afterwards
+
+
+def accounts_by_code(legacy, *codes):
+    with psycopg.connect(URL) as c:
+        return [c.execute('SELECT id FROM accounts WHERE business_id=%s AND code=%s', (legacy, code)).fetchone()[0] for code in codes]
+
+
+def runtime_post(books, command):
+    d, legacy, _, _, people, _ = books
+    with psycopg.connect(URL) as c:
+        entity = c.execute('SELECT entity_id FROM accounting.business_map WHERE business_id=%s', (legacy,)).fetchone()[0]
+    with d[0].begin() as c:
+        s = session_for(c, (d[0], legacy, people['owner'], entity, None, None, TODAY.year))
+        try:
+            return post_command(s, people['owner'], command)
+        finally:
+            s.close()
+
+
+def test_customers_pay_opening_balances_through_the_normal_receipt_flow(books):
+    _, legacy, _, _, _, ids = books
+    approved(books)
+    evidence = turn_on(books)
+    invoice = next(doc for doc in evidence['opening_documents'] if doc['type'] == 'invoice')
+    assert (invoice['party_id'], invoice['amount'], invoice['number']) == (str(ids['ada']), '60000.00', 'OPEN-000001')
+    with psycopg.connect(URL) as c:
+        assert c.execute('SELECT customer_id,invoice_number,status,total,issue_date FROM invoices WHERE id=%s', (invoice['source_id'],)).fetchone() == \
+            (ids['ada'], 'OPEN-000001', 'sent', Decimal('60000'), TODAY)
+    receivables, cash = accounts_by_code(legacy, '1100', '1000')
+
+    def receipt(amount):
+        return PostingCommand(request_key=uuid4(), kind='receipt', source_id=uuid4(), target_id=invoice['source_id'], main_account_id=receivables,
+                              entry_date=TODAY, narration='Ada paid', lines=[{'account_id': cash, 'amount': amount}],
+                              counterparty_id=ids['ada'], payment_method='Cash')
+    assert runtime_post(books, receipt('20000'))['outstanding'] == '40000.00'
+    with pytest.raises(HTTPException, match='exceeds outstanding'):
+        runtime_post(books, receipt('40000.01'))
+    assert runtime_post(books, receipt('40000'))['outstanding'] == '0.00'
+    with psycopg.connect(URL) as c:
+        assert c.execute('SELECT status FROM invoices WHERE id=%s', (invoice['source_id'],)).fetchone() == ('paid',)
+        # Opening balance equity is only a bridge: it ends at zero.
+        assert c.execute("""SELECT coalesce(sum(CASE WHEN l.entry_type::text='DEBIT' THEN l.amount ELSE -l.amount END),0) FROM accounting.ledger l
+            JOIN accounting.account_map m ON m.library_id=l.post_account_id AND m.business_id=l.business_id
+            JOIN accounts a ON a.id=m.account_id WHERE l.business_id=%s AND a.code='3900'""", (legacy,)).fetchone() == (0,)
+
+
+def test_suppliers_are_paid_against_their_opening_bill(books):
+    _, legacy, _, _, _, ids = books
+    approved(books)
+    bill = next(doc for doc in turn_on(books)['opening_documents'] if doc['type'] == 'bill')
+    assert (bill['party_id'], bill['amount']) == (str(ids['supplier']), '150000.50')
+    payables, cash = accounts_by_code(legacy, '2000', '1000')
+    paid = runtime_post(books, PostingCommand(request_key=uuid4(), kind='supplier_payment', source_id=uuid4(), target_id=bill['source_id'],
+                                              main_account_id=payables, entry_date=TODAY, narration='Paid Mills', counterparty_id=ids['supplier'],
+                                              lines=[{'account_id': cash, 'amount': '50000.50'}]))
+    assert paid['outstanding'] == '100000.00'

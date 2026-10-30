@@ -20,8 +20,10 @@ Doc 09 section 8 step 7, FR-130, RB-05 and PR-01. Fourth Phase 2 item, built on 
   - **Old-style records.** Activation is refused when the business has records dated after the start date: ledger entries, journal entries, sent invoices, sales or successful payments. They would otherwise be left out of the new books (`LEGACY_ACTIVITY_AFTER_START_DATE`).
   - **Provisioning.** Sets up the adopted chart through the same rules as before. It refuses an unreviewed template unless staging is explicitly allowed.
   - **Posting.**
-    - posts the approved journal as one compound journal entry dated on the start date, with per-customer and per-supplier line descriptions
-    - proves the posted ledger, account by account, equals the approved journal
+    - posts the approved journal dated on the start date. Each customer and supplier balance gets its own entry against opening balance equity (3900), and the main journal takes 3900 in their place, so 3900 nets to zero
+    - each customer balance gets an opening invoice (`OPEN-000001`, status sent, issue date the start date) linked to its entry. It appears in Invoices, and the normal receipt flow matches payments to it
+    - each supplier balance gets an opening bill linked the same way, so supplier payments match against it
+    - proves the whole ledger, account by account, equals the approved journal
     - fires the deferred balanced-ledger checks before returning
   - **Turning on.**
     - writes `business_map` as active, with the start date as cutover and the reconciliation evidence: version, approver, operator, totals, template and whether it was reviewed
@@ -33,13 +35,13 @@ Doc 09 section 8 step 7, FR-130, RB-05 and PR-01. Fourth Phase 2 item, built on 
 
 ## For the reviewer (DEP-02)
 
-1. The opening journal is one compound entry. When several customers or suppliers share an account, their lines stay separate with the party name in the description, and the ledger balance is per account.
-2. Customer and supplier opening balances are not yet opening invoices or bills. Until that follow-up, a receipt can't be allocated against an opening balance.
+1. Customer and supplier balances go through opening balance equity (3900), one entry per party, so each can be cleared by receipts or payments. 3900 ends at zero.
+2. Opening invoices have no line items, only the total and a note. The opening bills exist in the ledger but there is no bills screen yet.
 3. A cash-flow report whose period includes the start date shows the opening journal as cash flows. Reports should treat it as opening cash; this is left for the reports item.
 
 ## Verification
 
-- `test_activation_postgres.py` (13 cases). It covers:
+- `test_activation_postgres.py` (14 cases). It covers:
   - the ledger equals the approved journal by account
   - the business is active with the start date as cutover, the timezone, the document link and the audit row
   - the restricted runtime reads a balanced trial balance and balance sheet with the expected cash, stock, receivables and liabilities
@@ -48,6 +50,7 @@ Doc 09 section 8 step 7, FR-130, RB-05 and PR-01. Fourth Phase 2 item, built on 
   - refusals for an unapproved position, an unreviewed chart, Editors, Viewers and outsiders, changed stock, a removed customer, old-style records after the start date, and a start date outside the year; each refusal leaves nothing created
   - a dry run leaves nothing behind and the real run still works afterwards
   - choosing the main line when accounts repeat
+  - a customer pays an opening invoice in two parts (overpaying is refused; the invoice ends paid), and a supplier is paid part of an opening bill
 - Browser components add the live state.
 
 ## Release steps

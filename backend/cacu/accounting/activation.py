@@ -9,7 +9,7 @@ import json
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 from python_accounting.models import Account
 from python_accounting.transactions import JournalEntry
 from cacu.accounting.chart import build_mapping
@@ -90,12 +90,33 @@ def _party_names(connection, tenant, lines):
     return names
 
 
-def _ledger_matches(connection, tenant, transaction_id, expected):
+def _ledger_matches(connection, tenant, expected):
+    """Every ledger leg of the business, by source account, equals the approved journal (3900 nets to zero)."""
     rows = connection.exec_driver_sql("""SELECT m.account_id, sum(CASE WHEN l.entry_type::text='DEBIT' THEN l.amount ELSE -l.amount END)
         FROM accounting.ledger l JOIN accounting.account_map m ON m.library_id=l.post_account_id AND m.business_id=l.business_id
-        WHERE l.business_id=%s AND l.transaction_id=%s GROUP BY m.account_id""", (tenant, transaction_id)).all()
+        WHERE l.business_id=%s GROUP BY m.account_id""", (tenant,)).all()
     actual = {str(account): Decimal(total) for account, total in rows if Decimal(total) != 0}
     return actual == {k: v for k, v in expected.items() if v != 0}
+
+
+def _opening_document(connection, session, tenant, accounts, line, name, as_of, number):
+    """One clearable opening entry per customer or supplier balance, so receipts and payments can be matched to it.
+    Customers also get an opening invoice (OPEN-000001) that the invoice list and receipt flow already understand."""
+    customer = line['party_type'] == 'customers'
+    amount = Decimal(line['amount'])
+    party_account, clearing = accounts
+    tx = native_post(session, JournalEntry, party_account, [(clearing, amount, customer, f'Opening balance: {name}')], as_of,
+                     f'Opening balance: {name}', not customer)
+    source = uuid4()
+    if customer:
+        connection.exec_driver_sql("""INSERT INTO public.invoices(id,business_id,customer_id,invoice_number,type,status,issue_date,due_date,subtotal,total,tax,vat_included,notes)
+            VALUES(%s,%s,%s,%s,'Invoice','sent',%s,%s,%s,%s,0,false,%s)""",
+            (str(source), tenant, line['party_id'], f'OPEN-{number:06d}', as_of, as_of, amount, amount, f'Opening balance owed on {as_of.isoformat()}'))
+    kind = 'invoice' if customer else 'bill'
+    connection.exec_driver_sql('INSERT INTO accounting.document_map(business_id,source_type,source_id,transaction_id) VALUES(%s,%s,%s,%s)',
+                               (tenant, kind, str(source), tx.id))
+    return {'type': kind, 'source_id': str(source), 'party_id': line['party_id'], 'amount': format(amount, '.2f'),
+            'transaction_id': tx.id, 'number': f'OPEN-{number:06d}' if customer else None}
 
 
 def _main_and_rest(lines):
@@ -140,31 +161,49 @@ def activate(connection, business_id: UUID, operator: UUID, allow_unreviewed=Fal
         entity, library = provision(connection, session, business_id, mapping)
         session.entity = entity
         transaction_id = transaction_no = None
+        documents = []
         lines = position.journal['lines']
         expected = defaultdict(Decimal)
         for line in lines:
             expected[line['account_id']] += Decimal(line['amount']) * (1 if line['side'] == 'debit' else -1)
-        if lines:
-            if any(line['account_id'] not in library for line in lines):
-                raise ActivationError('OPENING_ACCOUNT_UNMAPPED', 'the approved journal uses an account outside the adopted chart')
-            names = _party_names(connection, tenant, lines)
-            main, rest = _main_and_rest(lines)
-            main_account = session.get(Account, library[main])
-            legs = [(session.get(Account, library[line['account_id']]), Decimal(line['amount']), line['side'] == 'credit',
-                     f"Opening balance: {names[line['party_id']]}" if line.get('party_id') else 'Opening balance') for line in rest]
-            tx = native_post(session, JournalEntry, main_account, legs, position.as_of, f'Opening balances (version {position.version})',
-                             expected[main] < 0, abs(expected[main]))
+        if any(line['account_id'] not in library for line in lines):
+            raise ActivationError('OPENING_ACCOUNT_UNMAPPED', 'the approved journal uses an account outside the adopted chart')
+        # Party balances post as their own clearable entries against opening balance equity (3900); the main
+        # journal takes 3900 in their place, so 3900 nets to zero and every account still equals the approval.
+        party_lines = [line for line in lines if line.get('party_id')]
+        main_lines = [line for line in lines if not line.get('party_id')]
+        clearing = str(connection.exec_driver_sql("SELECT id FROM public.accounts WHERE business_id=%s AND code='3900' AND is_active", (tenant,)).scalar())
+        if party_lines and clearing not in library:
+            raise ActivationError('OPENING_ACCOUNT_UNMAPPED', 'opening balance equity (3900) is needed for customer and supplier balances')
+        net = sum((Decimal(l['amount']) * (1 if l['side'] == 'debit' else -1) for l in party_lines), Decimal('0'))
+        if net:
+            main_lines.append({'account_id': clearing, 'side': 'debit' if net > 0 else 'credit', 'amount': str(abs(net))})
+        if main_lines:
+            signed = defaultdict(Decimal)
+            for line in main_lines:
+                signed[line['account_id']] += Decimal(line['amount']) * (1 if line['side'] == 'debit' else -1)
+            main, rest = _main_and_rest(main_lines)
+            legs = [(session.get(Account, library[line['account_id']]), Decimal(line['amount']), line['side'] == 'credit', 'Opening balance') for line in rest]
+            tx = native_post(session, JournalEntry, session.get(Account, library[main]), legs, position.as_of,
+                             f'Opening balances (version {position.version})', signed[main] < 0, abs(signed[main]))
             transaction_id, transaction_no = tx.id, tx.transaction_no
-            if not _ledger_matches(connection, tenant, transaction_id, expected):
-                raise ActivationError('LEDGER_MISMATCH', 'posted ledger does not equal the approved opening journal')
             connection.exec_driver_sql('INSERT INTO accounting.document_map(business_id,source_type,source_id,transaction_id) VALUES(%s,%s,%s,%s)',
                                        (tenant, SOURCE_TYPE, str(position.request_key), transaction_id))
+        names = _party_names(connection, tenant, party_lines)
+        customers = 0
+        for line in party_lines:
+            customers += line['party_type'] == 'customers'
+            documents.append(_opening_document(connection, session, tenant,
+                (session.get(Account, library[line['account_id']]), session.get(Account, library[clearing])),
+                line, names[line['party_id']], position.as_of, customers))
+        if not _ledger_matches(connection, tenant, expected):
+            raise ActivationError('LEDGER_MISMATCH', 'posted ledger does not equal the approved opening journal')
         evidence = {'opening_version': position.version, 'start_date': position.as_of.isoformat(), 'template': mapping['template'],
                     'approved_by': str(position.approved_by), 'approved_at': position.approved_at.isoformat(),
                     'activated_by': str(operator), 'debits': format(total, '.2f'), 'credits': format(total, '.2f'),
                     'stock_value': position.summary['stock'], 'owner_equity': position.summary['owner_equity'],
                     'transaction_id': transaction_id, 'transaction_no': transaction_no, 'accounts': len(mapping['accounts']),
-                    'parties': len(mapping['parties']), 'legacy_after_start_date': legacy,
+                    'parties': len(mapping['parties']), 'opening_documents': documents, 'legacy_after_start_date': legacy,
                     'template_reviewed': mapping['template_status'] == 'reviewed'}
         connection.exec_driver_sql("""INSERT INTO accounting.business_map(business_id,entity_id,timezone,state,cutover_date,reconciliation_evidence)
             VALUES(%s,%s,%s,'active',%s,%s::jsonb)""", (tenant, entity.id, timezone, position.as_of, json.dumps(evidence)))
