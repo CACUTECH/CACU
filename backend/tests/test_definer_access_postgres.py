@@ -17,6 +17,11 @@ MIGRATION = Path('../supabase/migrations/20261030120000_definer_function_access.
 # read-only advisor on 29 October 2026 plus later migrations; see docs/suite/definer-function-inventory-20261030.md.
 REVIEWED = {
     'accept_business_invitation': 'invitation email must match the verified caller',
+    'adopt_default_chart': 'management_private.authorize owner/admin',
+    'approve_opening_position': 'management_private.authorize owner/admin',
+    'chart_of_accounts': 'management_private.authorize any member',
+    'opening_position': 'management_private.authorize owner/admin',
+    'save_opening_position': 'management_private.authorize owner/admin',
     'accounting_mode': 'is_business_member',
     'can_read_upload': 'active membership and valid resource',
     'create_invoice_safe': 'has_business_role owner/admin/editor',

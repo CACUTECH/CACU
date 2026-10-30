@@ -21,6 +21,6 @@ Source: Supabase security advisor and `pg_proc` on production (read-only, 29 Oct
 | `request_upload_delete` | Owner/Admin row, then `can_read_upload`, which requires an active membership | Keep |
 | `reserve_upload` | Active membership with a role allowed for the purpose | Keep |
 
-Added since the advisor run: `record_ledger_entry_safe`, `update_invoice_status_safe` (20261030100000) and `create_invoice_safe` (20261030110000), all Owner/Admin/Editor.
+Added since the advisor run: `record_ledger_entry_safe`, `update_invoice_status_safe` (20261030100000) and `create_invoice_safe` (20261030110000), all Owner/Admin/Editor. Also `adopt_default_chart` (Owner/Admin) and `chart_of_accounts` (any member) from 20261031100000, and `save_opening_position`, `approve_opening_position` and `opening_position` (Owner/Admin) from 20261031110000, all through `management_private.authorize`.
 
 `backend/tests/test_definer_access_postgres.py` keeps this list honest: it fails when a callable SECURITY DEFINER function is not in its reviewed list or has no fixed `search_path`, and it calls every listed function as a member of another business and requires a refusal or an empty answer with nothing written. Re-run the advisor after each migration and update this table.
