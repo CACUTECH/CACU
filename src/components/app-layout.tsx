@@ -261,7 +261,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
           <div className="flex items-center gap-3 p-2.5 mt-1 rounded-xl bg-sidebar-accent/40 border border-sidebar-border">
             <Avatar className="size-9 border-2 border-primary/20 shrink-0">
-              <AvatarImage src={user?.user_metadata?.avatar_url || "https://placehold.co/40x40"} alt="User" />
+              <AvatarImage src={user?.user_metadata?.avatar_url || undefined} alt="User" />
               <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden group-data-[state=collapsed]:hidden">

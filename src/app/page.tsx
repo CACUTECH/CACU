@@ -155,7 +155,6 @@ export default function DashboardPage() {
             title="Revenue (MTD)" 
             value={`₦${Number(stats?.financials?.total_income || 0).toLocaleString()}`} 
             subtext={`${stats?.financials?.transaction_count || 0} events`} 
-            trend="up" 
             icon={TrendingUp} 
             variant="primary" 
         />
