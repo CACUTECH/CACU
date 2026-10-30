@@ -1,0 +1,42 @@
+import React from 'react';
+import { test, expect } from '@playwright/experimental-ct-react';
+import StartYourBooksPage from '../../src/app/setup/books/page';
+
+test('owner answers one question per screen, retries a save with the same key, reviews and approves on mobile', async ({ mount, page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const component = await mount(<StartYourBooksPage />);
+  const cash = component.getByLabel('How much cash is in the till and safe now?');
+  await expect(component.getByText('Step 1 of 8: Cash')).toBeVisible();
+  await cash.fill('25000');
+  await cash.pressSequentially('.555');
+  await expect(cash).toHaveValue('25000.55');
+  await component.getByRole('button', { name: 'Next' }).click();
+  await component.getByLabel('Money in Bank account').fill('400000');
+  await component.getByRole('button', { name: 'Next' }).click();
+  await expect(component.getByText('₦503,601.50')).toBeVisible();
+  await component.getByRole('button', { name: 'Next' }).click();
+  await component.getByLabel('Ada Stores').fill('60000');
+  for (let i = 0; i < 3; i++) await component.getByRole('button', { name: 'Next' }).click();
+  await component.getByLabel('How much of your own money have you put into the business?').fill('300000');
+  await component.getByRole('button', { name: 'Review' }).click();
+  await expect(component.getByRole('alert')).toContainText('Retry to check whether it was saved');
+  await component.getByRole('button', { name: 'Review' }).click();
+  await expect(component.getByText('Total you own')).toBeVisible();
+  await expect(component.getByText('₦988,602.05')).toHaveCount(2);
+  const calls = await page.evaluate(() => (window as unknown as { openingCalls: { key: string }[] }).openingCalls);
+  expect(calls).toHaveLength(2);
+  expect(calls[0].key).toBe(calls[1].key);
+  await component.getByLabel('Accountant view').click();
+  await expect(component.getByRole('columnheader', { name: 'Debit' })).toBeVisible();
+  await expect(component.getByText('Trade receivables (Ada Stores)')).toBeVisible();
+  await component.getByRole('button', { name: 'Approve opening position' }).click();
+  await expect(component.getByText(/Approved by Ada Owner/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('once the books are live the owner sees the start date and cannot edit opening balances', async ({ mount, page }) => {
+  await page.evaluate(() => { (window as unknown as { openingLive: boolean }).openingLive = true; });
+  const component = await mount(<StartYourBooksPage />);
+  await expect(component.getByText(/Your books are live from 1 October 2026/)).toBeVisible();
+  await expect(component.getByRole('button', { name: 'Next' })).toHaveCount(0);
+});

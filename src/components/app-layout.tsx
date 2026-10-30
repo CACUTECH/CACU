@@ -168,6 +168,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       label: 'Accounting',
       icon: BookText,
       children: [
+        { href: '/setup/books', label: 'Start your books' },
         { href: '/accounting/chart-of-accounts', label: 'Chart of Accounts' },
         { href: '/accounting/journal-entries', label: 'Journal Adjustments' },
         { href: '/accounting/trial-balance', label: 'Trial Balance' },
