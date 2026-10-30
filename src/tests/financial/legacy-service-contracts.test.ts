@@ -2,6 +2,8 @@ import { SalesService } from '@/services/sales-service';
 import { PaymentService } from '@/services/payment-service';
 import { InvoiceService } from '@/services/invoice-service';
 import { NotificationService } from '@/services/notification-service';
+import { CustomerService } from '@/services/customer-service';
+import { SupplierService } from '@/services/supplier-service';
 
 jest.mock('@/lib/accounting-client', () => ({
   usesPythonAccounting: jest.fn().mockResolvedValue(false), accountingRequest: jest.fn(),
@@ -84,4 +86,15 @@ describe('legacy invoice creation', () => {
     await expect(service.createInvoice({ ...header, requestKey: 'retry-key' }, [line])).rejects.toThrow('The invoice request was invalid');
     expect(rpc).not.toHaveBeenCalled();
   });
+});
+
+test.each([
+  ['customer', () => new CustomerService(), (s: CustomerService | SupplierService) => (s as CustomerService).deleteCustomer('id'), 'invoices, sales or payments'],
+  ['supplier', () => new SupplierService(), (s: CustomerService | SupplierService) => (s as SupplierService).deleteSupplier('id'), 'linked to catalogue items'],
+])('a %s with kept history explains why it cannot be removed', async (_name, make, remove, message) => {
+  const service = make();
+  const eq = jest.fn();
+  const query = { delete: () => query, eq: eq.mockImplementation(() => eq.mock.calls.length < 2 ? query : Promise.resolve({ error: { code: '23503', message: 'violates foreign key' } })) };
+  Object.assign(service, { getContext: jest.fn().mockResolvedValue({ supabase: { from: () => query }, businessId: 'business', role: 'owner' }) });
+  await expect(remove(service)).rejects.toThrow(message);
 });
