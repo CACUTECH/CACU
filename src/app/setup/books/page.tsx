@@ -78,7 +78,10 @@ export default function StartYourBooksPage() {
   if (!data || !answers) {
     return <Shell><div role="status" className="flex items-center gap-3 py-12"><Loader2 className="h-5 w-5 animate-spin text-primary" />Loading</div></Shell>;
   }
-  if (data.books_active) return <Shell><p>Your books are live. Opening balances can no longer be changed here.</p></Shell>;
+  if (data.books_active) {
+    const from = data.position ? ` from ${new Date(data.position.as_of).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })}` : '';
+    return <Shell><p>Your books are live{from}. Opening balances can no longer be changed here; ask your accountant to correct them with a journal entry.</p></Shell>;
+  }
   if (!data.chart_ready) {
     return <Shell><p>First set up the standard accounts your books will use.</p>
       <Button asChild className="mt-4"><Link href="/accounting/chart-of-accounts">Go to Chart of Accounts</Link></Button></Shell>;

@@ -55,5 +55,5 @@ def build_mapping(connection, business_id, allow_unreviewed=False):
     parties += [{'type': 'suppliers', 'id': str(r[0]), 'account_id': by_purpose['payables']}
                 for r in connection.execute('SELECT id FROM public.suppliers WHERE business_id = %s ORDER BY id', (str(business_id),))]
     return {'business_id': str(business_id), 'timezone': 'Africa/Lagos',
-            'template': version, 'accounts': [{k: a[k] for k in ('id', 'account_type', 'flow_section', 'purpose')} for a in accounts],
+            'template': version, 'template_status': status, 'accounts': [{k: a[k] for k in ('id', 'account_type', 'flow_section', 'purpose')} for a in accounts],
             'parties': parties}

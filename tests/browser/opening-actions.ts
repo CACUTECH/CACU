@@ -10,7 +10,14 @@ let state: OpeningPosition = base;
 let failFirstSave = true;
 const calls: { key: string; version: number; answers: OpeningAnswers }[] = [];
 
-export async function getOpeningPositionAction() { return { success: true as const, data: state }; }
+export async function getOpeningPositionAction() {
+  // A spec sets window.openingLive to see the screen after activation.
+  if ((window as unknown as { openingLive?: boolean }).openingLive) {
+    return { success: true as const, data: { ...base, books_active: true, position: { version: 1, status: 'approved' as const, as_of: '2026-10-01', answers: {} as OpeningAnswers,
+      summary: {} as NonNullable<OpeningPosition['position']>['summary'], journal: { entry_date: '2026-10-01', lines: [] }, approved_at: '2026-10-02T09:00:00Z', approved_by: 'Ada Owner' } } };
+  }
+  return { success: true as const, data: state };
+}
 
 export async function saveOpeningPositionAction(key: string, version: number, answers: OpeningAnswers) {
   calls.push({ key, version, answers });

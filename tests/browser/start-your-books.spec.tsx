@@ -33,3 +33,10 @@ test('owner answers one question per screen, retries a save with the same key, r
   await expect(component.getByText(/Approved by Ada Owner/)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test('once the books are live the owner sees the start date and cannot edit opening balances', async ({ mount, page }) => {
+  await page.evaluate(() => { (window as unknown as { openingLive: boolean }).openingLive = true; });
+  const component = await mount(<StartYourBooksPage />);
+  await expect(component.getByText(/Your books are live from 1 October 2026/)).toBeVisible();
+  await expect(component.getByRole('button', { name: 'Next' })).toHaveCount(0);
+});
