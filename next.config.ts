@@ -1,22 +1,10 @@
 import type {NextConfig} from 'next';
+import { securityHeaders } from './src/lib/security-headers';
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**',
-      },
-    ],
+  // Prototype image hosts (placehold.co, picsum.photos) removed: Doc 05 TD-014, Doc 19 TEST-406.
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders(process.env.NEXT_PUBLIC_SUPABASE_URL) }];
   },
 };
 
