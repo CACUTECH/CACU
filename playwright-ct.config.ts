@@ -12,6 +12,7 @@ export default defineConfig({
         if (source === 'next/navigation') return path.resolve(__dirname, 'tests/browser/setup-navigation.ts');
       }
       if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/transactions/page.tsx')) return path.resolve(__dirname, 'tests/browser/ledger-actions.ts');
+      if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/chart-of-accounts/page.tsx')) return path.resolve(__dirname, 'tests/browser/chart-actions.ts');
       if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/reports/page.tsx')) return path.resolve(__dirname, 'tests/browser/reports-action.ts');
       if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/accounting/cash-flow/cash-flow-statement.tsx')) return path.resolve(__dirname, 'tests/browser/cash-flow-action.ts');
     } }],

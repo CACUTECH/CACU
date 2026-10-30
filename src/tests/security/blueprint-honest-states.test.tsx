@@ -10,10 +10,9 @@ import Page7 from '@/app/analytics/aging-reports/page';
 import Page8 from '@/app/analytics/reconciliation/page';
 import Page9 from '@/app/appointments/page';
 import Page10 from '@/app/jobs/page';
-import Page11 from '@/app/accounting/chart-of-accounts/page';
 import Page12 from '@/app/settings/profile/page';
 
-// TEST-407 regression for the thirteen confirmed prototype routes, not a global
+// TEST-407 regression for the twelve confirmed prototype routes, not a global
 // production-build scan or proof that every route in the application is ready.
 test.each([
   { Page: Page0, title: 'Tax Settings' },
@@ -27,7 +26,6 @@ test.each([
   { Page: Page8, title: 'Bank Reconciliation' },
   { Page: Page9, title: 'Appointments' },
   { Page: Page10, title: 'Work Orders & Jobs' },
-  { Page: Page11, title: 'Chart of Accounts' },
   { Page: Page12, title: 'Personal Profile' }
 ])('$title explains unavailability without editable controls or sample figures', ({ Page, title }) => {
   const { container } = render(<Page />);
