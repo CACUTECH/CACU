@@ -24,6 +24,16 @@ class AtomicAccountingSession(AccountingSession):
         # may commit; otherwise document/stock/audit failures would leave postings.
         self.flush()
 
+def take_write_slot(engine, user_id: UUID, business_id: UUID):
+    """API-012: count this write against the user's and the business's per-minute allowance. It commits on its own,
+    before the write's transaction, so refused and failed writes count too."""
+    with engine.begin() as connection:
+        connection.exec_driver_sql("SELECT set_config('request.jwt.claims', %s, true), set_config('cacu.business_id', %s, true)",
+                                   (json.dumps({'sub': str(user_id), 'role': 'authenticated'}), str(business_id)))
+        wait = connection.exec_driver_sql('SELECT accounting.take_write_slot(%s)', (str(business_id),)).scalar()
+    if wait:
+        raise HTTPException(429, f'Too many changes in a short time. Try again in {wait} seconds.', headers={'Retry-After': str(wait)})
+
 @contextmanager
 def library_transaction(user_id: UUID, business_id: UUID, write=False):
     dsn = os.environ.get('CACU_DATABASE_URL')
@@ -36,6 +46,8 @@ def library_transaction(user_id: UUID, business_id: UUID, write=False):
     engine = create_engine(dsn, poolclass=NullPool, hide_parameters=True,
                           connect_args=database_connect_options())
     try:
+        if write:
+            take_write_slot(engine, user_id, business_id)
         with engine.begin() as connection:
             role = connection.exec_driver_sql('SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user').one()
             if role != ('cacu_runtime', False, False):
