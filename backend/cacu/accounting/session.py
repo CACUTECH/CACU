@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
+from cacu.database_tls import database_connect_options
 from python_accounting.database.session import AccountingSession
 from python_accounting.models import Entity
 import python_accounting.transactions  # register concrete polymorphic models
@@ -33,7 +34,7 @@ def library_transaction(user_id: UUID, business_id: UUID, write=False):
     if dsn.startswith('postgresql://'):
         dsn = dsn.replace('postgresql://', 'postgresql+psycopg://', 1)
     engine = create_engine(dsn, poolclass=NullPool, hide_parameters=True,
-                          connect_args={'sslmode': 'verify-full', 'prepare_threshold': None, 'connect_timeout': 10})
+                          connect_args=database_connect_options())
     try:
         with engine.begin() as connection:
             role = connection.exec_driver_sql('SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user').one()

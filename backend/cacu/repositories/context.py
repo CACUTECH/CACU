@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from uuid import UUID
 import psycopg
 from fastapi import HTTPException
+from cacu.database_tls import database_connect_options
 
 @contextmanager
 def authorized_transaction(user_id: UUID, business_id: UUID, write: bool = False):
@@ -12,7 +13,7 @@ def authorized_transaction(user_id: UUID, business_id: UUID, write: bool = False
     if not dsn:
         raise HTTPException(503, "Accounting database unavailable")
     # New connection per request: no client pool; prepared statements disabled for Supavisor.
-    with psycopg.connect(dsn, sslmode="verify-full", prepare_threshold=None, connect_timeout=10) as connection:
+    with psycopg.connect(dsn, **database_connect_options()) as connection:
         with connection.transaction():
             with connection.cursor() as cursor:
                 cursor.execute("SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user")
