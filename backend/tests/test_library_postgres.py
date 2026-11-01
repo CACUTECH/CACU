@@ -41,6 +41,8 @@ def database():
           CREATE TABLE public.financial_transactions(id uuid primary key,business_id uuid);
           CREATE TABLE public.journal_entries(id uuid primary key,business_id uuid);
           CREATE TABLE public.journal_lines(id uuid primary key,business_id uuid);
+          -- Plain PostgreSQL CI has no Supabase Auth roles; bootstrap both before migrations.
+          DO $$ BEGIN IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF; END $$;
           DO $$ BEGIN IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF; END $$;
           CREATE FUNCTION public.is_business_member(tenant uuid) RETURNS boolean LANGUAGE sql AS $$
           SELECT EXISTS(SELECT FROM public.memberships WHERE business_id=tenant AND user_id=(current_setting('request.jwt.claims')::jsonb->>'sub')::uuid); $$;
