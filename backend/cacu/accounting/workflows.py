@@ -156,3 +156,86 @@ def sale_create(session,actor,data:SaleCreate):
             lines=[{'account_id':purpose(session,'revenue'),'amount':format(total,'.2f')}],stock=stock)
         return {'saleId':str(data.request_key),'posting':post_command(session,actor,cmd)}
     return durable(session,actor,'pos',data,execute)
+
+
+EXPENSE_TYPES={Account.AccountType.OPERATING_EXPENSE,Account.AccountType.OVERHEAD_EXPENSE,Account.AccountType.OTHER_EXPENSE,Account.AccountType.DIRECT_EXPENSE}
+# Cost of sales and stock write-offs change only with stock movements (Doc 09 controls).
+STOCK_PURPOSES={'cogs','stock_adjustment'}
+
+class ExpenseCreate(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    request_key:UUID
+    expense_account_id:UUID
+    amount:str=Field(pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
+    entry_date:date
+    method:str=Field(pattern=r'^(Cash|Transfer)$')
+    bank_account_id:UUID|None=None
+    description:str=Field(min_length=1,max_length=500)
+
+class ReversalCreate(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    request_key:UUID
+    entry_date:date
+    reason:str=Field(min_length=1,max_length=500)
+
+
+def role(session,actor):
+    return raw(session,'SELECT accounting.lock_membership(%s,%s)',(str(session.business_id),str(actor))).scalar()
+
+def business_today(session):
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo(session.business_timezone)).date()
+
+def expense_accounts(session):
+    rows=raw(session,"""SELECT a.id,a.code,a.name,n.account_type::text AS library_type,m.purpose FROM accounting.account_map m
+      JOIN public.accounts a ON a.id=m.account_id AND a.business_id=m.business_id
+      JOIN accounting.account n ON n.id=m.library_id AND n.business_id=m.business_id
+      WHERE m.business_id=%s AND a.is_active ORDER BY a.code,a.name""",(str(session.business_id),)).all()
+    names={t.name for t in EXPENSE_TYPES}
+    return [{'id':str(r.id),'code':r.code,'name':r.name} for r in rows if r.library_type in names and r.purpose not in STOCK_PURPOSES]
+
+def expense_create(session,actor,data:ExpenseCreate):
+    """PR-17: debit the chosen expense account, credit the cash or bank account it was paid from."""
+    def execute():
+        if role(session,actor) not in {'owner','admin','editor'}:raise HTTPException(403,'Only Owners, Admins and Editors can record expenses')
+        if Decimal(data.amount)<=0:raise HTTPException(422,'Enter an amount above zero')
+        if data.entry_date>business_today(session):raise HTTPException(422,'An expense cannot be dated in the future')
+        if str(data.expense_account_id) not in {a['id'] for a in expense_accounts(session)}:
+            raise HTTPException(422,'Choose an expense account from your chart')
+        paid_from=collection_account(session,data.method,data.bank_account_id)
+        cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='expense',source_id=data.request_key,
+            main_account_id=paid_from,entry_date=data.entry_date,narration=data.description,
+            lines=[{'account_id':data.expense_account_id,'amount':data.amount}])
+        return {'id':str(data.request_key),'posting':post_command(session,actor,cmd)}
+    return durable(session,actor,'expense',data,execute)
+
+def recent_documents(session,kind,limit=50):
+    """Posted manual journals or expenses, newest first, with whether each was reversed."""
+    stock="AND NOT EXISTS(SELECT FROM accounting.stock_event e WHERE e.business_id=d.business_id AND e.source_id=d.source_id)" if kind=='adjustment' else ''
+    rows=raw(session,f"""SELECT d.source_id,t.transaction_no,t.transaction_date::date AS entry_date,t.narration,
+        (SELECT sum(l.amount) FROM accounting.ledger l WHERE l.business_id=t.business_id AND l.transaction_id=t.id AND l.entry_type::text='DEBIT') AS amount,
+        r.reversal_id IS NOT NULL AS reversed
+      FROM accounting.document_map d JOIN accounting."transaction" t ON t.id=d.transaction_id AND t.business_id=d.business_id
+      LEFT JOIN accounting.reversal_map r ON r.business_id=t.business_id AND r.original_id=t.id
+      WHERE d.business_id=%s AND d.source_type=%s {stock}
+      ORDER BY t.transaction_date DESC,t.id DESC LIMIT %s""",(str(session.business_id),kind,limit)).all()
+    return [{'id':str(r.source_id),'number':r.transaction_no,'date':r.entry_date.isoformat(),'description':r.narration,
+             'amount':format(r.amount or 0,'.2f'),'reversed':r.reversed} for r in rows]
+
+def reversal_create(session,actor,target_id:UUID,data:ReversalCreate):
+    """PR-26: post the mirror of a manual journal or expense; the original is never edited (ACC-010)."""
+    def execute():
+        if role(session,actor) not in {'owner','admin'}:raise HTTPException(403,'Only an Owner or Admin can reverse an entry')
+        if data.entry_date>business_today(session):raise HTTPException(422,'A reversal cannot be dated in the future')
+        original=raw(session,"""SELECT t.transaction_no,m.account_id FROM accounting.document_map d
+            JOIN accounting."transaction" t ON t.id=d.transaction_id AND t.business_id=d.business_id
+            JOIN accounting.account_map m ON m.business_id=t.business_id AND m.library_id=t.account_id
+            WHERE d.business_id=%s AND d.source_id=%s AND d.source_type IN ('adjustment','expense')""",(str(session.business_id),str(target_id))).first()
+        if not original:raise HTTPException(422,'Only posted manual journals and expenses can be reversed')
+        # The engine derives the legs from the original; this line only satisfies the command shape.
+        cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='reversal',source_id=data.request_key,target_id=target_id,
+            main_account_id=original.account_id,entry_date=data.entry_date,narration=f'Reversal of {original.transaction_no}: {data.reason}',
+            lines=[{'account_id':original.account_id,'amount':'0.01'}])
+        # post_command audits the reversal in accounting.audit_event; the reason is in its narration.
+        return {'id':str(data.request_key),'reversed':str(target_id),'posting':post_command(session,actor,cmd)}
+    return durable(session,actor,'reversal:'+str(target_id),data,execute)
