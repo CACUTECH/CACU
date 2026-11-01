@@ -28,10 +28,15 @@ test('shows reconciled ledger figures, transaction drill-down and exact CSV', as
 
 test('comparison uses the selected scope and error clears financial figures', async ({ mount }) => {
   const component = await mount(<CashFlowPage />);
-  await component.getByLabel('Compare previous equal period').check();
+  await component.getByLabel('Start date').fill('2026-10-01');
+  await component.getByLabel('End date').fill('2026-10-31');
+  await component.getByLabel('Compare with').selectOption('prior');
   await component.getByRole('button', { name: 'Run report' }).click();
-  await expect(component.getByText(/Comparison:/)).toBeVisible();
+  await expect(component.getByText('Comparison: 2026-08-31 to 2026-09-30')).toBeVisible();
   await expect(component.getByRole('columnheader', { name: 'Prior (NGN)' }).first()).toBeVisible();
+  await component.getByLabel('Compare with').selectOption('last_year');
+  await component.getByRole('button', { name: 'Run report' }).click();
+  await expect(component.getByText('Comparison: 2025-10-01 to 2025-10-31')).toBeVisible();
   await component.getByLabel('Start date').fill('2020-01-01');
   await component.getByRole('button', { name: 'Run report' }).click();
   await expect(component.getByRole('alert')).toHaveText('Accounting unavailable');

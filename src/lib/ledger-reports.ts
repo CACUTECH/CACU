@@ -11,3 +11,10 @@ export type GeneralLedger = Labels & {
   entries: { date: string; number: string; description: string; counter_account: string; debit: string; credit: string; balance: string }[];
   page: number; page_size: number; total_entries: number;
 };
+export type StatementSection = { key: string; title: string; total: string[];
+  lines: { account_id: string | null; code: string | null; name: string; amounts: string[] }[] };
+export type FinancialStatements = Labels & {
+  periods: { start_date: string; end_date: string }[]; compare: 'prior' | 'last_year' | null; exceptions: { check: string; message: string }[];
+  income_statement: { sections: StatementSection[]; gross_profit: string[]; net_profit: string[] };
+  financial_position: { sections: StatementSection[]; total_assets: string[]; total_liabilities: string[]; total_equity: string[]; difference: string[] };
+};
