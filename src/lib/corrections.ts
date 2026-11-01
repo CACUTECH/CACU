@@ -13,3 +13,12 @@ export type StockAdjustment = {
 };
 export type ApprovalPolicy = { stock_threshold: string | null; separation_of_duties: boolean };
 export type ActionResult<T> = { success: true; data: T } | { success: false; error: string; uncertain: boolean };
+export type SupplierBill = {
+  id: string; supplier_id: string | null; supplier_name: string; bill_number: string; date: string; due_date: string | null;
+  total: string; outstanding: string; status: 'unpaid' | 'part_paid' | 'paid'; opening: boolean;
+};
+export type BillInput = {
+  request_key: string; supplier_id: string; bill_number: string; entry_date: string; due_date?: string; notes: string;
+  lines: { account_id: string; amount: string; description: string }[];
+};
+export type SupplierPaymentInput = { request_key: string; amount: string; entry_date: string; method: 'Cash' | 'Transfer'; bank_account_id?: string };
