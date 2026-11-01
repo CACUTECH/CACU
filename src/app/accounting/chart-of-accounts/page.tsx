@@ -6,10 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useBusiness } from '@/components/business-provider';
-import type { ChartAccount, ChartOfAccounts } from '@/services/chart-service';
-import { adoptDefaultChartAction, getChartOfAccountsAction } from './actions';
+import { Input } from '@/components/ui/input';
+import type { AccountChange, AccountKind, ChartAccount, ChartOfAccounts } from '@/services/chart-service';
+import { adoptDefaultChartAction, changeAccountAction, getChartOfAccountsAction } from './actions';
 
-/** FR-131 read view of the business's chart (Doc 09 section 4, Doc 12 SCR-19). Accounts change through reviewed setup only. */
+/** FR-131: the business's chart (Doc 09 section 4, Doc 12 SCR-19). Owners and Admins add, rename, archive and restore
+ * accounts; accounts that automatic postings depend on cannot be archived. */
 const GROUPS: { type: ChartAccount['account_type']; title: string; term: string }[] = [
   { type: 'asset', title: 'What the business owns', term: 'Assets' },
   { type: 'liability', title: 'What the business owes', term: 'Liabilities' },
@@ -26,6 +28,13 @@ const USED_FOR: Record<string, string> = {
   cogs: 'Cost of the stock you sold', stock_adjustment: 'Stock losses and corrections', gateway_fees: 'Bank and card charges',
   cash_variance: 'Till shortages and surpluses',
 };
+const KINDS: { kind: AccountKind; label: string }[] = [
+  { kind: 'expense', label: 'A running cost (money going out)' }, { kind: 'other_expense', label: 'Another cost, such as interest' },
+  { kind: 'income', label: 'Income from sales or services' }, { kind: 'other_income', label: 'Other income' },
+  { kind: 'bank', label: 'Another bank account' }, { kind: 'current_asset', label: 'Something owned short term' },
+  { kind: 'fixed_asset', label: 'Equipment, vehicles or property' }, { kind: 'current_liability', label: 'Something owed short term' },
+  { kind: 'loan', label: 'A loan' }, { kind: 'equity', label: "Owner's money" },
+];
 
 export default function ChartOfAccountsPage() {
   const { business } = useBusiness();
@@ -45,6 +54,31 @@ export default function ChartOfAccountsPage() {
     else setError(result.error);
   }, []);
   React.useEffect(() => { void load(); }, [load]);
+
+  const [busy, setBusy] = React.useState(false), [changeError, setChangeError] = React.useState('');
+  const [newAccount, setNewAccount] = React.useState({ name: '', kind: '' as AccountKind | '' });
+  const [renaming, setRenaming] = React.useState<{ account: ChartAccount; name: string } | null>(null);
+  // An add keeps its key until confirmed, so a retry cannot add the account twice.
+  const addKey = React.useRef('');
+  const change = async (input: Omit<AccountChange, 'request_key'>) => {
+    if (!chart) return false;
+    setBusy(true); setChangeError('');
+    const key = input.operation === 'add' ? (addKey.current ||= crypto.randomUUID()) : crypto.randomUUID();
+    const result = await changeAccountAction({ ...input, request_key: key }, chart.books_active);
+    setBusy(false);
+    if (!result.success) { setChangeError(result.error); return false; }
+    if (input.operation === 'add') addKey.current = '';
+    await load();
+    return true;
+  };
+  const add = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newAccount.kind || !newAccount.name.trim()) return;
+    if (await change({ operation: 'add', kind: newAccount.kind, name: newAccount.name.trim() })) setNewAccount({ name: '', kind: '' });
+  };
+  const archive = (account: ChartAccount) => {
+    if (window.confirm('Archive ' + account.name + '? Nothing new can be posted to it until you restore it.')) void change({ operation: 'archive', account_id: account.id });
+  };
 
   const adopt = async () => {
     setAdopting(true);
@@ -93,6 +127,15 @@ export default function ChartOfAccountsPage() {
       ) : (
         <>
           <ReviewNotice chart={chart} />
+          {canSetUp && <Card><CardHeader className="pb-2"><CardTitle className="text-lg">Add an account</CardTitle>
+            <CardDescription>For example a second bank account or a cost you want to track on its own. CACU gives it a code.</CardDescription></CardHeader>
+            <CardContent><form onSubmit={event => void add(event)} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="flex-1 space-y-1 text-sm"><span>Name</span><Input value={newAccount.name} maxLength={100} disabled={busy} onChange={e => setNewAccount(a => ({ ...a, name: e.target.value }))}/></label>
+              <label className="flex-1 space-y-1 text-sm"><span>What kind of account?</span><select aria-label="Kind of account" className="w-full rounded-md border bg-background p-2" value={newAccount.kind} disabled={busy}
+                onChange={e => setNewAccount(a => ({ ...a, kind: e.target.value as AccountKind }))}><option value="">Choose</option>{KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}</select></label>
+              <Button type="submit" disabled={busy || !newAccount.name.trim() || !newAccount.kind}>Add account</Button>
+            </form></CardContent></Card>}
+          {changeError && <p role="alert" className="text-sm text-destructive">{changeError}</p>}
           {GROUPS.map(group => {
             const accounts = chart.accounts.filter(account => account.account_type === group.type);
             if (!accounts.length) return null;
@@ -105,7 +148,7 @@ export default function ChartOfAccountsPage() {
                 <CardContent className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow><TableHead className="w-16">Code</TableHead><TableHead>Account</TableHead><TableHead className="hidden sm:table-cell">Used for</TableHead></TableRow>
+                      <TableRow><TableHead className="w-16">Code</TableHead><TableHead>Account</TableHead><TableHead className="hidden sm:table-cell">Used for</TableHead>{canSetUp && <TableHead><span className="sr-only">Changes</span></TableHead>}</TableRow>
                     </TableHeader>
                     <TableBody>
                       {accounts.map(account => (
@@ -116,6 +159,12 @@ export default function ChartOfAccountsPage() {
                             <span className="block text-xs text-muted-foreground sm:hidden">{account.purpose ? USED_FOR[account.purpose] : ''}</span>
                           </TableCell>
                           <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">{account.purpose ? USED_FOR[account.purpose] : ''}</TableCell>
+                          {canSetUp && <TableCell className="text-right"><div className="flex flex-wrap justify-end gap-2">
+                            <Button size="sm" variant="outline" disabled={busy} onClick={() => setRenaming({ account, name: account.name })}>Rename</Button>
+                            {account.system ? <span className="self-center text-xs text-muted-foreground">Used by automatic postings</span>
+                              : account.is_active ? <Button size="sm" variant="outline" disabled={busy} onClick={() => archive(account)}>Archive</Button>
+                              : <Button size="sm" variant="outline" disabled={busy} onClick={() => void change({ operation: 'restore', account_id: account.id })}>Restore</Button>}
+                          </div></TableCell>}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -124,6 +173,14 @@ export default function ChartOfAccountsPage() {
               </Card>
             );
           })}
+          {renaming && <Card role="dialog" aria-label={'Rename ' + renaming.account.name}><CardContent className="pt-6">
+            <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={async event => { event.preventDefault();
+              if (renaming.name.trim() && await change({ operation: 'rename', account_id: renaming.account.id, name: renaming.name.trim() })) setRenaming(null); }}>
+              <label className="flex-1 space-y-1 text-sm"><span>New name for {renaming.account.code}</span><Input autoFocus value={renaming.name} maxLength={100} disabled={busy}
+                onChange={e => setRenaming(r => r && { ...r, name: e.target.value })}/></label>
+              <Button type="submit" disabled={busy || !renaming.name.trim()}>Save name</Button>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => setRenaming(null)}>Cancel</Button>
+            </form></CardContent></Card>}
         </>
       )}
     </div>

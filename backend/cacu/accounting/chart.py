@@ -43,10 +43,17 @@ def build_mapping(connection, business_id, allow_unreviewed=False):
     version, mode, status = adoption
     if status != 'reviewed' and not allow_unreviewed:
         raise ValueError(f'Chart template {version} is awaiting accountant review (DEP-02)')
+    # Template accounts are classified by the template; accounts the business added carry their own kind.
     rows = connection.execute("""SELECT acc.id, acc.code, t.library_type, t.flow_section, t.purpose
         FROM public.accounts acc JOIN onboarding_private.chart_template_accounts t
           ON t.version = %s AND t.mode = %s AND t.code = acc.code
-        WHERE acc.business_id = %s AND acc.is_active ORDER BY acc.code""", (version, mode, str(business_id))).fetchall()
+        WHERE acc.business_id = %s AND acc.is_active
+          AND NOT EXISTS (SELECT FROM onboarding_private.custom_accounts c WHERE c.account_id = acc.id)
+        UNION ALL
+        SELECT acc.id, acc.code, k.library_type, k.flow_section, k.purpose
+        FROM onboarding_private.custom_accounts c JOIN onboarding_private.account_kinds k ON k.kind = c.kind
+          JOIN public.accounts acc ON acc.id = c.account_id AND acc.business_id = c.business_id
+        WHERE c.business_id = %s AND acc.is_active ORDER BY 2""", (version, mode, str(business_id), str(business_id))).fetchall()
     accounts = [{'id': str(r[0]), 'code': r[1], 'account_type': r[2], 'flow_section': r[3], 'purpose': r[4] or 'other'} for r in rows]
     validate(mode, [{**a, 'purpose': None if a['purpose'] == 'other' else a['purpose']} for a in accounts])
     by_purpose = {a['purpose']: a['id'] for a in accounts}
