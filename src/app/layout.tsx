@@ -12,6 +12,9 @@ import { ErrorBoundary } from '@/components/error-boundary';
 const inter = localFont({ src: './fonts/inter-latin-variable.woff2', weight: '400 700', variable: '--font-inter', display: 'swap' });
 const spaceGrotesk = localFont({ src: './fonts/space-grotesk-latin-variable.woff2', weight: '400 700', variable: '--font-space-grotesk', display: 'swap' });
 
+// Every page renders per request so it carries that request's script nonce (see src/middleware.ts).
+export const dynamic = 'force-dynamic';
+
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
 export const metadata: Metadata = {
