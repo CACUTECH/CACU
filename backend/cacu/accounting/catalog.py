@@ -1,7 +1,7 @@
 """Catalog stock mutations share the existing native accounting transaction."""
 from datetime import datetime,time
 from zoneinfo import ZoneInfo
-from decimal import Decimal
+from decimal import Decimal,InvalidOperation
 import json
 from typing import Literal
 from uuid import UUID
@@ -31,6 +31,14 @@ def catalog_mutate(session,actor,data:CatalogMutation):
     if role not in {'owner','admin'} and not(role=='editor' and data.item_id is None):
         raise HTTPException(403,'Owner or administrator permission required')
     def execute():
+        if data.item_id is not None and 'cost_price' in data.details:
+            from cacu.accounting.inventory import state
+            if state(session,data.item_id):
+                current=raw(session,'SELECT cost_price FROM public.catalog_items WHERE business_id=%s AND id=%s',(str(session.business_id),str(data.item_id))).scalar()
+                try:requested=Decimal(str(data.details['cost_price']))
+                except (InvalidOperation,ValueError):raise HTTPException(422,'Use the recorded valuation cost for metadata edits') from None
+                if requested!=current:
+                    raise HTTPException(409,'Cost is maintained by the adopted valuation workflow; use goods receipts or NRV assessment')
         result=raw(session,'SELECT public.management_write(%s,%s,%s,%s,%s,%s::jsonb)',
             (str(session.business_id),str(data.request_key),data.operation,str(data.item_id) if data.item_id else None,data.expected_version,json.dumps(data.details))).scalar()
         if result.get('movement_id'):

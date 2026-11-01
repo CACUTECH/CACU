@@ -1,0 +1,9 @@
+{
+  "instructions": "Replace examples with reviewed facts. Signed debit balances: opening + debits - credits = closing. Include current and comparative dates for maturity reviews. Empty arrays require supported applicability exclusions.",
+  "schedules": [], "maturities": [], "equity_classifications": [],
+  "schedule_example": {"gap":"ASSET-01","title":"Asset register and accumulated charges","calculation_and_assumptions":"Describe useful lives, residual values, impairment, acquisitions and disposals; attach the signed register.","evidence":"Accountant signed register reference","rows":[{"label":"Asset cost","account_id":"REPLACE_WITH_MAPPED_ACCOUNT_ID","opening":"0.00","debits":"0.00","credits":"0.00","closing":"0.00"}]},
+  "maturity_example": {"account_id":"REPLACE_WITH_MAPPED_ACCOUNT_ID","as_of":"2026-12-31","current_portion":"0.00","rights_and_covenants":"Contractual due dates, rights at reporting date and covenant assessment."},
+  "equity_example": {"ledger_id":1,"nature":"owner_contribution","evidence":"Reviewed ledger entry and underlying owner document"},
+  "schedule_gap_codes": ["FIN-01","ASSET-01","LEASE-01","TAX-01","PEOPLE-01"],
+  "equity_natures": ["owner_contribution","distribution","oci","transfer","prior_period_adjustment","other"]
+}

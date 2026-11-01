@@ -54,7 +54,7 @@ def build_mapping(connection, business_id, allow_unreviewed=False):
         FROM onboarding_private.custom_accounts c JOIN onboarding_private.account_kinds k ON k.kind = c.kind
           JOIN public.accounts acc ON acc.id = c.account_id AND acc.business_id = c.business_id
         WHERE c.business_id = %s AND acc.is_active ORDER BY 2""", (version, mode, str(business_id), str(business_id))).fetchall()
-    accounts = [{'id': str(r[0]), 'code': r[1], 'account_type': r[2], 'flow_section': r[3], 'purpose': r[4] or 'other'} for r in rows]
+    accounts = [{'id': str(r[0]), 'code': r[1], 'account_type': r[2], 'flow_section': r[3], 'purpose': ('interest_paid' if r[1]=='7000' and r[2]=='OTHER_EXPENSE' else r[4] or 'other')} for r in rows]
     validate(mode, [{**a, 'purpose': None if a['purpose'] == 'other' else a['purpose']} for a in accounts])
     by_purpose = {a['purpose']: a['id'] for a in accounts}
     parties = [{'type': 'customers', 'id': str(r[0]), 'account_id': by_purpose['receivables']}

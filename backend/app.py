@@ -292,3 +292,69 @@ def add_account(business_id:UUID,data:AccountCreate,user_id:UUID=Depends(current
         if code in {'P0001','22023','23505','23514','42501'}:
             raise HTTPException(403 if code=='42501' else 409,ACCOUNT_MESSAGES.get(reason,'The account was not added. Check the name and kind.')) from None
         raise
+
+
+# IFRS valuation and reporting-close controls share the existing auth, tenant and transaction boundary.
+from cacu.accounting.inventory import (InventoryPolicy,AdoptItem,GoodsReceipt,NrvAssessment,StockReturn,
+    set_policy as inventory_policy_save,adopt as inventory_adopt,receipt as goods_receipt,
+    assess_nrv,restore_return,overview as inventory_overview)
+from cacu.accounting.cash_rules import CashClassification,save_classification
+from cacu.accounting.close import CloseDraft,Approval,save_close,load_close,approve_close,list_closes,GAPS
+
+@app.get('/api/v1/businesses/{business_id}/inventory/valuation')
+def inventory_valuation_report(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        return inventory_overview(session)
+
+@app.post('/api/v1/businesses/{business_id}/inventory/policy')
+def approve_inventory_policy(business_id:UUID,data:InventoryPolicy,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return inventory_policy_save(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/inventory/adopt')
+def adopt_inventory_valuation(business_id:UUID,data:AdoptItem,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return inventory_adopt(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/inventory/receipts')
+def receive_inventory(business_id:UUID,data:GoodsReceipt,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return goods_receipt(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/inventory/nrv')
+def review_inventory_nrv(business_id:UUID,data:NrvAssessment,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return assess_nrv(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/inventory/returns')
+def return_inventory(business_id:UUID,data:StockReturn,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return restore_return(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/cash-flow-classifications')
+def classify_cash_flows(business_id:UUID,data:CashClassification,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return save_classification(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/reporting-close')
+def reporting_closes(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        accounts=session.connection().exec_driver_sql("SELECT m.account_id::text AS id,a.name,to_jsonb(a)->>'code' AS code,n.account_type::text AS type,m.flow_section FROM accounting.account_map m JOIN public.accounts a ON a.id=m.account_id AND a.business_id=m.business_id JOIN accounting.account n ON n.id=m.library_id AND n.business_id=m.business_id WHERE m.business_id=%s",(str(business_id),)).mappings().all()
+        suppliers=session.connection().exec_driver_sql('SELECT id::text,name FROM public.suppliers WHERE business_id=%s ORDER BY name LIMIT 500',(str(business_id),)).mappings().all()
+        policies=session.connection().exec_driver_sql('SELECT account_id::text,effective_from,nature,section,cash_eligible,restricted,evidence FROM accounting.cash_flow_classification WHERE business_id=%s ORDER BY effective_from DESC,account_id LIMIT 200',(str(business_id),)).mappings().all()
+        return {'closes':list_closes(session),'checklist':GAPS,'accounts':[dict(r) for r in accounts],'suppliers':[dict(r) for r in suppliers],'cash_classifications':[dict(r) for r in policies]}
+
+@app.post('/api/v1/businesses/{business_id}/reporting-close')
+def submit_reporting_close(business_id:UUID,data:CloseDraft,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return save_close(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/reporting-close/{close_id}')
+def reporting_close_detail(business_id:UUID,close_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        return load_close(session,close_id)
+
+@app.post('/api/v1/businesses/{business_id}/reporting-close/{close_id}/approve')
+def approve_reporting_close(business_id:UUID,close_id:UUID,data:Approval,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return approve_close(session,user_id,close_id,data)

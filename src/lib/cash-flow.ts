@@ -1,5 +1,5 @@
 export type CashFlowDetail = { ledger_id: number; transaction_id: number; transaction_no: string; date: string; account_id: string; account_name: string; description: string; amount: string };
-export type CashFlowReport = { business_id: string; method: 'indirect'; currency: 'NGN'; timezone: string; start_date: string; end_date: string; sections: { key: string; lines: { label: string; amount: string; details: CashFlowDetail[] }[]; total: string }[]; net_change: string; opening_cash: string; fx_effect: string; closing_cash: string; ledger_cash: string; difference: string; reconciled: boolean; empty: boolean };
+export type CashFlowReport = { business_id: string; method: 'indirect'; currency: 'NGN'; timezone: string; start_date: string; end_date: string; sections: { key: string; lines: { label: string; amount: string; details: CashFlowDetail[] }[]; total: string }[]; net_change: string; opening_cash: string; fx_effect: string; closing_cash: string; ledger_cash: string; difference: string; reconciled: boolean; empty: boolean; cash_components?: { account_id: string; name: string; opening: string; closing: string; restricted: boolean }[]; financing_reconciliation?: { account_id: string; name: string; opening: string; cash_movements: string; noncash_movements: string; closing: string }[]; policy_basis?: string; review_required?: boolean };
 
 // Decimal strings stay exact even above JavaScript's safe integer range.
 export function formatNgn(value: string): string {
@@ -17,6 +17,9 @@ export function cashFlowRows(report: CashFlowReport): string[][] {
     ['Net change in cash', report.net_change], ['Opening cash', report.opening_cash], ['FX effect', report.fx_effect],
     ['Closing cash', report.closing_cash], ['Ledger cash', report.ledger_cash], ['Reconciliation difference', report.difference],
     ['Reconciled', String(report.reconciled)],
+    ['Policy basis', report.policy_basis || 'Classification review required'],
+    ...(report.cash_components || []).flatMap(line => [[`Cash component: ${line.name}`, line.closing], [`Opening component: ${line.name}`, line.opening], [`Restricted: ${line.name}`, String(line.restricted)]]),
+    ...(report.financing_reconciliation || []).flatMap(line => [[`Financing liability: ${line.name} opening`, line.opening], ['Cash movements', line.cash_movements], ['Non-cash movements', line.noncash_movements], ['Closing liability', line.closing]]),
   ];
 }
 

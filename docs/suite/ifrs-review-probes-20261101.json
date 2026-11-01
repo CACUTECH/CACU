@@ -1,0 +1,93 @@
+{
+  "scope": "Synthetic in-memory probes of current cash_flow function; ledger/provider objects mocked; not database or compliance acceptance",
+  "results": {
+    "gross_loan_flows": {
+      "reconciled": true,
+      "sections": [
+        {
+          "key": "operating",
+          "lines": [],
+          "total": "0.00"
+        },
+        {
+          "key": "investing",
+          "lines": [],
+          "total": "0.00"
+        },
+        {
+          "key": "financing",
+          "lines": [
+            {
+              "label": "Loans and borrowings",
+              "amount": "60.00",
+              "details": [
+                {
+                  "ledger_id": 4,
+                  "transaction_id": 2,
+                  "transaction_no": "2",
+                  "date": "2026-01-03",
+                  "account_id": "Loans and borrowings",
+                  "account_name": "Loans and borrowings",
+                  "description": "Invented review fixture",
+                  "amount": "100.00"
+                },
+                {
+                  "ledger_id": 5,
+                  "transaction_id": 3,
+                  "transaction_no": "3",
+                  "date": "2026-01-04",
+                  "account_id": "Loans and borrowings",
+                  "account_name": "Loans and borrowings",
+                  "description": "Invented review fixture",
+                  "amount": "-40.00"
+                }
+              ]
+            }
+          ],
+          "total": "60.00"
+        }
+      ],
+      "opening_cash": "1000.00",
+      "closing_cash": "1060.00"
+    },
+    "interest_paid": {
+      "reconciled": true,
+      "sections": [
+        {
+          "key": "operating",
+          "lines": [
+            {
+              "label": "Net profit",
+              "amount": "-10.00",
+              "details": [
+                {
+                  "ledger_id": 3,
+                  "transaction_id": 2,
+                  "transaction_no": "2",
+                  "date": "2026-01-03",
+                  "account_id": "Interest expense",
+                  "account_name": "Interest expense",
+                  "description": "Invented review fixture",
+                  "amount": "-10.00"
+                }
+              ]
+            }
+          ],
+          "total": "-10.00"
+        },
+        {
+          "key": "investing",
+          "lines": [],
+          "total": "0.00"
+        },
+        {
+          "key": "financing",
+          "lines": [],
+          "total": "0.00"
+        }
+      ],
+      "opening_cash": "1000.00",
+      "closing_cash": "990.00"
+    }
+  }
+}

@@ -321,6 +321,8 @@ function CreateDocumentDialog({
         { id: crypto.randomUUID(), item: '', quantity: 1, price: 0, total: 0 }
     ]);
     const [notes] = React.useState('');
+    const [performanceConfirmed, setPerformanceConfirmed] = React.useState(false);
+    const [performanceEvidence, setPerformanceEvidence] = React.useState('');
     // Tax stays off until it is configured for the business (Doc 09 ACC-015); the server refuses VAT.
     const [includeVat, setIncludeVat] = React.useState(false);
     const [accountingTaxDisabled, setAccountingTaxDisabled] = React.useState<boolean | null>(null);
@@ -351,6 +353,7 @@ function CreateDocumentDialog({
             tax,
             total,
             vat_included: includeVat,
+            performanceConfirmed, performanceEvidence,
             notes
         }, lineItems);
 
@@ -439,8 +442,13 @@ function CreateDocumentDialog({
                         </div>
                     </div>
                 </div>
+                {accountingTaxDisabled && type === 'Invoice' && <div className="space-y-3 rounded-md border p-3">
+                    <p>Issue invoices here for delivered goods or completed services. Advance billings and over-time contracts require a reviewed revenue-recognition workflow.</p>
+                    <label className="flex gap-2"><input type="checkbox" checked={performanceConfirmed} onChange={event => setPerformanceConfirmed(event.target.checked)} />Goods have been delivered or services completed on the invoice date</label>
+                    <label className="block">Delivery or completion reference<Input value={performanceEvidence} onChange={event => setPerformanceEvidence(event.target.value)} maxLength={2000} /></label>
+                </div>}
                 <DialogFooter>
-                    <Button onClick={handleSave} disabled={isSaving} className="w-full">
+                    <Button onClick={handleSave} disabled={isSaving || (!!accountingTaxDisabled && type === 'Invoice' && (!performanceConfirmed || performanceEvidence.trim().length < 10))} className="w-full">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : `Create ${type}`}
                     </Button>
                 </DialogFooter>

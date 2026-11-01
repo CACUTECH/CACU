@@ -6,7 +6,7 @@ import { BaseService } from './base-service';
 export type InvoiceInput = {
   requestKey?: string; customer_id: string | null; invoice_number: string; type: string; status: string;
   date: string; due_date?: string; subtotal: number | string; tax?: number | string; total: number | string;
-  vat_included?: boolean; notes?: string;
+  vat_included?: boolean; notes?: string; performanceConfirmed?: boolean; performanceEvidence?: string;
 };
 export type InvoiceLineInput = { item: string; catalog_item_id?: string | null; quantity: number; price: number | string; total: number | string };
 
@@ -66,6 +66,8 @@ export class InvoiceService extends BaseService {
       return accountingRequest<{ id: string }>('invoices', { method: 'POST', body: {
         request_key: invoiceData.requestKey || randomUUID(), customer_id: invoiceData.customer_id,
         invoice_number: invoiceData.invoice_number, entry_date: invoiceData.date, due_date: invoiceData.due_date || null,
+        performance_status: invoiceData.performanceConfirmed === false ? 'not_satisfied' : 'satisfied',
+        performance_evidence: invoiceData.performanceEvidence || '', performance_date: invoiceData.date,
         notes: invoiceData.notes || '', tax: decimalInput(invoiceData.tax || 0), issue: invoiceData.status !== 'Draft',
         items: items.map(item => ({ catalog_item_id: item.catalog_item_id, quantity: item.quantity, unit_price: decimalInput(item.price) })),
       } });

@@ -202,6 +202,221 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/reports/trial-balance": {
+      "get": {
+        "summary": "Trial Balance Report",
+        "operationId": "trial_balance_report_api_v1_businesses__business_id__reports_trial_balance_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/reports/statements": {
+      "get": {
+        "summary": "Financial Statements",
+        "operationId": "financial_statements_api_v1_businesses__business_id__reports_statements_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "compare",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Compare"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/reports/general-ledger": {
+      "get": {
+        "summary": "General Ledger Report",
+        "operationId": "general_ledger_report_api_v1_businesses__business_id__reports_general_ledger_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/postings": {
       "post": {
         "summary": "Accounting Posting",
@@ -233,6 +448,49 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/collection-accounts": {
+      "get": {
+        "summary": "Collection Accounts",
+        "operationId": "collection_accounts_api_v1_businesses__business_id__collection_accounts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -445,6 +703,47 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List Journals",
+        "operationId": "list_journals_api_v1_businesses__business_id__journals_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -703,10 +1002,2057 @@
           }
         }
       }
+    },
+    "/api/v1/businesses/{business_id}/catalog": {
+      "post": {
+        "summary": "Save Catalog",
+        "operationId": "save_catalog_api_v1_businesses__business_id__catalog_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogMutation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/expense-accounts": {
+      "get": {
+        "summary": "List Expense Accounts",
+        "operationId": "list_expense_accounts_api_v1_businesses__business_id__expense_accounts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/expenses": {
+      "get": {
+        "summary": "List Expenses",
+        "operationId": "list_expenses_api_v1_businesses__business_id__expenses_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Expense",
+        "operationId": "create_expense_api_v1_businesses__business_id__expenses_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/journals/{journal_id}/reversal": {
+      "post": {
+        "summary": "Reverse Journal",
+        "operationId": "reverse_journal_api_v1_businesses__business_id__journals__journal_id__reversal_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "journal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Journal Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReversalCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/expenses/{expense_id}/reversal": {
+      "post": {
+        "summary": "Reverse Expense",
+        "operationId": "reverse_expense_api_v1_businesses__business_id__expenses__expense_id__reversal_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Expense Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReversalCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/stock/adjustments": {
+      "get": {
+        "summary": "Stock Adjustments",
+        "operationId": "stock_adjustments_api_v1_businesses__business_id__stock_adjustments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Request Stock Adjustment",
+        "operationId": "request_stock_adjustment_api_v1_businesses__business_id__stock_adjustments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/stock/adjustments/{adjustment_id}/approve": {
+      "post": {
+        "summary": "Approve Stock Adjustment",
+        "operationId": "approve_stock_adjustment_api_v1_businesses__business_id__stock_adjustments__adjustment_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "adjustment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Adjustment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/stock/adjustments/{adjustment_id}/reject": {
+      "post": {
+        "summary": "Reject Stock Adjustment",
+        "operationId": "reject_stock_adjustment_api_v1_businesses__business_id__stock_adjustments__adjustment_id__reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "adjustment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Adjustment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/approval-policy": {
+      "get": {
+        "summary": "Approval Policy",
+        "operationId": "approval_policy_api_v1_businesses__business_id__approval_policy_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save Approval Policy",
+        "operationId": "save_approval_policy_api_v1_businesses__business_id__approval_policy_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Policy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/supplier-bills": {
+      "get": {
+        "summary": "Supplier Bills",
+        "operationId": "supplier_bills_api_v1_businesses__business_id__supplier_bills_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Supplier Bill",
+        "operationId": "create_supplier_bill_api_v1_businesses__business_id__supplier_bills_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/supplier-bills/{bill_id}/payments": {
+      "post": {
+        "summary": "Pay Supplier Bill",
+        "operationId": "pay_supplier_bill_api_v1_businesses__business_id__supplier_bills__bill_id__payments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "bill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bill Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierPaymentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/accounts": {
+      "post": {
+        "summary": "Add Account",
+        "operationId": "add_account_api_v1_businesses__business_id__accounts_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/inventory/valuation": {
+      "get": {
+        "summary": "Inventory Valuation Report",
+        "operationId": "inventory_valuation_report_api_v1_businesses__business_id__inventory_valuation_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/inventory/policy": {
+      "post": {
+        "summary": "Approve Inventory Policy",
+        "operationId": "approve_inventory_policy_api_v1_businesses__business_id__inventory_policy_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryPolicy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/inventory/adopt": {
+      "post": {
+        "summary": "Adopt Inventory Valuation",
+        "operationId": "adopt_inventory_valuation_api_v1_businesses__business_id__inventory_adopt_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdoptItem"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/inventory/receipts": {
+      "post": {
+        "summary": "Receive Inventory",
+        "operationId": "receive_inventory_api_v1_businesses__business_id__inventory_receipts_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoodsReceipt"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/inventory/nrv": {
+      "post": {
+        "summary": "Review Inventory Nrv",
+        "operationId": "review_inventory_nrv_api_v1_businesses__business_id__inventory_nrv_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NrvAssessment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/inventory/returns": {
+      "post": {
+        "summary": "Return Inventory",
+        "operationId": "return_inventory_api_v1_businesses__business_id__inventory_returns_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockReturn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/cash-flow-classifications": {
+      "post": {
+        "summary": "Classify Cash Flows",
+        "operationId": "classify_cash_flows_api_v1_businesses__business_id__cash_flow_classifications_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashClassification"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/reporting-close": {
+      "get": {
+        "summary": "Reporting Closes",
+        "operationId": "reporting_closes_api_v1_businesses__business_id__reporting_close_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Submit Reporting Close",
+        "operationId": "submit_reporting_close_api_v1_businesses__business_id__reporting_close_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/reporting-close/{close_id}": {
+      "get": {
+        "summary": "Reporting Close Detail",
+        "operationId": "reporting_close_detail_api_v1_businesses__business_id__reporting_close__close_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "close_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Close Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/reporting-close/{close_id}/approve": {
+      "post": {
+        "summary": "Approve Reporting Close",
+        "operationId": "approve_reporting_close_api_v1_businesses__business_id__reporting_close__close_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "close_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Close Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Approval"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccountCreate": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "current_asset",
+              "fixed_asset",
+              "current_liability",
+              "loan",
+              "equity",
+              "income",
+              "other_income",
+              "expense",
+              "other_expense"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "kind",
+          "name"
+        ],
+        "title": "AccountCreate"
+      },
+      "AdjustmentRequest": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "delta": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "Delta"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "item_id",
+          "expected_version",
+          "delta",
+          "reason",
+          "entry_date"
+        ],
+        "title": "AdjustmentRequest"
+      },
+      "AdoptItem": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "item_id",
+          "expected_version",
+          "entry_date",
+          "evidence"
+        ],
+        "title": "AdoptItem"
+      },
+      "Approval": {
+        "properties": {
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "evidence"
+        ],
+        "title": "Approval"
+      },
+      "BillCreate": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Supplier Id"
+          },
+          "bill_number": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Bill Number"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Notes",
+            "default": ""
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BillLine"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "supplier_id",
+          "bill_number",
+          "entry_date",
+          "lines"
+        ],
+        "title": "BillCreate"
+      },
+      "BillLine": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Account Id"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Amount"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "amount"
+        ],
+        "title": "BillLine"
+      },
+      "CashClassification": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Account Id"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Effective From"
+          },
+          "nature": {
+            "type": "string",
+            "enum": [
+              "other",
+              "interest_paid",
+              "interest_received",
+              "dividends_paid",
+              "dividends_received",
+              "income_tax"
+            ],
+            "title": "Nature",
+            "default": "other"
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "operating",
+              "investing",
+              "financing"
+            ],
+            "title": "Section"
+          },
+          "cash_eligible": {
+            "type": "boolean",
+            "title": "Cash Eligible",
+            "default": false
+          },
+          "restricted": {
+            "type": "boolean",
+            "title": "Restricted",
+            "default": false
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "account_id",
+          "effective_from",
+          "section",
+          "evidence"
+        ],
+        "title": "CashClassification"
+      },
+      "CatalogMutation": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "item.save",
+              "stock.adjust"
+            ],
+            "title": "Operation"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "expected_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Version"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "operation",
+          "details"
+        ],
+        "title": "CatalogMutation"
+      },
+      "CloseDraft": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "annual": {
+            "type": "boolean",
+            "title": "Annual",
+            "default": true
+          },
+          "compare": {
+            "type": "string",
+            "enum": [
+              "last_year",
+              "prior"
+            ],
+            "title": "Compare",
+            "default": "last_year"
+          },
+          "framework": {
+            "type": "string",
+            "const": "full_ifrs",
+            "title": "Framework",
+            "default": "full_ifrs"
+          },
+          "early_ifrs18": {
+            "type": "boolean",
+            "title": "Early Ifrs18",
+            "default": false
+          },
+          "accountant_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Accountant Name"
+          },
+          "accountant_review_evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Accountant Review Evidence"
+          },
+          "notes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Note"
+            },
+            "type": "object",
+            "title": "Notes"
+          },
+          "schedules": {
+            "items": {
+              "$ref": "#/components/schemas/Schedule"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Schedules"
+          },
+          "maturities": {
+            "items": {
+              "$ref": "#/components/schemas/Maturity"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Maturities"
+          },
+          "equity_classifications": {
+            "items": {
+              "$ref": "#/components/schemas/EquityClassification"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Equity Classifications"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "start_date",
+          "end_date",
+          "accountant_name",
+          "accountant_review_evidence",
+          "notes"
+        ],
+        "title": "CloseDraft"
+      },
+      "Decision": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Decision"
+      },
+      "EquityClassification": {
+        "properties": {
+          "ledger_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Ledger Id"
+          },
+          "nature": {
+            "type": "string",
+            "enum": [
+              "owner_contribution",
+              "distribution",
+              "oci",
+              "transfer",
+              "prior_period_adjustment",
+              "other"
+            ],
+            "title": "Nature"
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ledger_id",
+          "nature",
+          "evidence"
+        ],
+        "title": "EquityClassification"
+      },
+      "ExpenseCreate": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "expense_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Expense Account Id"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Amount"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "method": {
+            "type": "string",
+            "pattern": "^(Cash|Transfer)$",
+            "title": "Method"
+          },
+          "bank_account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Account Id"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "expense_account_id",
+          "amount",
+          "entry_date",
+          "method",
+          "description"
+        ],
+        "title": "ExpenseCreate"
+      },
+      "GoodsReceipt": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Supplier Id"
+          },
+          "bill_number": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Bill Number"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReceiptLine"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Lines"
+          },
+          "tax_account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Account Id"
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "supplier_id",
+          "bill_number",
+          "entry_date",
+          "lines",
+          "evidence"
+        ],
+        "title": "GoodsReceipt"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -719,6 +3065,40 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "InventoryPolicy": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "formula": {
+            "type": "string",
+            "const": "moving_weighted_average",
+            "title": "Formula"
+          },
+          "allowance_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Allowance Account Id"
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "formula",
+          "allowance_account_id",
+          "evidence"
+        ],
+        "title": "InventoryPolicy"
       },
       "InvoiceCreate": {
         "properties": {
@@ -780,6 +3160,34 @@
             "type": "boolean",
             "title": "Issue",
             "default": true
+          },
+          "performance_status": {
+            "type": "string",
+            "enum": [
+              "satisfied",
+              "not_satisfied",
+              "over_time"
+            ],
+            "title": "Performance Status",
+            "default": "satisfied"
+          },
+          "performance_evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Performance Evidence",
+            "default": ""
+          },
+          "performance_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Performance Date"
           }
         },
         "additionalProperties": false,
@@ -950,6 +3358,138 @@
         ],
         "title": "JournalValidation"
       },
+      "Maturity": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Account Id"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "current_portion": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Current Portion"
+          },
+          "rights_and_covenants": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Rights And Covenants"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "as_of",
+          "current_portion",
+          "rights_and_covenants"
+        ],
+        "title": "Maturity"
+      },
+      "Note": {
+        "properties": {
+          "applicable": {
+            "type": "boolean",
+            "title": "Applicable"
+          },
+          "assessment": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 10,
+            "title": "Assessment"
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "applicable",
+          "assessment",
+          "evidence"
+        ],
+        "title": "Note"
+      },
+      "NrvAssessment": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "estimated_selling_total": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Estimated Selling Total"
+          },
+          "completion_and_selling_costs": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Completion And Selling Costs"
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "item_id",
+          "entry_date",
+          "estimated_selling_total",
+          "completion_and_selling_costs",
+          "evidence"
+        ],
+        "title": "NrvAssessment"
+      },
+      "Policy": {
+        "properties": {
+          "stock_threshold": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Threshold"
+          },
+          "separation_of_duties": {
+            "type": "boolean",
+            "title": "Separation Of Duties",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Policy"
+      },
       "PostingCommand": {
         "properties": {
           "request_key": {
@@ -1051,6 +3591,21 @@
               }
             ],
             "title": "Counterparty Id"
+          },
+          "payment_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Cash",
+                  "Transfer"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Method"
           }
         },
         "additionalProperties": false,
@@ -1124,6 +3679,18 @@
             "type": "string",
             "pattern": "^(Cash|Transfer|Card)$",
             "title": "Method"
+          },
+          "bank_account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Account Id"
           }
         },
         "additionalProperties": false,
@@ -1136,6 +3703,86 @@
           "method"
         ],
         "title": "ReceiptCreate"
+      },
+      "ReceiptLine": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity"
+          },
+          "purchase_cost": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Purchase Cost"
+          },
+          "rebate": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Rebate",
+            "default": "0.00"
+          },
+          "landed_cost": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Landed Cost",
+            "default": "0.00"
+          },
+          "nonrecoverable_tax": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Nonrecoverable Tax",
+            "default": "0.00"
+          },
+          "recoverable_tax": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Recoverable Tax",
+            "default": "0.00"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item_id",
+          "quantity",
+          "purchase_cost"
+        ],
+        "title": "ReceiptLine"
+      },
+      "ReversalCreate": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "entry_date",
+          "reason"
+        ],
+        "title": "ReversalCreate"
       },
       "SaleCreate": {
         "properties": {
@@ -1163,6 +3810,18 @@
             "pattern": "^(Cash|Transfer|Card)$",
             "title": "Method"
           },
+          "bank_account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Account Id"
+          },
           "quoted_total": {
             "type": "string",
             "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
@@ -1179,6 +3838,104 @@
           "quoted_total"
         ],
         "title": "SaleCreate"
+      },
+      "Schedule": {
+        "properties": {
+          "gap": {
+            "type": "string",
+            "enum": [
+              "FIN-01",
+              "ASSET-01",
+              "LEASE-01",
+              "TAX-01",
+              "PEOPLE-01"
+            ],
+            "title": "Gap"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Title"
+          },
+          "calculation_and_assumptions": {
+            "type": "string",
+            "maxLength": 6000,
+            "minLength": 20,
+            "title": "Calculation And Assumptions"
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleRow"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Rows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "gap",
+          "title",
+          "calculation_and_assumptions",
+          "evidence",
+          "rows"
+        ],
+        "title": "Schedule"
+      },
+      "ScheduleRow": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Account Id"
+          },
+          "opening": {
+            "type": "string",
+            "pattern": "^-?[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Opening"
+          },
+          "debits": {
+            "type": "string",
+            "pattern": "^-?[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Debits"
+          },
+          "credits": {
+            "type": "string",
+            "pattern": "^-?[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Credits"
+          },
+          "closing": {
+            "type": "string",
+            "pattern": "^-?[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Closing"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "account_id",
+          "opening",
+          "debits",
+          "credits",
+          "closing"
+        ],
+        "title": "ScheduleRow"
       },
       "StockLine": {
         "properties": {
@@ -1201,6 +3958,125 @@
           "quantity"
         ],
         "title": "StockLine"
+      },
+      "StockReturn": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "refund_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Cash",
+                  "Transfer"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Method"
+          },
+          "bank_account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Account Id"
+          },
+          "original_source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Original Source Id"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "original_source_id",
+          "item_id",
+          "quantity",
+          "entry_date",
+          "evidence"
+        ],
+        "title": "StockReturn"
+      },
+      "SupplierPaymentCreate": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Amount"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "method": {
+            "type": "string",
+            "pattern": "^(Cash|Transfer)$",
+            "title": "Method"
+          },
+          "bank_account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Account Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "amount",
+          "entry_date",
+          "method"
+        ],
+        "title": "SupplierPaymentCreate"
       },
       "ValidationError": {
         "properties": {

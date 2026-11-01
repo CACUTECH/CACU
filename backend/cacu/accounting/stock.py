@@ -58,7 +58,7 @@ def set_policy(session,actor,data:Policy):
     return result
 
 def _item(session,item_id):
-    row=raw(session,"""SELECT name,version,stock_quantity,cost_price,item_type,track_stock,is_active FROM public.catalog_items
+    row=raw(session,"""SELECT id,name,version,stock_quantity,cost_price,item_type,track_stock,is_active FROM public.catalog_items
       WHERE id=%s AND business_id=%s FOR UPDATE""",(str(item_id),str(session.business_id))).first()
     if not row or row.item_type!='PRODUCT' or not row.track_stock or not row.is_active:raise HTTPException(409,'Choose an active product whose stock is tracked')
     return row
@@ -71,6 +71,10 @@ def _check(session,item,delta,entry_date):
     if period.status==ReportingPeriod.Status.CLOSED:raise HTTPException(409,'Stock changes cannot use a closed accounting period')
     cost=item.cost_price or Decimal('0')
     value=abs(delta)*cost
+    from cacu.accounting.inventory import state, proportion, cents
+    valuation=state(session,item.id) if hasattr(item,'id') else None
+    if valuation:
+        value=proportion(valuation.gross_cost,-delta,valuation.quantity) if delta<0 else cents(valuation.gross_cost*delta/valuation.quantity) if valuation.quantity else Decimal('0')
     if value!=value.quantize(Decimal('0.01')):raise HTTPException(409,'Stock valuation requires a reviewed two-decimal unit cost')
     return cost,value
 
@@ -79,12 +83,15 @@ def post_movement(session,actor,movement_id,offset):
     tenant=str(session.business_id)
     movement=raw(session,'SELECT item_id,delta,unit_cost,entry_date,reason FROM public.inventory_movements WHERE business_id=%s AND id=%s',(tenant,str(movement_id))).one()
     value=abs(movement.delta)*movement.unit_cost
+    from cacu.accounting.inventory import movement_value
+    valued=movement_value(session,actor,movement_id,movement.item_id,movement.delta,movement.entry_date)
+    if valued is not None:value=valued
     posted=None
     if value:
         inventory=purpose(session,'inventory')
         posted=post_command(session,actor,PostingCommand(request_key=movement_id,kind='adjustment',source_id=movement_id,
             main_account_id=inventory,entry_date=movement.entry_date,narration=movement.reason,
-            credited=movement.delta<0,lines=[{'account_id':offset,'amount':format(value,'.2f'),'credited':movement.delta>0}]))
+            credited=movement.delta<0,lines=[{'account_id':offset,'amount':format(value,'.2f'),'credited':movement.delta>0}]),managed_stock=True)
     raw(session,'INSERT INTO accounting.stock_event(business_id,source_id,item_id,quantity,unit_cost) VALUES(%s,%s,%s,%s,%s)',
         (tenant,str(movement_id),str(movement.item_id),movement.delta,movement.unit_cost))
     return posted
@@ -101,9 +108,11 @@ def _post(session,actor,adjustment_id,note):
     item=_item(session,row.item_id)
     cost,value=_check(session,item,row.delta,row.entry_date)
     if cost!=row.unit_cost:raise HTTPException(409,'The item cost changed after this request; reject it and ask for a new one')
+    if value!=row.value:raise HTTPException(409,'The exact stock value changed after this request; reject it and ask for a new one')
     result=raw(session,'SELECT public.management_write(%s,%s,%s,%s,%s,%s::jsonb)',(tenant,str(row.id),'stock.adjust',str(row.item_id),item.version,
         json.dumps({'delta':row.delta,'reason':row.reason,'entry_date':row.entry_date.isoformat()}))).scalar()
     posting=post_movement(session,actor,row.id,adjustment_offset(session))
+    result['version']=raw(session,'SELECT version FROM public.catalog_items WHERE business_id=%s AND id=%s',(tenant,str(row.item_id))).scalar()
     raw(session,"UPDATE accounting.stock_adjustment SET status='posted',decided_by=%s,decided_at=now(),decision_note=%s WHERE business_id=%s AND id=%s",
         (str(actor),note or None,tenant,str(row.id)))
     return result,posting
