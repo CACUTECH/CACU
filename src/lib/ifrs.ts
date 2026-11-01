@@ -1,0 +1,13 @@
+import type { FinancialStatements } from './ledger-reports';
+import type { CashFlowReport } from './cash-flow';
+export type ReviewAccount = { id: string; code: string | null; name: string; type: string; flow_section: string };
+export type CashClassificationRecord = { account_id:string; effective_from:string; nature:string; section:string; cash_eligible:boolean; restricted:boolean; evidence:string };
+export type CloseMetadata = { cash_classifications?: CashClassificationRecord[]; suppliers: { id: string; name: string }[]; checklist: Record<string, string>; accounts: ReviewAccount[]; closes: { id: string; start_date: string; end_date: string; created_at: string }[] };
+export type NoteInput = { applicable: boolean; assessment: string; evidence: string };
+export type CloseInput = { request_key: string; start_date: string; end_date: string; annual: boolean; compare: 'last_year' | 'prior'; framework: 'full_ifrs'; early_ifrs18: boolean; accountant_name: string; accountant_review_evidence: string; notes: Record<string, NoteInput>; schedules: unknown[]; maturities: unknown[]; equity_classifications: unknown[] };
+export type CloseReport = { id: string; issues: { check: string; message: string }[]; ready_for_owner_approval: boolean; review_status?: string; accountant_name?: string; compliance_claim?: string; statement_basis: string; statements: FinancialStatements; cash_flow: CashFlowReport; comparative_cash_flow?: CashFlowReport | null; notes: Record<string, NoteInput>; changes_in_equity: { period: { start_date: string; end_date: string }; opening_equity: string; profit: string; movements: Record<string,string>; closing_equity: string; difference: string }[]; comprehensive_income: { net_profit: string[]; other_comprehensive_income: string[]; total_comprehensive_income: string[] } };
+export type InventoryOverview = { formula: string | null; allowance_account_id: string | null; items: { id: string; name: string; version: number; stock_quantity: number; quantity: number | null; cost_price: string; gross_cost: string | null; allowance: string | null; carrying_amount?: string | null; last_date: string | null }[]; events: { id: string; item_id: string; kind: string; entry_date: string; quantity: number; gross_change: string; allowance_change: string; source_id: string; evidence: unknown }[] };
+export function downloadJson(name: string, value: unknown) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+}

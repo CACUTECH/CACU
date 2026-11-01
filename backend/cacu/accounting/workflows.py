@@ -3,6 +3,7 @@ from datetime import date,datetime
 from decimal import Decimal
 import hashlib,json
 from uuid import UUID,uuid5,NAMESPACE_URL
+from typing import Literal
 from fastapi import HTTPException
 from pydantic import BaseModel,ConfigDict,Field
 from cacu.accounting.posting import PostingCommand,StockLine,post_command,raw,account
@@ -25,6 +26,9 @@ class InvoiceCreate(BaseModel):
     items:list[InvoiceItem]=Field(min_length=1,max_length=100)
     tax:str=Field(default='0.00',pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
     issue:bool=True
+    performance_status:Literal['satisfied','not_satisfied','over_time']='satisfied'
+    performance_evidence:str=Field(default='',max_length=2000)
+    performance_date:date|None=None
 
 class ReceiptCreate(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -90,6 +94,10 @@ def durable(session,actor,kind,data,execute):
     payload=data.model_dump(mode='json')
     # Preserve existing Cash workflow hashes across this additive API change.
     if payload.get('bank_account_id') is None:payload.pop('bank_account_id',None)
+    if kind=='invoice':
+        if payload.get('performance_status')=='satisfied':payload.pop('performance_status',None)
+        if payload.get('performance_evidence')=='':payload.pop('performance_evidence',None)
+        if payload.get('performance_date') is None:payload.pop('performance_date',None)
     encoded=json.dumps(payload,sort_keys=True,separators=(',',':'))
     digest=hashlib.sha256((kind+encoded).encode()).hexdigest();tenant=str(session.business_id)
     old=raw(session,'SELECT payload_hash,result FROM accounting.workflow_request WHERE business_id=%s AND request_key=%s',(tenant,str(data.request_key))).first()
@@ -103,6 +111,9 @@ def durable(session,actor,kind,data,execute):
 def invoice_create(session,actor,data:InvoiceCreate):
     def execute():
         tenant=str(session.business_id)
+        if data.issue and (data.performance_status!='satisfied' or (data.performance_date and data.performance_date>data.entry_date)):
+            raise HTTPException(409,'Issue invoices only for delivered goods or completed services; advances and over-time contracts require a reviewed recognition workflow')
+        if data.entry_date>business_today(session):raise HTTPException(422,'An issued sale cannot be dated in the future')
         if Decimal(data.tax)!=0:raise HTTPException(409,'Taxed invoices require reviewed tax mappings before cutover')
         if len({i.catalog_item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate invoice item')
         customer=raw(session,'SELECT id FROM public.customers WHERE business_id=%s AND id=%s',(tenant,str(data.customer_id))).first()
@@ -120,6 +131,8 @@ def invoice_create(session,actor,data:InvoiceCreate):
             raw(session,'INSERT INTO public.invoice_items(id,business_id,invoice_id,catalog_item_id,description,quantity,unit_price,line_total) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
                 (str(uuid5(data.request_key,str(item.catalog_item_id))),tenant,str(data.request_key),str(item.catalog_item_id),name,item.quantity,Decimal(item.unit_price),value))
         if not data.issue:return {'id':str(data.request_key),'status':'draft'}
+        raw(session,'INSERT INTO accounting.audit_event(business_id,actor_id,request_key,event,details) VALUES(%s,%s,%s,%s,%s::jsonb)',
+            (tenant,str(actor),str(data.request_key),'revenue_performance_confirmed',json.dumps({'scope':'completed_sale','performance_date':str(data.performance_date or data.entry_date),'evidence':data.performance_evidence,'legacy_contract':not bool(data.performance_evidence)})))
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='invoice',source_id=data.request_key,
             main_account_id=ar,entry_date=data.entry_date,narration=data.invoice_number,counterparty_id=data.customer_id,
             lines=[{'account_id':purpose(session,'revenue'),'amount':format(total,'.2f')}],stock=stock)
@@ -216,7 +229,7 @@ def expense_create(session,actor,data:ExpenseCreate):
 
 def recent_documents(session,kind,limit=50):
     """Posted manual journals or expenses, newest first, with whether each was reversed."""
-    stock="AND NOT EXISTS(SELECT FROM accounting.stock_event e WHERE e.business_id=d.business_id AND e.source_id=d.source_id)" if kind=='adjustment' else ''
+    stock="AND NOT EXISTS(SELECT FROM accounting.stock_event e WHERE e.business_id=d.business_id AND e.source_id=d.source_id) AND NOT EXISTS(SELECT FROM accounting.inventory_journal j WHERE j.business_id=d.business_id AND j.source_id=d.source_id)" if kind=='adjustment' else ''
     rows=raw(session,f"""SELECT d.source_id,t.transaction_no,t.transaction_date::date AS entry_date,t.narration,
         (SELECT sum(l.amount) FROM accounting.ledger l WHERE l.business_id=t.business_id AND l.transaction_id=t.id AND l.entry_type::text='DEBIT') AS amount,
         r.reversal_id IS NOT NULL AS reversed

@@ -21,7 +21,7 @@ def ledger_rows(session, end):
     rows = list(session.connection().exec_driver_sql("""
       SELECT l.id,l.transaction_id,l.transaction_date,l.entry_type::text,l.amount,
              a.id account_id,a.name,a.account_type::text,m.account_id source_account_id,
-             m.flow_section,m.purpose,f.flow_section folio_section,t.narration,t.transaction_no
+             m.flow_section,m.purpose,f.flow_section folio_section,f.account_id folio_source_id,t.narration,t.transaction_no
       FROM accounting.ledger l JOIN accounting.account a ON a.id=l.post_account_id AND a.business_id=l.business_id
       JOIN accounting.account_map m ON m.library_id=a.id AND m.business_id=l.business_id
       JOIN accounting.account_map f ON f.library_id=l.folio_account_id AND f.business_id=l.business_id
@@ -37,7 +37,9 @@ def ledger_rows(session, end):
 def cash_flow(session,start:date,end:date):
     validate_dates(start,end)
     native=CashflowStatement(session,datetime.combine(start,time.min),datetime.combine(end,time.max))
-    rows=ledger_rows(session,end)
+    from cacu.accounting.cash_rules import classifications, apply_classifications, DISCLOSURE_LABELS
+    policies=classifications(session,start,end)
+    rows=apply_classifications(ledger_rows(session,end),policies)
     # Missing mappings must not silently drop ledger legs.
     actual=session.connection().exec_driver_sql('SELECT count(*) FROM accounting.ledger WHERE business_id=%s AND transaction_date<%s',
         (str(session.business_id),datetime.combine(end+timedelta(days=1),time.min))).scalar()
@@ -58,9 +60,10 @@ def cash_flow(session,start:date,end:date):
         if before:continue
         flow=-signed
         section=row['flow_section']
-        if section=='restricted':section='investing'
         profit=row['account_type'] in PROFIT_TYPES
         label='Net profit' if profit else row['name']
+        if not profit and section in {'investing','financing'} and row['folio_section']=='cash':
+            label += ' / receipts' if flow>0 else ' / payments'
         def add(section,label,value):
             key=(section,label)
             groups[key]['amount']+=value
@@ -74,6 +77,12 @@ def cash_flow(session,start:date,end:date):
         else:
             add(section,label,flow)
         if profit and section!='operating':add(section,row['name'],flow)
+        nature=row['cash_nature']
+        if nature in DISCLOSURE_LABELS and row['folio_section']=='cash':
+            # Remove the original row contribution, then disclose actual settlement once.
+            # Accruals without cash remain in profit/working capital until settled.
+            add(section,'Cash disclosure reclassification',-flow)
+            add(section,DISCLOSURE_LABELS[nature],flow)
         if section in {'investing','financing'} and row['folio_section']!='cash':
             # Remove actual non-cash ledger legs, e.g. an asset bought on credit.
             # The matching operating leg is neutralized with a traceable adjustment.
@@ -89,7 +98,7 @@ def cash_flow(session,start:date,end:date):
     # including partial settlements. A general payable account cannot encode this.
     allocations=session.connection().exec_driver_sql("""
       SELECT payment.id transaction_id,payment.transaction_no,payment.narration,
-             payment.transaction_date,a.amount allocated,l.amount component,l.entry_type::text,
+             payment.transaction_date,payment.transaction_type::text AS payment_kind,a.amount allocated,l.amount component,l.entry_type::text,
              m.flow_section,m.account_id,m.purpose,acc.name,
              (SELECT sum(li.amount*li.quantity) FROM accounting.line_item li
               WHERE li.transaction_id=bill.id AND li.business_id=bill.business_id) bill_amount
@@ -99,21 +108,43 @@ def cash_flow(session,start:date,end:date):
       JOIN accounting.ledger l ON l.transaction_id=bill.id AND l.business_id=bill.business_id AND l.post_account_id<>bill.account_id
       JOIN accounting.account_map m ON m.library_id=l.post_account_id AND m.business_id=l.business_id
       JOIN accounting.account acc ON acc.id=l.post_account_id AND acc.business_id=l.business_id
-      WHERE a.business_id=%s AND payment.transaction_type='SUPPLIER_PAYMENT'
+      WHERE a.business_id=%s AND payment.transaction_type IN ('SUPPLIER_PAYMENT','CLIENT_RECEIPT')
        AND payment.transaction_date>=%s AND payment.transaction_date<%s
-       AND m.flow_section IN ('investing','financing','restricted')
+       AND (m.flow_section IN ('investing','financing','restricted') OR m.purpose IN ('interest_paid','interest_received','dividends_paid','dividends_received','income_tax')
+         OR EXISTS(SELECT FROM accounting.cash_flow_classification c WHERE c.business_id=m.business_id AND c.account_id=m.account_id AND c.effective_from<=payment.transaction_date::date))
     """,(str(session.business_id),datetime.combine(start,time.min),datetime.combine(end+timedelta(days=1),time.min))).mappings()
     for allocation in allocations:
         if not allocation['bill_amount']:raise HTTPException(409,'Invalid allocated bill total')
-        section=allocation['flow_section'] if allocation['flow_section']!='restricted' else 'investing'
-        value=-allocation['allocated']*allocation['component']/allocation['bill_amount']
+        policy=policies.get(str(allocation['account_id']),{})
+        section=policy.get('section',allocation['flow_section'])
+        nature=policy.get('nature',allocation['purpose'])
+        if section=='restricted':raise HTTPException(409,'Restricted settlement requires reviewed classification')
+        if section not in {'investing','financing'} and nature not in DISCLOSURE_LABELS:continue
+        value=allocation['allocated']*allocation['component']/allocation['bill_amount']*(1 if allocation['payment_kind']=='CLIENT_RECEIPT' else -1)
         detail={'ledger_id':0,'transaction_id':allocation['transaction_id'],'transaction_no':allocation['transaction_no'],
                 'date':allocation['transaction_date'].date().isoformat(),'account_id':str(allocation['account_id']),
                 'account_name':allocation['name'],'description':'Settlement allocation: '+allocation['narration'],'amount':money(value)}
-        groups[(section,'Settlement of capital or financing obligations')]['amount']+=value
-        groups[(section,'Settlement of capital or financing obligations')]['details'].append(detail)
+        label=DISCLOSURE_LABELS.get(nature,'Settlement of capital or financing obligations / '+('receipts' if value>0 else 'payments'))
+        groups[(section,label)]['amount']+=value
+        groups[(section,label)]['details'].append(detail)
         groups[('operating','Settlements classified outside operating activities')]['amount']-=value
         groups[('operating','Settlements classified outside operating activities')]['details'].append({**detail,'amount':money(-value)})
+    components={};financing={}
+    for row in rows:
+        key=str(row['source_account_id'])
+        signed=row['amount']*(1 if row['entry_type']=='DEBIT' else -1)
+        before=row['transaction_date'].date()<start or row['transaction_id'] in brought_in
+        if row['flow_section']=='cash':
+            v=components.setdefault(key,{'account_id':key,'name':row['name'],'opening':ZERO,'closing':ZERO,'restricted':policies.get(key,{}).get('restricted',False)})
+            v['closing']+=signed
+            if before:v['opening']+=signed
+        if row['account_type'] in {'CURRENT_LIABILITY','NON_CURRENT_LIABILITY','PAYABLE','CONTROL'} and row['flow_section']=='financing':
+            v=financing.setdefault(key,{'account_id':key,'name':row['name'],'opening':ZERO,'cash_movements':ZERO,'noncash_movements':ZERO,'closing':ZERO})
+            v['closing']-=signed
+            if before:v['opening']-=signed
+            else:v['cash_movements' if row['folio_section']=='cash' else 'noncash_movements']-=signed
+    def serialize(values):
+        return [{k:money(v) if isinstance(v,Decimal) else v for k,v in line.items()} for line in values.values()]
     sections=[]
     for section in ('operating','investing','financing'):
         lines=[{'label':label,'amount':money(v['amount']),'details':v['details']}
@@ -128,13 +159,17 @@ def cash_flow(session,start:date,end:date):
             'sections':sections,'net_change':money(net),'opening_cash':money(opening),
             'fx_effect':money(ZERO),'closing_cash':money(calculated),'ledger_cash':money(closing),
             'difference':money(difference),'reconciled':difference==ZERO,'empty':not any(not r['transaction_date'].date()<start and r['transaction_id'] not in brought_in for r in rows),
+            'cash_components':serialize(components),'financing_reconciliation':serialize(financing),
+            'policy_basis':'IAS 7 pre-IFRS 18; classification review and complete notes are required',
+            'review_required':True,
             'library_totals':{str(k):money(v) for k,v in native.totals.items()},
             'library_results':{str(k):money(v) for k,v in native.result_amounts.items()}}
 
 def financial_summary(session,start:date,end:date):
     validate_dates(start,end)
     balances=defaultdict(lambda:ZERO);movements=defaultdict(lambda:ZERO);accounts={}
-    rows=ledger_rows(session,end)
+    from cacu.accounting.cash_rules import classifications,apply_classifications
+    rows=apply_classifications(ledger_rows(session,end),classifications(session,start,end))
     for row in rows:
         key=str(row['source_account_id']);accounts[key]=row
         signed=row['amount']*(1 if row['entry_type']=='DEBIT' else -1)
@@ -143,7 +178,10 @@ def financial_summary(session,start:date,end:date):
     income=-sum((movements[k] for k,r in accounts.items() if r['account_type'].endswith('REVENUE')),ZERO)
     expense=sum((movements[k] for k,r in accounts.items() if r['account_type'].endswith('EXPENSE')),ZERO)
     cash=sum((balances[k] for k,r in accounts.items() if r['flow_section']=='cash'),ZERO)
-    inventory=sum((balances[k] for k,r in accounts.items() if r['account_type']=='INVENTORY'),ZERO)
+    gross_inventory=sum((balances[k] for k,r in accounts.items() if r['account_type']=='INVENTORY'),ZERO)
+    allowance_account=session.connection().exec_driver_sql('SELECT allowance_account_id FROM accounting.inventory_policy WHERE business_id=%s',(str(session.business_id),)).scalar()
+    inventory_allowance=-balances[str(allowance_account)] if allowance_account else ZERO
+    inventory=gross_inventory-inventory_allowance
     receivables=sum((balances[k] for k,r in accounts.items() if r['account_type']=='RECEIVABLE'),ZERO)
     asset_types={'BANK','RECEIVABLE','INVENTORY','CURRENT_ASSET','NON_CURRENT_ASSET','CONTRA_ASSET'}
     liability_types={'PAYABLE','CONTROL','CURRENT_LIABILITY','NON_CURRENT_LIABILITY'}
@@ -161,7 +199,7 @@ def financial_summary(session,start:date,end:date):
             'transaction_count':len({r['transaction_id'] for r in rows if r['transaction_date'].date()>=start}),
             'revenue_trend':[{'period':key,'income':money(value)} for key,value in sorted(trend.items())],
             'income':money(income),'expenses':money(expense),'net_profit':money(income-expense),
-            'cash':money(cash),'inventory':money(inventory),'receivables':money(receivables),
+            'cash':money(cash),'inventory':money(inventory),'inventory_gross':money(gross_inventory),'inventory_allowance':money(inventory_allowance),'receivables':money(receivables),
             'trial_balance':[{'account_id':k,'name':r['name'],'type':r['account_type'],
                 'debit':money(max(balances[k],ZERO)),'credit':money(max(-balances[k],ZERO))} for k,r in accounts.items()],
             'trial_balance_difference':money(sum(balances.values(),ZERO))}
@@ -213,8 +251,9 @@ def trial_balance(session,as_of:date):
     if checked:
         def control(types):
             return sum((balances[k] for k,r in accounts.items() if r['account_type'] in types),ZERO)
-        stock=session.connection().exec_driver_sql("""SELECT coalesce(sum(stock_quantity*coalesce(cost_price,0)),0) FROM public.catalog_items
-            WHERE business_id=%s AND item_type='PRODUCT' AND track_stock AND is_active AND stock_quantity>0""",(str(session.business_id),)).scalar()
+        stock=session.connection().exec_driver_sql("""SELECT coalesce(sum(coalesce(v.gross_cost,c.stock_quantity*coalesce(c.cost_price,0))),0) FROM public.catalog_items c
+            LEFT JOIN accounting.inventory_valuation v ON v.business_id=c.business_id AND v.item_id=c.id
+            WHERE c.business_id=%s AND c.item_type='PRODUCT' AND c.track_stock AND c.is_active AND c.stock_quantity>0""",(str(session.business_id),)).scalar()
         for check,label,ledger,sub in (('receivables','Customer balances on open invoices',control({'RECEIVABLE'}),_outstanding(session,'invoice')),
                                        ('payables','Supplier balances on open bills',-control({'PAYABLE'}),_outstanding(session,'bill')),
                                        ('stock','Stock on hand at cost',control({'INVENTORY'}),Decimal(stock))):

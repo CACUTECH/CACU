@@ -18,10 +18,10 @@ test('mobile assistant shows readiness without sending page contents or acceptin
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test('policy screen has no active sample policies or fake persistence actions', async ({ mount }) => {
+test('policy screen reports missing accounting configuration without fake generation', async ({ mount, page }) => {
+  await page.route('**/test/ifrs/metadata', route => route.fulfill({json:{success:false,error:'Accounting API is not configured'}}));
   const component = await mount(<PoliciesPage />);
-  await expect(component.getByRole('heading', { name: 'Accounting Policies & Notes' })).toBeVisible();
-  await expect(component.getByRole('heading', { name: 'Not available yet', exact: true })).toBeVisible();
-  await expect(component.getByRole('textbox')).toHaveCount(0);
-  await expect(component.getByRole('button', { name: /save|generate|history/i })).toHaveCount(0);
+  await expect(component.getByRole('heading', { name: 'Accounting policies & financial close' })).toBeVisible();
+  await expect(component.getByRole('alert')).toHaveText('Accounting API is not configured');
+  await expect(component.getByRole('button', { name: /generate|send/i })).toHaveCount(0);
 });

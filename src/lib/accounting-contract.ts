@@ -72,6 +72,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/reports/trial-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trial Balance Report */
+        get: operations["trial_balance_report_api_v1_businesses__business_id__reports_trial_balance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/reports/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Financial Statements */
+        get: operations["financial_statements_api_v1_businesses__business_id__reports_statements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/reports/general-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** General Ledger Report */
+        get: operations["general_ledger_report_api_v1_businesses__business_id__reports_general_ledger_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/postings": {
         parameters: {
             query?: never;
@@ -83,6 +134,23 @@ export interface paths {
         put?: never;
         /** Accounting Posting */
         post: operations["accounting_posting_api_v1_businesses__business_id__postings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/collection-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Collection Accounts */
+        get: operations["collection_accounts_api_v1_businesses__business_id__collection_accounts_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -147,7 +215,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List Journals */
+        get: operations["list_journals_api_v1_businesses__business_id__journals_get"];
         put?: never;
         /** Post Balanced Journal */
         post: operations["post_balanced_journal_api_v1_businesses__business_id__journals_post"];
@@ -209,14 +278,711 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Catalog */
+        post: operations["save_catalog_api_v1_businesses__business_id__catalog_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/expense-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Expense Accounts */
+        get: operations["list_expense_accounts_api_v1_businesses__business_id__expense_accounts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Expenses */
+        get: operations["list_expenses_api_v1_businesses__business_id__expenses_get"];
+        put?: never;
+        /** Create Expense */
+        post: operations["create_expense_api_v1_businesses__business_id__expenses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/journals/{journal_id}/reversal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reverse Journal */
+        post: operations["reverse_journal_api_v1_businesses__business_id__journals__journal_id__reversal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/expenses/{expense_id}/reversal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reverse Expense */
+        post: operations["reverse_expense_api_v1_businesses__business_id__expenses__expense_id__reversal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/stock/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stock Adjustments */
+        get: operations["stock_adjustments_api_v1_businesses__business_id__stock_adjustments_get"];
+        put?: never;
+        /** Request Stock Adjustment */
+        post: operations["request_stock_adjustment_api_v1_businesses__business_id__stock_adjustments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/stock/adjustments/{adjustment_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Stock Adjustment */
+        post: operations["approve_stock_adjustment_api_v1_businesses__business_id__stock_adjustments__adjustment_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/stock/adjustments/{adjustment_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Stock Adjustment */
+        post: operations["reject_stock_adjustment_api_v1_businesses__business_id__stock_adjustments__adjustment_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/approval-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Approval Policy */
+        get: operations["approval_policy_api_v1_businesses__business_id__approval_policy_get"];
+        put?: never;
+        /** Save Approval Policy */
+        post: operations["save_approval_policy_api_v1_businesses__business_id__approval_policy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/supplier-bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Supplier Bills */
+        get: operations["supplier_bills_api_v1_businesses__business_id__supplier_bills_get"];
+        put?: never;
+        /** Create Supplier Bill */
+        post: operations["create_supplier_bill_api_v1_businesses__business_id__supplier_bills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/supplier-bills/{bill_id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pay Supplier Bill */
+        post: operations["pay_supplier_bill_api_v1_businesses__business_id__supplier_bills__bill_id__payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Account */
+        post: operations["add_account_api_v1_businesses__business_id__accounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/inventory/valuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inventory Valuation Report */
+        get: operations["inventory_valuation_report_api_v1_businesses__business_id__inventory_valuation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/inventory/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Inventory Policy */
+        post: operations["approve_inventory_policy_api_v1_businesses__business_id__inventory_policy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/inventory/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adopt Inventory Valuation */
+        post: operations["adopt_inventory_valuation_api_v1_businesses__business_id__inventory_adopt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/inventory/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive Inventory */
+        post: operations["receive_inventory_api_v1_businesses__business_id__inventory_receipts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/inventory/nrv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Inventory Nrv */
+        post: operations["review_inventory_nrv_api_v1_businesses__business_id__inventory_nrv_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/inventory/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Return Inventory */
+        post: operations["return_inventory_api_v1_businesses__business_id__inventory_returns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/cash-flow-classifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Classify Cash Flows */
+        post: operations["classify_cash_flows_api_v1_businesses__business_id__cash_flow_classifications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/reporting-close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reporting Closes */
+        get: operations["reporting_closes_api_v1_businesses__business_id__reporting_close_get"];
+        put?: never;
+        /** Submit Reporting Close */
+        post: operations["submit_reporting_close_api_v1_businesses__business_id__reporting_close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/reporting-close/{close_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reporting Close Detail */
+        get: operations["reporting_close_detail_api_v1_businesses__business_id__reporting_close__close_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/reporting-close/{close_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Reporting Close */
+        post: operations["approve_reporting_close_api_v1_businesses__business_id__reporting_close__close_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountCreate */
+        AccountCreate: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bank" | "current_asset" | "fixed_asset" | "current_liability" | "loan" | "equity" | "income" | "other_income" | "expense" | "other_expense";
+            /** Name */
+            name: string;
+        };
+        /** AdjustmentRequest */
+        AdjustmentRequest: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Expected Version */
+            expected_version: number;
+            /** Delta */
+            delta: number;
+            /** Reason */
+            reason: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+        };
+        /** AdoptItem */
+        AdoptItem: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Expected Version */
+            expected_version: number;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Evidence */
+            evidence: string;
+        };
+        /** Approval */
+        Approval: {
+            /** Evidence */
+            evidence: string;
+        };
+        /** BillCreate */
+        BillCreate: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /** Bill Number */
+            bill_number: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Due Date */
+            due_date?: string | null;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Lines */
+            lines: components["schemas"]["BillLine"][];
+        };
+        /** BillLine */
+        BillLine: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+        };
+        /** CashClassification */
+        CashClassification: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /**
+             * Nature
+             * @default other
+             * @enum {string}
+             */
+            nature: "other" | "interest_paid" | "interest_received" | "dividends_paid" | "dividends_received" | "income_tax";
+            /**
+             * Section
+             * @enum {string}
+             */
+            section: "cash" | "operating" | "investing" | "financing";
+            /**
+             * Cash Eligible
+             * @default false
+             */
+            cash_eligible: boolean;
+            /**
+             * Restricted
+             * @default false
+             */
+            restricted: boolean;
+            /** Evidence */
+            evidence: string;
+        };
+        /** CatalogMutation */
+        CatalogMutation: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "item.save" | "stock.adjust";
+            /** Item Id */
+            item_id?: string | null;
+            /** Expected Version */
+            expected_version?: number | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+        };
+        /** CloseDraft */
+        CloseDraft: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Annual
+             * @default true
+             */
+            annual: boolean;
+            /**
+             * Compare
+             * @default last_year
+             * @enum {string}
+             */
+            compare: "last_year" | "prior";
+            /**
+             * Framework
+             * @default full_ifrs
+             * @constant
+             */
+            framework: "full_ifrs";
+            /**
+             * Early Ifrs18
+             * @default false
+             */
+            early_ifrs18: boolean;
+            /** Accountant Name */
+            accountant_name: string;
+            /** Accountant Review Evidence */
+            accountant_review_evidence: string;
+            /** Notes */
+            notes: {
+                [key: string]: components["schemas"]["Note"];
+            };
+            /** Schedules */
+            schedules?: components["schemas"]["Schedule"][];
+            /** Maturities */
+            maturities?: components["schemas"]["Maturity"][];
+            /** Equity Classifications */
+            equity_classifications?: components["schemas"]["EquityClassification"][];
+        };
+        /** Decision */
+        Decision: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** EquityClassification */
+        EquityClassification: {
+            /** Ledger Id */
+            ledger_id: number;
+            /**
+             * Nature
+             * @enum {string}
+             */
+            nature: "owner_contribution" | "distribution" | "oci" | "transfer" | "prior_period_adjustment" | "other";
+            /** Evidence */
+            evidence: string;
+        };
+        /** ExpenseCreate */
+        ExpenseCreate: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Expense Account Id
+             * Format: uuid
+             */
+            expense_account_id: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Method */
+            method: string;
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+            /** Description */
+            description: string;
+        };
+        /** GoodsReceipt */
+        GoodsReceipt: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /** Bill Number */
+            bill_number: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Lines */
+            lines: components["schemas"]["ReceiptLine"][];
+            /** Tax Account Id */
+            tax_account_id?: string | null;
+            /** Evidence */
+            evidence: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InventoryPolicy */
+        InventoryPolicy: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Formula
+             * @constant
+             */
+            formula: "moving_weighted_average";
+            /**
+             * Allowance Account Id
+             * Format: uuid
+             */
+            allowance_account_id: string;
+            /** Evidence */
+            evidence: string;
         };
         /** InvoiceCreate */
         InvoiceCreate: {
@@ -256,6 +1022,19 @@ export interface components {
              * @default true
              */
             issue: boolean;
+            /**
+             * Performance Status
+             * @default satisfied
+             * @enum {string}
+             */
+            performance_status: "satisfied" | "not_satisfied" | "over_time";
+            /**
+             * Performance Evidence
+             * @default
+             */
+            performance_evidence: string;
+            /** Performance Date */
+            performance_date?: string | null;
         };
         /** InvoiceItem */
         InvoiceItem: {
@@ -335,6 +1114,66 @@ export interface components {
              */
             persisted: boolean;
         };
+        /** Maturity */
+        Maturity: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Current Portion */
+            current_portion: string;
+            /** Rights And Covenants */
+            rights_and_covenants: string;
+        };
+        /** Note */
+        Note: {
+            /** Applicable */
+            applicable: boolean;
+            /** Assessment */
+            assessment: string;
+            /** Evidence */
+            evidence: string;
+        };
+        /** NrvAssessment */
+        NrvAssessment: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Estimated Selling Total */
+            estimated_selling_total: string;
+            /** Completion And Selling Costs */
+            completion_and_selling_costs: string;
+            /** Evidence */
+            evidence: string;
+        };
+        /** Policy */
+        Policy: {
+            /** Stock Threshold */
+            stock_threshold?: string | null;
+            /**
+             * Separation Of Duties
+             * @default true
+             */
+            separation_of_duties: boolean;
+        };
         /** PostingCommand */
         PostingCommand: {
             /**
@@ -379,6 +1218,8 @@ export interface components {
             stock?: components["schemas"]["StockLine"][];
             /** Counterparty Id */
             counterparty_id?: string | null;
+            /** Payment Method */
+            payment_method?: ("Cash" | "Transfer") | null;
         };
         /** PostingLine */
         PostingLine: {
@@ -421,6 +1262,55 @@ export interface components {
             entry_date: string;
             /** Method */
             method: string;
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+        };
+        /** ReceiptLine */
+        ReceiptLine: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Quantity */
+            quantity: number;
+            /** Purchase Cost */
+            purchase_cost: string;
+            /**
+             * Rebate
+             * @default 0.00
+             */
+            rebate: string;
+            /**
+             * Landed Cost
+             * @default 0.00
+             */
+            landed_cost: string;
+            /**
+             * Nonrecoverable Tax
+             * @default 0.00
+             */
+            nonrecoverable_tax: string;
+            /**
+             * Recoverable Tax
+             * @default 0.00
+             */
+            recoverable_tax: string;
+        };
+        /** ReversalCreate */
+        ReversalCreate: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Reason */
+            reason: string;
         };
         /** SaleCreate */
         SaleCreate: {
@@ -438,8 +1328,44 @@ export interface components {
             entry_date: string;
             /** Method */
             method: string;
+            /** Bank Account Id */
+            bank_account_id?: string | null;
             /** Quoted Total */
             quoted_total: string;
+        };
+        /** Schedule */
+        Schedule: {
+            /**
+             * Gap
+             * @enum {string}
+             */
+            gap: "FIN-01" | "ASSET-01" | "LEASE-01" | "TAX-01" | "PEOPLE-01";
+            /** Title */
+            title: string;
+            /** Calculation And Assumptions */
+            calculation_and_assumptions: string;
+            /** Evidence */
+            evidence: string;
+            /** Rows */
+            rows: components["schemas"]["ScheduleRow"][];
+        };
+        /** ScheduleRow */
+        ScheduleRow: {
+            /** Label */
+            label: string;
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Opening */
+            opening: string;
+            /** Debits */
+            debits: string;
+            /** Credits */
+            credits: string;
+            /** Closing */
+            closing: string;
         };
         /** StockLine */
         StockLine: {
@@ -450,6 +1376,56 @@ export interface components {
             item_id: string;
             /** Quantity */
             quantity: number;
+        };
+        /** StockReturn */
+        StockReturn: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Refund Method */
+            refund_method?: ("Cash" | "Transfer") | null;
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+            /**
+             * Original Source Id
+             * Format: uuid
+             */
+            original_source_id: string;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Quantity */
+            quantity: number;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Evidence */
+            evidence: string;
+        };
+        /** SupplierPaymentCreate */
+        SupplierPaymentCreate: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Method */
+            method: string;
+            /** Bank Account Id */
+            bank_account_id?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -596,6 +1572,110 @@ export interface operations {
             };
         };
     };
+    trial_balance_report_api_v1_businesses__business_id__reports_trial_balance_get: {
+        parameters: {
+            query: {
+                as_of: string;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    financial_statements_api_v1_businesses__business_id__reports_statements_get: {
+        parameters: {
+            query: {
+                start_date: string;
+                end_date: string;
+                compare?: string | null;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    general_ledger_report_api_v1_businesses__business_id__reports_general_ledger_get: {
+        parameters: {
+            query: {
+                account_id: string;
+                start_date: string;
+                end_date: string;
+                page?: number;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     accounting_posting_api_v1_businesses__business_id__postings_post: {
         parameters: {
             query?: never;
@@ -610,6 +1690,37 @@ export interface operations {
                 "application/json": components["schemas"]["PostingCommand"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    collection_accounts_api_v1_businesses__business_id__collection_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -715,6 +1826,37 @@ export interface operations {
                 "application/json": components["schemas"]["SaleCreate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_journals_api_v1_businesses__business_id__journals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -883,6 +2025,928 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_catalog_api_v1_businesses__business_id__catalog_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogMutation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_expense_accounts_api_v1_businesses__business_id__expense_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_expenses_api_v1_businesses__business_id__expenses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_expense_api_v1_businesses__business_id__expenses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reverse_journal_api_v1_businesses__business_id__journals__journal_id__reversal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                journal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReversalCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reverse_expense_api_v1_businesses__business_id__expenses__expense_id__reversal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                expense_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReversalCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stock_adjustments_api_v1_businesses__business_id__stock_adjustments_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_stock_adjustment_api_v1_businesses__business_id__stock_adjustments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_stock_adjustment_api_v1_businesses__business_id__stock_adjustments__adjustment_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                adjustment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_stock_adjustment_api_v1_businesses__business_id__stock_adjustments__adjustment_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                adjustment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approval_policy_api_v1_businesses__business_id__approval_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_approval_policy_api_v1_businesses__business_id__approval_policy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Policy"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supplier_bills_api_v1_businesses__business_id__supplier_bills_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_supplier_bill_api_v1_businesses__business_id__supplier_bills_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pay_supplier_bill_api_v1_businesses__business_id__supplier_bills__bill_id__payments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                bill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierPaymentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_account_api_v1_businesses__business_id__accounts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inventory_valuation_report_api_v1_businesses__business_id__inventory_valuation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_inventory_policy_api_v1_businesses__business_id__inventory_policy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryPolicy"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    adopt_inventory_valuation_api_v1_businesses__business_id__inventory_adopt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdoptItem"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_inventory_api_v1_businesses__business_id__inventory_receipts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsReceipt"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_inventory_nrv_api_v1_businesses__business_id__inventory_nrv_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NrvAssessment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    return_inventory_api_v1_businesses__business_id__inventory_returns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockReturn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    classify_cash_flows_api_v1_businesses__business_id__cash_flow_classifications_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashClassification"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reporting_closes_api_v1_businesses__business_id__reporting_close_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_reporting_close_api_v1_businesses__business_id__reporting_close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseDraft"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reporting_close_detail_api_v1_businesses__business_id__reporting_close__close_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                close_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_reporting_close_api_v1_businesses__business_id__reporting_close__close_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                close_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Approval"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -14,3 +14,10 @@ test('neutralizes spreadsheet formulas in account names', () => {
   const manipulated: CashFlowReport = { ...report, sections: [{ key: 'operating', total: '0.00', lines: [{ label: '=1+2', amount: '0.00', details: [] }] }] };
   expect(reportCsv(manipulated)).toContain('"\'=1+2"');
 });
+
+
+test('cash-component restrictions and financing changes are included in exports',() => {
+  const noted:CashFlowReport={...report,cash_components:[{account_id:'bank',name:'Restricted demand deposit',opening:'100.00',closing:'160.00',restricted:true}],financing_reconciliation:[{account_id:'loan',name:'Loan',opening:'0.00',cash_movements:'60.00',noncash_movements:'0.00',closing:'60.00'}]};
+  expect(cashFlowRows(noted)).toContainEqual(['Restricted: Restricted demand deposit','true']);
+  expect(cashFlowRows(noted)).toContainEqual(['Cash movements','60.00']);
+});

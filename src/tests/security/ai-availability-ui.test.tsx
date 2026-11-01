@@ -1,5 +1,6 @@
 jest.mock('@/app/ai/actions', () => ({ getAIChatStatusAction: jest.fn(), askAIQuestionAction: jest.fn() }));
 jest.mock('lucide-react', () => ({ Sparkles: () => null, X: () => null }));
+jest.mock('@/app/accounting/policies/actions', () => ({ loadCloseMetadataAction: jest.fn().mockResolvedValue({ success: false, error: 'Accounting API is not configured' }) }));
 import { fireEvent, render, screen } from '@testing-library/react';
 import { AIAssistant } from '@/components/ai-assistant';
 import AccountingPoliciesPage from '@/app/accounting/policies/page';
@@ -14,15 +15,14 @@ test('assistant explains availability without asking for confidential inputs', (
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /analyze|send/i })).not.toBeInTheDocument();
 });
-test.each([
-  { Page: AccountingPoliciesPage, title: 'Accounting Policies & Notes' },
-])('$title does not claim a working save, generation or delivery workflow', ({ Page, title }) => {
-  render(<Page />);
-  expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
-  expect(screen.getByText('Not available yet')).toBeInTheDocument();
-  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /save|generate|send/i })).not.toBeInTheDocument();
+test('accounting close explains unavailable data without claiming AI generation or delivery', async () => {
+  render(<AccountingPoliciesPage />);
+  expect(screen.getByRole('heading', { name: 'Accounting policies & financial close' })).toBeInTheDocument();
+  expect(await screen.findByRole('alert')).toHaveTextContent('Accounting API is not configured');
+  expect(screen.queryByRole('button', { name: /generate|send/i })).not.toBeInTheDocument();
+  expect(screen.getByText(/does not automatically certify IFRS compliance/)).toBeInTheDocument();
 });
+
 test('departure page points to the employee record and offers no letter generation', () => {
   render(<DeparturePage />);
   expect(screen.getByRole('heading', { name: 'Employee Departure' })).toBeInTheDocument();

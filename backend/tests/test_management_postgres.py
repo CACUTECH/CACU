@@ -49,6 +49,8 @@ def managed(database,request):
         c.execute(Path('../supabase/migrations/20261012140639_inventory_user_management.sql').read_text(encoding='utf-8-sig'))
         c.execute('CREATE TRIGGER memberships_prevent_last_owner_loss BEFORE UPDATE OR DELETE ON public.memberships FOR EACH ROW EXECUTE FUNCTION public.prevent_last_owner_loss()')
         c.execute(Path('../supabase/migrations/20261101010624_stock_adjustment_approval.sql').read_text(encoding='utf-8'))
+        for migration in Path('../supabase/migrations').glob('*_ifrs_catalog_valuation_guard.sql'):
+            c.execute(migration.read_text(encoding='utf-8'))
         c.execute('INSERT INTO auth.users VALUES(%s,%s,now())',(database[2],'owner@example.com'))
     return database
 

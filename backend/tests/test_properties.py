@@ -15,3 +15,12 @@ def test_split_debits_balance_exactly(first, second):
     result = validate_journal(draft)
     assert Decimal(result.total_debit) == a + b == Decimal(result.total_credit)
     assert result.persisted is False
+
+@given(st.integers(min_value=1,max_value=10**12),st.integers(min_value=2,max_value=1000))
+def test_inventory_issues_preserve_exact_cost_and_last_unit_residual(total_cents,units):
+    from cacu.accounting.inventory import proportion
+    cost=Decimal(total_cents)/100
+    first=proportion(cost,1,units)
+    remaining=cost-first
+    final=proportion(remaining,units-1,units-1)
+    assert first>=0 and final>=0 and first+final==cost

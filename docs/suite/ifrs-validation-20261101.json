@@ -1,0 +1,104 @@
+{
+  "date": "2026-11-01",
+  "scope": "Local isolated PostgreSQL and repository checks; no production mutations or deployment",
+  "branch": "feat/ifrs-gap-remediation",
+  "python_full_suite": {
+    "passed": 425,
+    "warnings": 971
+  },
+  "python_targeted_final_regression": {
+    "passed": 46,
+    "warnings": 178
+  },
+  "python_final_ifrs_acceptance": {
+    "passed": 8,
+    "warnings": 34,
+    "includes": [
+      "Original-cost unpaid/paid returns and atomic refunds",
+      "NRV reversal cap and net dashboard inventory",
+      "Manual inventory posting refusal",
+      "Unchanged-cost metadata edits remain available",
+      "Replayed close checks current fingerprint",
+      "Independent approvals and tenant isolation",
+      "External schedule/maturity reconciliation",
+      "Dedicated allowance account cannot reuse historical postings"
+    ]
+  },
+  "frontend_ci": {
+    "passed_tests": 289,
+    "passed_suites": 38,
+    "lint": "passed",
+    "typecheck": "passed"
+  },
+  "browser": {
+    "passed": 50,
+    "workers": 2,
+    "latest_close_submission_test": "passed separately after adding nonannual comparison control"
+  },
+  "production_build": "passed final rebuild",
+  "security": {
+    "private_tables": [
+      {
+        "name": "cash_flow_classification",
+        "rls": true,
+        "force_rls": true,
+        "anon_privileges": false,
+        "authenticated_privileges": false
+      },
+      {
+        "name": "inventory_journal",
+        "rls": true,
+        "force_rls": true,
+        "anon_privileges": false,
+        "authenticated_privileges": false
+      },
+      {
+        "name": "inventory_policy",
+        "rls": true,
+        "force_rls": true,
+        "anon_privileges": false,
+        "authenticated_privileges": false
+      },
+      {
+        "name": "inventory_valuation",
+        "rls": true,
+        "force_rls": true,
+        "anon_privileges": false,
+        "authenticated_privileges": false
+      },
+      {
+        "name": "inventory_value_event",
+        "rls": true,
+        "force_rls": true,
+        "anon_privileges": false,
+        "authenticated_privileges": false
+      },
+      {
+        "name": "reporting_close",
+        "rls": true,
+        "force_rls": true,
+        "anon_privileges": false,
+        "authenticated_privileges": false
+      },
+      {
+        "name": "reporting_close_decision",
+        "rls": true,
+        "force_rls": true,
+        "anon_privileges": false,
+        "authenticated_privileges": false
+      }
+    ],
+    "immutable_evidence_runtime_update_delete": false,
+    "public_guard_execute": false
+  },
+  "known_scope": [
+    "No automatic IFRS certification",
+    "Accountant calculations/assumptions and Owner/Admin approvals required",
+    "Pre-cutover comparative integration and full IFRS18 presentation engine remain outside current supported approval scope"
+  ],
+  "transient_checks": [
+    "Obsolete unavailable-policies assertions updated for implemented workflow",
+    "New select locator corrected to accessible combobox role",
+    "Default parallel browser run had a cash-report 5-second wait timeout; all 50 passed with two workers"
+  ]
+}

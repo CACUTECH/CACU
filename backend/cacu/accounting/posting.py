@@ -4,7 +4,7 @@ import json
 from datetime import date,datetime,time
 from decimal import Decimal
 from typing import Literal
-from uuid import UUID,uuid4
+from uuid import UUID,uuid4,uuid5
 from fastapi import HTTPException
 from pydantic import BaseModel,ConfigDict,Field,field_validator
 from python_accounting.models import Account,LineItem,Transaction,Assignment
@@ -77,7 +77,7 @@ def native_post(session,cls,main,lines,entry_date,narration,credited=None,main_a
     session.flush();tx.post(session);session.flush();session.expire(tx, ['ledgers'])
     return tx
 
-def post_command(session,actor:UUID,command:PostingCommand):
+def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False):
     serialized=command.model_dump(mode='json')
     if serialized.get('payment_method') is None:serialized.pop('payment_method',None)
     payload=json.dumps(serialized,sort_keys=True,separators=(',',':'))
@@ -129,7 +129,7 @@ def post_command(session,actor:UUID,command:PostingCommand):
         # invoices, bills and their payments by their credit-note workflow.
         if not command.target_id:raise HTTPException(422,'Reversal target required')
         targetrow=raw(session,"""SELECT d.transaction_id FROM accounting.document_map d WHERE d.business_id=%s AND d.source_id=%s
-            AND d.source_type IN ('adjustment','expense') AND NOT EXISTS(SELECT FROM accounting.stock_event e WHERE e.business_id=d.business_id AND e.source_id=d.source_id)""",
+            AND d.source_type IN ('adjustment','expense') AND NOT EXISTS(SELECT FROM accounting.stock_event e WHERE e.business_id=d.business_id AND e.source_id=d.source_id) AND NOT EXISTS(SELECT FROM accounting.inventory_journal j WHERE j.business_id=d.business_id AND j.source_id=d.source_id)""",
             (tenant,str(command.target_id))).first()
         if not targetrow:raise HTTPException(422,'Only posted manual journals and expenses can be reversed')
         original=session.get(Transaction,targetrow.transaction_id)
@@ -152,6 +152,13 @@ def post_command(session,actor:UUID,command:PostingCommand):
         selected=command.main_account_id if command.kind=='pos' else command.lines[0].account_id
         reviewed=collection_account(session,command.payment_method,selected if command.payment_method=='Transfer' else None)
         if str(reviewed)!=str(selected):raise HTTPException(422,'Collection method/account mismatch')
+    if not managed_stock:
+        controlled=raw(session,"""SELECT m.library_id FROM accounting.account_map m
+          JOIN accounting.inventory_policy p ON p.business_id=m.business_id
+          WHERE m.business_id=%s AND (m.purpose='inventory' OR m.account_id=p.allowance_account_id)""",(tenant,)).all()
+        protected={r.library_id for r in controlled}
+        if main.id in protected or any(line[0].id in protected for line in lines):
+            raise HTTPException(409,'Adopted inventory and NRV control accounts require the inventory valuation workflows')
     tx=native_post(session,CLASSES[command.kind],main,lines,command.entry_date,command.narration,
                    command.credited if command.kind in {'adjustment','reversal'} else None,compound)
     if target:
@@ -185,11 +192,15 @@ def post_command(session,actor:UUID,command:PostingCommand):
         if command.kind not in {'invoice','pos'}:raise HTTPException(422,'Stock fulfillment requires a sale')
         if len({s.item_id for s in command.stock})!=len(command.stock):raise HTTPException(422,'Duplicate stock item')
         cost=Decimal('0')
+        from cacu.accounting.inventory import consume, allowance_post
         for item in sorted(command.stock,key=lambda x:str(x.item_id)):
             row=raw(session,"SELECT stock_quantity,cost_price FROM public.catalog_items WHERE id=%s AND business_id=%s AND item_type='PRODUCT' AND is_active FOR UPDATE",(str(item.item_id),tenant)).first()
             if not row or row.cost_price is None or row.cost_price<0 or (row.stock_quantity or 0)<item.quantity:
                 raise HTTPException(409,'Stock or authoritative cost unavailable')
-            cost+=row.cost_price*item.quantity
+            valued=consume(session,actor,command.source_id,item.item_id,item.quantity,command.entry_date)
+            cost+=valued[0] if valued is not None else row.cost_price*item.quantity
+            if valued is not None and valued[1]:
+                allowance_post(session,actor,uuid5(command.source_id,'allowance:'+str(item.item_id)),command.entry_date,-valued[1],'Fulfillment of inventory allowance')
             raw(session,'UPDATE public.catalog_items SET stock_quantity=stock_quantity-%s WHERE id=%s AND business_id=%s',(item.quantity,str(item.item_id),tenant))
             raw(session,'INSERT INTO accounting.stock_event(business_id,source_id,item_id,quantity,unit_cost) VALUES(%s,%s,%s,%s,%s)',
                 (tenant,str(command.source_id),str(item.item_id),-item.quantity,row.cost_price))
