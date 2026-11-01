@@ -252,3 +252,20 @@ def approval_policy(business_id:UUID,user_id:UUID=Depends(current_user)):
 def save_approval_policy(business_id:UUID,data:Policy,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True) as session:
         return set_policy(session,user_id,data)
+
+from cacu.accounting.bills import BillCreate,SupplierPaymentCreate,bill_create,list_bills,payment_create
+
+@app.get('/api/v1/businesses/{business_id}/supplier-bills')
+def supplier_bills(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        return list_bills(session)
+
+@app.post('/api/v1/businesses/{business_id}/supplier-bills')
+def create_supplier_bill(business_id:UUID,data:BillCreate,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return bill_create(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/supplier-bills/{bill_id}/payments')
+def pay_supplier_bill(business_id:UUID,bill_id:UUID,data:SupplierPaymentCreate,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return payment_create(session,user_id,bill_id,data)

@@ -50,6 +50,12 @@ def purpose(session,name):
     if len(rows)!=1:raise HTTPException(409,f'One reviewed {name} account mapping required')
     return rows[0].account_id
 
+def party_account(session,kind,party_id):
+    """The control account a customer or supplier posts to. Parties added after the books went live are mapped
+    to the receivables or payables account the first time they are used (accounting.map_party)."""
+    library=raw(session,'SELECT accounting.map_party(%s,%s,%s)',(str(session.business_id),kind,str(party_id))).scalar()
+    return raw(session,'SELECT account_id FROM accounting.account_map WHERE business_id=%s AND library_id=%s',(str(session.business_id),library)).scalar()
+
 def collection_account(session,method,bank_account_id):
     if method=='Card':raise HTTPException(409,'Card payments require verified gateway settlement')
     if method=='Transfer':
@@ -101,8 +107,7 @@ def invoice_create(session,actor,data:InvoiceCreate):
         if len({i.catalog_item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate invoice item')
         customer=raw(session,'SELECT id FROM public.customers WHERE business_id=%s AND id=%s',(tenant,str(data.customer_id))).first()
         if not customer:raise HTTPException(422,'Customer unavailable')
-        ar=raw(session,"SELECT m.account_id FROM accounting.party_map p JOIN accounting.account_map m ON m.library_id=p.library_id AND m.business_id=p.business_id WHERE p.business_id=%s AND p.party_type='customers' AND p.party_id=%s",(tenant,str(data.customer_id))).scalar()
-        if not ar:raise HTTPException(409,'Reviewed customer receivable mapping required')
+        ar=party_account(session,'customers',data.customer_id)
         total=Decimal('0');items=[];stock=[]
         for item in sorted(data.items,key=lambda x:str(x.catalog_item_id)):
             row=raw(session,"SELECT name,item_type,unit_price,coalesce((to_jsonb(catalog_items)->>'track_stock')::boolean,true) AS track_stock FROM public.catalog_items WHERE business_id=%s AND id=%s AND is_active FOR UPDATE",(tenant,str(item.catalog_item_id))).first()

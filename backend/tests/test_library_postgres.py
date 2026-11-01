@@ -28,7 +28,7 @@ def database():
     with psycopg.connect(DSN) as c:
         c.execute('DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
         c.execute("""CREATE TABLE public.businesses(id uuid primary key,name text);
-          CREATE TABLE public.memberships(business_id uuid,user_id uuid,role text);
+          CREATE TABLE public.memberships(business_id uuid,user_id uuid,role text,is_active boolean NOT NULL DEFAULT true);
           CREATE TABLE public.accounts(id uuid primary key,business_id uuid,name text,is_active boolean default true);
           CREATE TABLE public.customers(id uuid primary key,business_id uuid,name text);
           CREATE TABLE public.suppliers(id uuid primary key,business_id uuid,name text);
@@ -48,6 +48,8 @@ def database():
         for p in sorted([*Path('../supabase/migrations').glob('2026101108*.sql'), *Path('../supabase/migrations').glob('20261011090*.sql')]):
             c.execute(p.read_text(encoding='utf-8-sig'))
         for migration in Path('../supabase/migrations').glob('*_native_collection_account_lock.sql'):
+            c.execute(migration.read_text(encoding='utf-8'))
+        for migration in Path('../supabase/migrations').glob('*_supplier_bills.sql'):
             c.execute(migration.read_text(encoding='utf-8'))
         for tab in ['memberships','accounts','customers','suppliers','catalog_items','invoices','invoice_items','payments','transactions','transaction_items']:
             c.execute(f'ALTER TABLE public.{tab} ENABLE ROW LEVEL SECURITY')

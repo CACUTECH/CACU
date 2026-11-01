@@ -13,6 +13,7 @@ export default defineConfig({
       }
       if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/transactions/page.tsx')) return path.resolve(__dirname, 'tests/browser/ledger-actions.ts');
       if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/setup/books/page.tsx')) return path.resolve(__dirname, 'tests/browser/opening-actions.ts');
+      if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/accounting/bills/page.tsx')) return path.resolve(__dirname, 'tests/browser/bill-actions.ts');
       if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/accounting/expenses/page.tsx')) return path.resolve(__dirname, 'tests/browser/expense-actions.ts');
       if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/chart-of-accounts/page.tsx')) return path.resolve(__dirname, 'tests/browser/chart-actions.ts');
       if (source === './actions' && importer?.replaceAll('\\', '/').endsWith('/reports/page.tsx')) return path.resolve(__dirname, 'tests/browser/reports-action.ts');

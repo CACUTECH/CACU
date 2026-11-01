@@ -38,6 +38,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/accounting': 'Accounting',
   '/accounting/chart-of-accounts': 'Chart of Accounts',
   '/accounting/expenses': 'Expenses',
+  '/accounting/bills': 'Bills',
   '/accounting/journal-entries': 'Journal Adjustments',
   '/accounting/trial-balance': 'Trial Balance',
   '/accounting/general-ledger': 'General Ledger',
