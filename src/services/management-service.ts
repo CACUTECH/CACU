@@ -30,7 +30,14 @@ export class ManagementService extends BaseService {
         const { data, error } = await supabase.rpc('management_write', { p_business_id: businessId, p_request_key: input.request_key,
             p_operation: input.operation, p_id: input.item_id ?? null, p_version: input.expected_version ?? null, p_data: input.details });
         if (error)
-            throw new ManagementWriteError(error.message, !/^(22|23|42|P0001)/.test(error.code || ''));
+            throw new ManagementWriteError(MANAGEMENT_MESSAGES[error.message] ?? error.message, !/^(22|23|42|P0001)/.test(error.code || ''));
         return data;
     }
 }
+/** Plain wording for refusals people meet while managing their team; other codes pass through unchanged. */
+const MANAGEMENT_MESSAGES: Record<string, string> = {
+    INVITATION_LIMIT_REACHED: 'Too many invitations sent recently. Try again in an hour.',
+    PLEASE_WAIT_BEFORE_RESENDING: 'This invitation was just sent. Wait a minute before resending it.',
+    MEMBER_ALREADY_EXISTS: 'That person is already a member of this business.',
+    INVALID_INVITATION: 'Enter a valid email address and choose Admin, Editor or Viewer.',
+};

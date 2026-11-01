@@ -51,6 +51,7 @@ def managed(database,request):
         c.execute(Path('../supabase/migrations/20261101010624_stock_adjustment_approval.sql').read_text(encoding='utf-8'))
         for migration in Path('../supabase/migrations').glob('*_ifrs_catalog_valuation_guard.sql'):
             c.execute(migration.read_text(encoding='utf-8'))
+        c.execute(Path('../supabase/migrations/20261101180000_invitation_limits.sql').read_text(encoding='utf-8'))
         c.execute('INSERT INTO auth.users VALUES(%s,%s,now())',(database[2],'owner@example.com'))
     return database
 
@@ -284,3 +285,26 @@ def test_existing_native_invoice_and_receipt_work_with_management_guard(managed)
         try:receipt_create(session,d[2],ReceiptCreate(request_key=uuid4(),invoice_id=invoice_id,amount='100.00',entry_date=f'{d[6]}-02-11',method='Cash'))
         finally:session.close()
     with psycopg.connect(URL) as c:assert c.execute('SELECT status FROM invoices WHERE id=%s',(invoice_id,)).fetchone()[0]=='paid'
+
+
+def test_invitations_are_rate_limited_per_person_and_per_business(managed):
+    d=managed;admin=uuid4()
+    with psycopg.connect(URL) as c:
+        c.execute('INSERT INTO auth.users VALUES(%s,%s,now())',(admin,'admin@example.com'));c.execute('INSERT INTO memberships(business_id,user_id,role) VALUES(%s,%s,%s)',(d[1],admin,'admin'))
+    invite=lambda n,actor=None:write(d,'invitation.create',{'email':f'person{n}@example.com','role':'viewer'},actor=actor)
+    first=[invite(n) for n in range(10)]
+    with pytest.raises(psycopg.Error,match='INVITATION_LIMIT_REACHED'):invite(10)  # ten an hour per person
+    for n in range(10,20):invite(n,admin)
+    with pytest.raises(psycopg.Error,match='INVITATION_LIMIT_REACHED'):invite(20,admin)  # twenty an hour per business
+    with psycopg.connect(URL) as c:  # past the one-minute resend wait, still inside the hour
+        c.execute("UPDATE management_private.audit SET created_at=now()-interval '2 minutes' WHERE record_id=%s",(first[0]['id'],))
+    with pytest.raises(psycopg.Error,match='INVITATION_LIMIT_REACHED'):write(d,'invitation.resend',{},first[0]['id'],first[0]['version'],actor=admin)
+    write(d,'invitation.cancel',{},first[0]['id'],first[0]['version'])  # cancelling is never limited
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE management_private.audit SET created_at=created_at-interval '2 hours'")
+        assert c.execute("SELECT count(*) FROM business_invitations WHERE business_id=%s",(d[1],)).fetchone()==(20,)
+    invite(21)  # an hour later sending works again
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE management_private.audit SET created_at=now()-interval '2 hours' WHERE created_at>now()-interval '1 hour'")
+        for n in range(79):c.execute("INSERT INTO management_private.audit(business_id,actor_id,event,created_at) VALUES(%s,%s,'invitation.create',now()-interval '3 hours')",(d[1],d[2]))
+    with pytest.raises(psycopg.Error,match='INVITATION_LIMIT_REACHED'):invite(22)  # a hundred a day per business
