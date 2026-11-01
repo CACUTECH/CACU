@@ -53,6 +53,8 @@ def database():
             c.execute(migration.read_text(encoding='utf-8'))
         for migration in Path('../supabase/migrations').glob('*_supplier_bills.sql'):
             c.execute(migration.read_text(encoding='utf-8'))
+        for migration in Path('../supabase/migrations').glob('*_api_rate_limits.sql'):
+            c.execute(migration.read_text(encoding='utf-8'))
         for migration in Path('../supabase/migrations').glob('*_ifrs_inventory_and_reporting_close.sql'):
             c.execute(migration.read_text(encoding='utf-8'))
         for tab in ['memberships','accounts','customers','suppliers','catalog_items','invoices','invoice_items','payments','transactions','transaction_items']:
