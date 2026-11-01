@@ -197,8 +197,10 @@ def trial_balance(session,as_of:date):
     for row in rows:
         key=str(row['source_account_id']);accounts[key]=row
         balances[key]+=row['amount']*(1 if row['entry_type']=='DEBIT' else -1)
-    codes=dict(session.connection().exec_driver_sql('SELECT id::text,code FROM public.accounts WHERE business_id=%s',(str(session.business_id),)).all())
-    lines=[{'account_id':k,'code':codes.get(k),'name':r['name'],'type':r['account_type'],
+    # Code and name as the owner sees them in the chart; the ledger keeps its own title-cased copy of the name.
+    chart={r.id:(r.code,r.name) for r in session.connection().exec_driver_sql('SELECT id::text AS id,code,name FROM public.accounts WHERE business_id=%s',(str(session.business_id),)).all()}
+    codes={k:v[0] for k,v in chart.items()}
+    lines=[{'account_id':k,'code':codes.get(k),'name':chart.get(k,(None,r['name']))[1],'type':r['account_type'],
             'debit':money(max(balances[k],ZERO)),'credit':money(max(-balances[k],ZERO))}
            for k,r in sorted(accounts.items(),key=lambda item:(codes.get(item[0]) or '',item[1]['name'])) if balances[k]!=ZERO]
     debits=sum((Decimal(l['debit']) for l in lines),ZERO);credits=sum((Decimal(l['credit']) for l in lines),ZERO)

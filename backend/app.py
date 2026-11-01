@@ -269,3 +269,20 @@ def create_supplier_bill(business_id:UUID,data:BillCreate,user_id:UUID=Depends(c
 def pay_supplier_bill(business_id:UUID,bill_id:UUID,data:SupplierPaymentCreate,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True) as session:
         return payment_create(session,user_id,bill_id,data)
+
+from cacu.accounting.accounts import AccountCreate,account_create
+
+ACCOUNT_MESSAGES={'DUPLICATE_ACCOUNT_NAME':'Another account already has that name.','CODE_RANGE_FULL':'There is no free code left for this kind of account.',
+    'INVALID_ACCOUNT_KIND':'Choose what kind of account this is.','INVALID_NAME':'Enter a name of up to 100 characters.',
+    'CHART_NOT_ADOPTED':'Set up the standard accounts first.','ACCESS_DENIED':'Only an Owner or Admin can change the chart of accounts.'}
+
+@app.post('/api/v1/businesses/{business_id}/accounts')
+def add_account(business_id:UUID,data:AccountCreate,user_id:UUID=Depends(current_user)):
+    try:
+        with library_transaction(user_id,business_id,write=True) as session:
+            return account_create(session,user_id,data)
+    except SQLAlchemyError as exc:
+        code=getattr(exc.orig,'sqlstate',None);reason=str(getattr(exc,'orig',exc)).splitlines()[0]
+        if code in {'P0001','22023','23505','23514','42501'}:
+            raise HTTPException(403 if code=='42501' else 409,ACCOUNT_MESSAGES.get(reason,'The account was not added. Check the name and kind.')) from None
+        raise
