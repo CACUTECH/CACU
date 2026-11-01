@@ -10,11 +10,15 @@ from test_library_postgres import database, DSN
 pytestmark = pytest.mark.skipif(not DSN, reason='Disposable PostgreSQL required')
 
 
-def slot(business, actor):
+def slots(business, actors):
+    # One transaction keeps now() fixed, so every call lands in the same one-minute window even if the clock turns over.
     with psycopg.connect(DSN) as c:
         c.execute('SET LOCAL ROLE cacu_runtime')
-        c.execute("SELECT set_config('request.jwt.claims',%s,true),set_config('cacu.business_id',%s,true)", (json.dumps({'sub': str(actor)}), str(business)))
-        return c.execute('SELECT accounting.take_write_slot(%s)', (str(business),)).fetchone()[0]
+        taken = []
+        for actor in actors:
+            c.execute("SELECT set_config('request.jwt.claims',%s,true),set_config('cacu.business_id',%s,true)", (json.dumps({'sub': str(actor)}), str(business)))
+            taken.append(c.execute('SELECT accounting.take_write_slot(%s)', (str(business),)).fetchone()[0])
+        return taken
 
 
 def member(business, role='editor'):
@@ -26,24 +30,24 @@ def member(business, role='editor'):
 
 def test_sixty_writes_a_minute_per_person_then_a_wait(database):
     business, owner = database[1], database[2]
-    assert [slot(business, owner) for _ in range(60)] == [0] * 60
-    wait = slot(business, owner)
-    assert 1 <= wait <= 60
-    assert slot(business, member(business)) == 0  # another person still has their own allowance
+    taken = slots(business, [owner] * 61 + [member(business)])
+    assert taken[:60] == [0] * 60
+    assert 1 <= taken[60] <= 60
+    assert taken[61] == 0  # another person still has their own allowance
 
 
 def test_three_hundred_writes_a_minute_per_business(database):
     business = database[1]
     people = [member(business) for _ in range(5)]
-    assert all(slot(business, p) == 0 for p in people for _ in range(60))
-    assert slot(business, member(business)) > 0  # the business allowance is used up for everyone
+    taken = slots(business, [p for p in people for _ in range(60)] + [member(business)])
+    assert taken[:300] == [0] * 300
+    assert taken[300] > 0  # the business allowance is used up for everyone
 
 
 def test_viewers_and_outsiders_do_not_use_up_a_business_allowance(database):
     business = database[1]
     viewer, outsider = member(business, 'viewer'), uuid4()
-    for _ in range(70):
-        assert slot(business, viewer) == 0 and slot(business, outsider) == 0
+    assert slots(business, [viewer, outsider] * 70) == [0] * 140
     with psycopg.connect(DSN) as c:
         assert c.execute("SELECT coalesce(sum(requests),0) FROM accounting.request_window WHERE scope='business' AND subject=%s", (business,)).fetchone()[0] == 0
 
@@ -88,8 +92,11 @@ def test_api_answers_429_with_retry_after_and_writes_nothing(database, monkeypat
     try:
         client = TestClient(api.app)
         assert client.post(f'/api/v1/businesses/{business}/journals', json=journal()).status_code == 200
-        for _ in range(59):
-            slot(business, owner)
+        # Use up the owner's allowance in this minute and the next, so the refusal does not depend on the clock.
+        with psycopg.connect(DSN) as c:
+            c.execute("""INSERT INTO accounting.request_window VALUES ('user', %s, date_trunc('minute', now()), 60),
+                ('user', %s, date_trunc('minute', now()) + interval '1 minute', 60)
+                ON CONFLICT (scope, subject, window_start) DO UPDATE SET requests = 60""", (owner, owner))
         refused = client.post(f'/api/v1/businesses/{business}/journals', json=journal())
         assert refused.status_code == 429 and 1 <= int(refused.headers['Retry-After']) <= 60
         assert refused.json()['detail'].startswith('Too many changes in a short time')
