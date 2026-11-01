@@ -1,6 +1,8 @@
 """Default chart of accounts (Doc 09 section 4, ACC-012, FR-131) on disposable PostgreSQL fixtures."""
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 import psycopg
 import pytest
 from cacu.accounting.chart import build_mapping, validate
@@ -108,6 +110,36 @@ def test_mapping_refuses_unreviewed_template_and_builds_a_valid_mapping_for_stag
     assert len(mapping['accounts']) == 28 and mapping['template'] == 'NG-2026.1'
     assert {a['purpose'] for a in mapping['accounts']} >= {'cash', 'bank', 'revenue', 'equity', 'inventory', 'cogs', 'other'}
     assert mapping['parties'] == [{'type': 'customers', 'id': str(customer), 'account_id': str(receivables)}]
+
+
+REVIEW = Path('../supabase/migrations/20261101210000_chart_template_review.sql')
+
+
+def record_review():
+    with psycopg.connect(URL) as c:
+        c.execute(REVIEW.read_text(encoding='utf-8'))
+
+
+def test_accountant_review_is_recorded_once_and_lets_the_mapping_build(charted):
+    _, legacy, _, _, people = charted
+    record_review()
+    adopt(legacy, people['owner'])
+    template = chart(legacy, people['viewer'])['template']
+    assert (template['status'], template['reviewed_by']) == ('reviewed', 'Oyewale Olayiwola (CACU Technologies Limited)')
+    assert datetime.fromisoformat(template['reviewed_at']) == datetime(2026, 11, 1, tzinfo=ZoneInfo('Africa/Lagos'))
+    with psycopg.connect(URL) as c:
+        assert build_mapping(c, legacy)['template_status'] == 'reviewed'
+    with pytest.raises(psycopg.Error, match='not awaiting review'):
+        record_review()
+
+
+def test_accountant_review_refuses_a_template_changed_after_review(charted):
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE onboarding_private.chart_template_accounts SET name = 'Till' WHERE version = 'NG-2026.1' AND code = '1000'")
+    with pytest.raises(psycopg.Error, match='differs from the reviewed template'):
+        record_review()
+    with psycopg.connect(URL) as c:
+        assert c.execute("SELECT status, reviewed_by FROM onboarding_private.chart_templates").fetchall() == [('pending_review', None)]
 
 
 @pytest.mark.parametrize('change,error', [('drop_cash', 'missing'), ('second_revenue', 'duplicated'), ('cash_not_bank', 'BANK type')])
