@@ -12,7 +12,7 @@ from cacu.accounting.reports import financial_summary
 from test_library_postgres import session_for
 from test_management_postgres import managed, database, URL
 from test_legacy_write_boundary_postgres import boundary, run
-from test_default_chart_postgres import charted, adopt
+from test_default_chart_postgres import charted, adopt, record_review
 from test_opening_position_postgres import books, answers, save, approve
 
 pytestmark = pytest.mark.skipif(not URL, reason='Disposable PostgreSQL required')
@@ -109,6 +109,13 @@ def test_needs_an_approved_position_and_a_reviewed_chart(books):
     with pytest.raises(ActivationError, match='CHART_NOT_READY: .*awaiting accountant review'):
         turn_on(books, reviewed=True)
     nothing_created(books)
+
+
+def test_books_go_live_on_the_reviewed_template_without_the_staging_switch(books):
+    approved(books)
+    record_review()
+    evidence = turn_on(books, reviewed=True)
+    assert evidence['template_reviewed'] is True
 
 
 @pytest.mark.parametrize('role', ['editor', 'viewer', 'outsider'])
