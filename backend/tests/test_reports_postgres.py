@@ -78,3 +78,31 @@ def test_general_ledger_shows_running_balances_across_pages(live, monkeypatch):
 def test_general_ledger_refuses_accounts_of_other_businesses(live):
     with pytest.raises(HTTPException, match='Account not found'):
         call(live, 'viewer', lambda s, a: general_ledger(s, uuid4(), TODAY, TODAY))
+
+
+def test_statements_show_profit_by_section_and_a_balanced_position_with_comparatives(live):
+    from cacu.accounting.reports import statements
+    from cacu.accounting.workflows import InvoiceCreate, invoice_create
+    call(live, 'owner', lambda s, a: expense_create(s, a, expense(live)))
+    sale = InvoiceCreate(request_key=uuid4(), customer_id=live.ids['ada'], invoice_number='INV-2001', entry_date=TODAY,
+                         items=[{'catalog_item_id': live.items['Rice'], 'quantity': 1, 'unit_price': '65000'}])
+    call(live, 'owner', lambda s, a: invoice_create(s, a, sale))
+    report = call(live, 'viewer', lambda s, a: statements(s, TODAY, TODAY, 'prior'))
+    assert report['tier'] == 'Management statements, not reviewed' and report['exceptions'] == []
+    assert report['periods'] == [{'start_date': TODAY.isoformat(), 'end_date': TODAY.isoformat()},
+                                 {'start_date': (TODAY - timedelta(days=1)).isoformat(), 'end_date': (TODAY - timedelta(days=1)).isoformat()}]
+    income = {s['key']: s for s in report['income_statement']['sections']}
+    assert [(l['code'], l['amounts']) for l in income['revenue']['lines']] == [('4000', ['65000.00', '0.00'])]
+    assert income['cost_of_sales']['total'] == ['50000.00', '0.00'] and income['operating_expenses']['total'] == ['15000.00', '0.00']
+    assert report['income_statement']['gross_profit'] == ['15000.00', '0.00'] and report['income_statement']['net_profit'] == ['0.00', '0.00']
+    position = report['financial_position']
+    sections = {s['key']: s for s in position['sections']}
+    assert sections['current_assets']['total'][0] == '988601.50'  # cash 10,000 + bank 400,000 + receivables 125,000 + stock 453,601.50
+    assert sections['current_liabilities']['total'][0] == '150000.50' and sections['non_current_liabilities']['total'][0] == '200000.00'
+    assert position['total_equity'][0] == '638601.00' and position['difference'] == ['0.00', '0.00']
+    assert sections['equity']['lines'][-1] == {'account_id': None, 'code': None, 'name': 'Profit to date not yet closed to retained earnings', 'amounts': ['0.00', '0.00']}
+    assert position['total_assets'][1] == '0.00'  # the day before the books started
+    last_year = call(live, 'viewer', lambda s, a: statements(s, TODAY, TODAY, 'last_year'))
+    assert last_year['periods'][1]['start_date'][:4] == str(TODAY.year - 1)
+    with pytest.raises(HTTPException, match='prior or last_year'):
+        call(live, 'viewer', lambda s, a: statements(s, TODAY, TODAY, 'quarter'))

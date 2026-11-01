@@ -96,6 +96,12 @@ def trial_balance_report(business_id:UUID,as_of:date,user_id:UUID=Depends(curren
     with library_transaction(user_id,business_id) as session:
         return trial_balance(session,as_of)
 
+@app.get('/api/v1/businesses/{business_id}/reports/statements')
+def financial_statements(business_id:UUID,start_date:date,end_date:date,compare:str|None=None,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.reports import statements
+    with library_transaction(user_id,business_id) as session:
+        return statements(session,start_date,end_date,compare)
+
 @app.get('/api/v1/businesses/{business_id}/reports/general-ledger')
 def general_ledger_report(business_id:UUID,account_id:UUID,start_date:date,end_date:date,page:int=0,user_id:UUID=Depends(current_user)):
     from cacu.accounting.reports import general_ledger

@@ -9,7 +9,8 @@ ZERO=Decimal('0')
 PROFIT_TYPES={'OPERATING_REVENUE','NON_OPERATING_REVENUE','OPERATING_EXPENSE','DIRECT_EXPENSE','OVERHEAD_EXPENSE','OTHER_EXPENSE'}
 
 def money(amount):
-    return format(Decimal(amount).quantize(Decimal('0.01')), '.2f')
+    # Adding zero turns a negated zero into 0.00, never -0.00.
+    return format(Decimal(amount).quantize(Decimal('0.01')) + 0, '.2f')
 
 def validate_dates(start: date, end: date):
     if start>end or (end-start).days>3660:
@@ -256,3 +257,72 @@ def general_ledger(session,account_id,start:date,end:date,page:int=0):
             'start_date':start.isoformat(),'end_date':end.isoformat(),'opening_balance':money(opening),
             'total_debit':money(totals[1]),'total_credit':money(totals[2]),'closing_balance':money(opening+totals[1]-totals[2]),
             'entries':entries,'page':page,'page_size':PAGE,'total_entries':totals[0]}
+
+
+def _year_before(day:date):
+    try:return day.replace(year=day.year-1)
+    except ValueError:return day.replace(year=day.year-1,day=28)  # 29 February
+
+def comparison_period(start:date,end:date,compare):
+    if compare=='prior':
+        length=(end-start).days+1
+        return start-timedelta(days=length),start-timedelta(days=1)
+    if compare=='last_year':return _year_before(start),_year_before(end)
+    if compare is None:return None
+    raise HTTPException(422,'Compare with prior or last_year')
+
+INCOME_SECTIONS=[('revenue','Revenue',{'OPERATING_REVENUE'},-1),('cost_of_sales','Cost of sales',{'DIRECT_EXPENSE'},1),
+    ('operating_expenses','Operating expenses',{'OPERATING_EXPENSE','OVERHEAD_EXPENSE'},1),
+    ('other_income','Other income',{'NON_OPERATING_REVENUE'},-1),('other_expenses','Other expenses',{'OTHER_EXPENSE'},1)]
+POSITION_SECTIONS=[('current_assets','Current assets',{'BANK','RECEIVABLE','INVENTORY','CURRENT_ASSET'},1),
+    ('non_current_assets','Non-current assets',{'NON_CURRENT_ASSET','CONTRA_ASSET'},1),
+    ('current_liabilities','Current liabilities',{'PAYABLE','CURRENT_LIABILITY','CONTROL'},-1),
+    ('non_current_liabilities','Non-current liabilities',{'NON_CURRENT_LIABILITY'},-1),
+    ('equity','Equity',{'EQUITY','RECONCILIATION'},-1)]
+
+def statements(session,start:date,end:date,compare=None):
+    """FR-140 to FR-142: statement of profit or loss for the period and statement of financial position at its end,
+    each with an optional comparison column (Doc 09: prior period or the same period last year)."""
+    validate_dates(start,end)
+    periods=[(start,end)]
+    other=comparison_period(start,end,compare)
+    if other:periods.append(other)
+    rows=ledger_rows(session,end)
+    chart={r.id:(r.code,r.name) for r in session.connection().exec_driver_sql('SELECT id::text AS id,code,name FROM public.accounts WHERE business_id=%s',(str(session.business_id),)).all()}
+    types={};moves=[defaultdict(lambda:ZERO) for _ in periods];balances=[defaultdict(lambda:ZERO) for _ in periods]
+    for row in rows:
+        key=str(row['source_account_id']);types[key]=row['account_type']
+        signed=row['amount']*(1 if row['entry_type']=='DEBIT' else -1);day=row['transaction_date'].date()
+        for i,(s,e) in enumerate(periods):
+            if day<=e:balances[i][key]+=signed
+            if s<=day<=e:moves[i][key]+=signed
+    def section(key,title,kinds,sign,values):
+        accounts=sorted((k for k,t in types.items() if t in kinds and any(v[k] for v in values)),key=lambda k:(chart.get(k,('',''))[0] or '',k))
+        lines=[{'account_id':k,'code':chart.get(k,(None,None))[0],'name':chart.get(k,(None,'Unknown account'))[1],
+                'amounts':[money(sign*v[k]) for v in values]} for k in accounts]
+        totals=[sign*sum((v[k] for k in accounts),ZERO) for v in values]
+        return {'key':key,'title':title,'lines':lines,'total':[money(t) for t in totals]},totals
+    income={};sums={}
+    for key,title,kinds,sign in INCOME_SECTIONS:income[key],sums[key]=section(key,title,kinds,sign,moves)
+    gross=[sums['revenue'][i]-sums['cost_of_sales'][i] for i in range(len(periods))]
+    net=[gross[i]-sums['operating_expenses'][i]+sums['other_income'][i]-sums['other_expenses'][i] for i in range(len(periods))]
+    position={};totals={}
+    for key,title,kinds,sign in POSITION_SECTIONS:position[key],totals[key]=section(key,title,kinds,sign,balances)
+    # Books are not closed at year end yet, so all profit to date is shown as its own line in equity.
+    profit=[-sum((v[k] for k,t in types.items() if t in PROFIT_TYPES),ZERO) for v in balances]
+    position['equity']['lines'].append({'account_id':None,'code':None,'name':'Profit to date not yet closed to retained earnings','amounts':[money(p) for p in profit]})
+    equity=[totals['equity'][i]+profit[i] for i in range(len(periods))]
+    position['equity']['total']=[money(e) for e in equity]
+    assets=[totals['current_assets'][i]+totals['non_current_assets'][i] for i in range(len(periods))]
+    liabilities=[totals['current_liabilities'][i]+totals['non_current_liabilities'][i] for i in range(len(periods))]
+    exceptions=[]
+    for i,(s,e) in enumerate(periods):
+        label='this period' if i==0 else 'the comparison period'
+        if sum(balances[i].values(),ZERO)!=ZERO:exceptions.append({'check':'trial_balance','message':f'Debits and credits differ at the end of {label}'})
+        if assets[i]!=liabilities[i]+equity[i]:exceptions.append({'check':'financial_position','message':f'Assets do not equal liabilities and equity at the end of {label}'})
+    return {**LABELS,'generated_at':_generated(session),'periods':[{'start_date':s.isoformat(),'end_date':e.isoformat()} for s,e in periods],
+            'compare':compare,'exceptions':exceptions,
+            'income_statement':{'sections':[income[k] for k,*_ in INCOME_SECTIONS],'gross_profit':[money(g) for g in gross],'net_profit':[money(n) for n in net]},
+            'financial_position':{'sections':[position[k] for k,*_ in POSITION_SECTIONS],'total_assets':[money(a) for a in assets],
+                'total_liabilities':[money(l) for l in liabilities],'total_equity':[money(e) for e in equity],
+                'difference':[money(assets[i]-liabilities[i]-equity[i]) for i in range(len(periods))]}}

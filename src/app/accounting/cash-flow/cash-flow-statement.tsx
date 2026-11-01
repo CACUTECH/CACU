@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from 'react';
-import { subDays, differenceInCalendarDays, format } from 'date-fns';
+import { subDays, subYears, differenceInCalendarDays, format } from 'date-fns';
 import { getCashFlowAction } from './actions';
 import { cashFlowRows, formatNgn, reportCsv, type CashFlowReport } from '@/lib/cash-flow';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ export default function CashFlowStatement({ embedded = false }: { embedded?: boo
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date());
   const [start, setStart] = useState(`${today.slice(0, 7)}-01`);
   const [end, setEnd] = useState(today);
-  const [compare, setCompare] = useState(false);
+  const [compare, setCompare] = useState<'' | 'prior' | 'last_year'>('');
   const [report, setReport] = useState<CashFlowReport | null>(null);
   const [prior, setPrior] = useState<CashFlowReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -26,9 +26,11 @@ export default function CashFlowStatement({ embedded = false }: { embedded?: boo
       if (!current.success) throw new Error(current.error);
       let previous: CashFlowReport | null = null;
       if (compare) {
-        const first = new Date(`${start}T12:00:00`);
-        const count = differenceInCalendarDays(new Date(`${end}T12:00:00`), first) + 1;
-        const result = await getCashFlowAction(format(subDays(first, count), 'yyyy-MM-dd'), format(subDays(first, 1), 'yyyy-MM-dd'));
+        const first = new Date(`${start}T12:00:00`), last = new Date(`${end}T12:00:00`);
+        const count = differenceInCalendarDays(last, first) + 1;
+        // Doc 09: the period before, or the same period last year.
+        const [from, to] = compare === 'prior' ? [subDays(first, count), subDays(first, 1)] : [subYears(first, 1), subYears(last, 1)];
+        const result = await getCashFlowAction(format(from, 'yyyy-MM-dd'), format(to, 'yyyy-MM-dd'));
         if (!result.success) throw new Error(`Comparison unavailable: ${result.error}`);
         previous = result.data;
       }
@@ -50,8 +52,9 @@ export default function CashFlowStatement({ embedded = false }: { embedded?: boo
       XLSX.writeFile(book, `cash-flow-${report.start_date}-${report.end_date}.xlsx`);
     } else {
       const { jsPDF } = await import('jspdf'); const { default: autoTable } = await import('jspdf-autotable');
-      const document = new jsPDF(); document.text('CACU Statement of Cash Flows (NGN)', 14, 15);
-      autoTable(document, { startY: 22, head: [['Description', 'Amount / scope']], body: rows });
+      const document = new jsPDF(); document.text('Statement of Cash Flows (NGN)', 14, 15);
+      document.text('Management statements, not reviewed · Indirect method', 14, 22);
+      autoTable(document, { startY: 29, head: [['Description', 'Amount / scope']], body: rows });
       document.save(`cash-flow-${report.start_date}-${report.end_date}.pdf`);
     }
   }
@@ -62,11 +65,12 @@ export default function CashFlowStatement({ embedded = false }: { embedded?: boo
   const valid = !!start && !!end && start <= end;
   return <div className="space-y-6">
     {!embedded && <><Link href="/reports" className="text-primary underline">Reports</Link><h1 className="text-3xl font-bold">Statement of Cash Flows</h1></>}
-    <p className="text-muted-foreground">Indirect method · NGN · Posted accounting ledger</p>
+    <p className="text-muted-foreground">Management statements, not reviewed · Indirect method · Accrual basis · NGN · Posted accounting ledger</p>
     <form className="flex flex-wrap items-end gap-4 rounded-xl border bg-muted/30 p-4" onSubmit={event => { event.preventDefault(); void load(); }}>
       <label>Start date<Input type="date" value={start} onChange={event => { requestVersion.current++; setLoading(false); setStart(event.target.value); setReport(null); setPrior(null); }} required /></label>
       <label>End date<Input type="date" value={end} onChange={event => { requestVersion.current++; setLoading(false); setEnd(event.target.value); setReport(null); setPrior(null); }} required /></label>
-      <label className="flex gap-2 items-center pb-2"><input type="checkbox" checked={compare} onChange={event => { requestVersion.current++; setLoading(false); setCompare(event.target.checked); setReport(null); setPrior(null); }} />Compare previous equal period</label>
+      <label>Compare with<select aria-label="Compare with" className="block rounded-md border bg-background p-2" value={compare} onChange={event => { requestVersion.current++; setLoading(false); setCompare(event.target.value as typeof compare); setReport(null); setPrior(null); }}>
+        <option value="">No comparison</option><option value="prior">The period before</option><option value="last_year">Same period last year</option></select></label>
       <Button disabled={loading || !valid} type="submit">{loading ? 'Loading…' : 'Run report'}</Button>
     </form>
     {error && <p role="alert" className="text-destructive">{error}</p>}

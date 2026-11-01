@@ -56,3 +56,11 @@ export async function getAccountingSummaryAction(start: string, end: string) {
     return { success: true as const, data: await getAccountingSummary(start, end) };
   } catch (error) { return { success: false as const, error: error instanceof Error ? error.message : 'Accounting report unavailable' }; }
 }
+
+export async function getStatementsAction(startDate: string, endDate: string, compare: 'prior' | 'last_year' | '') {
+  try {
+    const { accountingRequest } = await import('@/lib/accounting-client');
+    const query = new URLSearchParams({ start_date: startDate, end_date: endDate, ...(compare ? { compare } : {}) });
+    return { success: true as const, data: await accountingRequest<import('@/lib/ledger-reports').FinancialStatements>(`reports/statements?${query}`) };
+  } catch (error) { return { success: false as const, error: error instanceof Error ? error.message : 'Statements unavailable' }; }
+}
