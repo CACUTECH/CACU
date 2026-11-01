@@ -4,7 +4,7 @@
 
 FR-120 (expenses, PR-17), FR-112 (reverse a manual journal, PR-26) and FR-080 (stock adjustments with approval, PR-20, BR-021). These are the fifth Phase 2 item, for businesses whose books are live. Doc 11 planned three endpoints: `POST /expenses`, `POST /journals/{id}/reversal`, and `POST /stock/adjustments` with `/approve`. All three are added, plus the reads the screens need.
 
-There is one migration, `20261101090000_stock_adjustment_approval.sql`. Expenses and reversals need no new tables.
+There is one migration, `20261101010624_stock_adjustment_approval.sql`. Expenses and reversals need no new tables.
 
 ## Change
 
@@ -76,5 +76,5 @@ There is one migration, `20261101090000_stock_adjustment_approval.sql`. Expenses
 ## Release steps
 
 1. Merge after Turn on the books.
-2. Apply `20261101090000_stock_adjustment_approval.sql` on staging, then run the browser and backend checks there.
+2. Apply `20261101010624_stock_adjustment_approval.sql` on staging, then run the browser and backend checks there.
 3. Production follows only after DEP-01 and DEP-02, like the earlier R1 items.

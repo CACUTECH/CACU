@@ -48,7 +48,7 @@ def managed(database,request):
             c.execute('ALTER TABLE public.catalog_items ENABLE TRIGGER accounting_cutover_guard')
         c.execute(Path('../supabase/migrations/20261012140639_inventory_user_management.sql').read_text(encoding='utf-8-sig'))
         c.execute('CREATE TRIGGER memberships_prevent_last_owner_loss BEFORE UPDATE OR DELETE ON public.memberships FOR EACH ROW EXECUTE FUNCTION public.prevent_last_owner_loss()')
-        c.execute(Path('../supabase/migrations/20261101090000_stock_adjustment_approval.sql').read_text(encoding='utf-8'))
+        c.execute(Path('../supabase/migrations/20261101010624_stock_adjustment_approval.sql').read_text(encoding='utf-8'))
         c.execute('INSERT INTO auth.users VALUES(%s,%s,now())',(database[2],'owner@example.com'))
     return database
 
