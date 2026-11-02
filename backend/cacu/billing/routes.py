@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request
 from starlette.concurrency import run_in_threadpool
-from .service import Checkout, Verification, checkout, verify_return, webhook
+from .service import Checkout, PlanChange, Verification, checkout, schedule, verify_return, webhook
 
 
 def billing_router(current_user):
@@ -10,6 +10,10 @@ def billing_router(current_user):
     @router.post('/api/v1/businesses/{business_id}/billing/checkout')
     def open_checkout(business_id: UUID, data: Checkout, user_id: UUID = Depends(current_user)):
         return checkout(business_id, user_id, data)
+
+    @router.post('/api/v1/businesses/{business_id}/billing/schedule')
+    def schedule_plan(business_id: UUID, data: PlanChange, user_id: UUID = Depends(current_user)):
+        return schedule(business_id, user_id, data)
 
     @router.post('/api/v1/businesses/{business_id}/billing/verify')
     def verify_payment(business_id: UUID, data: Verification, user_id: UUID = Depends(current_user)):

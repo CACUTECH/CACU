@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { AccountingRequestError, accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
-import { isCheckoutUrl, type BillingInterval, type BillingInvoice, type CheckoutResult, type CurrentPlan, type Plan, type PlanCode, type VerifyOutcome } from '@/lib/billing';
+import { isCheckoutUrl, type BillingInterval, type BillingInvoice, type CheckoutResult, type CurrentPlan, type Plan, type PlanCode, type ScheduleResult, type VerifyOutcome } from '@/lib/billing';
 
 type Result<T> = { success: true; data: T } | { success: false; error: string };
 const failed = (error: unknown, fallback: string) => ({ success: false as const,
@@ -30,6 +30,14 @@ export async function startCheckoutAction(input: { request_key: string; plan: Pl
     if (!isCheckoutUrl(data.authorization_url)) throw new Error('Unexpected checkout link');
     return { success: true, data };
   } catch (error) { return failed(error, 'Checkout could not start. Try again; you have not been charged.'); }
+}
+
+export async function schedulePlanAction(plan: PlanCode): Promise<Result<ScheduleResult>> {
+  try {
+    const data = await accountingRequest<ScheduleResult>('billing/schedule', { method: 'POST', body: { plan } });
+    revalidatePath('/settings/billing');
+    return { success: true, data };
+  } catch (error) { return failed(error, 'The plan change was not saved. Try again.'); }
 }
 
 export async function verifyPaymentAction(reference: string): Promise<Result<VerifyOutcome>> {

@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { VAT_NOTE, highlights, naira, nextStep, planLine, price, returnedReference, statusOf, usageLines,
+import { VAT_NOTE, highlights, naira, nextStep, overLimitNotes, planAction, planLine, price, returnedReference, statusOf, usageLines,
   type BillingInterval, type BillingInvoice, type CurrentPlan, type Plan, type PlanCode } from '@/lib/billing';
-import { getBillingAction, startCheckoutAction, verifyPaymentAction } from './actions';
+import { getBillingAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from './actions';
 
 type State = { plans: Plan[]; current: CurrentPlan; history: BillingInvoice[] | null };
 const OUTCOME: Record<string, string> = {
@@ -17,6 +17,7 @@ const OUTCOME: Record<string, string> = {
   already_applied: 'Payment confirmed. Your plan is active.',
   not_paid: 'Paystack has not confirmed a payment for this checkout. If you paid, it will show here once confirmed.',
   amount_or_currency_mismatch: 'The payment did not match the invoice, so we have not changed your plan. CACU support will contact you.',
+  upgrade_no_longer_applies: 'Your billing period changed before this upgrade was paid, so we have not changed your plan. CACU support will refund or apply it.',
 };
 const TONE = { good: 'bg-emerald-100 text-emerald-900', warn: 'bg-amber-100 text-amber-900', bad: 'bg-red-100 text-red-900' } as const;
 const INVOICE_STATUS = { open: 'Awaiting payment', paid: 'Paid', review: 'Under review', void: 'Void' } as const;
@@ -27,6 +28,7 @@ export default function BillingPage() {
   const [state, setState] = useState<State | null>(null), [loadError, setLoadError] = useState('');
   const [period, setPeriod] = useState<BillingInterval>('monthly');
   const [busy, setBusy] = useState<PlanCode | null>(null), [message, setMessage] = useState(''), [error, setError] = useState('');
+  const [warnings, setWarnings] = useState<string[]>([]);
   // One request key per plan choice, kept across retries so a lost response never opens a second invoice.
   const keys = useRef(new Map<string, string>());
   const verified = useRef(false);
@@ -62,11 +64,22 @@ export default function BillingPage() {
     setBusy(null); setError(result.error);
   }
 
+  // A smaller plan is scheduled, not paid; choosing the current plan again cancels it.
+  async function schedule(plan: PlanCode) {
+    setBusy(plan); setError(''); setMessage(''); setWarnings([]);
+    const result = await schedulePlanAction(plan);
+    if (result.success) {
+      setMessage(result.data.scheduled_plan ? 'Plan change scheduled.' : 'Scheduled change cancelled. Your plan stays as it is.');
+      setWarnings(overLimitNotes(result.data));
+      await load();
+    } else setError(result.error);
+    setBusy(null);
+  }
+
   if (loadError) return <Card><CardHeader><CardTitle>Subscription & billing</CardTitle><CardDescription role="alert">{loadError}</CardDescription></CardHeader></Card>;
   if (!state) return <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading your plan…</p>;
 
   const { current, plans, history } = state;
-  const active = current.subscribed && current.status === 'active';
   const status = current.subscribed ? statusOf(current.status) : null;
 
   return (
@@ -77,6 +90,7 @@ export default function BillingPage() {
       </div>
 
       {message && <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">{message}</p>}
+      {warnings.map(line => <p key={line} className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{line}</p>)}
       {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
 
       <Card>
@@ -112,7 +126,7 @@ export default function BillingPage() {
       <div className="grid gap-4 md:grid-cols-3">
         {plans.map(plan => {
           const amount = price(plan, period);
-          const mine = current.subscribed && current.plan === plan.code && current.status !== 'trialing';
+          const action = planAction(current, plan, period);
           return (
             <Card key={plan.code} className={cn('flex flex-col', plan.code === 'GROW' && 'border-primary')}>
               <CardHeader>
@@ -128,18 +142,21 @@ export default function BillingPage() {
                   {highlights(plan.entitlements).map(line => <li key={line} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{line}</li>)}
                 </ul>
               </CardContent>
-              <CardFooter>
-                {manager ? (
-                  <Button className="w-full" disabled={amount === null || active || busy !== null} onClick={() => choose(plan.code)}>
-                    {busy === plan.code ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening Paystack…</>
-                      : mine && active ? 'Current plan' : `Choose ${plan.name}`}
+              <CardFooter className="flex-col items-stretch gap-2">
+                {manager ? (<>
+                  <Button className="w-full" variant={action.kind === 'cancel' || action.kind === 'schedule' ? 'outline' : 'default'}
+                    disabled={['current', 'none'].includes(action.kind) || busy !== null}
+                    onClick={() => action.kind === 'schedule' ? schedule(plan.code)
+                      : action.kind === 'cancel' && current.subscribed ? schedule(current.plan) : choose(plan.code)}>
+                    {busy === plan.code ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {['schedule', 'cancel'].includes(action.kind) ? 'Saving…' : 'Opening Paystack…'}</>
+                      : action.label}
                   </Button>
-                ) : <p className="text-xs text-muted-foreground">Only an Owner or Admin can change the plan.</p>}
+                  {action.note && <p className="text-xs text-muted-foreground">{action.note}</p>}
+                </>) : <p className="text-xs text-muted-foreground">Only an Owner or Admin can change the plan.</p>}
               </CardFooter>
             </Card>);
         })}
       </div>
-      {manager && active && <p className="text-sm text-muted-foreground">Changing plan while one is active is coming soon. Contact CACU support if you need it now.</p>}
 
       {history && (
         <Card>
@@ -153,7 +170,7 @@ export default function BillingPage() {
                   {history.map(row => (
                     <TableRow key={row.invoice}>
                       <TableCell className="font-mono text-xs">{row.invoice}</TableCell>
-                      <TableCell>{plans.find(p => p.code === row.plan)?.name ?? row.plan} · {row.billing_interval === 'annual' ? 'yearly' : 'monthly'}</TableCell>
+                      <TableCell>{plans.find(p => p.code === row.plan)?.name ?? row.plan} · {row.kind === 'upgrade' ? 'upgrade' : row.billing_interval === 'annual' ? 'yearly' : 'monthly'}</TableCell>
                       <TableCell className="text-right">{naira(row.vat_kobo)}</TableCell>
                       <TableCell className="text-right">{naira(row.total_kobo)}</TableCell>
                       <TableCell>{INVOICE_STATUS[row.status]}</TableCell>

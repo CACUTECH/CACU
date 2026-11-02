@@ -36,7 +36,8 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 
 ## Not yet
 
-- **Plan changes:** changing plans while active, with proration (SUB-05, SUB-06), and renewals with saved cards (SUB-04, SUB-08).
+- **Renewals with saved cards** (SUB-04, SUB-08). Today the owner renews through checkout once a period ends.
+- **Downgrade choices:** before a downgrade applies, Doc 14 has the owner choose which users and outlets stay active. Today nothing is deactivated; the owner just can't add more while over the limit.
 - **Usage counters:** AI questions and messages a month (TEST-210).
 - **PDFs:** PDF invoices and receipts that show CACU's legal name, address and TIN.
 
@@ -66,6 +67,19 @@ Migration `20261102130000_plan_limits.sql` enforces three limits with triggers o
 - `public.business_plan` now returns `usage`, and the billing screen shows, for example, "2 of 2 users · plan limit reached".
 - The users, outlets and catalogue screens show the refusal in plain words.
 - Tests: 5 cases in `backend/tests/test_management_postgres.py`, run through the real `management_write`, invitation acceptance and the accounting catalogue path.
+
+## Plan changes (SUB-05, SUB-06) and period end
+
+Migration `20261102140000_plan_changes.sql`.
+
+- **Upgrade:** an active business checks out a bigger plan on its current interval. The CACU invoice (kind `upgrade`) charges the new price minus the current price for the time left in the period, rounded to the nearest naira, plus VAT. For example, Oga to Chairman with 20 of 30 days left is ₦6,000 + ₦450 VAT. On payment the plan and its limits change at once and the period end stays the same. If the period changed before the payment arrived, the invoice is flagged for review and nothing changes.
+- **Refused mid-period:** the same plan, a smaller plan through checkout, a switch between monthly and yearly, and an upgrade with under a day left ("renew first").
+- **Downgrade:** `POST /api/v1/businesses/{id}/billing/schedule` with `{plan}` schedules a smaller plan for the period end, at no charge. Choosing the current plan cancels it. The response lists any limit the business is over on the new plan. A Hybrid business can't schedule a plan without Hybrid. If it switches to Hybrid after scheduling, it stays on Chairman.
+- **Period end:** `platform.end_periods()` runs hourly at :17 (`cacu-billing-end-periods`). It applies a scheduled downgrade and moves the subscription to `past_due`, with the usual 7 days of grace. Then `suspend_unpaid` makes it read-only. The owner renews by choosing a plan at checkout, and can switch between monthly and yearly then.
+- **Billing screen:** it shows "Upgrade to …" with the proration note, "Move to … on <date>" and "Keep my current plan". After a downgrade is scheduled it warns about anything over the new limits. Upgrade invoices are labelled in the history.
+- **Tests:** 7 cases in `test_platform_billing_postgres.py`; screen and action tests in Jest.
+
+After applying in production, check that `cron.job` also lists `cacu-billing-end-periods`.
 
 ## Billing screen
 

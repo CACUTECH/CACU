@@ -2,11 +2,11 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BillingPage from '@/app/settings/billing/page';
-import { getBillingAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
+import { getBillingAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { useBusiness } from '@/components/business-provider';
 import type { Plan } from '@/lib/billing';
 
-jest.mock('@/app/settings/billing/actions', () => ({ getBillingAction: jest.fn(), startCheckoutAction: jest.fn(), verifyPaymentAction: jest.fn() }));
+jest.mock('@/app/settings/billing/actions', () => ({ getBillingAction: jest.fn(), schedulePlanAction: jest.fn(), startCheckoutAction: jest.fn(), verifyPaymentAction: jest.fn() }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: jest.fn() }));
 jest.mock('lucide-react', () => ({ Check: () => null, Loader2: () => null }));
 
@@ -85,4 +85,23 @@ test('a failed read says so instead of showing no plan', async () => {
   render(<BillingPage />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Billing details are unavailable');
   expect(screen.queryByText('No plan yet')).not.toBeInTheDocument();
+});
+
+test('an active plan offers an upgrade and schedules a smaller plan with a warning about limits', async () => {
+  as('owner');
+  const active = { ...trial, status: 'active', current_period_end: '2026-12-02T10:00:00Z', scheduled_plan: null };
+  (getBillingAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { plans, current: active, history: [] } })
+    .mockResolvedValue({ success: true, data: { plans, current: { ...active, scheduled_plan: 'BASE' }, history: [] } });
+  (schedulePlanAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { scheduled_plan: 'BASE', effective_at: active.current_period_end,
+    over_limits: { 'users.max': { used: 4, limit: 2 } } } });
+  render(<BillingPage />);
+  expect(await screen.findByRole('button', { name: 'Upgrade to Chairman' })).toBeEnabled();
+  expect(screen.getByText('You pay the difference for the days left in this period, plus VAT.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Current plan' })).toBeDisabled();
+  await userEvent.click(screen.getByRole('button', { name: 'Move to General on 2 Dec 2026' }));
+  expect(schedulePlanAction).toHaveBeenCalledWith('BASE');
+  expect(await screen.findByText(/You have 4 users; the General Plan allows 2/)).toBeInTheDocument();
+  expect(await screen.findByText('Paid until 2 Dec 2026. You move to the General Plan then.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Keep my current plan' })).toBeEnabled();
+  expect(startCheckoutAction).not.toHaveBeenCalled();
 });
