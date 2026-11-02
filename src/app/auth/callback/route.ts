@@ -19,10 +19,11 @@ export async function GET(request: Request) {
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
+
     if (!error) {
-      // Successful login/verification
-      return NextResponse.redirect(new URL(next, request.url))
+      // Successful login/verification. Only same-origin paths: '//host' and absolute URLs would leave the app.
+      const target = new URL(/^\/(?![/\\])/.test(next) ? next : '/', request.url)
+      return NextResponse.redirect(target.origin === requestUrl.origin ? target : new URL('/', request.url))
     }
   }
 
