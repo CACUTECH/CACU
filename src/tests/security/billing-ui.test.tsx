@@ -2,11 +2,11 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BillingPage from '@/app/settings/billing/page';
-import { getBillingAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
+import { getBillingAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { useBusiness } from '@/components/business-provider';
 import type { Plan } from '@/lib/billing';
 
-jest.mock('@/app/settings/billing/actions', () => ({ getBillingAction: jest.fn(), schedulePlanAction: jest.fn(), startCheckoutAction: jest.fn(), verifyPaymentAction: jest.fn() }));
+jest.mock('@/app/settings/billing/actions', () => ({ getBillingAction: jest.fn(), payRenewalAction: jest.fn(), removeCardAction: jest.fn(), schedulePlanAction: jest.fn(), startCheckoutAction: jest.fn(), verifyPaymentAction: jest.fn() }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: jest.fn() }));
 jest.mock('lucide-react', () => ({ Check: () => null, Loader2: () => null }));
 
@@ -104,4 +104,32 @@ test('an active plan offers an upgrade and schedules a smaller plan with a warni
   expect(await screen.findByText('Paid until 2 Dec 2026. You move to the General Plan then.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Keep my current plan' })).toBeEnabled();
   expect(startCheckoutAction).not.toHaveBeenCalled();
+});
+
+test('a declined renewal offers to pay now, and the saved card can be removed', async () => {
+  as('owner');
+  const active = { ...trial, status: 'active', current_period_end: '2026-12-02T10:00:00Z', scheduled_plan: null,
+    card: { card_type: 'visa', bank: null, last4: '4081', exp_month: '12', exp_year: '2030' },
+    renewal: { invoice: 'CACU-INV-000002', plan: 'GROW', billing_interval: 'monthly', total_kobo: 645000, due_at: '2026-12-02T10:00:00Z', last_failure: 'Insufficient Funds' } };
+  (getBillingAction as jest.Mock).mockResolvedValue({ success: true, data: { plans, current: active, history: [] } });
+  (payRenewalAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { authorization_url: 'https://checkout.paystack.com/r' } });
+  (removeCardAction as jest.Mock).mockResolvedValueOnce({ success: true, data: null });
+  render(<BillingPage />);
+  expect(await screen.findByText(/did not go through: Insufficient Funds/)).toBeInTheDocument();
+  expect(screen.getByText('Saved for renewals: Visa ending 4081, expires 12/2030')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Remove card' }));
+  expect(await screen.findByText('Card removed. Renewals will need you to pay from this page.')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Pay ₦6,450 now' }));
+  await waitFor(() => expect(assign).toHaveBeenCalledWith('https://checkout.paystack.com/r'));
+});
+
+test('editors never see the card or the renewal', async () => {
+  as('editor');
+  const active = { ...trial, status: 'active', card: { card_type: 'visa', bank: null, last4: '4081', exp_month: '12', exp_year: '2030' },
+    renewal: { invoice: 'CACU-INV-000002', plan: 'GROW', billing_interval: 'monthly', total_kobo: 645000, due_at: '2026-12-02T10:00:00Z', last_failure: null } };
+  (getBillingAction as jest.Mock).mockResolvedValue({ success: true, data: { plans, current: active, history: null } });
+  render(<BillingPage />);
+  expect(await screen.findByText('Oga Plan')).toBeInTheDocument();
+  expect(screen.queryByText(/4081/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Renewal of/)).not.toBeInTheDocument();
 });

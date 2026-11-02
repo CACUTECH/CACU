@@ -46,6 +46,13 @@ def initialize(email: str, amount_kobo: int, reference: str, metadata: dict) -> 
     return url
 
 
+def charge_authorization(authorization_code: str, email: str, amount_kobo: int, reference: str, metadata: dict) -> dict:
+    """Charge a saved card (SUB-04). The answer is a hint only; activation still waits for verify."""
+    return _request('POST', '/transaction/charge_authorization', json={
+        'authorization_code': authorization_code, 'email': email, 'amount': amount_kobo, 'currency': 'NGN',
+        'reference': reference, 'metadata': metadata})
+
+
 def verify(reference: str) -> dict:
     """The only source of truth for a payment: Paystack's verify endpoint, never the redirect or the webhook body."""
     return _request('GET', f'/transaction/verify/{reference}')

@@ -9,10 +9,13 @@ export type CurrentPlan = { subscribed: false } | {
   subscribed: true; plan: PlanCode; plan_name: string; status: SubscriptionStatus; billing_interval: BillingInterval;
   current_period_end: string | null; grace_ends_at: string | null; writes_allowed: boolean; entitlements: Entitlements;
   usage?: Partial<Record<LimitKey, number>>; scheduled_plan?: PlanCode | null;
+  card?: SavedCard | null; renewal?: Renewal | null;
 };
+export type SavedCard = { card_type: string | null; bank: string | null; last4: string | null; exp_month: string | null; exp_year: string | null };
+export type Renewal = { invoice: string; plan: PlanCode; billing_interval: BillingInterval; total_kobo: number; due_at: string; last_failure: string | null };
 export type LimitKey = 'users.max' | 'outlets.max' | 'catalog.max_items';
 export type BillingInvoice = { invoice: string; plan: PlanCode; billing_interval: BillingInterval; subtotal_kobo: number; vat_kobo: number;
-  total_kobo: number; status: 'open' | 'paid' | 'review' | 'void'; created_at: string; paid_at: string | null; receipt: string | null; kind?: 'subscription' | 'upgrade' };
+  total_kobo: number; status: 'open' | 'paid' | 'review' | 'void'; created_at: string; paid_at: string | null; receipt: string | null; kind?: 'subscription' | 'upgrade' | 'renewal' };
 export type CheckoutResult = { invoice: string; reference: string; total_kobo: number; vat_kobo: number; subtotal_kobo: number; authorization_url: string };
 export type ScheduleResult = { scheduled_plan: PlanCode | null; effective_at: string | null; over_limits: Partial<Record<LimitKey, { used: number; limit: number }>> };
 export type VerifyOutcome = { outcome: string };
@@ -116,6 +119,21 @@ export function planAction(current: CurrentPlan, plan: Plan, period: BillingInte
 }
 
 const LIMIT_NOUN: Record<LimitKey, string> = { 'users.max': 'users', 'outlets.max': 'outlets', 'catalog.max_items': 'catalogue items' };
+
+/** The saved card in an owner's words, e.g. "Visa ending 4081, expires 12/2030". */
+export function cardLine(card: SavedCard) {
+  const brand = card.card_type ? card.card_type.charAt(0).toUpperCase() + card.card_type.slice(1).trim() : 'Card';
+  const expiry = card.exp_month && card.exp_year ? `, expires ${card.exp_month}/${card.exp_year}` : '';
+  return `${brand} ending ${card.last4 ?? '••••'}${expiry}`;
+}
+
+/** SUB-04, SUB-08: the renewal that is due, and how it will be paid. */
+export function renewalLine(renewal: Renewal, card: SavedCard | null | undefined) {
+  const amount = `${naira(renewal.total_kobo)} (${PLAN_NAME[renewal.plan]} Plan, VAT included)`;
+  if (renewal.last_failure) return `Your card payment of ${amount} did not go through: ${renewal.last_failure}. Pay now to keep full access.`;
+  return card ? `Renewal of ${amount} is due on ${day(renewal.due_at)}. We'll charge your ${cardLine(card)}.`
+    : `Renewal of ${amount} is due on ${day(renewal.due_at)}. Pay now, or your plan stops when the period ends.`;
+}
 
 /** After scheduling a smaller plan: where the business is over its limits. Nothing is removed. */
 export function overLimitNotes(result: ScheduleResult) {

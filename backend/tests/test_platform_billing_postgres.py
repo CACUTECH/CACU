@@ -1,4 +1,4 @@
-"""Trials, Paystack checkout, verified activation and plan changes (Doc 14 SUB-01 to SUB-06, TEST-201 to TEST-204)."""
+"""Trials, Paystack checkout, verified activation, plan changes and renewals (Doc 14 SUB-01 to SUB-08, TEST-201 to TEST-204)."""
 import hashlib
 import hmac
 import json
@@ -39,7 +39,7 @@ def database(monkeypatch):
           GRANT USAGE ON SCHEMA public, auth TO authenticated, anon, cacu_runtime;
           GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, anon;""")
         for name in ('20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql',
-                     '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql'):
+                     '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql', '20261102150000_renewals.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -54,9 +54,17 @@ def database(monkeypatch):
 class FakePaystack:
     """Stands in for api.paystack.co: records initialisations and answers verify with what a test sets."""
     def __init__(self, monkeypatch):
-        self.initialized, self.payments = [], {}
+        self.initialized, self.payments, self.charges, self.decline = [], {}, [], False
         monkeypatch.setattr(paystack, 'initialize', self.initialize)
         monkeypatch.setattr(paystack, 'verify', self.verify)
+        monkeypatch.setattr(paystack, 'charge_authorization', self.charge_authorization)
+
+    def charge_authorization(self, code, email, amount, reference, metadata):
+        self.charges.append((code, email, amount, reference))
+        if self.decline:
+            return {'status': 'failed', 'gateway_response': 'Insufficient Funds'}
+        self.pay({'reference': reference, 'total_kobo': amount})
+        return {'status': 'success', 'gateway_response': 'Approved'}
 
     def initialize(self, email, amount, reference, metadata):
         self.initialized.append((email, amount, reference))
@@ -68,7 +76,10 @@ class FakePaystack:
     def pay(self, invoice, amount=None, currency='NGN'):
         self.payments[invoice['reference']] = {'status': 'success', 'reference': invoice['reference'], 'currency': currency,
                                                'amount': invoice['total_kobo'] if amount is None else amount,
-                                               'paid_at': PAID_AT, 'channel': 'card'}
+                                               'paid_at': PAID_AT, 'channel': 'card', 'customer': {'email': 'ada@example.com'},
+                                               'authorization': {'authorization_code': 'AUTH_fixture1', 'reusable': True, 'channel': 'card',
+                                                                 'last4': '4081', 'card_type': 'visa', 'bank': 'TEST BANK',
+                                                                 'exp_month': '12', 'exp_year': '2030'}}
 
 
 @pytest.fixture
@@ -397,3 +408,138 @@ def test_upgrade_invoices_show_in_history_as_upgrades(gateway):
         c.execute("SELECT set_config('request.jwt.claims',%s,true)", (json.dumps({'sub': str(owner)}),))
         rows = c.execute('SELECT public.business_billing_history(%s)', (ident,)).fetchone()[0]
     assert [(r['kind'], r['plan'], r['status']) for r in rows] == [('upgrade', 'GROW', 'open')]
+
+
+def plan_as(ident, actor):
+    with psycopg.connect(URL) as c:
+        c.execute('SET LOCAL ROLE authenticated')
+        c.execute("SELECT set_config('request.jwt.claims',%s,true)", (json.dumps({'sub': str(actor)}),))
+        return c.execute('SELECT public.business_plan(%s)', (ident,)).fetchone()[0]
+
+
+def paid_with_card(gateway, ident, owner, plan='GROW'):
+    invoice = service.checkout(ident, owner, Checkout(request_key=uuid4(), plan=plan))
+    gateway.pay(invoice)
+    assert service.verify_return(ident, owner, Verification(reference=invoice['reference']))['outcome'] == 'activated'
+
+
+def renewals(now="now()"):
+    with psycopg.connect(URL) as c:
+        return c.execute(f'SELECT platform.issue_renewals({now})').fetchone()[0]
+
+
+def open_renewal(ident):
+    with psycopg.connect(URL) as c:
+        return c.execute("SELECT plan_code, period_start, total_kobo, reference FROM platform.invoices "
+                         "WHERE business_id=%s AND kind='renewal' AND status='open'", (ident,)).fetchone()
+
+
+def test_a_paid_card_is_saved_shown_to_managers_only_and_can_be_removed(gateway):
+    ident, owner, editor = business()
+    paid_with_card(gateway, ident, owner)
+    assert plan_as(ident, owner)['card'] == {'card_type': 'visa', 'bank': 'TEST BANK', 'last4': '4081', 'exp_month': '12', 'exp_year': '2030'}
+    assert plan_as(ident, editor)['card'] is None
+    for role in ('authenticated', 'cacu_runtime'):
+        assert count("SELECT has_table_privilege(%s, 'platform.payment_methods', 'SELECT')", role) is False
+    with psycopg.connect(URL) as c:
+        c.execute('SET LOCAL ROLE authenticated')
+        c.execute("SELECT set_config('request.jwt.claims',%s,true)", (json.dumps({'sub': str(editor)}),))
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute('SELECT public.remove_payment_method(%s)', (ident,))
+    with psycopg.connect(URL) as c:
+        c.execute('SET LOCAL ROLE authenticated')
+        c.execute("SELECT set_config('request.jwt.claims',%s,true)", (json.dumps({'sub': str(owner)}),))
+        c.execute('SELECT public.remove_payment_method(%s)', (ident,))
+    assert plan_as(ident, owner)['card'] is None
+
+
+def test_renewal_invoices_are_issued_three_days_ahead_once_and_follow_plan_changes(gateway):  # SUB-04
+    ident, owner, _ = business()
+    activate(ident, 'GROW', start='28 days', end='2 days')
+    end = subscription(ident)[3]
+    assert renewals() == 1 and renewals() == 0
+    plan, starts, total, _ = open_renewal(ident)
+    assert (plan, starts, total) == ('GROW', end, 645000)
+    assert plan_as(ident, owner)['renewal']['invoice'] == count("SELECT number FROM platform.invoices WHERE kind='renewal'")
+    service.schedule(ident, owner, PlanChange(plan='BASE'))  # the open invoice no longer matches: voided, then reissued
+    assert open_renewal(ident) is None and renewals() == 1
+    assert open_renewal(ident)[:3] == ('BASE', end, 161250)
+    with psycopg.connect(URL) as c:  # the period ends with the downgrade applied: the reissued invoice still applies
+        c.execute("SELECT platform.end_periods(now()+interval '3 days')")
+    assert subscription(ident)[:2] == ('BASE', 'past_due') and open_renewal(ident)[0] == 'BASE'
+
+
+def test_a_saved_card_is_charged_on_the_due_date_and_the_new_period_follows_on(gateway):
+    ident, owner, _ = business()
+    paid_with_card(gateway, ident, owner)
+    activate(ident, 'GROW', start='29 days 21 hours', end='3 hours')
+    end = subscription(ident)[3]
+    renewals()
+    assert service.renew_due() == {'due': 1, 'activated': 1, 'declined': 0, 'pending': 0}
+    assert gateway.charges[0][:3] == ('AUTH_fixture1', 'ada@example.com', 645000)
+    plan, status, start, new_end, _, _ = subscription(ident)
+    assert (plan, status, start) == ('GROW', 'active', end) and new_end.month == (end.month % 12) + 1
+    assert count("SELECT count(*) FROM platform.charge_attempts WHERE outcome='activated'") == 1
+    assert service.renew_due()['due'] == 0
+
+
+def test_a_declined_card_is_retried_on_days_1_3_and_5_then_the_owner_pays_by_link(gateway):  # SUB-08
+    ident, owner, _ = business()
+    paid_with_card(gateway, ident, owner)
+    activate(ident, 'GROW', start='29 days 21 hours', end='3 hours')
+    end = subscription(ident)[3]
+    renewals()
+    gateway.decline = True
+    assert service.renew_due() == {'due': 1, 'activated': 0, 'declined': 1, 'pending': 0}
+    assert service.renew_due()['due'] == 0  # not again until day 1 of grace
+    assert plan_as(ident, owner)['renewal']['last_failure'] == 'Insufficient Funds'
+    reference = open_renewal(ident)[3]
+    with psycopg.connect(URL) as c:
+        due_on = [c.execute('SELECT platform.due_card_charges(%s::timestamptz + %s::interval)', (end, after)).fetchone()[0]
+                  for after in ('23 hours', '1 day', '3 days')]
+        assert due_on == [[], [reference], [reference]]
+        invoice_id = c.execute('SELECT id FROM platform.invoices WHERE reference=%s', (reference,)).fetchone()[0]
+        for attempt in (2, 3, 4):
+            c.execute("INSERT INTO platform.charge_attempts(reference, invoice_id, attempt, finished_at, outcome) VALUES (%s,%s,%s,now(),'declined')",
+                      ('CACU-REN-' + uuid4().hex, invoice_id, attempt))
+        assert c.execute("SELECT platform.due_card_charges(now()+interval '30 days')").fetchone()[0] == []
+        c.execute("SELECT platform.end_periods(now()+interval '4 hours')")
+    assert subscription(ident)[1] == 'past_due'
+    gateway.decline = False
+    link = service.renewal_checkout(ident, owner)
+    assert link['reference'] == reference and link['authorization_url'].startswith('https://checkout.paystack.com/')
+    gateway.pay(link)
+    assert service.verify_return(ident, owner, Verification(reference=reference))['outcome'] == 'activated'
+    assert subscription(ident)[1:3] == ('active', end)  # paid inside grace: no days lost
+
+
+def test_a_renewal_paid_after_a_fresh_plan_was_bought_is_flagged(gateway):
+    ident, owner, _ = business()
+    activate(ident, 'GROW', start='28 days', end='2 days')
+    renewals()
+    stale = service.renewal_checkout(ident, owner)
+    with psycopg.connect(URL) as c:  # the period moves on another way first (for example support re-dates it)
+        c.execute("SELECT set_config('platform.reason','test: re-dated',true)")
+        c.execute("UPDATE platform.subscriptions SET current_period_end=current_period_end+interval '1 day' WHERE business_id=%s", (ident,))
+    gateway.pay(stale)
+    assert service.verify_return(ident, owner, Verification(reference=stale['reference']))['outcome'] == 'invoice_void'
+    assert count('SELECT status FROM platform.invoices WHERE reference=%s', stale['reference']) == 'review'
+    assert count('SELECT count(*) FROM platform.receipts') == 0
+    with pytest.raises(HTTPException) as refused:
+        service.renewal_checkout(uuid4(), owner)
+    assert refused.value.status_code == 403
+
+
+def test_the_renewal_operator_reports_counts_only(gateway, capsys):
+    from tools.renew_subscriptions import main
+    ident, owner, _ = business()
+    paid_with_card(gateway, ident, owner)
+    activate(ident, 'GROW', start='29 days 21 hours', end='3 hours')
+    renewals()
+    assert main(['--json']) == 0
+    assert json.loads(capsys.readouterr().out) == {'mode': 'dry-run', 'status': 'ok', 'due': 1}
+    assert gateway.charges == []
+    assert main(['--apply', '--json']) == 0
+    out = capsys.readouterr().out
+    assert json.loads(out) == {'mode': 'apply', 'status': 'ok', 'due': 1, 'activated': 1, 'declined': 0, 'pending': 0}
+    assert 'AUTH_' not in out and 'ada@' not in out
