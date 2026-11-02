@@ -72,3 +72,7 @@ test('reading without an active business fails closed', async () => {
   await expect(service.read()).rejects.toThrow('Select an active business.');
   expect(from).not.toHaveBeenCalled();
 });
+test('a mode outside the plan explains the Chairman Plan without leaking database detail', async () => {
+  const { service } = setup({ updated: null, updateError: { message: 'PLAN_LIMIT module.modes', details: 'HYBRID mode is not included' } });
+  await expect(service.update(change)).rejects.toThrow('Hybrid mode is on the Chairman Plan only. Upgrade to use it.');
+});

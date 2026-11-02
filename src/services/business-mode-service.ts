@@ -32,6 +32,8 @@ export class BusinessModeService extends BaseService {
     if (current !== input.expectedMode) throw new BusinessModeError('Business mode changed elsewhere. Refresh before saving again.');
     const { data, error } = await supabase.from('businesses').update({ business_type: input.mode })
       .eq('id', businessId).eq('business_type', input.expectedMode).select('business_type').maybeSingle();
+    // The database refuses modes outside the business's plan (Hybrid is on the Chairman Plan only).
+    if (error?.message?.includes('PLAN_LIMIT module.modes')) throw new BusinessModeError('Hybrid mode is on the Chairman Plan only. Upgrade to use it.');
     if (error) throw new BusinessModeError('Business mode could not be saved. Refresh to check its current value.');
     // No returned row means a concurrent change or a denied write; either way nothing was saved.
     if (!data || data.business_type !== input.mode) throw new BusinessModeError('Business mode was not saved. Refresh to check the current mode and your access.');

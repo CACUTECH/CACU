@@ -4,7 +4,8 @@ import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import { FeatureUnavailable } from '@/components/feature-unavailable';
 
-type SubscriptionTier = 'Starter' | 'Growth' | 'Enterprise';
+// Plan codes from platform.plans: General (BASE), Oga (GROW), Chairman (TOP).
+type SubscriptionTier = 'BASE' | 'GROW' | 'TOP';
 interface SubscriptionContextType {
   tier: SubscriptionTier | null;
   isFeatureAccessible: (requiredTier: SubscriptionTier) => boolean;
@@ -13,7 +14,7 @@ interface SubscriptionContextType {
 // tenant subscription policy and verified billing are implemented.
 const snapshot: SubscriptionContextType = {
   tier: null,
-  isFeatureAccessible: requiredTier => requiredTier === 'Starter',
+  isFeatureAccessible: requiredTier => requiredTier === 'BASE',
 };
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
