@@ -36,10 +36,19 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 
 ## Not yet
 
-- **Scheduling:** nothing runs `end_trials` and `suspend_unpaid` yet. The job runner is Doc 07 M-10.
 - **Plan changes:** changing plans while active, with proration (SUB-05, SUB-06), and renewals with saved cards (SUB-04, SUB-08).
 - **Entitlement checks:** seat, outlet and catalogue limits, and AI and message counters.
 - **PDFs:** PDF invoices and receipts that show CACU's legal name, address and TIN.
+
+## Scheduled jobs (M-10 part 1)
+
+Migration `20261102120000_ops_scheduled_jobs.sql` adds two `pg_cron` jobs on hosted Supabase:
+- **Trial end:** `ops.run_job('billing.end_trials')` runs every hour at :07.
+- **Suspension:** `ops.run_job('billing.suspend_unpaid')` runs daily at 23:00 UTC, which is midnight in Lagos. A business is never suspended mid-trading-day (RSK-039).
+
+Each run writes a row to `ops.job_runs` with the number of subscriptions it changed. A failure is logged with its error and changes nothing. Users and the runtime role can't run the jobs or read the log. Plain PostgreSQL (CI) has no `pg_cron`, so it gets the functions without the schedule.
+
+After the migration is applied in production, check that both jobs are listed in `cron.job` (`cacu-billing-end-trials` and `cacu-billing-suspend-unpaid`).
 
 ## Billing screen
 
