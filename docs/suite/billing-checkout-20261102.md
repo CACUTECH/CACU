@@ -36,7 +36,8 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 
 ## Not yet
 
-- **Renewals with saved cards** (SUB-04, SUB-08). Today the owner renews through checkout once a period ends.
+- **Monthly to yearly mid-period** (SUB-07). Doc 14 prorates it; today it waits for renewal.
+- **Owner notifications** for renewals and declined cards (email, WhatsApp). Today they show on the billing screen only.
 - **Downgrade choices:** before a downgrade applies, Doc 14 has the owner choose which users and outlets stay active. Today nothing is deactivated; the owner just can't add more while over the limit.
 - **Usage counters:** AI questions and messages a month (TEST-210).
 - **PDFs:** PDF invoices and receipts that show CACU's legal name, address and TIN.
@@ -80,6 +81,20 @@ Migration `20261102140000_plan_changes.sql`.
 - **Tests:** 7 cases in `test_platform_billing_postgres.py`; screen and action tests in Jest.
 
 After applying in production, check that `cron.job` also lists `cacu-billing-end-periods`.
+
+## Renewals and saved cards (SUB-04, SUB-08)
+
+Migration `20261102150000_renewals.sql`, the operator `backend/tools/renew_subscriptions.py` and the workflow `.github/workflows/billing-renewals.yml`.
+
+- **Saved card:** a confirmed card payment marked reusable saves its authorization in `platform.payment_methods`. Only definer functions read it, never users or the runtime role directly. Owners and Admins see "Visa ending 4081, expires 12/2030" on the billing screen and can remove it.
+- **Renewal invoice:** `platform.issue_renewals()` runs hourly at :27 (`cacu-billing-issue-renewals`). It issues a renewal invoice 3 days before an active period ends, on the plan the next period will have, including a scheduled downgrade. If an upgrade, a new or cancelled downgrade or a new period makes it stale, it is voided and reissued.
+- **Card charge:** the operator charges the saved card from 6 hours before the period ends, then on days 1, 3 and 5 of grace if it is declined. Each attempt has its own `CACU-REN-…` reference and is logged in `platform.charge_attempts`. Only Paystack's verify endpoint activates anything. A renewal paid inside grace starts where the old period ended, so no days are lost; once suspended, it starts from the payment.
+- **Pay by link:** with no card, or after a decline, the billing screen shows the amount due and "Pay ₦… now" (`POST /api/v1/businesses/{id}/billing/renewal`), using the same checkout and verify steps.
+- **Late payments:** a payment for an invoice that was voided or no longer applies is flagged for review and changes nothing else. The owner's return from Paystack checks this too.
+- **Workflow:** it runs hourly at :40 but stays off until the repository variable `CACU_BILLING_RENEWALS_ENABLED` is `true`. It needs the secrets `CACU_DATABASE_URL` and `PAYSTACK_SECRET_KEY` in the `billing-operations` environment. It prints counts only.
+- **Tests:** 6 cases in `test_platform_billing_postgres.py`, with Paystack replaced by a stand-in; screen and action tests in Jest.
+
+After applying in production, check that `cron.job` also lists `cacu-billing-issue-renewals`.
 
 ## Billing screen
 

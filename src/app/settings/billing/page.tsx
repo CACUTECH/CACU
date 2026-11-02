@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { VAT_NOTE, highlights, naira, nextStep, overLimitNotes, planAction, planLine, price, returnedReference, statusOf, usageLines,
+import { VAT_NOTE, cardLine, highlights, naira, nextStep, overLimitNotes, planAction, planLine, price, renewalLine, returnedReference, statusOf, usageLines,
   type BillingInterval, type BillingInvoice, type CurrentPlan, type Plan, type PlanCode } from '@/lib/billing';
-import { getBillingAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from './actions';
+import { getBillingAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from './actions';
 
 type State = { plans: Plan[]; current: CurrentPlan; history: BillingInvoice[] | null };
 const OUTCOME: Record<string, string> = {
@@ -18,6 +18,8 @@ const OUTCOME: Record<string, string> = {
   not_paid: 'Paystack has not confirmed a payment for this checkout. If you paid, it will show here once confirmed.',
   amount_or_currency_mismatch: 'The payment did not match the invoice, so we have not changed your plan. CACU support will contact you.',
   upgrade_no_longer_applies: 'Your billing period changed before this upgrade was paid, so we have not changed your plan. CACU support will refund or apply it.',
+  renewal_no_longer_applies: 'Your plan changed before this renewal was paid, so we have not applied it. CACU support will refund or apply it.',
+  invoice_void: 'This invoice was replaced before it was paid, so we have not applied it. CACU support will refund or apply it.',
 };
 const TONE = { good: 'bg-emerald-100 text-emerald-900', warn: 'bg-amber-100 text-amber-900', bad: 'bg-red-100 text-red-900' } as const;
 const INVOICE_STATUS = { open: 'Awaiting payment', paid: 'Paid', review: 'Under review', void: 'Void' } as const;
@@ -27,7 +29,7 @@ export default function BillingPage() {
   const manager = ['owner', 'admin'].includes(business?.userRole ?? '');
   const [state, setState] = useState<State | null>(null), [loadError, setLoadError] = useState('');
   const [period, setPeriod] = useState<BillingInterval>('monthly');
-  const [busy, setBusy] = useState<PlanCode | null>(null), [message, setMessage] = useState(''), [error, setError] = useState('');
+  const [busy, setBusy] = useState<PlanCode | 'renewal' | 'card' | null>(null), [message, setMessage] = useState(''), [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   // One request key per plan choice, kept across retries so a lost response never opens a second invoice.
   const keys = useRef(new Map<string, string>());
@@ -62,6 +64,20 @@ export default function BillingPage() {
     const result = await startCheckoutAction({ request_key: requestKey, plan, interval: period });
     if (result.success) { window.location.assign(result.data.authorization_url); return; }
     setBusy(null); setError(result.error);
+  }
+
+  async function payRenewal() {
+    setBusy('renewal'); setError(''); setMessage('');
+    const result = await payRenewalAction();
+    if (result.success) { window.location.assign(result.data.authorization_url); return; }
+    setBusy(null); setError(result.error);
+  }
+
+  async function removeCard() {
+    setBusy('card'); setError(''); setMessage('');
+    const result = await removeCardAction();
+    if (result.success) { setMessage('Card removed. Renewals will need you to pay from this page.'); await load(); } else setError(result.error);
+    setBusy(null);
   }
 
   // A smaller plan is scheduled, not paid; choosing the current plan again cancels it.
@@ -101,6 +117,22 @@ export default function BillingPage() {
           </CardTitle>
           <CardDescription>{current.subscribed ? nextStep(current) : 'This workspace has no subscription yet.'}</CardDescription>
         </CardHeader>
+        {current.subscribed && manager && (current.renewal || current.card) && (
+          <CardContent className="space-y-3">
+            {current.renewal && (
+              <div className={cn('rounded-md border p-3 text-sm', current.renewal.last_failure && 'border-amber-300 bg-amber-50 text-amber-900')}>
+                <p>{renewalLine(current.renewal, current.card)}</p>
+                {(!current.card || current.renewal.last_failure) && (
+                  <Button className="mt-2" size="sm" disabled={busy !== null} onClick={payRenewal}>
+                    {busy === 'renewal' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening Paystack…</> : `Pay ${naira(current.renewal.total_kobo)} now`}
+                  </Button>)}
+              </div>)}
+            {current.card && (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span>Saved for renewals: {cardLine(current.card)}</span>
+                <Button size="sm" variant="outline" disabled={busy !== null} onClick={removeCard}>{busy === 'card' ? 'Removing…' : 'Remove card'}</Button>
+              </div>)}
+          </CardContent>)}
         {current.subscribed && usageLines(current).length > 0 && (
           <CardContent>
             <dl className="grid gap-3 text-sm sm:grid-cols-3">
@@ -170,7 +202,7 @@ export default function BillingPage() {
                   {history.map(row => (
                     <TableRow key={row.invoice}>
                       <TableCell className="font-mono text-xs">{row.invoice}</TableCell>
-                      <TableCell>{plans.find(p => p.code === row.plan)?.name ?? row.plan} · {row.kind === 'upgrade' ? 'upgrade' : row.billing_interval === 'annual' ? 'yearly' : 'monthly'}</TableCell>
+                      <TableCell>{plans.find(p => p.code === row.plan)?.name ?? row.plan} · {row.kind === 'upgrade' || row.kind === 'renewal' ? row.kind : row.billing_interval === 'annual' ? 'yearly' : 'monthly'}</TableCell>
                       <TableCell className="text-right">{naira(row.vat_kobo)}</TableCell>
                       <TableCell className="text-right">{naira(row.total_kobo)}</TableCell>
                       <TableCell>{INVOICE_STATUS[row.status]}</TableCell>

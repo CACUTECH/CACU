@@ -1,0 +1,46 @@
+name: Billing renewals
+# Charges saved cards whose CACU renewal is due (Doc 14 SUB-04, SUB-08). Off until the repository variable
+# CACU_BILLING_RENEWALS_ENABLED is 'true'; a manual run is a dry run unless "apply" is ticked.
+on:
+  schedule:
+    - cron: '40 * * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Charge the saved cards that are due (approved production operation)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: billing-renewals
+  cancel-in-progress: false
+jobs:
+  renew:
+    if: github.event_name == 'workflow_dispatch' || vars.CACU_BILLING_RENEWALS_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: billing-operations
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.11'
+      - run: uv sync --frozen --no-editable
+      - name: Charge due renewals or dry run
+        env:
+          CACU_DATABASE_URL: ${{ secrets.CACU_DATABASE_URL }}
+          PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
+          APPLY_RENEWALS: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          if [ "$APPLY_RENEWALS" = "true" ]; then
+            uv run --frozen python -m tools.renew_subscriptions --apply --json
+          else
+            uv run --frozen python -m tools.renew_subscriptions --json
+          fi

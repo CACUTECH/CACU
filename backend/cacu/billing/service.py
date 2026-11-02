@@ -1,4 +1,4 @@
-"""Checkout, payment verification and webhook handling for CACU subscriptions (Doc 14 SUB-02, SUB-03)."""
+"""Checkout, payment verification, webhooks and saved-card renewals for CACU subscriptions (Doc 14 SUB-02 to SUB-08)."""
 import json
 import logging
 import os
@@ -15,6 +15,8 @@ from . import paystack
 
 log = logging.getLogger(__name__)
 REFERENCE = re.compile(r'^CACU-SUB-[0-9a-f]{32}$')
+# A saved-card charge has its own reference per attempt; it is never something an owner returns with.
+PAYMENT_REFERENCE = re.compile(r'^CACU-(SUB|REN)-[0-9a-f]{32}$')
 ERRORS = {
     'ACCESS_DENIED': (403, 'Business membership required'),
     'BILLING_OWNER_OR_ADMIN_REQUIRED': (403, 'Only an Owner or Admin can manage the subscription'),
@@ -27,6 +29,7 @@ ERRORS = {
     'BILLING_SCHEDULE_NEEDS_ACTIVE_PLAN': (409, 'Choose and pay for a plan instead; there is no paid period to change'),
     'BILLING_REQUEST_KEY_REUSED': (409, 'This checkout request was already used for another plan'),
     'BILLING_NO_SUBSCRIPTION': (409, 'This business has no subscription'),
+    'BILLING_NO_RENEWAL_DUE': (409, 'There is no renewal to pay right now'),
     'BILLING_PLAN_INVALID': (422, 'Choose a valid plan and billing interval'),
 }
 
@@ -85,6 +88,17 @@ def checkout(business_id: UUID, actor: UUID, data: Checkout) -> dict:
     with platform_transaction() as cursor:
         invoice = call(cursor, 'SELECT platform.open_checkout(%s,%s,%s,%s,%s)',
                        (business_id, actor, data.request_key, data.plan, data.interval))
+    return _checkout_link(business_id, invoice)
+
+
+def renewal_checkout(business_id: UUID, actor: UUID) -> dict:
+    """SUB-04: the owner pays the open renewal invoice through Paystack checkout, with or without a saved card."""
+    with platform_transaction() as cursor:
+        invoice = call(cursor, 'SELECT platform.renewal_checkout(%s,%s)', (business_id, actor))
+    return _checkout_link(business_id, invoice)
+
+
+def _checkout_link(business_id: UUID, invoice: dict) -> dict:
     if invoice['status'] != 'open':
         raise HTTPException(409, 'This checkout is already settled')
     if not invoice['authorization_url']:
@@ -107,7 +121,7 @@ def schedule(business_id: UUID, actor: UUID, data: PlanChange) -> dict:
 
 def apply_verified(reference: str, event_key: str | None = None) -> dict:
     """Ask Paystack for the payment, then let the database match amount, currency and reference to the invoice."""
-    if not REFERENCE.fullmatch(reference):
+    if not PAYMENT_REFERENCE.fullmatch(reference):
         raise HTTPException(422, 'Unknown payment reference')
     payment = paystack.verify(reference)
     if payment.get('status') != 'success' or payment.get('reference') != reference:
@@ -122,9 +136,45 @@ def apply_verified(reference: str, event_key: str | None = None) -> dict:
                       (reference, amount, payment.get('currency'), paid_at, payment.get('channel'), event_key))
     if result['outcome'] == 'amount_or_currency_mismatch':
         log.warning('CACU invoice %s flagged for review: verified payment does not match', result['invoice'])
-    elif result['outcome'] == 'upgrade_no_longer_applies':
-        log.warning('CACU invoice %s flagged for review: upgrade paid after its period changed', result['invoice'])
+    elif result['outcome'] in {'upgrade_no_longer_applies', 'renewal_no_longer_applies', 'invoice_void'}:
+        log.warning('CACU invoice %s flagged for review: paid after it stopped applying', result['invoice'])
+    if result['outcome'] == 'activated' and isinstance(payment.get('authorization'), dict):
+        # A reusable card from a confirmed payment is kept for renewals; the database checks it is reusable.
+        customer = payment.get('customer') if isinstance(payment.get('customer'), dict) else {}
+        with platform_transaction() as cursor:
+            cursor.execute('SELECT platform.save_payment_method(%s,%s,%s)',
+                           (reference, json.dumps({**payment['authorization'], 'channel': payment.get('channel')}), customer.get('email')))
     return result
+
+
+def renew_due() -> dict:
+    """SUB-04, SUB-08: charge each saved card whose renewal attempt is due. Counts only; no card or provider details."""
+    with platform_transaction() as cursor:
+        due = call(cursor, 'SELECT platform.due_card_charges()', ())
+    report = {'due': len(due), 'activated': 0, 'declined': 0, 'pending': 0}
+    for invoice_reference in due:
+        with platform_transaction() as cursor:
+            attempt = call(cursor, 'SELECT platform.start_charge_attempt(%s)', (invoice_reference,))
+        if not attempt:
+            continue
+        try:
+            charge = paystack.charge_authorization(attempt['authorization_code'], attempt['email'], attempt['amount_kobo'],
+                                                   attempt['reference'], {'business_id': attempt['business_id'], 'invoice': attempt['invoice']})
+        except HTTPException:
+            charge = {'status': 'failed', 'gateway_response': 'Payment provider unavailable'}
+        if charge.get('status') == 'success':
+            outcome = apply_verified(attempt['reference'])['outcome']
+            if outcome == 'activated':
+                report['activated'] += 1
+                continue
+        else:
+            outcome = 'declined' if charge.get('status') == 'failed' else 'pending'
+        report['declined' if outcome != 'pending' else 'pending'] += 1
+        # A pending charge can still succeed; its charge.success webhook activates it through the same verify step.
+        with platform_transaction() as cursor:
+            cursor.execute('SELECT platform.finish_charge_attempt(%s,%s,%s)',
+                           (attempt['reference'], outcome, str(charge.get('gateway_response') or '')))
+    return report
 
 
 def verify_return(business_id: UUID, actor: UUID, data: Verification) -> dict:
@@ -133,7 +183,8 @@ def verify_return(business_id: UUID, actor: UUID, data: Verification) -> dict:
         invoice = call(cursor, 'SELECT platform.invoice_for(%s,%s,%s)', (business_id, actor, data.reference))
     if not invoice:
         raise HTTPException(404, 'Unknown payment reference')
-    if invoice['status'] != 'open':
+    # A voided invoice may still have been paid at Paystack before it was voided; verify flags that for review.
+    if invoice['status'] not in {'open', 'void'}:
         return {'outcome': 'already_applied' if invoice['status'] == 'paid' else 'invoice_' + invoice['status']}
     return apply_verified(data.reference)
 
@@ -150,7 +201,7 @@ def webhook(raw: bytes, signature: str | None) -> dict:
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         raise HTTPException(400, 'Unreadable event') from exc
     # Tenant payment references are routed elsewhere (Doc 11); only CACU subscription events are handled here.
-    if not (isinstance(reference, str) and REFERENCE.fullmatch(reference)):
+    if not (isinstance(reference, str) and PAYMENT_REFERENCE.fullmatch(reference)):
         return {'received': True}
     with platform_transaction() as cursor:
         cursor.execute('SELECT platform.record_billing_event(%s,%s,%s,%s)', (key, kind, reference, json.dumps(event)))

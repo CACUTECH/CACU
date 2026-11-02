@@ -1,5 +1,5 @@
-import { highlights, isCheckoutUrl, naira, nextStep, overLimitNotes, planAction, price, returnedReference, usageLines, type CurrentPlan, type Plan } from '@/lib/billing';
-import { getBillingAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
+import { cardLine, highlights, isCheckoutUrl, naira, nextStep, overLimitNotes, planAction, price, renewalLine, returnedReference, usageLines, type CurrentPlan, type Plan } from '@/lib/billing';
+import { getBillingAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { AccountingRequestError, accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
 
@@ -64,6 +64,27 @@ test('scheduling goes to the billing API and reports refusals in its words', asy
   expect(accountingRequest).toHaveBeenCalledWith('billing/schedule', { method: 'POST', body: { plan: 'BASE' } });
   (accountingRequest as jest.Mock).mockRejectedValueOnce(new AccountingRequestError('A move to a bigger plan is paid through checkout', 409));
   await expect(schedulePlanAction('TOP')).resolves.toEqual({ success: false, error: 'A move to a bigger plan is paid through checkout' });
+});
+
+test('renewals say what is due, how it will be paid and why a card failed', () => {
+  const card = { card_type: 'visa ', bank: 'TEST BANK', last4: '4081', exp_month: '12', exp_year: '2030' };
+  const renewal = { invoice: 'CACU-INV-000002', plan: 'GROW' as const, billing_interval: 'monthly' as const, total_kobo: 645000, due_at: '2026-12-02T10:00:00Z', last_failure: null };
+  expect(cardLine(card)).toBe('Visa ending 4081, expires 12/2030');
+  expect(renewalLine(renewal, card)).toBe("Renewal of ₦6,450 (Oga Plan, VAT included) is due on 2 Dec 2026. We'll charge your Visa ending 4081, expires 12/2030.");
+  expect(renewalLine(renewal, null)).toBe('Renewal of ₦6,450 (Oga Plan, VAT included) is due on 2 Dec 2026. Pay now, or your plan stops when the period ends.');
+  expect(renewalLine({ ...renewal, last_failure: 'Insufficient Funds' }, card))
+    .toBe('Your card payment of ₦6,450 (Oga Plan, VAT included) did not go through: Insufficient Funds. Pay now to keep full access.');
+});
+
+test('paying a renewal accepts only a Paystack link, and removing the card goes through the database', async () => {
+  (accountingRequest as jest.Mock).mockResolvedValueOnce({ authorization_url: 'https://checkout.paystack.com/r' });
+  await expect(payRenewalAction()).resolves.toMatchObject({ success: true });
+  expect(accountingRequest).toHaveBeenCalledWith('billing/renewal', { method: 'POST', body: {} });
+  (accountingRequest as jest.Mock).mockResolvedValueOnce({ authorization_url: 'https://evil.example/r' });
+  await expect(payRenewalAction()).resolves.toMatchObject({ success: false });
+  const rpc = client({ remove_payment_method: { data: null, error: null } });
+  await expect(removeCardAction()).resolves.toEqual({ success: true, data: null });
+  expect(rpc).toHaveBeenCalledWith('remove_payment_method', { p_business_id: 'active-business' });
 });
 
 test('next step explains the trial, payment due and read-only states', () => {

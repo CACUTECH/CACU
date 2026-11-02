@@ -32,6 +32,24 @@ export async function startCheckoutAction(input: { request_key: string; plan: Pl
   } catch (error) { return failed(error, 'Checkout could not start. Try again; you have not been charged.'); }
 }
 
+export async function payRenewalAction(): Promise<Result<CheckoutResult>> {
+  try {
+    const data = await accountingRequest<CheckoutResult>('billing/renewal', { method: 'POST', body: {} });
+    if (!isCheckoutUrl(data.authorization_url)) throw new Error('Unexpected checkout link');
+    return { success: true, data };
+  } catch (error) { return failed(error, 'Checkout could not start. Try again; you have not been charged.'); }
+}
+
+export async function removeCardAction(): Promise<Result<null>> {
+  try {
+    const supabase = await createClient(); const businessId = await getActiveBusinessIdAction();
+    const { error } = await supabase.rpc('remove_payment_method', { p_business_id: businessId });
+    if (error) throw new Error('unavailable');
+    revalidatePath('/settings/billing');
+    return { success: true, data: null };
+  } catch { return { success: false, error: 'The card was not removed. Try again.' }; }
+}
+
 export async function schedulePlanAction(plan: PlanCode): Promise<Result<ScheduleResult>> {
   try {
     const data = await accountingRequest<ScheduleResult>('billing/schedule', { method: 'POST', body: { plan } });
