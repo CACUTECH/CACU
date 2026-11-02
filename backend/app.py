@@ -181,7 +181,8 @@ CATALOG_MESSAGES={'VERSION_CONFLICT':'Item changed. Refresh before editing.', 'D
     'COST_REVALUATION_REQUIRED':'On-hand inventory cost changes require a reviewed revaluation.',
     'INVALID_STOCK_ADJUSTMENT':'Check the quantity, reason, date and available stock.',
     'ADJUSTMENT_ALREADY_DECIDED':'This adjustment was already decided.',
-    'CATEGORY_INVALID':'Select an active category for this item type.', 'SUPPLIER_INVALID':'Select a supplier in this business.'}
+    'CATEGORY_INVALID':'Select an active category for this item type.', 'SUPPLIER_INVALID':'Select a supplier in this business.',
+    'PLAN_LIMIT catalog.max_items':'Your plan has no room for more catalogue items. Archive items you no longer sell, or upgrade in Billing.'}
 
 def catalog_write(business_id,user_id,work):
     try:

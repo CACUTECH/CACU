@@ -40,4 +40,7 @@ const MANAGEMENT_MESSAGES: Record<string, string> = {
     PLEASE_WAIT_BEFORE_RESENDING: 'This invitation was just sent. Wait a minute before resending it.',
     MEMBER_ALREADY_EXISTS: 'That person is already a member of this business.',
     INVALID_INVITATION: 'Enter a valid email address and choose Admin, Editor or Viewer.',
+    'PLAN_LIMIT users.max': 'Your plan has no free user seats. Open invitations hold a seat too. Cancel one, deactivate someone, or upgrade in Billing.',
+    'PLAN_LIMIT outlets.max': 'Your plan has no room for another outlet. Upgrade in Billing to add one.',
+    'PLAN_LIMIT catalog.max_items': 'Your plan has no room for more catalogue items. Archive items you no longer sell, or upgrade in Billing.',
 };

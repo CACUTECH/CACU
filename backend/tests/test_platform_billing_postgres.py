@@ -25,7 +25,7 @@ def database(monkeypatch):
     parsed = urlparse(URL)
     assert parsed.hostname in {'127.0.0.1', 'localhost'} and parsed.path.endswith('_test')
     with psycopg.connect(URL) as c:
-        c.execute("""DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA IF EXISTS auth CASCADE;
+        c.execute("""DROP SCHEMA IF EXISTS ops CASCADE; DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA IF EXISTS auth CASCADE;
           DROP SCHEMA public CASCADE; CREATE SCHEMA public; CREATE SCHEMA auth;
           DO $$ DECLARE r text; BEGIN FOREACH r IN ARRAY ARRAY['anon','authenticated','cacu_runtime'] LOOP
             IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname=r) THEN EXECUTE format('CREATE ROLE %I NOLOGIN', r); END IF; END LOOP; END $$;
@@ -35,7 +35,7 @@ def database(monkeypatch):
           CREATE TABLE public.memberships(business_id uuid, user_id uuid, role text, is_active boolean NOT NULL DEFAULT true);
           GRANT USAGE ON SCHEMA public, auth TO authenticated, anon, cacu_runtime;
           GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, anon;""")
-        for name in ('20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql'):
+        for name in ('20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -245,3 +245,45 @@ def test_owners_see_their_billing_history_and_others_see_nothing(gateway):
         for role in ('authenticated', 'cacu_runtime'):
             for table in ('invoices', 'receipts', 'billing_events', 'settings', 'subscriptions'):
                 assert not c.execute("SELECT has_table_privilege(%s,%s,'SELECT')", (role, 'platform.' + table)).fetchone()[0]
+
+
+def run_job(name):
+    with psycopg.connect(URL) as c:
+        return c.execute('SELECT ops.run_job(%s)', (name,)).fetchone()[0]
+
+
+def test_scheduled_jobs_end_trials_and_suspend_and_log_every_run():
+    ident, _, _ = business()
+    assert run_job('billing.end_trials') == {'job': 'billing.end_trials', 'ok': True, 'changed': 0}
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.reason','test: trial elapsed',true)")
+        c.execute("UPDATE platform.subscriptions SET current_period_start=now()-interval '22 days', current_period_end=now()-interval '8 days' WHERE business_id=%s", (ident,))
+    assert run_job('billing.end_trials')['changed'] == 1
+    assert run_job('billing.suspend_unpaid')['changed'] == 1  # trial ended 8 days ago, so the 7-day grace is over
+    assert subscription(ident)[:2] == ('BASE', 'suspended')
+    with psycopg.connect(URL) as c:
+        runs = c.execute('SELECT job, ok, changed, error FROM ops.job_runs ORDER BY id').fetchall()
+    assert runs == [('billing.end_trials', True, 0, None), ('billing.end_trials', True, 1, None), ('billing.suspend_unpaid', True, 1, None)]
+
+
+def test_a_failing_job_is_logged_and_changes_nothing():
+    ident, _, _ = business()
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.reason','test: trial elapsed',true)")
+        c.execute("UPDATE platform.subscriptions SET current_period_start=now()-interval '15 days', current_period_end=now()-interval '1 day' WHERE business_id=%s", (ident,))
+        # Break the job: with no settings row the trial cannot know which plan follows it.
+        c.execute('ALTER TABLE platform.settings DISABLE TRIGGER settings_audit')
+        c.execute('DELETE FROM platform.settings')
+    result = run_job('billing.end_trials')
+    assert result['ok'] is False and result['error']
+    assert subscription(ident)[:2] == ('GROW', 'trialing')
+    assert count('SELECT count(*) FROM ops.job_runs WHERE NOT ok') == 1
+    with pytest.raises(psycopg.errors.InvalidParameterValue, match='UNKNOWN_JOB'):
+        run_job('billing.delete_everything')
+
+
+def test_jobs_are_not_callable_by_users_or_the_runtime():
+    with psycopg.connect(URL) as c:
+        for role in ('anon', 'authenticated', 'cacu_runtime'):
+            assert not c.execute("SELECT has_function_privilege(%s, 'ops.run_job(text)', 'EXECUTE')", (role,)).fetchone()[0]
+            assert not c.execute("SELECT has_table_privilege(%s, 'ops.job_runs', 'SELECT')", (role,)).fetchone()[0]
