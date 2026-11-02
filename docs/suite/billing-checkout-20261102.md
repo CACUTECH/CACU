@@ -38,9 +38,17 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 
 - **Scheduling:** nothing runs `end_trials` and `suspend_unpaid` yet. The job runner is Doc 07 M-10.
 - **Plan changes:** changing plans while active, with proration (SUB-05, SUB-06), and renewals with saved cards (SUB-04, SUB-08).
-- **Billing screen:** a screen under Settings with the plan picker, history and receipts. The data functions already exist: `billing_plans`, `business_plan` and `business_billing_history`.
 - **Entitlement checks:** seat, outlet and catalogue limits, and AI and message counters.
 - **PDFs:** PDF invoices and receipts that show CACU's legal name, address and TIN.
+
+## Billing screen
+
+`/settings/billing` shows:
+- the current plan, its status and what happens next, for example when the trial ends or the date to pay by;
+- the three plans, monthly or yearly, with prices before VAT and the VAT note;
+- each plan's main limits.
+
+Owners and Admins choose a plan and go to Paystack. A retry of the same choice reuses its request key, so it never opens a second invoice. When the owner returns from Paystack, the page asks the server to verify the payment before it says anything is paid. Owners and Admins also see their CACU invoices and receipts. Editors and Viewers see the plans but can't choose one.
 
 ## Configuration
 
