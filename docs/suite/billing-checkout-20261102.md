@@ -1,0 +1,65 @@
+# Trials, Paystack checkout and verified activation (Phase 3, M-09 part 2)
+
+This builds on `platform-plans-20261102.md` and applies the owner decisions of 2 November 2026:
+
+- **Trial:** every new business starts a 14-day Oga trial. When it ends, the business moves to General with its first payment due.
+- **Annual prices:** ₦60,000 for Oga and ₦150,000 for Chairman. General is monthly only.
+- **VAT:** prices exclude VAT, and CACU is VAT-registered, so every CACU invoice adds 7.5% VAT.
+- **Existing businesses:** none, so nothing is migrated.
+
+## Amounts charged
+
+| Plan | Monthly | VAT | Total | Annual total |
+|---|---|---|---|---|
+| General | ₦1,500 | ₦112.50 | ₦1,612.50 | — |
+| Oga | ₦6,000 | ₦450 | ₦6,450 | ₦64,500 |
+| Chairman | ₦15,000 | ₦1,125 | ₦16,125 | ₦161,250 |
+
+The VAT rate, the trial and the grace period are stored in `platform.settings`, and changes to them are logged.
+
+## Flow
+
+1. **Setup:** setup starts the trial in the same transaction that creates the business. Hybrid can't be chosen at setup, because the trial plan has no Hybrid mode. The setup screen shows Hybrid as a Chairman Plan option, and the database refuses it too.
+2. **Checkout:** `POST /api/v1/businesses/{id}/billing/checkout` takes `{request_key, plan, interval}`.
+   - Only an active Owner or Admin can call it.
+   - It creates a numbered CACU invoice (`CACU-INV-000001`), starts a Paystack checkout for the exact total, and returns the checkout link.
+   - A retry with the same request key returns the same invoice and link.
+3. **Activation:** the Paystack webhook (`POST /api/v1/webhooks/paystack`) and the owner's return from checkout (`POST …/billing/verify`) both lead to the same step.
+   - The server asks Paystack's verify endpoint about the payment.
+   - The database activates the plan only if the amount, the currency (NGN) and the reference match the invoice exactly.
+   - That produces one receipt (`CACU-RCT-000001`), and a new period starts from the payment time.
+4. **Webhook security:** webhooks are authenticated by an HMAC-SHA512 signature over the raw body, using `PAYSTACK_SECRET_KEY`.
+   - Events are stored once per key.
+   - A redelivery is processed again only if the first attempt didn't finish.
+   - A short or wrong-currency payment flags the invoice for review and changes nothing else.
+5. **End of trial:** `platform.end_trials()` moves expired trials to General, with the first payment due and 7 days of grace at full access. `platform.suspend_unpaid()` makes businesses that are unpaid after grace read-only. Paying restores full access.
+
+## Not yet
+
+- **Scheduling:** nothing runs `end_trials` and `suspend_unpaid` yet. The job runner is Doc 07 M-10.
+- **Plan changes:** changing plans while active, with proration (SUB-05, SUB-06), and renewals with saved cards (SUB-04, SUB-08).
+- **Billing screen:** a screen under Settings with the plan picker, history and receipts. The data functions already exist: `billing_plans`, `business_plan` and `business_billing_history`.
+- **Entitlement checks:** seat, outlet and catalogue limits, and AI and message counters.
+- **PDFs:** PDF invoices and receipts that show CACU's legal name, address and TIN.
+
+## Configuration
+
+These go in the backend's environment, never with a `NEXT_PUBLIC_` prefix:
+
+- `PAYSTACK_SECRET_KEY`: the secret key. Test keys start with `sk_test_`.
+- `CACU_BILLING_CALLBACK_URL` (optional): the `https://` page Paystack returns the owner to.
+
+## Tests
+
+- `backend/tests/test_platform_billing_postgres.py` (16 cases):
+  - the trial;
+  - Hybrid refused at setup;
+  - VAT on every plan and interval;
+  - roles;
+  - TEST-201 to TEST-204;
+  - a failed first webhook attempt being retried;
+  - trial end, grace, suspension and payment;
+  - history visibility.
+- `backend/tests/test_paystack.py`: signature and key handling.
+
+The tests use a stand-in for Paystack. No live Paystack call has been made yet.

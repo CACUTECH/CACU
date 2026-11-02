@@ -42,7 +42,8 @@ import { useBusiness } from "@/components/business-provider";
 
 const formSchema = z.object({
   businessName: z.string().trim().max(1000).min(1, "Business name is required"),
-  businessType: z.enum(['PRODUCT', 'SERVICE', 'HYBRID'], {
+  // New businesses start on the Oga trial, which has no Hybrid mode; Hybrid is on the Chairman Plan only.
+  businessType: z.enum(['PRODUCT', 'SERVICE'], {
     error: "Please select a business type",
   }),
   businessSector: z.string().trim().max(1000).min(1, "Business sector is required"),
@@ -214,18 +215,20 @@ export default function SetupPage() {
                                     {[
                                         { val: 'PRODUCT', label: 'Products', icon: Package, desc: 'Retail, Wholesale' },
                                         { val: 'SERVICE', label: 'Services', icon: Briefcase, desc: 'Consulting, Repairs' },
-                                        { val: 'HYBRID', label: 'Hybrid', icon: Sparkles, desc: 'Both goods & work' },
+                                        { val: 'HYBRID', label: 'Hybrid', icon: Sparkles, desc: 'Chairman Plan: switch on after you subscribe', locked: true },
                                     ].map((type) => (
                                         <button
                                             key={type.val}
                                             type="button"
-                                            disabled={isLoading}
+                                            disabled={isLoading || type.locked}
+                                            aria-disabled={isLoading || type.locked}
                                             onClick={() => field.onChange(type.val)}
                                             className={cn(
                                                 "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center",
                                                 field.value === type.val 
                                                     ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" 
-                                                    : "border-muted bg-card hover:border-primary/50"
+                                                    : "border-muted bg-card hover:border-primary/50",
+                                                type.locked && "cursor-not-allowed opacity-60 hover:border-muted"
                                             )}
                                         >
                                             <type.icon className={cn("h-6 w-6", field.value === type.val ? "text-primary" : "text-muted-foreground")} />

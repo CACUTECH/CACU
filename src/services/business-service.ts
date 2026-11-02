@@ -26,6 +26,9 @@ export class BusinessService extends BaseService {
       if (error.code === 'P0001' && error.message === 'User is already registered with a business') {
         throw new Error('User is already registered with a business. Select your existing business.');
       }
+      if (error.message?.includes('PLAN_LIMIT module.modes')) {
+        throw new Error('Hybrid mode is on the Chairman Plan only. Start as Products or Services, then switch after you subscribe.');
+      }
       throw new Error('Business setup could not be confirmed. Retry with the same details.');
     }
     if (!business || typeof business.id !== 'string' || typeof business.replayed !== 'boolean') {

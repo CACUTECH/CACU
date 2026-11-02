@@ -358,3 +358,6 @@ def reporting_close_detail(business_id:UUID,close_id:UUID,user_id:UUID=Depends(c
 def approve_reporting_close(business_id:UUID,close_id:UUID,data:Approval,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True) as session:
         return approve_close(session,user_id,close_id,data)
+
+from cacu.billing.routes import billing_router
+app.include_router(billing_router(current_user))
