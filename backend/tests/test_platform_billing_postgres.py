@@ -1,4 +1,4 @@
-"""Trials, Paystack checkout and verified activation (Doc 14 SUB-01 to SUB-03, TEST-201 to TEST-204)."""
+"""Trials, Paystack checkout, verified activation and plan changes (Doc 14 SUB-01 to SUB-06, TEST-201 to TEST-204)."""
 import hashlib
 import hmac
 import json
@@ -11,7 +11,7 @@ import psycopg
 import pytest
 from fastapi import HTTPException
 from cacu.billing import paystack, service
-from cacu.billing.service import Checkout, Verification
+from cacu.billing.service import Checkout, PlanChange, Verification
 
 URL = os.getenv('CACU_TEST_DATABASE_URL')
 pytestmark = pytest.mark.skipif(not URL, reason='Disposable PostgreSQL required')
@@ -33,9 +33,13 @@ def database(monkeypatch):
           CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
           CREATE TABLE public.businesses(id uuid PRIMARY KEY, name text, business_type text NOT NULL, created_by uuid);
           CREATE TABLE public.memberships(business_id uuid, user_id uuid, role text, is_active boolean NOT NULL DEFAULT true);
+          CREATE TABLE public.business_invitations(business_id uuid, status text, expires_at timestamptz);
+          CREATE TABLE public.business_locations(business_id uuid, is_active boolean NOT NULL DEFAULT true);
+          CREATE TABLE public.catalog_items(business_id uuid, is_active boolean);
           GRANT USAGE ON SCHEMA public, auth TO authenticated, anon, cacu_runtime;
           GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, anon;""")
-        for name in ('20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql'):
+        for name in ('20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql',
+                     '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -218,8 +222,8 @@ def test_trial_ends_on_general_with_grace_then_read_only_until_paid(gateway):
     assert service.verify_return(ident, owner, Verification(reference=invoice['reference']))['outcome'] == 'activated'
     assert subscription(ident)[:2] == ('BASE', 'active')
     with pytest.raises(HTTPException) as refused:
-        service.checkout(ident, owner, Checkout(request_key=uuid4(), plan='TOP'))
-    assert refused.value.status_code == 409  # plan changes while active come with proration
+        service.checkout(ident, owner, Checkout(request_key=uuid4(), plan='BASE'))
+    assert refused.value.status_code == 409  # already on this plan for the period
 
 
 def test_owners_see_their_billing_history_and_others_see_nothing(gateway):
@@ -287,3 +291,109 @@ def test_jobs_are_not_callable_by_users_or_the_runtime():
         for role in ('anon', 'authenticated', 'cacu_runtime'):
             assert not c.execute("SELECT has_function_privilege(%s, 'ops.run_job(text)', 'EXECUTE')", (role,)).fetchone()[0]
             assert not c.execute("SELECT has_table_privilege(%s, 'ops.job_runs', 'SELECT')", (role,)).fetchone()[0]
+
+
+def activate(ident, plan, start='10 days', end='20 days', interval='monthly'):
+    """A paid period that began `start` ago and ends in `end`."""
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.reason','test: paid period',true)")
+        c.execute(f"UPDATE platform.subscriptions SET plan_code=%s, status='active', billing_interval=%s, grace_ends_at=NULL, "
+                  f"current_period_start=now()-interval '{start}', current_period_end=now()+interval '{end}' WHERE business_id=%s",
+                  (plan, interval, ident))
+
+
+def refusal(call):
+    with pytest.raises(HTTPException) as refused:
+        call()
+    return refused.value.status_code, refused.value.detail
+
+
+def test_an_upgrade_charges_the_prorated_difference_and_keeps_the_period_end(gateway):  # SUB-05
+    ident, owner, _ = business()
+    activate(ident, 'GROW')
+    before = subscription(ident)
+    invoice = service.checkout(ident, owner, Checkout(request_key=uuid4(), plan='TOP'))
+    # (₦15,000 - ₦6,000) for 20 of 30 days = ₦6,000, plus 7.5% VAT.
+    assert (invoice['kind'], invoice['subtotal_kobo'], invoice['vat_kobo'], invoice['total_kobo']) == ('upgrade', 600000, 45000, 645000)
+    gateway.pay(invoice)
+    assert service.verify_return(ident, owner, Verification(reference=invoice['reference']))['outcome'] == 'activated'
+    after = subscription(ident)
+    assert after[:2] == ('TOP', 'active') and after[2:4] == before[2:4]
+    assert count("SELECT platform.entitlement(%s,'users.max')", ident) == 15
+
+
+def test_only_upgrades_on_the_same_interval_are_paid_mid_period(gateway):
+    ident, owner, editor = business()
+    activate(ident, 'GROW')
+    checkout = lambda actor=owner, **kw: service.checkout(ident, actor, Checkout(request_key=uuid4(), **kw))
+    assert refusal(lambda: checkout(plan='GROW'))[0] == 409
+    assert 'scheduled' in refusal(lambda: checkout(plan='BASE'))[1]
+    assert 'monthly and yearly' in refusal(lambda: checkout(plan='TOP', interval='annual'))[1]
+    assert refusal(lambda: checkout(editor, plan='TOP'))[0] == 403
+    activate(ident, 'GROW', start='29 days 20 hours', end='4 hours')
+    assert 'Renew first' in refusal(lambda: checkout(plan='TOP'))[1]
+    assert gateway.initialized == []
+
+
+def test_an_upgrade_paid_after_its_period_changed_is_flagged_not_applied(gateway):
+    ident, owner, _ = business()
+    activate(ident, 'GROW')
+    invoice = service.checkout(ident, owner, Checkout(request_key=uuid4(), plan='TOP'))
+    activate(ident, 'GROW', start='1 day', end='29 days')  # renewed in the meantime
+    gateway.pay(invoice)
+    assert service.verify_return(ident, owner, Verification(reference=invoice['reference']))['outcome'] == 'upgrade_no_longer_applies'
+    assert subscription(ident)[0] == 'GROW'
+    assert count('SELECT status FROM platform.invoices WHERE reference=%s', invoice['reference']) == 'review'
+    assert count('SELECT count(*) FROM platform.receipts') == 0
+
+
+def test_a_downgrade_is_scheduled_shows_what_is_over_and_applies_when_the_period_ends(gateway):  # SUB-06
+    ident, owner, editor = business()
+    activate(ident, 'TOP')
+    with psycopg.connect(URL) as c:
+        c.execute('INSERT INTO business_locations SELECT %s FROM generate_series(1,3)', (ident,))
+    scheduled = service.schedule(ident, owner, PlanChange(plan='BASE'))
+    assert scheduled['scheduled_plan'] == 'BASE' and scheduled['over_limits'] == {'outlets.max': {'used': 3, 'limit': 1}}
+    assert subscription(ident)[0] == 'TOP'  # nothing changes until the period ends
+    assert service.schedule(ident, owner, PlanChange(plan='TOP'))['scheduled_plan'] is None  # cancelled
+    service.schedule(ident, owner, PlanChange(plan='GROW'))
+    assert refusal(lambda: service.schedule(ident, editor, PlanChange(plan='BASE')))[0] == 403
+    with psycopg.connect(URL) as c:
+        assert c.execute('SELECT platform.end_periods()').fetchone()[0] == 0
+        assert c.execute("SELECT platform.end_periods(now()+interval '21 days')").fetchone()[0] == 1
+    plan, status, _, end, grace, _ = subscription(ident)
+    assert (plan, status, grace - end) == ('GROW', 'past_due', timedelta(days=7))
+    assert 'no paid period' in refusal(lambda: service.schedule(ident, owner, PlanChange(plan='BASE')))[1]
+    with psycopg.connect(URL) as c:
+        reasons = [r for (r,) in c.execute('SELECT reason FROM platform.subscription_changes WHERE business_id=%s ORDER BY id', (ident,))]
+    assert reasons[-3:] == ['Scheduled plan change cancelled', 'Downgrade to Oga scheduled for the end of the period', 'Paid period ended; renewal due']
+
+
+def test_upgrades_are_not_scheduled(gateway):
+    ident, owner, _ = business()
+    activate(ident, 'GROW')
+    assert 'checkout' in refusal(lambda: service.schedule(ident, owner, PlanChange(plan='TOP')))[1]
+
+
+def test_a_hybrid_business_keeps_chairman_until_it_changes_mode(gateway):
+    ident, owner, _ = business()
+    activate(ident, 'TOP')
+    service.schedule(ident, owner, PlanChange(plan='GROW'))
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE businesses SET business_type='HYBRID' WHERE id=%s", (ident,))
+    assert refusal(lambda: service.schedule(ident, owner, PlanChange(plan='BASE')))[0] == 403
+    assert run_job('billing.end_periods')['changed'] == 0
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT platform.end_periods(now()+interval '21 days')")
+    assert subscription(ident)[:2] == ('TOP', 'past_due')
+
+
+def test_upgrade_invoices_show_in_history_as_upgrades(gateway):
+    ident, owner, _ = business()
+    activate(ident, 'BASE')
+    service.checkout(ident, owner, Checkout(request_key=uuid4(), plan='GROW'))
+    with psycopg.connect(URL) as c:
+        c.execute('SET LOCAL ROLE authenticated')
+        c.execute("SELECT set_config('request.jwt.claims',%s,true)", (json.dumps({'sub': str(owner)}),))
+        rows = c.execute('SELECT public.business_billing_history(%s)', (ident,)).fetchone()[0]
+    assert [(r['kind'], r['plan'], r['status']) for r in rows] == [('upgrade', 'GROW', 'open')]

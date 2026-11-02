@@ -1,5 +1,5 @@
-import { highlights, isCheckoutUrl, naira, nextStep, price, returnedReference, usageLines, type Plan } from '@/lib/billing';
-import { getBillingAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
+import { highlights, isCheckoutUrl, naira, nextStep, overLimitNotes, planAction, price, returnedReference, usageLines, type CurrentPlan, type Plan } from '@/lib/billing';
+import { getBillingAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { AccountingRequestError, accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
 
@@ -34,6 +34,36 @@ test('usage shows each counted limit and flags a full one', () => {
   expect(usageLines(current).map(({ label, text, full }) => [label, text, full])).toEqual([
     ['Users', '2 of 2', true], ['Outlets', '0 of 1', false], ['Catalogue items', '1,250 (unlimited)', false]]);
   expect(usageLines({ ...current, usage: undefined })).toEqual([]);
+});
+
+test('an active plan upgrades on its interval, schedules smaller plans and can cancel the schedule', () => {
+  const general: Plan = { ...oga, code: 'BASE', name: 'General', annual_price_kobo: null };
+  const chairman: Plan = { ...oga, code: 'TOP', name: 'Chairman' };
+  const current = { subscribed: true as const, plan: 'GROW' as const, plan_name: 'Oga', status: 'active' as const, billing_interval: 'monthly' as const,
+    current_period_end: '2026-12-02T10:00:00Z', grace_ends_at: null, writes_allowed: true, entitlements: {}, scheduled_plan: null };
+  expect(planAction(current, chairman, 'monthly')).toMatchObject({ kind: 'upgrade', label: 'Upgrade to Chairman' });
+  expect(planAction(current, chairman, 'annual')).toEqual({ kind: 'none', label: 'Switch to yearly at renewal' });
+  expect(planAction(current, oga, 'monthly')).toEqual({ kind: 'current', label: 'Current plan' });
+  expect(planAction(current, general, 'monthly')).toMatchObject({ kind: 'schedule', label: 'Move to General on 2 Dec 2026' });
+  expect(planAction({ ...current, scheduled_plan: 'BASE' }, general, 'monthly')).toMatchObject({ kind: 'cancel', note: 'Moving to General on 2 Dec 2026.' });
+  expect(nextStep({ ...current, scheduled_plan: 'BASE' })).toBe('Paid until 2 Dec 2026. You move to the General Plan then.');
+  const trial: CurrentPlan = { ...current, status: 'trialing' };
+  expect([planAction(trial, general, 'monthly'), planAction(trial, general, 'annual')]).toEqual([
+    { kind: 'checkout', label: 'Choose General' }, { kind: 'none', label: 'Choose General' }]);
+});
+
+test('a scheduled downgrade explains what is over the new limits', () => {
+  expect(overLimitNotes({ scheduled_plan: 'BASE', effective_at: null, over_limits: { 'outlets.max': { used: 3, limit: 1 } } })).toEqual([
+    "You have 3 outlets; the General Plan allows 1. Nothing is removed, but you can't add more until you're under the limit."]);
+  expect(overLimitNotes({ scheduled_plan: null, effective_at: null, over_limits: {} })).toEqual([]);
+});
+
+test('scheduling goes to the billing API and reports refusals in its words', async () => {
+  (accountingRequest as jest.Mock).mockResolvedValueOnce({ scheduled_plan: 'BASE', effective_at: null, over_limits: {} });
+  await expect(schedulePlanAction('BASE')).resolves.toMatchObject({ success: true });
+  expect(accountingRequest).toHaveBeenCalledWith('billing/schedule', { method: 'POST', body: { plan: 'BASE' } });
+  (accountingRequest as jest.Mock).mockRejectedValueOnce(new AccountingRequestError('A move to a bigger plan is paid through checkout', 409));
+  await expect(schedulePlanAction('TOP')).resolves.toEqual({ success: false, error: 'A move to a bigger plan is paid through checkout' });
 });
 
 test('next step explains the trial, payment due and read-only states', () => {

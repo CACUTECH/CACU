@@ -19,7 +19,12 @@ ERRORS = {
     'ACCESS_DENIED': (403, 'Business membership required'),
     'BILLING_OWNER_OR_ADMIN_REQUIRED': (403, 'Only an Owner or Admin can manage the subscription'),
     'PLAN_LIMIT module.modes': (403, 'Hybrid mode is on the Chairman Plan only. Switch to Products or Services first.'),
-    'BILLING_PLAN_CHANGE_NOT_AVAILABLE': (409, 'Changing an active plan is not available yet'),
+    'BILLING_ALREADY_ON_PLAN': (409, 'This business is already on that plan'),
+    'BILLING_DOWNGRADE_IS_SCHEDULED': (409, 'A move to a smaller plan is scheduled for the end of the period, not paid now'),
+    'BILLING_UPGRADE_NEEDS_CHECKOUT': (409, 'A move to a bigger plan is paid through checkout'),
+    'BILLING_INTERVAL_CHANGES_AT_RENEWAL': (409, 'Switch between monthly and yearly when the current period ends'),
+    'BILLING_RENEW_FIRST': (409, 'This period ends within a day. Renew first, then upgrade'),
+    'BILLING_SCHEDULE_NEEDS_ACTIVE_PLAN': (409, 'Choose and pay for a plan instead; there is no paid period to change'),
     'BILLING_REQUEST_KEY_REUSED': (409, 'This checkout request was already used for another plan'),
     'BILLING_NO_SUBSCRIPTION': (409, 'This business has no subscription'),
     'BILLING_PLAN_INVALID': (422, 'Choose a valid plan and billing interval'),
@@ -31,6 +36,11 @@ class Checkout(BaseModel):
     request_key: UUID
     plan: Literal['BASE', 'GROW', 'TOP']
     interval: Literal['monthly', 'annual'] = 'monthly'
+
+
+class PlanChange(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    plan: Literal['BASE', 'GROW', 'TOP']
 
 
 class Verification(BaseModel):
@@ -89,6 +99,12 @@ def checkout(business_id: UUID, actor: UUID, data: Checkout) -> dict:
     return invoice
 
 
+def schedule(business_id: UUID, actor: UUID, data: PlanChange) -> dict:
+    """SUB-06: schedule a smaller plan for the end of the paid period, or cancel one by choosing the current plan."""
+    with platform_transaction() as cursor:
+        return call(cursor, 'SELECT platform.schedule_plan_change(%s,%s,%s)', (business_id, actor, data.plan))
+
+
 def apply_verified(reference: str, event_key: str | None = None) -> dict:
     """Ask Paystack for the payment, then let the database match amount, currency and reference to the invoice."""
     if not REFERENCE.fullmatch(reference):
@@ -106,6 +122,8 @@ def apply_verified(reference: str, event_key: str | None = None) -> dict:
                       (reference, amount, payment.get('currency'), paid_at, payment.get('channel'), event_key))
     if result['outcome'] == 'amount_or_currency_mismatch':
         log.warning('CACU invoice %s flagged for review: verified payment does not match', result['invoice'])
+    elif result['outcome'] == 'upgrade_no_longer_applies':
+        log.warning('CACU invoice %s flagged for review: upgrade paid after its period changed', result['invoice'])
     return result
 
 
