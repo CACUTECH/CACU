@@ -29,9 +29,9 @@ test('refresh clears previously displayed business data', async () => {
   rerender(<BusinessProvider><BusinessProbe /></BusinessProvider>);
 });
 test('a forged browser tier grants no paid access', async () => {
-  localStorage.setItem('subscription-tier', 'Enterprise');
+  localStorage.setItem('subscription-tier', 'TOP');
   function Probe() { const { tier, isFeatureAccessible } = useSubscription();
-    return <p>{tier === null && !isFeatureAccessible('Enterprise') && !isFeatureAccessible('Growth') ? 'Paid access unavailable' : 'Granted'}</p>; }
+    return <p>{tier === null && !isFeatureAccessible('TOP') && !isFeatureAccessible('GROW') ? 'Paid access unavailable' : 'Granted'}</p>; }
   render(<SubscriptionProvider><Probe /></SubscriptionProvider>);
   await waitFor(() => expect(screen.getByText('Paid access unavailable')).toBeInTheDocument());
   localStorage.removeItem('subscription-tier');
