@@ -77,7 +77,14 @@ def native_post(session,cls,main,lines,entry_date,narration,credited=None,main_a
     session.flush();tx.post(session);session.flush();session.expire(tx, ['ledgers'])
     return tx
 
+CORRECTION_KINDS={'reversal','credit_note'}
+
 def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False):
+    # Corrections are Owner/Admin-only in their workflows; enforce it here too so the
+    # generic postings route cannot reach around them, and before a replay returns.
+    if command.kind in CORRECTION_KINDS:
+        member=raw(session,'SELECT accounting.lock_membership(%s,%s)',(str(session.business_id),str(actor))).scalar()
+        if member not in {'owner','admin'}:raise HTTPException(403,'Only an Owner or Admin can post reversals and credit notes')
     serialized=command.model_dump(mode='json')
     if serialized.get('payment_method') is None:serialized.pop('payment_method',None)
     payload=json.dumps(serialized,sort_keys=True,separators=(',',':'))

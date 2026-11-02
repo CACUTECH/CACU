@@ -134,3 +134,26 @@ def test_editors_cannot_change_stock_outside_movements(boundary):
 def test_ledger_trigger_has_fixed_search_path_and_stays_immutable(boundary):
     with psycopg.connect(URL) as c:
         assert c.execute("SELECT proconfig FROM pg_proc WHERE oid='accounting.immutable_ledger'::regproc").fetchone()[0] == ['search_path=pg_catalog, pg_temp']
+
+
+@pytest.mark.parametrize('role,allowed', [('owner', True), ('editor', True), ('viewer', False), ('outsider', False)])
+def test_only_writing_roles_add_suppliers_directly(boundary, role, allowed):
+    _, legacy, _, people = boundary
+    with psycopg.connect(URL) as c:
+        # Mirror hosted Supabase: authenticated holds the table grant, so the policy is the only gate.
+        c.execute('GRANT INSERT ON public.suppliers TO authenticated')
+        c.execute(Path('../supabase/migrations/20261102090000_supplier_insert_role.sql').read_text(encoding='utf-8'))
+    supplier = uuid4()
+
+    def add():
+        with psycopg.connect(URL) as c:
+            c.execute('SET LOCAL ROLE authenticated')
+            c.execute("SELECT set_config('request.jwt.claims',%s,true)", (json.dumps({'sub': str(people[role])}),))
+            c.execute("INSERT INTO suppliers(id,business_id,name) VALUES(%s,%s,'Nkechi Wholesale')", (supplier, legacy))
+    if allowed:
+        add()
+    else:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            add()
+    with psycopg.connect(URL) as c:
+        assert c.execute('SELECT count(*) FROM suppliers WHERE id=%s', (supplier,)).fetchone()[0] == int(allowed)

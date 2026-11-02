@@ -23,13 +23,13 @@ def database():
                 c.execute(psycopg.sql.SQL('CREATE ROLE {} NOLOGIN').format(psycopg.sql.Identifier(role)))
         c.execute("""CREATE TABLE auth.users(id uuid PRIMARY KEY);
         CREATE TABLE public.businesses(id uuid PRIMARY KEY);
-        CREATE TABLE public.memberships(user_id uuid NOT NULL,business_id uuid NOT NULL REFERENCES public.businesses(id),role text NOT NULL,PRIMARY KEY(user_id,business_id));
+        CREATE TABLE public.memberships(user_id uuid NOT NULL,business_id uuid NOT NULL REFERENCES public.businesses(id),role text NOT NULL,is_active boolean NOT NULL DEFAULT true,PRIMARY KEY(user_id,business_id));
         CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
         GRANT USAGE ON SCHEMA public,auth TO authenticated,anon;
         GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated,anon;
         ALTER TABLE public.memberships ENABLE ROW LEVEL SECURITY;""")
-        migration = Path(__file__).resolve().parents[2]/'supabase/migrations/20261012132427_guarded_ai_chat.sql'
-        c.execute(migration.read_text(encoding='utf-8'))
+        for name in ('20261012132427_guarded_ai_chat.sql','20261102090100_ai_active_members.sql'):
+            c.execute((Path(__file__).resolve().parents[2]/'supabase/migrations'/name).read_text(encoding='utf-8'))
     yield
 
 def member(business=None,role='owner'):
@@ -37,7 +37,7 @@ def member(business=None,role='owner'):
     with psycopg.connect(URL) as c:
         c.execute('INSERT INTO auth.users VALUES(%s)',(actor,))
         c.execute('INSERT INTO public.businesses VALUES(%s) ON CONFLICT DO NOTHING',(business,))
-        c.execute('INSERT INTO public.memberships VALUES(%s,%s,%s)',(actor,business,role))
+        c.execute('INSERT INTO public.memberships(user_id,business_id,role) VALUES(%s,%s,%s)',(actor,business,role))
     return actor,business
 
 def enable(**limits):
@@ -145,3 +145,10 @@ def test_deleted_auth_user_cannot_use_an_old_identity_claim():
     actor,business=member(); enable()
     with psycopg.connect(URL) as c: c.execute('DELETE FROM auth.users WHERE id=%s',(actor,))
     with pytest.raises(psycopg.errors.InsufficientPrivilege): reserve(actor,business)
+
+
+def test_deactivated_member_cannot_reserve_or_finish():
+    actor,business=member(role='editor'); enable(); key=uuid4(); reserve(actor,business,key)
+    with psycopg.connect(URL) as c: c.execute('UPDATE public.memberships SET is_active=false WHERE user_id=%s',(actor,))
+    with pytest.raises(psycopg.errors.InsufficientPrivilege): reserve(actor,business)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege): rpc(actor,'finish_ai_chat',(business,key,'completed'))

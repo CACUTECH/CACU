@@ -149,6 +149,27 @@ def test_documents_other_than_journals_and_expenses_cannot_be_reversed(live):
         call(live, 'owner', lambda s, a: reversal_create(s, a, posted['adjustment']['id'], ReversalCreate(request_key=uuid4(), entry_date=TODAY, reason='No')))
 
 
+def test_editors_cannot_post_corrections_through_the_generic_route(live):
+    key = uuid4()
+    journal = PostingCommand(request_key=key, kind='adjustment', source_id=key, main_account_id=live.codes['3100'], entry_date=TODAY,
+                             narration='Owner drawings', credited=False, lines=[{'account_id': live.codes['1000'], 'amount': '20000', 'credited': True}])
+    call(live, 'owner', lambda s, a: post_command(s, a, journal))
+    with psycopg.connect(URL) as c:
+        invoice = c.execute("SELECT source_id FROM accounting.document_map WHERE business_id=%s AND source_type='invoice'", (live.business,)).fetchone()[0]
+    reversal = PostingCommand(request_key=uuid4(), kind='reversal', source_id=uuid4(), target_id=key, main_account_id=live.codes['3100'],
+                              entry_date=TODAY, narration='Undo', lines=[{'account_id': live.codes['1000'], 'amount': '20000'}])
+    credit = PostingCommand(request_key=uuid4(), kind='credit_note', source_id=uuid4(), target_id=invoice, main_account_id=live.codes['1100'],
+                            entry_date=TODAY, narration='Discount', lines=[{'account_id': live.codes['4000'], 'amount': '1000'}])
+    for command in (reversal, credit):
+        with pytest.raises(HTTPException, match='Only an Owner or Admin') as refused:
+            call(live, 'editor', lambda s, a: post_command(s, a, command))
+        assert refused.value.status_code == 403
+    assert balance(live, '3100') == Decimal('20000') and balance(live, '1000') == Decimal('5000')
+    with psycopg.connect(URL) as c:
+        assert c.execute("SELECT count(*) FROM accounting.document_map WHERE business_id=%s AND source_type IN ('reversal','credit_note')",
+                         (live.business,)).fetchone()[0] == 0
+
+
 def test_owner_adjustment_posts_directly_to_stock_write_offs(live):
     result = call(live, 'owner', lambda s, a: request_adjustment(s, a, adjustment(live, -2)))
     assert result['adjustment']['status'] == 'posted' and result['adjustment']['value'] == '100000.00'
