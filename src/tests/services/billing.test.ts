@@ -1,4 +1,4 @@
-import { highlights, isCheckoutUrl, naira, nextStep, price, returnedReference, type Plan } from '@/lib/billing';
+import { highlights, isCheckoutUrl, naira, nextStep, price, returnedReference, usageLines, type Plan } from '@/lib/billing';
 import { getBillingAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { AccountingRequestError, accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
@@ -25,6 +25,15 @@ test('plan highlights read like an owner would compare them', () => {
     'Purchasing and supplier bills', 'Cash flow and ageing reports', '100 AI questions a month']);
   expect(highlights({ 'users.max': 1, 'outlets.max': 1, 'catalog.max_items': null, 'module.modes': ['PRODUCT', 'SERVICE', 'HYBRID'], 'ai.queries_per_month': 0 }))
     .toEqual(['1 user', '1 outlet', 'Unlimited catalogue items', 'Products, services or Hybrid']);
+});
+
+test('usage shows each counted limit and flags a full one', () => {
+  const current = { subscribed: true as const, plan: 'BASE' as const, plan_name: 'General', status: 'active' as const, billing_interval: 'monthly' as const,
+    current_period_end: null, grace_ends_at: null, writes_allowed: true,
+    entitlements: { 'users.max': 2, 'outlets.max': 1, 'catalog.max_items': null }, usage: { 'users.max': 2, 'outlets.max': 0, 'catalog.max_items': 1250 } };
+  expect(usageLines(current).map(({ label, text, full }) => [label, text, full])).toEqual([
+    ['Users', '2 of 2', true], ['Outlets', '0 of 1', false], ['Catalogue items', '1,250 (unlimited)', false]]);
+  expect(usageLines({ ...current, usage: undefined })).toEqual([]);
 });
 
 test('next step explains the trial, payment due and read-only states', () => {

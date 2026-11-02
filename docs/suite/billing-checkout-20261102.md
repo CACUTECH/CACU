@@ -37,7 +37,7 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 ## Not yet
 
 - **Plan changes:** changing plans while active, with proration (SUB-05, SUB-06), and renewals with saved cards (SUB-04, SUB-08).
-- **Entitlement checks:** seat, outlet and catalogue limits, and AI and message counters.
+- **Usage counters:** AI questions and messages a month (TEST-210).
 - **PDFs:** PDF invoices and receipts that show CACU's legal name, address and TIN.
 
 ## Scheduled jobs (M-10 part 1)
@@ -49,6 +49,23 @@ Migration `20261102120000_ops_scheduled_jobs.sql` adds two `pg_cron` jobs on hos
 Each run writes a row to `ops.job_runs` with the number of subscriptions it changed. A failure is logged with its error and changes nothing. Users and the runtime role can't run the jobs or read the log. Plain PostgreSQL (CI) has no `pg_cron`, so it gets the functions without the schedule.
 
 After the migration is applied in production, check that both jobs are listed in `cron.job` (`cacu-billing-end-trials` and `cacu-billing-suspend-unpaid`).
+
+## Plan limits (TEST-209)
+
+Migration `20261102130000_plan_limits.sql` enforces three limits with triggers on the tables themselves. The browser, the accounting API and direct Data API writes all meet the same check.
+
+| Limit | General | Oga | Chairman | What counts |
+|---|---|---|---|---|
+| Users | 2 | 5 | 15 | Active members plus invitations still open. An expired invitation frees its seat until it is resent. |
+| Outlets | 1 | 2 | 5 | Active outlets. |
+| Catalogue items | 300 | 3,000 | Unlimited | Active items. Archiving an item makes room. |
+
+- Only a new or reactivated row is refused, with `PLAN_LIMIT <key>`. Accepting an invitation fills the seat the invitation already held.
+- After a downgrade, everything already there stays usable. Nothing is deactivated for the owner; they can't add more until they are under the new limit.
+- A business with no subscription and a JSON-null limit are not limited.
+- `public.business_plan` now returns `usage`, and the billing screen shows, for example, "2 of 2 users · plan limit reached".
+- The users, outlets and catalogue screens show the refusal in plain words.
+- Tests: 5 cases in `backend/tests/test_management_postgres.py`, run through the real `management_write`, invitation acceptance and the accounting catalogue path.
 
 ## Billing screen
 

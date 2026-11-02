@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { VAT_NOTE, highlights, naira, nextStep, planLine, price, returnedReference, statusOf,
+import { VAT_NOTE, highlights, naira, nextStep, planLine, price, returnedReference, statusOf, usageLines,
   type BillingInterval, type BillingInvoice, type CurrentPlan, type Plan, type PlanCode } from '@/lib/billing';
 import { getBillingAction, startCheckoutAction, verifyPaymentAction } from './actions';
 
@@ -87,6 +87,16 @@ export default function BillingPage() {
           </CardTitle>
           <CardDescription>{current.subscribed ? nextStep(current) : 'This workspace has no subscription yet.'}</CardDescription>
         </CardHeader>
+        {current.subscribed && usageLines(current).length > 0 && (
+          <CardContent>
+            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+              {usageLines(current).map(line => (
+                <div key={line.key} className="rounded-md border p-3">
+                  <dt className="text-muted-foreground">{line.label}</dt>
+                  <dd className={cn('font-semibold', line.full && 'text-amber-700')}>{line.text}{line.full && ' · plan limit reached'}</dd>
+                </div>))}
+            </dl>
+          </CardContent>)}
       </Card>
 
       <div className="flex items-center justify-between gap-4">

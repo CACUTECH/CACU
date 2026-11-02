@@ -8,7 +8,9 @@ export type SubscriptionStatus = 'trialing' | 'incomplete' | 'active' | 'past_du
 export type CurrentPlan = { subscribed: false } | {
   subscribed: true; plan: PlanCode; plan_name: string; status: SubscriptionStatus; billing_interval: BillingInterval;
   current_period_end: string | null; grace_ends_at: string | null; writes_allowed: boolean; entitlements: Entitlements;
+  usage?: Partial<Record<LimitKey, number>>;
 };
+export type LimitKey = 'users.max' | 'outlets.max' | 'catalog.max_items';
 export type BillingInvoice = { invoice: string; plan: PlanCode; billing_interval: BillingInterval; subtotal_kobo: number; vat_kobo: number;
   total_kobo: number; status: 'open' | 'paid' | 'review' | 'void'; created_at: string; paid_at: string | null; receipt: string | null };
 export type CheckoutResult = { invoice: string; reference: string; total_kobo: number; vat_kobo: number; subtotal_kobo: number; authorization_url: string };
@@ -73,6 +75,20 @@ export function highlights(entitlements: Entitlements): string[] {
   const ai = n('ai.queries_per_month');
   if (typeof ai === 'number' && ai > 0) lines.push(`${ai} AI questions a month`);
   return lines;
+}
+
+const LIMITS: [LimitKey, string][] = [['users.max', 'Users'], ['outlets.max', 'Outlets'], ['catalog.max_items', 'Catalogue items']];
+
+/** What the business uses against each counted limit. A full limit is flagged so the owner knows why adding fails. */
+export function usageLines(current: Extract<CurrentPlan, { subscribed: true }>) {
+  return LIMITS.flatMap(([key, label]) => {
+    const used = current.usage?.[key];
+    if (typeof used !== 'number') return [];
+    const limit = current.entitlements[key];
+    const capped = typeof limit === 'number';
+    const n = (value: number) => value.toLocaleString('en-NG');
+    return [{ key, label, text: capped ? `${n(used)} of ${n(limit)}` : `${n(used)} (unlimited)`, full: capped && used >= limit }];
+  });
 }
 
 /** Paystack sends the owner back with ?reference= (and ?trxref=). Only CACU subscription references are accepted. */

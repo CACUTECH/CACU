@@ -308,3 +308,87 @@ def test_invitations_are_rate_limited_per_person_and_per_business(managed):
         c.execute("UPDATE management_private.audit SET created_at=now()-interval '2 hours' WHERE created_at>now()-interval '1 hour'")
         for n in range(79):c.execute("INSERT INTO management_private.audit(business_id,actor_id,event,created_at) VALUES(%s,%s,'invitation.create',now()-interval '3 hours')",(d[1],d[2]))
     with pytest.raises(psycopg.Error,match='INVITATION_LIMIT_REACHED'):invite(22)  # a hundred a day per business
+
+
+@pytest.fixture
+def limited(managed):
+    """The managed business with plans and plan limits (TEST-209), subscribed to the given plan by subscribe()."""
+    with psycopg.connect(URL) as c:
+        c.execute("DROP SCHEMA IF EXISTS platform CASCADE;ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS business_type text NOT NULL DEFAULT 'PRODUCT'")
+        for name in ['20261102100000_platform_plans.sql','20261102130000_plan_limits.sql']:
+            c.execute(Path(f'../supabase/migrations/{name}').read_text(encoding='utf-8'))
+    return managed
+
+def subscribe(d,plan,change=False):
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.actor_kind','system',true),set_config('platform.reason','Plan limit test',true)")
+        if change:c.execute('UPDATE platform.subscriptions SET plan_code=%s WHERE business_id=%s',(plan,d[1]))
+        else:c.execute("INSERT INTO platform.subscriptions(business_id,plan_code,status) VALUES(%s,%s,'active')",(d[1],plan))
+
+def plan(d):
+    with psycopg.connect(URL) as c:
+        c.execute('SET LOCAL ROLE authenticated');c.execute("SELECT set_config('request.jwt.claims',%s,true)",(json.dumps({'sub':str(d[2])}),))
+        return c.execute('SELECT public.business_plan(%s)',(d[1],)).fetchone()[0]
+
+def accept(d,invitation,email):
+    actor=uuid4()
+    with psycopg.connect(URL) as c:c.execute('INSERT INTO auth.users VALUES(%s,%s,now())',(actor,email))
+    with psycopg.connect(URL) as c:
+        c.execute('SET LOCAL ROLE authenticated');c.execute("SELECT set_config('request.jwt.claims',%s,true)",(json.dumps({'sub':str(actor)}),))
+        c.execute('SELECT accept_business_invitation(%s)',(invitation['id'],))
+    return actor
+
+def test_general_plan_limits_outlets_and_seats_including_open_invitations(limited):
+    d=limited;subscribe(d,'BASE')
+    write(d,'location.save',{'name':'Ikorodu shop'})
+    with pytest.raises(psycopg.Error,match='PLAN_LIMIT outlets.max'):write(d,'location.save',{'name':'Second shop'})
+    first=write(d,'invitation.create',{'email':'ada@example.com','role':'viewer'})  # owner plus one open invitation: 2 of 2
+    with pytest.raises(psycopg.Error,match='PLAN_LIMIT users.max'):write(d,'invitation.create',{'email':'chidi@example.com','role':'viewer'})
+    member=accept(d,first,'ada@example.com')  # the invitation already held its seat
+    assert plan(d)['usage']=={'users.max':2,'outlets.max':1,'catalog.max_items':0}
+    write(d,'member.status',{'is_active':False},member,1)
+    second=write(d,'invitation.create',{'email':'chidi@example.com','role':'viewer'})
+    with pytest.raises(psycopg.Error,match='PLAN_LIMIT users.max'):write(d,'member.status',{'is_active':True},member,2)
+    write(d,'invitation.cancel',{},second['id'],second['version'])
+    write(d,'member.status',{'is_active':True},member,2)
+
+def test_expired_invitations_free_their_seat_until_resent(limited):
+    d=limited;subscribe(d,'BASE')
+    old=write(d,'invitation.create',{'email':'ada@example.com','role':'viewer'})
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE business_invitations SET expires_at=now()-interval '1 day' WHERE id=%s",(old['id'],))
+        c.execute("UPDATE management_private.audit SET created_at=now()-interval '2 minutes'")
+    write(d,'invitation.create',{'email':'chidi@example.com','role':'viewer'})
+    with pytest.raises(psycopg.Error,match='PLAN_LIMIT users.max'):write(d,'invitation.resend',{},old['id'],old['version'])
+
+def test_catalogue_limit_counts_active_items_and_archiving_makes_room(limited):
+    d=limited;subscribe(d,'BASE')
+    with psycopg.connect(URL) as c:
+        c.execute('SET session_replication_role=replica')  # seed 299 items without the guards
+        c.execute("INSERT INTO catalog_items(id,business_id,name,item_type,unit_price,stock_quantity) SELECT gen_random_uuid(),%s,'Item '||n,'SERVICE',100,0 FROM generate_series(1,299) n",(d[1],))
+    last=write(d,'item.save',{'name':'Indomie carton','unit_price':'9500','item_type':'SERVICE'})
+    with pytest.raises(psycopg.Error,match='PLAN_LIMIT catalog.max_items'):write(d,'item.save',{'name':'Peak milk','unit_price':'400','item_type':'SERVICE'})
+    archived=write(d,'item.save',{'is_active':False},last['id'],last['version'])
+    write(d,'item.save',{'name':'Peak milk','unit_price':'400','item_type':'SERVICE'})
+    with pytest.raises(psycopg.Error,match='PLAN_LIMIT catalog.max_items'):write(d,'item.save',{'is_active':True},last['id'],archived['version'])
+    subscribe(d,'TOP',change=True)  # Chairman: unlimited catalogue
+    write(d,'item.save',{'is_active':True},last['id'],archived['version'])
+
+def test_a_downgrade_keeps_what_exists_but_adds_nothing_past_the_new_limit(limited):
+    d=limited
+    write(d,'location.save',{'name':'Shop one'});write(d,'location.save',{'name':'Shop two'})  # unbilled: not limited
+    subscribe(d,'GROW');subscribe(d,'BASE',change=True)
+    with psycopg.connect(URL) as c:assert c.execute('SELECT count(*) FROM business_locations WHERE business_id=%s AND is_active',(d[1],)).fetchone()==(2,)
+    with pytest.raises(psycopg.Error,match='PLAN_LIMIT outlets.max'):write(d,'location.save',{'name':'Shop three'})
+    assert plan(d)['usage']['outlets.max']==2
+
+def test_catalogue_limit_reaches_the_accounting_api_in_plain_words(limited):
+    from app import CATALOG_MESSAGES
+    d=limited;subscribe(d,'BASE')
+    with psycopg.connect(URL) as c:
+        c.execute('SET session_replication_role=replica')
+        c.execute("INSERT INTO catalog_items(id,business_id,name,item_type,unit_price,stock_quantity) SELECT gen_random_uuid(),%s,'Item '||n,'SERVICE',100,0 FROM generate_series(1,300) n",(d[1],))
+    with pytest.raises(SQLAlchemyError) as refused:
+        native(d,CatalogMutation(request_key=uuid4(),operation='item.save',details={'name':'Peak milk','unit_price':'400','item_type':'SERVICE'}))
+    reason=str(refused.value.orig).splitlines()[0]
+    assert refused.value.orig.sqlstate=='P0001' and 'catalogue items' in CATALOG_MESSAGES[reason]

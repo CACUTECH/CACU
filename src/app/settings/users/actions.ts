@@ -29,7 +29,7 @@ export async function acceptInvitationAction(id: string) {
         throw new Error('Sign in with the invited email');
     const { data, error } = await client.rpc('accept_business_invitation', { p_invitation_id: id });
     if (error)
-        throw new Error(error.message);
+        throw new Error(error.message === 'PLAN_LIMIT users.max' ? 'This business has no free user seats on its plan. Ask the owner to make room or upgrade.' : error.message);
     await selectBusinessAction(data);
     return data as string;
 }
