@@ -31,16 +31,16 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`} suppressHydrationWarning>
       <body className="font-body antialiased" suppressHydrationWarning>
         <ThemeProvider>
-          <SubscriptionProvider>
-            <BusinessProvider>
+          <BusinessProvider>
+            <SubscriptionProvider>
               <ErrorBoundary>
                 <AppLayout>
                   {children}
                 </AppLayout>
               </ErrorBoundary>
               <Toaster />
-            </BusinessProvider>
-          </SubscriptionProvider>
+            </SubscriptionProvider>
+          </BusinessProvider>
         </ThemeProvider>
       </body>
     </html>

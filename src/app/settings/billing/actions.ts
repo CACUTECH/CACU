@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { AccountingRequestError, accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
-import { isCheckoutUrl, type BillingInterval, type BillingInvoice, type CheckoutResult, type CurrentPlan, type Plan, type PlanCode, type ScheduleResult, type VerifyOutcome } from '@/lib/billing';
+import { isCheckoutUrl, type BillingInterval, type BillingInvoice, type CheckoutResult, type CurrentPlan, type Plan, type PlanCode, type Quote, type ScheduleResult, type VerifyOutcome } from '@/lib/billing';
 
 type Result<T> = { success: true; data: T } | { success: false; error: string };
 const failed = (error: unknown, fallback: string) => ({ success: false as const,
@@ -22,6 +22,16 @@ export async function getBillingAction(manager: boolean): Promise<Result<{ plans
   } catch {
     return { success: false, error: 'Billing details are unavailable. Refresh and try again.' };
   }
+}
+
+/** The active business's plan only, for the app-wide banner and feature gates. */
+export async function getCurrentPlanAction(): Promise<Result<CurrentPlan>> {
+  try {
+    const supabase = await createClient(); const businessId = await getActiveBusinessIdAction();
+    const { data, error } = await supabase.rpc('business_plan', { p_business_id: businessId });
+    if (error || !data) throw new Error('unavailable');
+    return { success: true, data: data as CurrentPlan };
+  } catch { return { success: false, error: 'Billing details are unavailable.' }; }
 }
 
 export async function startCheckoutAction(input: { request_key: string; plan: PlanCode; interval: BillingInterval }): Promise<Result<CheckoutResult>> {
@@ -50,9 +60,24 @@ export async function removeCardAction(): Promise<Result<null>> {
   } catch { return { success: false, error: 'The card was not removed. Try again.' }; }
 }
 
-export async function schedulePlanAction(plan: PlanCode): Promise<Result<ScheduleResult>> {
+export async function quoteAction(plan: PlanCode, interval: BillingInterval): Promise<Result<Quote>> {
   try {
-    const data = await accountingRequest<ScheduleResult>('billing/schedule', { method: 'POST', body: { plan } });
+    const supabase = await createClient(); const businessId = await getActiveBusinessIdAction();
+    const { data, error } = await supabase.rpc('billing_quote', { p_business_id: businessId, p_plan: plan, p_interval: interval });
+    if (error || !data) return { success: false, error: QUOTE_REFUSALS[error?.message ?? ''] ?? 'The price could not be worked out. Refresh and try again.' };
+    return { success: true, data: data as Quote };
+  } catch { return { success: false, error: 'The price could not be worked out. Refresh and try again.' }; }
+}
+const QUOTE_REFUSALS: Record<string, string> = {
+  BILLING_RENEW_FIRST: 'This period ends within a day. Renew first, then change plan.',
+  BILLING_DOWNGRADE_IS_SCHEDULED: 'A move to a smaller plan is scheduled for the end of the period, not paid now.',
+  BILLING_INTERVAL_CHANGES_AT_RENEWAL: 'Switching from yearly to monthly is scheduled for the end of the year, not paid now.',
+  'PLAN_LIMIT module.modes': 'Hybrid mode is on the Chairman Plan only. Switch to Products or Services first.',
+};
+
+export async function schedulePlanAction(plan: PlanCode, interval?: BillingInterval): Promise<Result<ScheduleResult>> {
+  try {
+    const data = await accountingRequest<ScheduleResult>('billing/schedule', { method: 'POST', body: interval ? { plan, interval } : { plan } });
     revalidatePath('/settings/billing');
     return { success: true, data };
   } catch (error) { return failed(error, 'The plan change was not saved. Try again.'); }

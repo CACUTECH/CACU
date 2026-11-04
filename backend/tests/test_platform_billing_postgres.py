@@ -41,7 +41,7 @@ def database(monkeypatch):
         for name in ('20261012132427_guarded_ai_chat.sql', '20261102090100_ai_active_members.sql',
                      '20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql',
                      '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql', '20261102150000_renewals.sql',
-                     '20261104090000_ai_plan_quota.sql'):
+                     '20261104090000_ai_plan_quota.sql', '20261104100000_interval_changes.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -341,7 +341,6 @@ def test_only_upgrades_on_the_same_interval_are_paid_mid_period(gateway):
     checkout = lambda actor=owner, **kw: service.checkout(ident, actor, Checkout(request_key=uuid4(), **kw))
     assert refusal(lambda: checkout(plan='GROW'))[0] == 409
     assert 'scheduled' in refusal(lambda: checkout(plan='BASE'))[1]
-    assert 'monthly and yearly' in refusal(lambda: checkout(plan='TOP', interval='annual'))[1]
     assert refusal(lambda: checkout(editor, plan='TOP'))[0] == 403
     activate(ident, 'GROW', start='29 days 20 hours', end='4 hours')
     assert 'Renew first' in refusal(lambda: checkout(plan='TOP'))[1]
@@ -546,3 +545,58 @@ def test_the_renewal_operator_reports_counts_only(gateway, capsys):
     out = capsys.readouterr().out
     assert json.loads(out) == {'mode': 'apply', 'status': 'ok', 'due': 1, 'activated': 1, 'declined': 0, 'pending': 0}
     assert 'AUTH_' not in out and 'ada@' not in out
+
+
+def quote(ident, actor, plan, interval):
+    with psycopg.connect(URL) as c:
+        c.execute('SET LOCAL ROLE authenticated')
+        c.execute("SELECT set_config('request.jwt.claims',%s,true)", (json.dumps({'sub': str(actor)}),))
+        return c.execute('SELECT public.billing_quote(%s,%s,%s)', (ident, plan, interval)).fetchone()[0]
+
+
+@pytest.mark.parametrize('plan,subtotal', [('GROW', 5600000), ('TOP', 14600000)])
+def test_monthly_to_yearly_is_paid_now_less_the_unused_month_and_starts_a_year(gateway, plan, subtotal):  # SUB-07
+    ident, owner, _ = business()
+    activate(ident, 'GROW')
+    # Yearly price less the unused 20 of 30 days of Oga monthly (₦4,000), plus VAT; quoted before payment (SUB-R05).
+    shown = quote(ident, owner, plan, 'annual')
+    assert (shown['subtotal_kobo'], shown['credit_kobo'], shown['vat_kobo']) == (subtotal, 400000, subtotal * 75 // 1000)
+    invoice = service.checkout(ident, owner, Checkout(request_key=uuid4(), plan=plan, interval='annual'))
+    assert (invoice['kind'], invoice['total_kobo']) == ('upgrade', shown['total_kobo'])
+    gateway.pay(invoice)
+    assert service.verify_return(ident, owner, Verification(reference=invoice['reference']))['outcome'] == 'activated'
+    plan_code, status, start, end, _, interval = subscription(ident)
+    assert (plan_code, status, interval) == (plan, 'active', 'annual') and end.year == start.year + 1 and start.isoformat().startswith('2026-11-02T10:00')
+
+
+def test_yearly_to_monthly_waits_for_the_end_of_the_year_and_renews_monthly(gateway):
+    ident, owner, _ = business()
+    activate(ident, 'GROW', start='300 days', end='2 days', interval='annual')
+    assert 'end of the year' in refusal(lambda: service.checkout(ident, owner, Checkout(request_key=uuid4(), plan='GROW')))[1]
+    scheduled = service.schedule(ident, owner, PlanChange(plan='GROW', interval='monthly'))
+    assert (scheduled['scheduled_plan'], scheduled['scheduled_interval']) == (None, 'monthly')
+    assert plan_as(ident, owner)['scheduled_interval'] == 'monthly'
+    renewals()
+    assert open_renewal(ident)[:3][0::2] == ('GROW', 645000)  # one month of Oga, not a year
+    assert service.schedule(ident, owner, PlanChange(plan='GROW', interval='annual'))['scheduled_interval'] is None  # cancelled
+    assert open_renewal(ident) is None and renewals() == 1 and open_renewal(ident)[2] == 6450000
+    service.schedule(ident, owner, PlanChange(plan='BASE'))  # General has no yearly price: it renews monthly
+    assert renewals() == 1 and open_renewal(ident)[0::2] == ('BASE', 161250)
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT platform.end_periods(now()+interval '3 days')")
+    plan, status, _, _, _, interval = subscription(ident)
+    assert (plan, status, interval) == ('BASE', 'past_due', 'monthly')
+    with psycopg.connect(URL) as c:
+        reasons = [r for (r,) in c.execute('SELECT reason FROM platform.subscription_changes WHERE business_id=%s ORDER BY id', (ident,))]
+    assert 'Switch to monthly billing scheduled for the end of the period' in reasons
+
+
+def test_quotes_are_for_owners_and_admins_and_refuse_what_checkout_refuses(gateway):
+    ident, owner, editor = business()
+    activate(ident, 'TOP')
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        quote(ident, editor, 'TOP', 'annual')
+    with pytest.raises(psycopg.errors.RaiseException, match='BILLING_DOWNGRADE_IS_SCHEDULED'):
+        quote(ident, owner, 'GROW', 'annual')  # a smaller plan, even yearly, is scheduled
+    assert 'checkout' in refusal(lambda: service.schedule(ident, owner, PlanChange(plan='TOP', interval='annual')))[1]
+    assert service.schedule(ident, owner, PlanChange(plan='GROW', interval='annual'))['scheduled_interval'] == 'annual'

@@ -1,5 +1,6 @@
 'use client';
 import { isApprovedPreview } from "@/lib/upload-policy";
+import { BillingBanner } from '@/components/billing-banner';
 
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -278,6 +279,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarInset>
         <Header />
         <main className="p-4 lg:p-8 flex-1 overflow-auto bg-muted/5 pb-20 lg:pb-8">
+          <BillingBanner />
           {children}
         </main>
         <MobileNav />

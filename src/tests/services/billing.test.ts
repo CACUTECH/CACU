@@ -1,5 +1,5 @@
-import { cardLine, highlights, isCheckoutUrl, naira, nextStep, overLimitNotes, planAction, price, renewalLine, returnedReference, usageLines, type CurrentPlan, type Plan } from '@/lib/billing';
-import { getBillingAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
+import { bannerFor, cardLine, quoteLine, highlights, isCheckoutUrl, naira, nextStep, overLimitNotes, planAction, price, renewalLine, returnedReference, usageLines, type CurrentPlan, type Plan } from '@/lib/billing';
+import { getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { AccountingRequestError, accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
 
@@ -46,14 +46,31 @@ test('an active plan upgrades on its interval, schedules smaller plans and can c
   const current = { subscribed: true as const, plan: 'GROW' as const, plan_name: 'Oga', status: 'active' as const, billing_interval: 'monthly' as const,
     current_period_end: '2026-12-02T10:00:00Z', grace_ends_at: null, writes_allowed: true, entitlements: {}, scheduled_plan: null };
   expect(planAction(current, chairman, 'monthly')).toMatchObject({ kind: 'upgrade', label: 'Upgrade to Chairman' });
-  expect(planAction(current, chairman, 'annual')).toEqual({ kind: 'none', label: 'Switch to yearly at renewal' });
+  expect(planAction(current, chairman, 'annual')).toMatchObject({ kind: 'upgrade', label: 'Upgrade to Chairman yearly' });
+  expect(planAction(current, oga, 'annual')).toMatchObject({ kind: 'upgrade', label: 'Switch to yearly' });
   expect(planAction(current, oga, 'monthly')).toEqual({ kind: 'current', label: 'Current plan' });
   expect(planAction(current, general, 'monthly')).toMatchObject({ kind: 'schedule', label: 'Move to General on 2 Dec 2026' });
-  expect(planAction({ ...current, scheduled_plan: 'BASE' }, general, 'monthly')).toMatchObject({ kind: 'cancel', note: 'Moving to General on 2 Dec 2026.' });
+  expect(planAction({ ...current, scheduled_plan: 'BASE' }, general, 'monthly')).toMatchObject({ kind: 'cancel', note: 'Move to General on 2 Dec 2026 is scheduled.' });
   expect(nextStep({ ...current, scheduled_plan: 'BASE' })).toBe('Paid until 2 Dec 2026. You move to the General Plan then.');
   const trial: CurrentPlan = { ...current, status: 'trialing' };
   expect([planAction(trial, general, 'monthly'), planAction(trial, general, 'annual')]).toEqual([
     { kind: 'checkout', label: 'Choose General' }, { kind: 'none', label: 'Choose General' }]);
+});
+
+test('a yearly plan switches to monthly at the end of the year, and the quote shows credit and VAT (SUB-07, SUB-R05)', () => {
+  const chairman: Plan = { ...oga, code: 'TOP', name: 'Chairman' };
+  const yearly = { subscribed: true as const, plan: 'GROW' as const, plan_name: 'Oga', status: 'active' as const, billing_interval: 'annual' as const,
+    current_period_end: '2027-11-02T10:00:00Z', grace_ends_at: null, writes_allowed: true, entitlements: {}, scheduled_plan: null, scheduled_interval: null };
+  expect(planAction(yearly, oga, 'annual')).toEqual({ kind: 'current', label: 'Current plan' });
+  expect(planAction(yearly, oga, 'monthly')).toMatchObject({ kind: 'schedule', label: 'Switch to monthly on 2 Nov 2027' });
+  expect(planAction(yearly, chairman, 'monthly')).toEqual({ kind: 'none', label: 'Available when your year ends' });
+  expect(planAction({ ...yearly, scheduled_interval: 'monthly' }, oga, 'monthly')).toMatchObject({ kind: 'cancel', label: 'Keep my current plan' });
+  expect(nextStep({ ...yearly, scheduled_plan: 'BASE', scheduled_interval: 'monthly' }))
+    .toBe('Paid until 2 Nov 2027. You move to the General Plan and switch to monthly billing then.');
+  expect(quoteLine({ kind: 'upgrade', subtotal_kobo: 5600000, vat_kobo: 420000, total_kobo: 6020000, credit_kobo: 400000, period_end: null }))
+    .toBe('Pay ₦60,200 now: ₦56,000 + ₦4,200 VAT, after ₦4,000 for your unused days.');
+  expect(quoteLine({ kind: 'upgrade', subtotal_kobo: 600000, vat_kobo: 45000, total_kobo: 645000, credit_kobo: null, period_end: null }))
+    .toBe('Pay ₦6,450 now: ₦6,000 + ₦450 VAT.');
 });
 
 test('a scheduled downgrade explains what is over the new limits', () => {
@@ -139,4 +156,31 @@ test('server failures while verifying never claim the payment failed', async () 
   (accountingRequest as jest.Mock).mockRejectedValueOnce(new AccountingRequestError('Accounting request failed (502)', 502));
   await expect(verifyPaymentAction(REFERENCE)).resolves.toEqual({ success: false,
     error: 'We could not confirm the payment yet. Refresh in a minute; it will show once Paystack confirms it.' });
+});
+
+test('quotes come from the database for the active business and refusals read in plain words', async () => {
+  const rpc = client({ billing_quote: { data: { kind: 'upgrade', subtotal_kobo: 1, vat_kobo: 0, total_kobo: 1, credit_kobo: null, period_end: null }, error: null } });
+  await expect(quoteAction('TOP', 'annual')).resolves.toMatchObject({ success: true });
+  expect(rpc).toHaveBeenCalledWith('billing_quote', { p_business_id: 'active-business', p_plan: 'TOP', p_interval: 'annual' });
+  client({ billing_quote: { data: null, error: { message: 'BILLING_RENEW_FIRST' } } });
+  await expect(quoteAction('TOP', 'monthly')).resolves.toEqual({ success: false, error: 'This period ends within a day. Renew first, then change plan.' });
+  client({ billing_quote: { data: null, error: { message: 'something internal' } } });
+  await expect(quoteAction('TOP', 'monthly')).resolves.toEqual({ success: false, error: 'The price could not be worked out. Refresh and try again.' });
+});
+
+test('the app-wide banner reminds near the trial end, asks for payment in grace and explains read-only (SUB-09)', () => {
+  const now = new Date('2026-11-12T10:00:00Z');
+  const base = { subscribed: true as const, plan: 'GROW' as const, plan_name: 'Oga', billing_interval: 'monthly' as const,
+    grace_ends_at: null, writes_allowed: true, entitlements: {} };
+  expect(bannerFor({ ...base, status: 'trialing', current_period_end: '2026-11-20T10:00:00Z' }, now)).toBeNull();
+  expect(bannerFor({ ...base, status: 'trialing', current_period_end: '2026-11-16T10:00:00Z' }, now))
+    .toEqual({ tone: 'info', text: 'Your free Oga trial ends on 16 Nov 2026. Choose a plan to keep its features.', action: 'choose' });
+  expect(bannerFor({ ...base, plan: 'BASE', plan_name: 'General', status: 'incomplete', current_period_end: '2026-11-16T10:00:00Z', grace_ends_at: '2026-11-23T10:00:00Z' }, now))
+    .toEqual({ tone: 'warn', text: 'Payment due. Pay by 23 Nov 2026 to keep full access.', action: 'pay' });
+  expect(bannerFor({ ...base, status: 'suspended', current_period_end: null, writes_allowed: false }, now)?.text).toBe('Your workspace is read-only until you pay. Nothing has been deleted.');
+  expect(bannerFor({ ...base, status: 'active', current_period_end: '2026-12-02T10:00:00Z' }, now)).toBeNull();
+  expect(bannerFor({ ...base, status: 'active', current_period_end: '2026-12-02T10:00:00Z',
+    renewal: { invoice: 'CACU-INV-000009', plan: 'GROW', billing_interval: 'monthly', total_kobo: 645000, due_at: '2026-12-02T10:00:00Z', last_failure: 'Insufficient Funds' } }, now))
+    .toMatchObject({ tone: 'warn', action: 'pay' });
+  expect(bannerFor({ subscribed: false })).toBeNull();
 });

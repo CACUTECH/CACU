@@ -1275,6 +1275,8 @@ export interface components {
              * @enum {string}
              */
             plan: "BASE" | "GROW" | "TOP";
+            /** Interval */
+            interval?: ("monthly" | "annual") | null;
         };
         /** Policy */
         Policy: {

@@ -79,6 +79,11 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** For components that also render outside a BusinessProvider (signed out, tests): null there. */
+export function useOptionalBusiness() {
+  return useContext(BusinessContext) ?? null;
+}
+
 export function useBusiness() {
   const context = useContext(BusinessContext);
   if (!context) throw new Error('useBusiness must be used within a BusinessProvider');
