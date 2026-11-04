@@ -36,7 +36,6 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 
 ## Not yet
 
-- **Owner notifications** for renewals and declined cards (email, WhatsApp). Today they show on the billing screen only.
 - **Downgrade choices:** before a downgrade applies, Doc 14 has the owner choose which users and outlets stay active. Today nothing is deactivated; the owner just can't add more while over the limit.
 - **Message counter:** `messages.per_month` waits until CACU sends email or WhatsApp messages; nothing sends any yet.
 
@@ -139,6 +138,26 @@ Migration `20261104100000_interval_changes.sql`.
   - on a receipt, how it was paid.
 - **How it works:** the PDF is drawn in the browser (`src/lib/billing-pdf.ts`, using the existing `jspdf`) from `public.business_billing_history`, which now also returns the VAT rate, the period and the payment channel (migration `20261104110000_billing_history_details.sql`). Amounts print as NGN because the PDF's built-in fonts have no naira sign.
 - **Tests:** Jest document and screen tests; the history fields are checked in `test_platform_billing_postgres.py`.
+
+## Billing reminders by email and SMS (SUB-04, SUB-08 to SUB-10)
+
+Migration `20261104120000_billing_notifications.sql`, `backend/cacu/billing/notify.py`, the operator `backend/tools/send_notifications.py` and the workflow `.github/workflows/billing-notifications.yml`. Providers, chosen by the owner on 4 November 2026: **Resend** for email and **Termii** for SMS or WhatsApp.
+
+- **What is queued:** `platform.queue_notifications()` runs hourly at :47 (`cacu-billing-queue-notifications`). It adds each reminder once per channel to `platform.notifications`:
+  - the trial ending, 4 days and 1 day before;
+  - a renewal invoice issued, saying whether the saved card will be charged;
+  - each declined card charge;
+  - payment due during grace;
+  - read-only after suspension.
+- **Who receives them:** emails go to the business's active owners. SMS goes to the business phone from setup, normalised to `234…`; a number that can't be read is skipped.
+- **Sending:** the operator claims a batch and sends it. A failure retries after an hour, up to three attempts. A reminder more than three days old is dropped rather than sent late. A channel without its keys stays queued. Emails use an idempotency key, so a retry is not delivered twice. SMS shows amounts as NGN, because the naira sign makes a costlier unicode SMS.
+- **Turning it on:** the workflow runs hourly at :52 and is off until `CACU_BILLING_NOTIFICATIONS_ENABLED` is `true`. It needs these in the `billing-operations` environment:
+  - secrets: `CACU_DATABASE_URL`, `RESEND_API_KEY`, `TERMII_API_KEY`;
+  - variables: `CACU_EMAIL_FROM` (on a domain verified in Resend), `TERMII_SENDER_ID` (approved by Termii), `CACU_APP_URL`, and optionally `TERMII_CHANNEL` (`generic`, `dnd` or `whatsapp`) and `TERMII_BASE_URL`.
+- **Privacy:** reports print counts only. No addresses, numbers or message text are logged.
+- **Tests:** 6 cases in `test_platform_billing_postgres.py`, with Resend and Termii replaced by stand-ins.
+
+After applying in production, check that `cron.job` also lists `cacu-billing-queue-notifications`.
 
 ## Billing screen
 
