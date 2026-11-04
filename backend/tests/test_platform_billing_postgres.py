@@ -25,7 +25,7 @@ def database(monkeypatch):
     parsed = urlparse(URL)
     assert parsed.hostname in {'127.0.0.1', 'localhost'} and parsed.path.endswith('_test')
     with psycopg.connect(URL) as c:
-        c.execute("""DROP SCHEMA IF EXISTS ops CASCADE; DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA IF EXISTS auth CASCADE;
+        c.execute("""DROP SCHEMA IF EXISTS ai_private CASCADE; DROP SCHEMA IF EXISTS ops CASCADE; DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA IF EXISTS auth CASCADE;
           DROP SCHEMA public CASCADE; CREATE SCHEMA public; CREATE SCHEMA auth;
           DO $$ DECLARE r text; BEGIN FOREACH r IN ARRAY ARRAY['anon','authenticated','cacu_runtime'] LOOP
             IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname=r) THEN EXECUTE format('CREATE ROLE %I NOLOGIN', r); END IF; END LOOP; END $$;
@@ -38,8 +38,10 @@ def database(monkeypatch):
           CREATE TABLE public.catalog_items(business_id uuid, is_active boolean);
           GRANT USAGE ON SCHEMA public, auth TO authenticated, anon, cacu_runtime;
           GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, anon;""")
-        for name in ('20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql',
-                     '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql', '20261102150000_renewals.sql'):
+        for name in ('20261012132427_guarded_ai_chat.sql', '20261102090100_ai_active_members.sql',
+                     '20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql',
+                     '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql', '20261102150000_renewals.sql',
+                     '20261104090000_ai_plan_quota.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -439,6 +441,7 @@ def test_a_paid_card_is_saved_shown_to_managers_only_and_can_be_removed(gateway)
     paid_with_card(gateway, ident, owner)
     assert plan_as(ident, owner)['card'] == {'card_type': 'visa', 'bank': 'TEST BANK', 'last4': '4081', 'exp_month': '12', 'exp_year': '2030'}
     assert plan_as(ident, editor)['card'] is None
+    assert plan_as(ident, editor)['usage'] == {'users.max': 2, 'outlets.max': 0, 'catalog.max_items': 0, 'ai.queries_per_month': 0}
     for role in ('authenticated', 'cacu_runtime'):
         assert count("SELECT has_table_privilege(%s, 'platform.payment_methods', 'SELECT')", role) is False
     with psycopg.connect(URL) as c:

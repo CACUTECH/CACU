@@ -16,6 +16,7 @@ function AssistantPanel({ businessId }: { businessId?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState('');
+  const [allowance, setAllowance] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [question, setQuestion] = useState('');
@@ -31,7 +32,7 @@ function AssistantPanel({ businessId }: { businessId?: string }) {
     if (isOpen && businessId) {
       setChecking(true); setReady(false);
       void getAIChatStatusAction(businessId).then(result => {
-        if (active) { setReady(result.ready); setStatus(result.message); }
+        if (active) { setReady(result.ready); setStatus(result.message); setAllowance(result.allowance ?? null); }
       }).catch(() => { if (active) setStatus('AI setup could not be checked. Close and reopen to retry.'); })
         .finally(() => { if (active) setChecking(false); });
     }
@@ -49,8 +50,11 @@ function AssistantPanel({ businessId }: { businessId?: string }) {
       if (result.ok) {
         setMessages(previous => [...previous.slice(-4), { question: original.question, answer: result.answer }]);
         attempt.current = null; setHasAttempt(false); setQuestion('');
+        if (result.allowance !== undefined) setAllowance(result.allowance);
       } else {
         setError(result.message);
+        // Refused before anything was recorded: this question can be dropped rather than retried.
+        if (result.code === 'plan_limit') { attempt.current = null; setHasAttempt(false); }
         if (result.code === 'access_denied' || result.code === 'unavailable') {
           setReady(false); setStatus(result.message); setMessages([]);
         }
@@ -74,6 +78,7 @@ function AssistantPanel({ businessId }: { businessId?: string }) {
         <p className="mt-4 text-sm text-muted-foreground">No financial or employee records or page contents are read. AI answers may be inaccurate; review them before acting.</p>
         {ready && <>
           <p className="text-sm text-muted-foreground">Your question is sent to OpenAI. Do not include personal or confidential records.</p>
+          {allowance && <p role="status" className="text-sm font-medium">{allowance}</p>}
           <div role="log" aria-label="AI conversation" aria-live="polite" className="flex-1 space-y-4 min-h-12">
             {messages.map((message, index) => <div key={index} className="space-y-2 text-sm break-words">
               <p className="rounded-lg bg-muted p-3 whitespace-pre-wrap">{message.question}</p>

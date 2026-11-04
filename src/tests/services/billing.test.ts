@@ -34,6 +34,10 @@ test('usage shows each counted limit and flags a full one', () => {
   expect(usageLines(current).map(({ label, text, full }) => [label, text, full])).toEqual([
     ['Users', '2 of 2', true], ['Outlets', '0 of 1', false], ['Catalogue items', '1,250 (unlimited)', false]]);
   expect(usageLines({ ...current, usage: undefined })).toEqual([]);
+  const general = { ...current, entitlements: { ...current.entitlements, 'ai.queries_per_month': 0 }, usage: { ...current.usage, 'ai.queries_per_month': 0 } };
+  expect(usageLines(general).at(-1)).toEqual({ key: 'ai.queries_per_month', label: 'AI questions this month', text: 'Not on this plan', full: false });
+  const oga = { ...current, entitlements: { ...current.entitlements, 'ai.queries_per_month': 100 }, usage: { ...current.usage, 'ai.queries_per_month': 100 } };
+  expect(usageLines(oga).at(-1)).toMatchObject({ text: '100 of 100', full: true });
 });
 
 test('an active plan upgrades on its interval, schedules smaller plans and can cancel the schedule', () => {

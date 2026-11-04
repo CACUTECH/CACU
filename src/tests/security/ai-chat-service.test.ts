@@ -120,3 +120,29 @@ test('missing database migration prevents availability from being advertised', a
   expect((await new AIChatService().status(businessId)).ready).toBe(false);
   expect(generateOpenAIText).not.toHaveBeenCalled();
 });
+
+test('a question at the monthly limit is refused with zero remaining and never reaches the provider (TEST-210)', async () => {
+  const client = await prepare();
+  client.rpc.mockImplementation(async (name: string) => name === 'reserve_ai_chat'
+    ? { data: null, error: { message: 'AI_MONTHLY_LIMIT', code: 'P0001' } }
+    : { data: { billed: true, limit: 100, used: 100, remaining: 0, resets_at: '2026-11-30T23:00:00Z' }, error: null });
+  expect(await new AIChatService().ask(input)).toEqual({ ok: false, code: 'plan_limit',
+    message: "You've used all 100 AI questions on your plan this month (0 left). They reset on 1 Dec 2026. Upgrade in Billing for more." });
+  expect(generateOpenAIText).not.toHaveBeenCalled();
+  expect(client.rpc.mock.calls.map((call: unknown[]) => call[0])).toEqual(['reserve_ai_chat', 'get_ai_chat_quota']);
+});
+test('a suspended workspace is told why, and nothing is sent', async () => {
+  const client = await prepare();
+  client.rpc.mockImplementation(async () => ({ data: null, error: { message: 'AI_PLAN_SUSPENDED', code: 'P0001' } }));
+  expect(await new AIChatService().ask(input)).toEqual(expect.objectContaining({ ok: false, code: 'plan_limit', message: expect.stringContaining('read-only until the subscription is paid') }));
+  expect(generateOpenAIText).not.toHaveBeenCalled();
+});
+test('an answer returns the allowance left, and a plan without AI is not offered the chat', async () => {
+  const client = await prepare();
+  client.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === 'reserve_ai_chat' ? { reserved: true, status: 'reserved', remaining: 36 }
+    : name === 'get_ai_chat_quota' ? { billed: true, limit: 100, used: 64, remaining: 36, resets_at: '2026-11-30T23:00:00Z' } : true }));
+  expect(await new AIChatService().ask(input)).toEqual(expect.objectContaining({ ok: true, allowance: '36 of 100 AI questions left this month. Resets on 1 Dec 2026.' }));
+  client.from.mockReturnValueOnce(query({ business_id: businessId, role: 'owner' }));
+  client.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === 'get_ai_chat_quota' ? { billed: true, limit: 0, used: 0, remaining: 0, resets_at: '2026-11-30T23:00:00Z' } : true }));
+  expect(await new AIChatService().status(businessId)).toEqual({ ready: false, message: 'AI questions are on the Oga and Chairman Plans. Upgrade in Billing to use them.' });
+});

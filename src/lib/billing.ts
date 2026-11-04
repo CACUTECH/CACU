@@ -13,7 +13,7 @@ export type CurrentPlan = { subscribed: false } | {
 };
 export type SavedCard = { card_type: string | null; bank: string | null; last4: string | null; exp_month: string | null; exp_year: string | null };
 export type Renewal = { invoice: string; plan: PlanCode; billing_interval: BillingInterval; total_kobo: number; due_at: string; last_failure: string | null };
-export type LimitKey = 'users.max' | 'outlets.max' | 'catalog.max_items';
+export type LimitKey = 'users.max' | 'outlets.max' | 'catalog.max_items' | 'ai.queries_per_month';
 export type BillingInvoice = { invoice: string; plan: PlanCode; billing_interval: BillingInterval; subtotal_kobo: number; vat_kobo: number;
   total_kobo: number; status: 'open' | 'paid' | 'review' | 'void'; created_at: string; paid_at: string | null; receipt: string | null; kind?: 'subscription' | 'upgrade' | 'renewal' };
 export type CheckoutResult = { invoice: string; reference: string; total_kobo: number; vat_kobo: number; subtotal_kobo: number; authorization_url: string };
@@ -85,7 +85,7 @@ export function highlights(entitlements: Entitlements): string[] {
   return lines;
 }
 
-const LIMITS: [LimitKey, string][] = [['users.max', 'Users'], ['outlets.max', 'Outlets'], ['catalog.max_items', 'Catalogue items']];
+const LIMITS: [LimitKey, string][] = [['users.max', 'Users'], ['outlets.max', 'Outlets'], ['catalog.max_items', 'Catalogue items'], ['ai.queries_per_month', 'AI questions this month']];
 
 /** What the business uses against each counted limit. A full limit is flagged so the owner knows why adding fails. */
 export function usageLines(current: Extract<CurrentPlan, { subscribed: true }>) {
@@ -94,6 +94,7 @@ export function usageLines(current: Extract<CurrentPlan, { subscribed: true }>) 
     if (typeof used !== 'number') return [];
     const limit = current.entitlements[key];
     const capped = typeof limit === 'number';
+    if (limit === 0) return [{ key, label, text: 'Not on this plan', full: false }];
     const n = (value: number) => value.toLocaleString('en-NG');
     return [{ key, label, text: capped ? `${n(used)} of ${n(limit)}` : `${n(used)} (unlimited)`, full: capped && used >= limit }];
   });
@@ -118,7 +119,7 @@ export function planAction(current: CurrentPlan, plan: Plan, period: BillingInte
   return { kind: 'schedule', label: `Move to ${name} on ${end}`, note: 'No charge now. Your current plan runs until then.' };
 }
 
-const LIMIT_NOUN: Record<LimitKey, string> = { 'users.max': 'users', 'outlets.max': 'outlets', 'catalog.max_items': 'catalogue items' };
+const LIMIT_NOUN: Record<LimitKey, string> = { 'users.max': 'users', 'outlets.max': 'outlets', 'catalog.max_items': 'catalogue items', 'ai.queries_per_month': 'AI questions a month' };
 
 /** The saved card in an owner's words, e.g. "Visa ending 4081, expires 12/2030". */
 export function cardLine(card: SavedCard) {
