@@ -41,7 +41,8 @@ def database(monkeypatch):
         for name in ('20261012132427_guarded_ai_chat.sql', '20261102090100_ai_active_members.sql',
                      '20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql',
                      '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql', '20261102150000_renewals.sql',
-                     '20261104090000_ai_plan_quota.sql', '20261104100000_interval_changes.sql'):
+                     '20261104090000_ai_plan_quota.sql', '20261104100000_interval_changes.sql',
+                     '20261104110000_billing_history_details.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -252,6 +253,9 @@ def test_owners_see_their_billing_history_and_others_see_nothing(gateway):
             return c.execute('SELECT public.business_billing_history(%s)', (ident,)).fetchone()[0]
     rows = history(owner)
     assert [(r['invoice'], r['receipt'], r['total_kobo'], r['status']) for r in rows] == [('CACU-INV-000001', 'CACU-RCT-000001', 6450000, 'paid')]
+    # What the PDF invoice and receipt print (SUB-14).
+    assert (rows[0]['vat_rate_bps'], rows[0]['channel'], rows[0]['receipt_amount_kobo'], rows[0]['kind'], rows[0]['billing_interval']) == \
+        (750, 'card', 6450000, 'subscription', 'annual')
     for outsider in (editor, uuid4()):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             history(outsider)

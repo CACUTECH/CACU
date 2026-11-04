@@ -37,6 +37,36 @@ test('mobile product creation retries the original opening stock request', async
     expect(attempts[0]).toMatchObject({ operation: 'item.save', details: { opening_quantity: 5, unit_price: '150.50' } });
 });
 
+test('a delayed catalog load preserves an unconfirmed product save alert', async ({ mount, page }) => {
+    await page.clock.install();
+    await page.clock.pauseAt(new Date());
+    await page.route('**/test/catalog?*', route => route.fulfill({ json: { data: [], total: 0 } }));
+    const attempts: unknown[] = [];
+    await page.route('**/test/catalog-mutation', route => {
+        attempts.push(route.request().postDataJSON());
+        return attempts.length === 1
+            ? route.fulfill({ status: 502, contentType: 'text/plain', body: 'Upstream response unavailable' })
+            : route.fulfill({ json: { success: true, data: {} } });
+    });
+    await mount(<CatalogWorkspace />);
+    await page.getByRole('button', { name: 'Add product', exact: true }).click();
+    await page.getByLabel('Name', { exact: true }).fill('Product awaiting confirmation');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    const alert = page.getByRole('dialog').getByRole('alert');
+    await expect(alert).toContainText('Response unavailable');
+    // Start the initial debounced catalog load after the mutation has failed.
+    const loaded = page.waitForResponse('**/test/catalog?*');
+    await page.clock.runFor(300);
+    await loaded;
+    await expect(page.getByRole('status').filter({ hasText: 'Loading catalog' })).toHaveCount(0);
+    await expect(alert).toContainText('Response unavailable');
+    await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Retry original request' }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]).toEqual(attempts[0]);
+});
+
 test('services have rates and billing units without product stock inputs', async ({ mount, page }) => {
     await page.route('**/test/catalog?*', route => route.fulfill({ json: { data: [], total: 0 } }));
     await mount(<CatalogWorkspace />);

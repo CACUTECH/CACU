@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { VAT_NOTE, quoteLine, cardLine, highlights, naira, nextStep, overLimitNotes, planAction, planLine, price, renewalLine, returnedReference, statusOf, usageLines,
   type BillingInterval, type BillingInvoice, type CurrentPlan, type Plan, type PlanCode, type Quote } from '@/lib/billing';
+import { invoiceDocument, receiptDocument, savePdf } from '@/lib/billing-pdf';
 import { getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from './actions';
 
 type State = { plans: Plan[]; current: CurrentPlan; history: BillingInvoice[] | null };
@@ -218,7 +219,7 @@ export default function BillingPage() {
             {history.length === 0 ? <p className="text-sm text-muted-foreground">No CACU invoices yet.</p> : (
               <Table>
                 <TableHeader><TableRow><TableHead>Invoice</TableHead><TableHead>Plan</TableHead><TableHead className="text-right">VAT</TableHead>
-                  <TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead>Receipt</TableHead></TableRow></TableHeader>
+                  <TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead>Receipt</TableHead><TableHead>PDF</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {history.map(row => (
                     <TableRow key={row.invoice}>
@@ -228,6 +229,12 @@ export default function BillingPage() {
                       <TableCell className="text-right">{naira(row.total_kobo)}</TableCell>
                       <TableCell>{INVOICE_STATUS[row.status]}</TableCell>
                       <TableCell className="font-mono text-xs">{row.receipt ?? '—'}</TableCell>
+                      <TableCell className="space-x-1 whitespace-nowrap">
+                        <Button size="sm" variant="outline" aria-label={`Download invoice ${row.invoice}`}
+                          onClick={() => void savePdf(invoiceDocument(row, business?.name ?? 'Your business'))}>Invoice</Button>
+                        {receiptDocument(row, '') && <Button size="sm" variant="outline" aria-label={`Download receipt ${row.receipt}`}
+                          onClick={() => { const receipt = receiptDocument(row, business?.name ?? 'Your business'); if (receipt) void savePdf(receipt); }}>Receipt</Button>}
+                      </TableCell>
                     </TableRow>))}
                 </TableBody>
               </Table>)}
