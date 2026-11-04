@@ -9,8 +9,11 @@ export type CurrentPlan = { subscribed: false } | {
   subscribed: true; plan: PlanCode; plan_name: string; status: SubscriptionStatus; billing_interval: BillingInterval;
   current_period_end: string | null; grace_ends_at: string | null; writes_allowed: boolean; entitlements: Entitlements;
   usage?: Partial<Record<LimitKey, number>>; scheduled_plan?: PlanCode | null; scheduled_interval?: BillingInterval | null;
-  card?: SavedCard | null; renewal?: Renewal | null;
+  card?: SavedCard | null; renewal?: Renewal | null; cancel_at_period_end?: boolean;
 };
+export type DowngradeChoices = { plan: null } | { plan: PlanCode; plan_name: string; seats: number | null; outlets_limit: number | null; chosen: boolean;
+  members: { user_id: string; name: string | null; email: string | null; role: string; keep: boolean }[];
+  outlets: { id: string; name: string | null; keep: boolean }[] };
 export type SavedCard = { card_type: string | null; bank: string | null; last4: string | null; exp_month: string | null; exp_year: string | null };
 export type Renewal = { invoice: string; plan: PlanCode; billing_interval: BillingInterval; total_kobo: number; due_at: string; last_failure: string | null };
 export type LimitKey = 'users.max' | 'outlets.max' | 'catalog.max_items' | 'ai.queries_per_month';
@@ -58,6 +61,9 @@ const day = (iso: string) => new Date(iso).toLocaleDateString('en-NG', { day: 'n
 export function nextStep(current: Extract<CurrentPlan, { subscribed: true }>) {
   const end = current.current_period_end && day(current.current_period_end);
   const grace = current.grace_ends_at && day(current.grace_ends_at);
+  if (current.cancel_at_period_end && ['active', 'trialing'].includes(current.status)) {
+    return `Cancelled: your ${current.status === 'trialing' ? 'free trial' : 'plan'} ends on ${end}. After that your workspace is read-only and nothing is deleted. Choose a plan any time to reopen it.`;
+  }
   switch (current.status) {
     case 'trialing': return `Your free trial of the ${current.plan_name} Plan ends on ${end}. Choose a plan to keep going; otherwise you move to the General Plan.`;
     case 'active': {
@@ -167,6 +173,17 @@ export function bannerFor(current: CurrentPlan, now = new Date()): Banner | null
     default:
       return { tone: 'bad', text: 'This workspace has no active plan. Choose one to reopen it with all your data.', action: 'choose' };
   }
+}
+
+/** Owners always stay; the rest only if chosen. Over-limit choices are flagged before saving. */
+export function keepSummary(choices: Extract<DowngradeChoices, { plan: PlanCode }>, users: Set<string>, outlets: Set<string>) {
+  const seats = choices.members.filter(m => m.role === 'owner' || users.has(m.user_id)).length;
+  return {
+    seats, outlets: outlets.size,
+    seatsOver: choices.seats !== null && seats > choices.seats,
+    outletsOver: choices.outlets_limit !== null && outlets.size > choices.outlets_limit,
+    needed: (choices.seats !== null && choices.members.length > choices.seats) || (choices.outlets_limit !== null && choices.outlets.length > choices.outlets_limit),
+  };
 }
 
 /** The saved card in an owner's words, e.g. "Visa ending 4081, expires 12/2030". */

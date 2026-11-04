@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { AccountingRequestError, accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
-import { isCheckoutUrl, type BillingInterval, type BillingInvoice, type CheckoutResult, type CurrentPlan, type Plan, type PlanCode, type Quote, type ScheduleResult, type VerifyOutcome } from '@/lib/billing';
+import { isCheckoutUrl, type BillingInterval, type BillingInvoice, type CheckoutResult, type CurrentPlan, type DowngradeChoices, type Plan, type PlanCode, type Quote, type ScheduleResult, type VerifyOutcome } from '@/lib/billing';
 
 type Result<T> = { success: true; data: T } | { success: false; error: string };
 const failed = (error: unknown, fallback: string) => ({ success: false as const,
@@ -48,6 +48,46 @@ export async function payRenewalAction(): Promise<Result<CheckoutResult>> {
     if (!isCheckoutUrl(data.authorization_url)) throw new Error('Unexpected checkout link');
     return { success: true, data };
   } catch (error) { return failed(error, 'Checkout could not start. Try again; you have not been charged.'); }
+}
+
+const PLAN_END_REFUSALS: Record<string, string> = {
+  BILLING_OWNER_REQUIRED: 'Only the business owner can cancel the subscription.',
+  BILLING_CANCEL_NEEDS_ACTIVE_PLAN: 'There is no running plan or trial to cancel.',
+  BILLING_NO_DOWNGRADE_SCHEDULED: 'No move to a smaller plan is coming up.',
+  BILLING_KEEP_NOT_IN_BUSINESS: 'Someone or an outlet you chose is no longer active. Refresh and choose again.',
+  'PLAN_LIMIT users.max': 'Choose no more people than the plan has seats for. Owners count as one each.',
+  'PLAN_LIMIT outlets.max': 'Choose no more outlets than the plan allows.',
+};
+const planEndError = (error: { message?: string } | null) => PLAN_END_REFUSALS[error?.message ?? ''] ?? 'That change was not saved. Try again.';
+
+/** SUB-11: the owner cancels at the end of the period, or takes it back. */
+export async function cancelSubscriptionAction(cancel: boolean): Promise<Result<{ cancel_at_period_end: boolean; ends_at: string | null }>> {
+  try {
+    const supabase = await createClient(); const businessId = await getActiveBusinessIdAction();
+    const { data, error } = await supabase.rpc('cancel_subscription', { p_business_id: businessId, p_cancel: cancel });
+    if (error || !data) return { success: false, error: planEndError(error) };
+    revalidatePath('/settings/billing');
+    return { success: true, data };
+  } catch { return { success: false, error: 'That change was not saved. Try again.' }; }
+}
+
+/** SUB-06: who stays active on the smaller plan. */
+export async function getDowngradeChoicesAction(): Promise<Result<DowngradeChoices>> {
+  try {
+    const supabase = await createClient(); const businessId = await getActiveBusinessIdAction();
+    const { data, error } = await supabase.rpc('downgrade_choices', { p_business_id: businessId });
+    if (error || !data) return { success: false, error: planEndError(error) };
+    return { success: true, data: data as DowngradeChoices };
+  } catch { return { success: false, error: 'That change was not saved. Try again.' }; }
+}
+
+export async function saveDowngradeChoicesAction(users: string[], outlets: string[]): Promise<Result<DowngradeChoices>> {
+  try {
+    const supabase = await createClient(); const businessId = await getActiveBusinessIdAction();
+    const { data, error } = await supabase.rpc('save_downgrade_choices', { p_business_id: businessId, p_users: users, p_outlets: outlets });
+    if (error || !data) return { success: false, error: planEndError(error) };
+    return { success: true, data: data as DowngradeChoices };
+  } catch { return { success: false, error: 'That change was not saved. Try again.' }; }
 }
 
 export async function removeCardAction(): Promise<Result<null>> {

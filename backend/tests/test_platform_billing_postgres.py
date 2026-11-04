@@ -32,9 +32,9 @@ def database(monkeypatch):
           CREATE TABLE auth.users(id uuid PRIMARY KEY, email text);
           CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
           CREATE TABLE public.businesses(id uuid PRIMARY KEY, name text, business_type text NOT NULL, created_by uuid, phone_number text);
-          CREATE TABLE public.memberships(business_id uuid, user_id uuid, role text, is_active boolean NOT NULL DEFAULT true);
+          CREATE TABLE public.memberships(business_id uuid, user_id uuid, role text, is_active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT clock_timestamp());
           CREATE TABLE public.business_invitations(business_id uuid, status text, expires_at timestamptz);
-          CREATE TABLE public.business_locations(business_id uuid, is_active boolean NOT NULL DEFAULT true);
+          CREATE TABLE public.business_locations(business_id uuid, is_active boolean NOT NULL DEFAULT true, id uuid NOT NULL DEFAULT gen_random_uuid(), name text, created_at timestamptz NOT NULL DEFAULT clock_timestamp());
           CREATE TABLE public.catalog_items(business_id uuid, is_active boolean);
           GRANT USAGE ON SCHEMA public, auth TO authenticated, anon, cacu_runtime;
           GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, anon;""")
@@ -42,7 +42,8 @@ def database(monkeypatch):
                      '20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql',
                      '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql', '20261102150000_renewals.sql',
                      '20261104090000_ai_plan_quota.sql', '20261104100000_interval_changes.sql',
-                     '20261104110000_billing_history_details.sql', '20261104120000_billing_notifications.sql', '20261104130000_plan_limit_values.sql'):
+                     '20261104110000_billing_history_details.sql', '20261104120000_billing_notifications.sql', '20261104130000_plan_limit_values.sql',
+                     '20261105100000_cancel_and_downgrade_choices.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -739,3 +740,125 @@ def test_reminder_wording_and_phone_numbers():
     assert email.startswith('Hello Ada Provisions,') and '₦1,612.50' in email and 'CACU Technologies Limited' in email
     assert [nigerian_number(n) for n in ('08031234567', '+234 803 123 4567', '2348031234567', '12345', None)] == \
         ['2348031234567', '2348031234567', '2348031234567', None, None]
+
+
+def as_user(actor, sql, args=()):
+    with psycopg.connect(URL) as c:
+        c.execute('SET LOCAL ROLE authenticated')
+        c.execute("SELECT set_config('request.jwt.claims',%s,true)", (json.dumps({'sub': str(actor)}),))
+        return c.execute(sql, args).fetchone()[0]
+
+
+def status(ident):
+    with psycopg.connect(URL) as c:
+        return c.execute('SELECT status, cancel_at_period_end FROM platform.subscriptions WHERE business_id=%s', (ident,)).fetchone()
+
+
+def test_the_owner_cancels_and_access_continues_to_the_period_end_then_read_only(gateway):  # SUB-11
+    ident, owner, editor = business()
+    activate(ident, 'GROW', start='28 days', end='2 days')
+    renewals()
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_user(editor, 'SELECT public.cancel_subscription(%s,true)', (ident,))
+    assert as_user(owner, 'SELECT public.cancel_subscription(%s,true)', (ident,))['cancel_at_period_end'] is True
+    assert open_renewal(ident) is None and renewals() == 0  # no renewal for a period that is not coming
+    assert status(ident) == ('active', True) and count('SELECT platform.writes_allowed(%s)', ident) is True
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT platform.end_periods(now()+interval '3 days')")
+    assert status(ident) == ('cancelled', True) and count('SELECT platform.writes_allowed(%s)', ident) is False
+    # SUB-12: choosing a plan reopens the same business.
+    invoice = service.checkout(ident, owner, Checkout(request_key=uuid4(), plan='GROW'))
+    gateway.pay(invoice)
+    assert service.verify_return(ident, owner, Verification(reference=invoice['reference']))['outcome'] == 'activated'
+    assert status(ident) == ('active', False)
+
+
+def test_a_cancellation_can_be_taken_back_and_a_cancelled_trial_does_not_move_to_general(gateway):
+    ident, owner, _ = business()
+    as_user(owner, 'SELECT public.cancel_subscription(%s,true)', (ident,))
+    as_user(owner, 'SELECT public.cancel_subscription(%s,false)', (ident,))
+    assert status(ident) == ('trialing', False)
+    as_user(owner, 'SELECT public.cancel_subscription(%s,true)', (ident,))
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.reason','test: trial elapsed',true)")
+        c.execute("UPDATE platform.subscriptions SET current_period_start=now()-interval '14 days', current_period_end=now()-interval '1 minute' WHERE business_id=%s", (ident,))
+        c.execute('SELECT platform.end_trials()')
+    assert status(ident) == ('cancelled', True) and subscription(ident)[0] == 'GROW'
+    with pytest.raises(psycopg.errors.RaiseException, match='BILLING_CANCEL_NEEDS_ACTIVE_PLAN'):
+        as_user(owner, 'SELECT public.cancel_subscription(%s,false)', (ident,))
+    with psycopg.connect(URL) as c:
+        reasons = [r for (r,) in c.execute('SELECT reason FROM platform.subscription_changes WHERE business_id=%s ORDER BY id', (ident,))]
+    assert 'Trial ended; subscription cancelled by the owner' in reasons
+
+
+def staff(ident, n, role='editor'):
+    people = [uuid4() for _ in range(n)]
+    with psycopg.connect(URL) as c:
+        for person in people:
+            c.execute('INSERT INTO auth.users VALUES(%s,%s)', (person, f'{person.hex[:6]}@example.com'))
+            c.execute('INSERT INTO memberships(business_id,user_id,role) VALUES(%s,%s,%s)', (ident, person, role))
+    return people
+
+
+def outlets(ident, n):
+    with psycopg.connect(URL) as c:
+        return [c.execute('INSERT INTO business_locations(business_id,name) VALUES(%s,%s) RETURNING id', (ident, f'Shop {i}')).fetchone()[0] for i in range(n)]
+
+
+def active_members(ident):
+    with psycopg.connect(URL) as c:
+        return {u for (u,) in c.execute('SELECT user_id FROM memberships WHERE business_id=%s AND is_active', (ident,))}
+
+
+def test_the_owner_chooses_who_stays_on_a_downgrade_and_the_rest_are_deactivated_not_deleted(gateway):  # SUB-06, TEST-206
+    ident, owner, editor = business()
+    activate(ident, 'TOP')
+    extra = staff(ident, 3)
+    shops = outlets(ident, 3)
+    with psycopg.connect(URL) as c:
+        c.execute("INSERT INTO business_invitations VALUES(%s,'invited',now()+interval '7 days')", (ident,))
+    assert as_user(owner, 'SELECT public.downgrade_choices(%s)', (ident,))['plan'] is None  # nothing scheduled yet
+    service.schedule(ident, owner, PlanChange(plan='BASE'))
+    choices = as_user(owner, 'SELECT public.downgrade_choices(%s)', (ident,))
+    assert (choices['plan_name'], choices['seats'], choices['outlets_limit'], len(choices['members']), len(choices['outlets'])) == ('General', 2, 1, 5, 3)
+    assert [m['keep'] for m in choices['members'] if m['role'] == 'owner'] == [True]  # owners always stay
+    with pytest.raises(psycopg.errors.RaiseException, match='PLAN_LIMIT users.max'):  # owner plus two is three seats
+        as_user(owner, 'SELECT public.save_downgrade_choices(%s,%s,%s)', (ident, [extra[0], extra[1]], [shops[2]]))
+    with pytest.raises(psycopg.errors.InvalidParameterValue, match='BILLING_KEEP_NOT_IN_BUSINESS'):
+        as_user(owner, 'SELECT public.save_downgrade_choices(%s,%s,%s)', (ident, [uuid4()], []))
+    saved = as_user(owner, 'SELECT public.save_downgrade_choices(%s,%s,%s)', (ident, [extra[2]], [shops[2]]))
+    assert saved['chosen'] is True and [m['user_id'] for m in saved['members'] if m['keep']] == [str(owner), str(extra[2])]
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT platform.end_periods(now()+interval '21 days')")
+        assert c.execute('SELECT count(*) FROM memberships WHERE business_id=%s', (ident,)).fetchone()[0] == 5  # nothing deleted
+        assert c.execute('SELECT id FROM business_locations WHERE business_id=%s AND is_active', (ident,)).fetchall() == [(shops[2],)]
+        assert c.execute("SELECT status FROM business_invitations WHERE business_id=%s", (ident,)).fetchone()[0] == 'cancelled'
+    assert active_members(ident) == {owner, extra[2]} and subscription(ident)[:2] == ('BASE', 'past_due')
+
+
+def test_without_a_choice_the_earliest_added_stay_and_a_new_schedule_clears_an_old_choice(gateway):
+    ident, owner, editor = business()  # the editor was added with the owner, before anyone else
+    activate(ident, 'TOP')
+    later = staff(ident, 2)
+    service.schedule(ident, owner, PlanChange(plan='BASE'))
+    as_user(owner, 'SELECT public.save_downgrade_choices(%s,%s,%s)', (ident, [later[1]], []))
+    service.schedule(ident, owner, PlanChange(plan='TOP'))  # cancelled
+    service.schedule(ident, owner, PlanChange(plan='BASE'))
+    assert as_user(owner, 'SELECT public.downgrade_choices(%s)', (ident,))['chosen'] is False
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT platform.end_periods(now()+interval '21 days')")
+    assert active_members(ident) == {owner, editor}
+
+
+def test_a_trial_ending_on_general_applies_the_choice_too_and_only_managers_see_it(gateway):
+    ident, owner, editor = business()
+    extra = staff(ident, 2)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_user(editor, 'SELECT public.downgrade_choices(%s)', (ident,))
+    assert as_user(owner, 'SELECT public.downgrade_choices(%s)', (ident,))['plan'] == 'BASE'  # Oga trial ends on General
+    as_user(owner, 'SELECT public.save_downgrade_choices(%s,%s,%s)', (ident, [extra[1]], []))
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.reason','test: trial elapsed',true)")
+        c.execute("UPDATE platform.subscriptions SET current_period_start=now()-interval '14 days', current_period_end=now()-interval '1 minute' WHERE business_id=%s", (ident,))
+        c.execute('SELECT platform.end_trials()')
+    assert active_members(ident) == {owner, extra[1]} and status(ident) == ('incomplete', False)

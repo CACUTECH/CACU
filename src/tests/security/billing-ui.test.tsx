@@ -2,12 +2,13 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BillingPage from '@/app/settings/billing/page';
-import { getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
+import { cancelSubscriptionAction, getDowngradeChoicesAction, saveDowngradeChoicesAction, getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { useBusiness } from '@/components/business-provider';
 import type { Plan } from '@/lib/billing';
 import { savePdf } from '@/lib/billing-pdf';
 
-jest.mock('@/app/settings/billing/actions', () => ({ getBillingAction: jest.fn(), quoteAction: jest.fn(), payRenewalAction: jest.fn(), removeCardAction: jest.fn(), schedulePlanAction: jest.fn(), startCheckoutAction: jest.fn(), verifyPaymentAction: jest.fn() }));
+jest.mock('@/app/settings/billing/actions', () => ({ cancelSubscriptionAction: jest.fn(), saveDowngradeChoicesAction: jest.fn(),
+  getDowngradeChoicesAction: jest.fn().mockResolvedValue({ success: true, data: { plan: null } }), getBillingAction: jest.fn(), quoteAction: jest.fn(), payRenewalAction: jest.fn(), removeCardAction: jest.fn(), schedulePlanAction: jest.fn(), startCheckoutAction: jest.fn(), verifyPaymentAction: jest.fn() }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: jest.fn() }));
 jest.mock('@/lib/billing-pdf', () => ({ ...jest.requireActual('@/lib/billing-pdf'), savePdf: jest.fn() }));
 jest.mock('lucide-react', () => ({ Check: () => null, Loader2: () => null }));
@@ -24,6 +25,7 @@ Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, val
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (getDowngradeChoicesAction as jest.Mock).mockResolvedValue({ success: true, data: { plan: null } });
   window.history.replaceState(null, '', '/settings/billing');
   Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, assign, search: '', pathname: '/settings/billing' } });
   (getBillingAction as jest.Mock).mockResolvedValue({ success: true, data: { plans, current: trial, history: [] } });
@@ -166,4 +168,54 @@ test('owners download CACU invoices, and receipts only for paid ones', async () 
   await userEvent.click(screen.getByRole('button', { name: 'Download invoice CACU-INV-000008' }));
   expect(savePdf).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Invoice', number: 'CACU-INV-000008' }));
   expect(screen.getAllByRole('button', { name: /Download receipt/ })).toHaveLength(1);
+});
+
+test('the owner cancels with a clear consequence and can take it back; others cannot cancel (SUB-11)', async () => {
+  as('owner');
+  const active = { ...trial, status: 'active', current_period_end: '2026-12-02T10:00:00Z', scheduled_plan: null, cancel_at_period_end: false };
+  (getBillingAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { plans, current: active, history: [] } })
+    .mockResolvedValue({ success: true, data: { plans, current: { ...active, cancel_at_period_end: true }, history: [] } });
+  (cancelSubscriptionAction as jest.Mock).mockResolvedValue({ success: true, data: { cancel_at_period_end: true, ends_at: active.current_period_end } });
+  render(<BillingPage />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Cancel subscription' }));
+  expect(screen.getByText(/You keep full access until 2 Dec 2026\. After that your workspace is read-only/)).toBeInTheDocument();
+  expect(cancelSubscriptionAction).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel' }));
+  expect(cancelSubscriptionAction).toHaveBeenCalledWith(true);
+  expect(await screen.findByText('Cancelled: your plan ends on 2 Dec 2026. After that your workspace is read-only and nothing is deleted. Choose a plan any time to reopen it.')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Keep my subscription' }));
+  expect(cancelSubscriptionAction).toHaveBeenLastCalledWith(false);
+});
+
+test('admins see no cancel button', async () => {
+  as('admin');
+  (getBillingAction as jest.Mock).mockResolvedValue({ success: true, data: { plans, current: { ...trial, status: 'active', cancel_at_period_end: false }, history: [] } });
+  render(<BillingPage />);
+  expect(await screen.findByText('Oga Plan')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Cancel subscription' })).not.toBeInTheDocument();
+});
+
+test('before a downgrade, managers choose who stays; owners always stay and seats are counted (SUB-06)', async () => {
+  as('admin');
+  const active = { ...trial, status: 'active', current_period_end: '2026-12-02T10:00:00Z', scheduled_plan: 'BASE', cancel_at_period_end: false };
+  (getBillingAction as jest.Mock).mockResolvedValue({ success: true, data: { plans, current: active, history: [] } });
+  const choices = { plan: 'BASE', plan_name: 'General', seats: 2, outlets_limit: 1, chosen: false,
+    members: [{ user_id: 'u-owner', name: 'Ada', email: null, role: 'owner', keep: true }, { user_id: 'u-1', name: 'Chidi', email: null, role: 'editor', keep: false },
+      { user_id: 'u-2', name: 'Bisi', email: null, role: 'viewer', keep: false }],
+    outlets: [{ id: 'o-1', name: 'Ikorodu', keep: false }, { id: 'o-2', name: 'Ipaja', keep: false }] };
+  (getDowngradeChoicesAction as jest.Mock).mockResolvedValue({ success: true, data: choices });
+  (saveDowngradeChoicesAction as jest.Mock).mockResolvedValue({ success: true, data: { ...choices, chosen: true } });
+  render(<BillingPage />);
+  expect(await screen.findByText('Who stays on the General Plan?')).toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: /Ada/ })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: /Ada/ })).toBeDisabled();
+  await userEvent.click(screen.getByRole('checkbox', { name: /Chidi/ }));
+  await userEvent.click(screen.getByRole('checkbox', { name: /Bisi/ }));
+  expect(screen.getByText('That is more people than the plan has seats for.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save who stays' })).toBeDisabled();
+  await userEvent.click(screen.getByRole('checkbox', { name: /Bisi/ }));
+  await userEvent.click(screen.getByRole('checkbox', { name: /Ipaja/ }));
+  await userEvent.click(screen.getByRole('button', { name: 'Save who stays' }));
+  expect(saveDowngradeChoicesAction).toHaveBeenCalledWith(['u-1'], ['o-2']);
+  expect(await screen.findByText('Saved. These people and outlets stay on the General Plan.')).toBeInTheDocument();
 });

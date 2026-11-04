@@ -1,5 +1,5 @@
-import { bannerFor, cardLine, quoteLine, highlights, isCheckoutUrl, naira, nextStep, overLimitNotes, planAction, price, renewalLine, returnedReference, usageLines, type CurrentPlan, type Plan } from '@/lib/billing';
-import { getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
+import { bannerFor, cardLine, keepSummary, quoteLine, highlights, isCheckoutUrl, naira, nextStep, overLimitNotes, planAction, price, renewalLine, returnedReference, usageLines, type CurrentPlan, type Plan } from '@/lib/billing';
+import { cancelSubscriptionAction, saveDowngradeChoicesAction, getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { AccountingRequestError, accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
 
@@ -185,4 +185,24 @@ test('the app-wide banner reminds near the trial end, asks for payment in grace 
     renewal: { invoice: 'CACU-INV-000009', plan: 'GROW', billing_interval: 'monthly', total_kobo: 645000, due_at: '2026-12-02T10:00:00Z', last_failure: 'Insufficient Funds' } }, now))
     .toMatchObject({ tone: 'warn', action: 'pay' });
   expect(bannerFor({ subscribed: false })).toBeNull();
+});
+
+test('a cancelled plan says when it ends, and who-stays counts owners as seats', () => {
+  const current = { subscribed: true as const, plan: 'GROW' as const, plan_name: 'Oga', status: 'trialing' as const, billing_interval: 'monthly' as const,
+    current_period_end: '2026-11-16T10:00:00Z', grace_ends_at: null, writes_allowed: true, entitlements: {}, cancel_at_period_end: true };
+  expect(nextStep(current)).toBe('Cancelled: your free trial ends on 16 Nov 2026. After that your workspace is read-only and nothing is deleted. Choose a plan any time to reopen it.');
+  const choices = { plan: 'BASE' as const, plan_name: 'General', seats: 2, outlets_limit: 1, chosen: false,
+    members: [{ user_id: 'o', name: null, email: null, role: 'owner', keep: true }, { user_id: 'a', name: null, email: null, role: 'editor', keep: false },
+      { user_id: 'b', name: null, email: null, role: 'editor', keep: false }], outlets: [{ id: 'x', name: null, keep: false }] };
+  expect(keepSummary(choices, new Set(['a']), new Set(['x']))).toEqual({ seats: 2, outlets: 1, seatsOver: false, outletsOver: false, needed: true });
+  expect(keepSummary(choices, new Set(['a', 'b']), new Set()).seatsOver).toBe(true);
+});
+
+test('cancelling and saving choices go to the database for the active business, with refusals in plain words', async () => {
+  const rpc = client({ cancel_subscription: { data: null, error: { message: 'BILLING_OWNER_REQUIRED' } },
+    save_downgrade_choices: { data: null, error: { message: 'PLAN_LIMIT users.max' } } });
+  await expect(cancelSubscriptionAction(true)).resolves.toEqual({ success: false, error: 'Only the business owner can cancel the subscription.' });
+  expect(rpc).toHaveBeenCalledWith('cancel_subscription', { p_business_id: 'active-business', p_cancel: true });
+  await expect(saveDowngradeChoicesAction(['a'], [])).resolves.toEqual({ success: false, error: 'Choose no more people than the plan has seats for. Owners count as one each.' });
+  expect(rpc).toHaveBeenCalledWith('save_downgrade_choices', { p_business_id: 'active-business', p_users: ['a'], p_outlets: [] });
 });
