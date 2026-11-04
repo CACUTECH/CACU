@@ -1,4 +1,4 @@
-import { cardLine, quoteLine, highlights, isCheckoutUrl, naira, nextStep, overLimitNotes, planAction, price, renewalLine, returnedReference, usageLines, type CurrentPlan, type Plan } from '@/lib/billing';
+import { bannerFor, cardLine, quoteLine, highlights, isCheckoutUrl, naira, nextStep, overLimitNotes, planAction, price, renewalLine, returnedReference, usageLines, type CurrentPlan, type Plan } from '@/lib/billing';
 import { getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { AccountingRequestError, accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
@@ -166,4 +166,21 @@ test('quotes come from the database for the active business and refusals read in
   await expect(quoteAction('TOP', 'monthly')).resolves.toEqual({ success: false, error: 'This period ends within a day. Renew first, then change plan.' });
   client({ billing_quote: { data: null, error: { message: 'something internal' } } });
   await expect(quoteAction('TOP', 'monthly')).resolves.toEqual({ success: false, error: 'The price could not be worked out. Refresh and try again.' });
+});
+
+test('the app-wide banner reminds near the trial end, asks for payment in grace and explains read-only (SUB-09)', () => {
+  const now = new Date('2026-11-12T10:00:00Z');
+  const base = { subscribed: true as const, plan: 'GROW' as const, plan_name: 'Oga', billing_interval: 'monthly' as const,
+    grace_ends_at: null, writes_allowed: true, entitlements: {} };
+  expect(bannerFor({ ...base, status: 'trialing', current_period_end: '2026-11-20T10:00:00Z' }, now)).toBeNull();
+  expect(bannerFor({ ...base, status: 'trialing', current_period_end: '2026-11-16T10:00:00Z' }, now))
+    .toEqual({ tone: 'info', text: 'Your free Oga trial ends on 16 Nov 2026. Choose a plan to keep its features.', action: 'choose' });
+  expect(bannerFor({ ...base, plan: 'BASE', plan_name: 'General', status: 'incomplete', current_period_end: '2026-11-16T10:00:00Z', grace_ends_at: '2026-11-23T10:00:00Z' }, now))
+    .toEqual({ tone: 'warn', text: 'Payment due. Pay by 23 Nov 2026 to keep full access.', action: 'pay' });
+  expect(bannerFor({ ...base, status: 'suspended', current_period_end: null, writes_allowed: false }, now)?.text).toBe('Your workspace is read-only until you pay. Nothing has been deleted.');
+  expect(bannerFor({ ...base, status: 'active', current_period_end: '2026-12-02T10:00:00Z' }, now)).toBeNull();
+  expect(bannerFor({ ...base, status: 'active', current_period_end: '2026-12-02T10:00:00Z',
+    renewal: { invoice: 'CACU-INV-000009', plan: 'GROW', billing_interval: 'monthly', total_kobo: 645000, due_at: '2026-12-02T10:00:00Z', last_failure: 'Insufficient Funds' } }, now))
+    .toMatchObject({ tone: 'warn', action: 'pay' });
+  expect(bannerFor({ subscribed: false })).toBeNull();
 });

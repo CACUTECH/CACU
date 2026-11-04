@@ -118,6 +118,18 @@ Migration `20261104100000_interval_changes.sql`.
 - **Quotes:** every change paid mid-period is quoted first by `public.billing_quote` (Owners and Admins). It uses the same calculation as checkout, `platform.change_charge`. The screen shows, for example, "Pay ₦60,200 now: ₦56,000 + ₦4,200 VAT, after ₦4,000 for your unused days" before anything goes to Paystack.
 - **Tests:** 4 database cases in `test_platform_billing_postgres.py`; screen and action tests in Jest.
 
+## Billing banner and real plan in the app (SUB-09)
+
+- `SubscriptionProvider` now reads the active business's plan from `public.business_plan` (`getCurrentPlanAction`). It refreshes when the business changes and when the user leaves the billing page. A tier stored in the browser grants nothing, and a read-only (suspended) business has no paid tier. `FeatureGate` uses this tier. The database still enforces every limit itself.
+- `BillingBanner` shows above every page except Billing:
+  - a trial reminder in the last 4 days of the trial;
+  - "Payment due. Pay by <date>" during grace;
+  - the read-only notice once suspended;
+  - a declined renewal card.
+- **Who can pay:** Owners and Admins pay the open renewal in one tap, straight to Paystack, or are sent to Billing to choose a plan. Other members are told to ask the owner.
+- **Not included:** email and WhatsApp reminders, which need a sending provider.
+- **Tests:** Jest provider, banner and wording tests.
+
 ## Billing screen
 
 `/settings/billing` shows:

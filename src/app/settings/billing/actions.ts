@@ -24,6 +24,16 @@ export async function getBillingAction(manager: boolean): Promise<Result<{ plans
   }
 }
 
+/** The active business's plan only, for the app-wide banner and feature gates. */
+export async function getCurrentPlanAction(): Promise<Result<CurrentPlan>> {
+  try {
+    const supabase = await createClient(); const businessId = await getActiveBusinessIdAction();
+    const { data, error } = await supabase.rpc('business_plan', { p_business_id: businessId });
+    if (error || !data) throw new Error('unavailable');
+    return { success: true, data: data as CurrentPlan };
+  } catch { return { success: false, error: 'Billing details are unavailable.' }; }
+}
+
 export async function startCheckoutAction(input: { request_key: string; plan: PlanCode; interval: BillingInterval }): Promise<Result<CheckoutResult>> {
   try {
     const data = await accountingRequest<CheckoutResult>('billing/checkout', { method: 'POST', body: input });

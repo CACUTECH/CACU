@@ -140,6 +140,33 @@ export function quoteLine(quote: Quote) {
 
 const LIMIT_NOUN: Record<LimitKey, string> = { 'users.max': 'users', 'outlets.max': 'outlets', 'catalog.max_items': 'catalogue items', 'ai.queries_per_month': 'AI questions a month' };
 
+export type Banner = { tone: 'info' | 'warn' | 'bad'; text: string; action: 'pay' | 'choose' | null };
+const TRIAL_REMINDER_DAYS = 4;
+
+/** The app-wide billing banner (Doc 14 SUB-09, SUB-10, trial reminders). Null when there is nothing to say. */
+export function bannerFor(current: CurrentPlan, now = new Date()): Banner | null {
+  if (!current.subscribed) return null;
+  const end = current.current_period_end && day(current.current_period_end);
+  switch (current.status) {
+    case 'trialing': {
+      const left = current.current_period_end ? (new Date(current.current_period_end).getTime() - now.getTime()) / 86_400_000 : Infinity;
+      return left <= TRIAL_REMINDER_DAYS
+        ? { tone: 'info', text: `Your free ${current.plan_name} trial ends on ${end}. Choose a plan to keep its features.`, action: 'choose' }
+        : null;
+    }
+    case 'incomplete': case 'past_due': case 'grace':
+      return { tone: 'warn', text: `Payment due. Pay by ${day(current.grace_ends_at ?? current.current_period_end ?? now.toISOString())} to keep full access.`, action: 'pay' };
+    case 'suspended':
+      return { tone: 'bad', text: 'Your workspace is read-only until you pay. Nothing has been deleted.', action: 'pay' };
+    case 'active':
+      return current.renewal?.last_failure
+        ? { tone: 'warn', text: `Your card payment for the renewal on ${day(current.renewal.due_at)} did not go through.`, action: 'pay' }
+        : null;
+    default:
+      return { tone: 'bad', text: 'This workspace has no active plan. Choose one to reopen it with all your data.', action: 'choose' };
+  }
+}
+
 /** The saved card in an owner's words, e.g. "Visa ending 4081, expires 12/2030". */
 export function cardLine(card: SavedCard) {
   const brand = card.card_type ? card.card_type.charAt(0).toUpperCase() + card.card_type.slice(1).trim() : 'Card';
