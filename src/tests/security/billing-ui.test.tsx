@@ -5,9 +5,11 @@ import BillingPage from '@/app/settings/billing/page';
 import { getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { useBusiness } from '@/components/business-provider';
 import type { Plan } from '@/lib/billing';
+import { savePdf } from '@/lib/billing-pdf';
 
 jest.mock('@/app/settings/billing/actions', () => ({ getBillingAction: jest.fn(), quoteAction: jest.fn(), payRenewalAction: jest.fn(), removeCardAction: jest.fn(), schedulePlanAction: jest.fn(), startCheckoutAction: jest.fn(), verifyPaymentAction: jest.fn() }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: jest.fn() }));
+jest.mock('@/lib/billing-pdf', () => ({ ...jest.requireActual('@/lib/billing-pdf'), savePdf: jest.fn() }));
 jest.mock('lucide-react', () => ({ Check: () => null, Loader2: () => null }));
 
 const plan = (code: Plan['code'], name: string, monthly: number, annual: number | null, hybrid = false): Plan => ({ code, name, monthly_price_kobo: monthly,
@@ -149,4 +151,19 @@ test('a mid-period change shows the exact amount first and only then opens Payst
   await userEvent.click(screen.getByRole('button', { name: 'Pay ₦60,200 with Paystack' }));
   await waitFor(() => expect(assign).toHaveBeenCalledWith('https://checkout.paystack.com/y'));
   expect(startCheckoutAction).toHaveBeenCalledWith({ request_key: expect.any(String), plan: 'GROW', interval: 'annual' });
+});
+
+test('owners download CACU invoices, and receipts only for paid ones', async () => {
+  (useBusiness as jest.Mock).mockReturnValue({ business: { id: 'b1', name: 'Ada Provisions', userRole: 'owner' } });
+  const row = { invoice: 'CACU-INV-000007', plan: 'GROW', billing_interval: 'monthly', kind: 'subscription', subtotal_kobo: 600000, vat_rate_bps: 750,
+    vat_kobo: 45000, total_kobo: 645000, status: 'paid', created_at: '2026-11-02T09:55:00Z', paid_at: '2026-11-02T10:00:00Z',
+    receipt: 'CACU-RCT-000004', receipt_amount_kobo: 645000, channel: 'card' };
+  const open = { ...row, invoice: 'CACU-INV-000008', status: 'open', paid_at: null, receipt: null, receipt_amount_kobo: null, channel: null };
+  (getBillingAction as jest.Mock).mockResolvedValue({ success: true, data: { plans, current: trial, history: [open, row] } });
+  render(<BillingPage />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Download receipt CACU-RCT-000004' }));
+  expect(savePdf).toHaveBeenCalledWith(expect.objectContaining({ title: 'Receipt', number: 'CACU-RCT-000004', billedTo: 'Ada Provisions' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Download invoice CACU-INV-000008' }));
+  expect(savePdf).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Invoice', number: 'CACU-INV-000008' }));
+  expect(screen.getAllByRole('button', { name: /Download receipt/ })).toHaveLength(1);
 });

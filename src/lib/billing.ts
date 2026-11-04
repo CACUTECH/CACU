@@ -15,7 +15,8 @@ export type SavedCard = { card_type: string | null; bank: string | null; last4: 
 export type Renewal = { invoice: string; plan: PlanCode; billing_interval: BillingInterval; total_kobo: number; due_at: string; last_failure: string | null };
 export type LimitKey = 'users.max' | 'outlets.max' | 'catalog.max_items' | 'ai.queries_per_month';
 export type BillingInvoice = { invoice: string; plan: PlanCode; billing_interval: BillingInterval; subtotal_kobo: number; vat_kobo: number;
-  total_kobo: number; status: 'open' | 'paid' | 'review' | 'void'; created_at: string; paid_at: string | null; receipt: string | null; kind?: 'subscription' | 'upgrade' | 'renewal' };
+  total_kobo: number; status: 'open' | 'paid' | 'review' | 'void'; created_at: string; paid_at: string | null; receipt: string | null; kind?: 'subscription' | 'upgrade' | 'renewal';
+  vat_rate_bps?: number; period_start?: string | null; period_end?: string | null; receipt_amount_kobo?: number | null; channel?: string | null };
 export type CheckoutResult = { invoice: string; reference: string; total_kobo: number; vat_kobo: number; subtotal_kobo: number; authorization_url: string };
 export type Quote = { kind: 'subscription' | 'upgrade'; subtotal_kobo: number; vat_kobo: number; total_kobo: number; credit_kobo: number | null; period_end: string | null };
 export type ScheduleResult = { scheduled_plan: PlanCode | null; scheduled_interval?: BillingInterval | null; effective_at: string | null; over_limits: Partial<Record<LimitKey, { used: number; limit: number }>> };
@@ -28,7 +29,7 @@ const PLAN_LINE: Record<PlanCode, string> = {
   TOP: 'For bigger or mixed businesses that sell goods and services together.',
 };
 export const planLine = (code: PlanCode) => PLAN_LINE[code];
-const PLAN_NAME: Record<PlanCode, string> = { BASE: 'General', GROW: 'Oga', TOP: 'Chairman' };
+export const PLAN_NAME: Record<PlanCode, string> = { BASE: 'General', GROW: 'Oga', TOP: 'Chairman' };
 const RANK: Record<PlanCode, number> = { BASE: 1, GROW: 2, TOP: 3 };
 
 export function naira(kobo: number) {

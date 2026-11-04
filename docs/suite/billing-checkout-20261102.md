@@ -39,7 +39,6 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 - **Owner notifications** for renewals and declined cards (email, WhatsApp). Today they show on the billing screen only.
 - **Downgrade choices:** before a downgrade applies, Doc 14 has the owner choose which users and outlets stay active. Today nothing is deactivated; the owner just can't add more while over the limit.
 - **Message counter:** `messages.per_month` waits until CACU sends email or WhatsApp messages; nothing sends any yet.
-- **PDFs:** PDF invoices and receipts that show CACU's legal name, address and TIN.
 
 ## Scheduled jobs (M-10 part 1)
 
@@ -129,6 +128,17 @@ Migration `20261104100000_interval_changes.sql`.
 - **Who can pay:** Owners and Admins pay the open renewal in one tap, straight to Paystack, or are sent to Billing to choose a plan. Other members are told to ask the owner.
 - **Not included:** email and WhatsApp reminders, which need a sending provider.
 - **Tests:** Jest provider, banner and wording tests.
+
+## PDF invoices and receipts (SUB-14)
+
+- **Downloads:** Owners and Admins download any CACU invoice, and the receipt of any paid one, from Invoices and receipts on the billing screen.
+- **Contents:** the seller is **CACU Technologies Limited, 15 College Road, Ipaja, Lagos State, Nigeria**, approved by the owner on 4 November 2026. No TIN is printed, on the owner's instruction. The buyer is the business name. Each document shows:
+  - the invoice or receipt number and its dates;
+  - what was bought and for which period, for example "Oga Plan, monthly subscription: 2 November 2026 to 2 December 2026";
+  - the subtotal, VAT at its rate, and the total;
+  - on a receipt, how it was paid.
+- **How it works:** the PDF is drawn in the browser (`src/lib/billing-pdf.ts`, using the existing `jspdf`) from `public.business_billing_history`, which now also returns the VAT rate, the period and the payment channel (migration `20261104110000_billing_history_details.sql`). Amounts print as NGN because the PDF's built-in fonts have no naira sign.
+- **Tests:** Jest document and screen tests; the history fields are checked in `test_platform_billing_postgres.py`.
 
 ## Billing screen
 
