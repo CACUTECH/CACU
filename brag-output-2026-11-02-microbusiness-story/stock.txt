@@ -1,1 +1,0 @@
-Stock is more than a number on a shelf. CACU keeps item records, stock changes and adjustment history. Supported valuation controls help track inventory cost and reviewed write downs, so changes have an explanation rather than disappearing into a notebook.

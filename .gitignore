@@ -66,3 +66,16 @@ backend/scratch_*.py
 /playwright-report/
 
 /supabase/.temp/
+
+# Local working files: launch-video output, editor and agent settings, exports and review drafts. Kept on disk, not
+# committed (they were pushed by mistake in 14858db and untracked afterwards).
+/brag-output/
+/brag-output-*/
+/.claude/
+/.vscode/
+/exports/
+/.agents/skills/brag/
+/.agents/skills/brag-slim/
+/.agents/skills/security-audit/
+/docs/suite/implementation-status-review-*
+/docs/suite/ng-2026-1-account-review-*

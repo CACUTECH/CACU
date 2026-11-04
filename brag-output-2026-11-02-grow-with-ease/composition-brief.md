@@ -1,1 +1,0 @@
-Extended 45-second CACU film. Follow brag-plan.md and features.md. Six editable scenes, new operations scene, exact tagline Grow With Ease at opening and closing. Existing approved visual style retained. Local Kokoro narration; previous export preserved.

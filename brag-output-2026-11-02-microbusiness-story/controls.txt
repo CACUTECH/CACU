@@ -1,1 +1,0 @@
-An assistant can help run the shop without everyone sharing the same authority. Business roles control access, audit history helps explain changes, and configured secure uploads keep supporting files within the reviewed workflow. The owner still has responsibility for reviewing the records.
