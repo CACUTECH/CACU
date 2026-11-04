@@ -1,0 +1,52 @@
+name: Billing notifications
+# Sends queued CACU billing reminders by email (Resend) and SMS or WhatsApp (Termii). Off until the repository variable
+# CACU_BILLING_NOTIFICATIONS_ENABLED is 'true'; a manual run is a dry run unless "apply" is ticked.
+on:
+  schedule:
+    - cron: '52 * * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Send the queued reminders (approved production operation)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: billing-notifications
+  cancel-in-progress: false
+jobs:
+  send:
+    if: github.event_name == 'workflow_dispatch' || vars.CACU_BILLING_NOTIFICATIONS_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: billing-operations
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.11'
+      - run: uv sync --frozen --no-editable
+      - name: Send queued reminders or dry run
+        env:
+          CACU_DATABASE_URL: ${{ secrets.CACU_DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CACU_EMAIL_FROM: ${{ vars.CACU_EMAIL_FROM }}
+          TERMII_API_KEY: ${{ secrets.TERMII_API_KEY }}
+          TERMII_SENDER_ID: ${{ vars.TERMII_SENDER_ID }}
+          TERMII_CHANNEL: ${{ vars.TERMII_CHANNEL }}
+          TERMII_BASE_URL: ${{ vars.TERMII_BASE_URL }}
+          CACU_APP_URL: ${{ vars.CACU_APP_URL }}
+          APPLY_NOTIFICATIONS: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          if [ "$APPLY_NOTIFICATIONS" = "true" ]; then
+            uv run --frozen python -m tools.send_notifications --apply --json
+          else
+            uv run --frozen python -m tools.send_notifications --json
+          fi

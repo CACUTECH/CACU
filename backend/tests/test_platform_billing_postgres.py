@@ -31,7 +31,7 @@ def database(monkeypatch):
             IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname=r) THEN EXECUTE format('CREATE ROLE %I NOLOGIN', r); END IF; END LOOP; END $$;
           CREATE TABLE auth.users(id uuid PRIMARY KEY, email text);
           CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
-          CREATE TABLE public.businesses(id uuid PRIMARY KEY, name text, business_type text NOT NULL, created_by uuid);
+          CREATE TABLE public.businesses(id uuid PRIMARY KEY, name text, business_type text NOT NULL, created_by uuid, phone_number text);
           CREATE TABLE public.memberships(business_id uuid, user_id uuid, role text, is_active boolean NOT NULL DEFAULT true);
           CREATE TABLE public.business_invitations(business_id uuid, status text, expires_at timestamptz);
           CREATE TABLE public.business_locations(business_id uuid, is_active boolean NOT NULL DEFAULT true);
@@ -42,7 +42,7 @@ def database(monkeypatch):
                      '20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql',
                      '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql', '20261102150000_renewals.sql',
                      '20261104090000_ai_plan_quota.sql', '20261104100000_interval_changes.sql',
-                     '20261104110000_billing_history_details.sql'):
+                     '20261104110000_billing_history_details.sql', '20261104120000_billing_notifications.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -604,3 +604,138 @@ def test_quotes_are_for_owners_and_admins_and_refuse_what_checkout_refuses(gatew
         quote(ident, owner, 'GROW', 'annual')  # a smaller plan, even yearly, is scheduled
     assert 'checkout' in refusal(lambda: service.schedule(ident, owner, PlanChange(plan='TOP', interval='annual')))[1]
     assert service.schedule(ident, owner, PlanChange(plan='GROW', interval='annual'))['scheduled_interval'] == 'annual'
+
+
+def queue(now='now()'):
+    with psycopg.connect(URL) as c:
+        return c.execute(f'SELECT platform.queue_notifications({now})').fetchone()[0]
+
+
+def outbox(ident=None):
+    with psycopg.connect(URL) as c:
+        return c.execute("SELECT kind, channel, status, dedupe_key FROM platform.notifications WHERE %s::uuid IS NULL OR business_id=%s ORDER BY id",
+                         (ident, ident)).fetchall()
+
+
+class FakeProviders:
+    """Stands in for Resend and Termii: records what would be sent, and can refuse."""
+    def __init__(self, monkeypatch):
+        from cacu.billing import notify
+        self.sent, self.refuse = [], False
+        for name, value in {'RESEND_API_KEY': 're_test_fixture', 'CACU_EMAIL_FROM': 'CACU <billing@example.com>', 'TERMII_API_KEY': 'termii-fixture',
+                            'TERMII_SENDER_ID': 'CACU', 'CACU_APP_URL': 'https://app.example.com'}.items():
+            monkeypatch.setenv(name, value)
+        monkeypatch.setattr(notify, '_post', self.post)
+
+    def post(self, url, **kwargs):
+        from cacu.billing.notify import SendFailed
+        if self.refuse:
+            raise SendFailed('provider_refused_500')
+        self.sent.append((url, kwargs))
+        return {'id': 'email-1'} if 'resend' in url else {'message_id': 'sms-1'}
+
+
+def test_trial_reminders_are_queued_four_days_and_one_day_before_once_per_channel():
+    ident, _, _ = business()
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.reason','test: trial nearly over',true)")
+        c.execute("UPDATE platform.subscriptions SET current_period_end=now()+interval '3 days' WHERE business_id=%s", (ident,))
+    assert queue() == 1 and queue() == 0  # email only: no business phone yet
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE businesses SET phone_number='0803 123 4567' WHERE id=%s", (ident,))
+    assert queue() == 1  # the SMS for the same reminder
+    assert queue("now()+interval '2 days 12 hours'") == 2  # one day left: email and SMS
+    assert [(k, ch) for k, ch, _, _ in outbox(ident)] == [('trial_ending', 'email'), ('trial_ending', 'sms'), ('trial_ending', 'email'), ('trial_ending', 'sms')]
+
+
+def test_renewal_decline_grace_and_read_only_each_queue_a_reminder(gateway):
+    ident, owner, _ = business()
+    paid_with_card(gateway, ident, owner)
+    activate(ident, 'GROW', start='29 days 21 hours', end='3 hours')
+    renewals()
+    gateway.decline = True
+    service.renew_due()
+    queue()
+    assert sorted({k for k, _, _, _ in outbox(ident)}) == ['card_declined', 'renewal_due']
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT platform.end_periods(now()+interval '4 hours')")
+    queue()
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT platform.suspend_unpaid(now()+interval '8 days')")
+    queue()
+    assert sorted(k for k, _, _, _ in outbox(ident)) == ['card_declined', 'payment_due', 'renewal_due', 'suspended']  # once each
+
+
+def test_reminders_go_to_owners_by_email_and_the_business_phone_by_sms(monkeypatch):
+    from cacu.billing import notify
+    providers = FakeProviders(monkeypatch)
+    ident, _, _ = business()
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE businesses SET phone_number='+234 803 123 4567' WHERE id=%s", (ident,))
+        c.execute("SELECT set_config('platform.reason','test: trial nearly over',true)")
+        c.execute("UPDATE platform.subscriptions SET current_period_end='2026-11-16T10:00:00Z' WHERE business_id=%s", (ident,))
+    queue("'2026-11-13T10:00:00Z'::timestamptz")
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE platform.notifications SET created_at=now()")
+    assert notify.send_due() == {'channels': ['email', 'sms'], 'claimed': 2, 'sent': 2, 'failed': 0, 'skipped': 0}
+    (email_url, email), (sms_url, sms) = providers.sent
+    assert email_url == 'https://api.resend.com/emails' and email['json']['to'] == ['ada@example.com']  # the owner, not the editor
+    assert email['json']['subject'] == 'Your CACU trial ends on 16 Nov 2026' and 'https://app.example.com/settings/billing' in email['json']['text']
+    assert email['headers']['Idempotency-Key'].startswith('cacu-notification-')
+    assert sms_url == 'https://api.ng.termii.com/api/sms/send' and sms['json']['to'] == '2348031234567' and sms['json']['sms'].startswith('CACU: ')
+    assert {status for _, _, status, _ in outbox(ident)} == {'sent'}
+    assert notify.send_due()['claimed'] == 0
+
+
+def test_failures_retry_after_an_hour_up_to_three_times_and_stale_reminders_are_dropped(monkeypatch):
+    from cacu.billing import notify
+    providers = FakeProviders(monkeypatch)
+    ident, _, _ = business()
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.reason','test: trial nearly over',true)")
+        c.execute("UPDATE platform.subscriptions SET current_period_end=now()+interval '3 days' WHERE business_id=%s", (ident,))
+    queue()
+    providers.refuse = True
+    assert notify.send_due()['failed'] == 1 and notify.send_due()['claimed'] == 0  # not again within the hour
+    for _ in range(2):
+        with psycopg.connect(URL) as c:
+            c.execute("UPDATE platform.notifications SET claimed_at=claimed_at-interval '2 hours'")
+        assert notify.send_due()['failed'] == 1
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE platform.notifications SET claimed_at=claimed_at-interval '2 hours'")
+    assert notify.send_due()['claimed'] == 0  # three attempts used
+    with psycopg.connect(URL) as c:
+        c.execute("UPDATE platform.notifications SET created_at=now()-interval '4 days', attempts=0, status='queued'")
+    assert notify.send_due()['claimed'] == 0 and outbox(ident)[0][2] == 'skipped'
+
+
+def test_a_channel_without_keys_stays_queued_and_the_operator_reports_counts_only(monkeypatch, capsys):
+    from tools.send_notifications import main
+    for name in ('RESEND_API_KEY', 'CACU_EMAIL_FROM', 'TERMII_API_KEY', 'TERMII_SENDER_ID'):
+        monkeypatch.delenv(name, raising=False)
+    ident, _, _ = business()
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.reason','test: trial nearly over',true)")
+        c.execute("UPDATE platform.subscriptions SET current_period_end=now()+interval '3 days' WHERE business_id=%s", (ident,))
+    queue()
+    assert main(['--apply', '--json']) == 0
+    assert json.loads(capsys.readouterr().out) == {'mode': 'apply', 'status': 'ok', 'channels': [], 'claimed': 0, 'sent': 0, 'failed': 0, 'skipped': 0}
+    assert outbox(ident)[0][2] == 'queued'
+    providers = FakeProviders(monkeypatch)
+    assert main(['--apply', '--json']) == 0
+    out = capsys.readouterr().out
+    assert json.loads(out)['sent'] == 1 and 'ada@' not in out and len(providers.sent) == 1
+    with psycopg.connect(URL) as c:
+        for role in ('authenticated', 'cacu_runtime'):
+            assert not c.execute("SELECT has_table_privilege(%s, 'platform.notifications', 'SELECT')", (role,)).fetchone()[0]
+
+
+def test_reminder_wording_and_phone_numbers():
+    from cacu.billing.notify import nigerian_number, render
+    subject, text = render('renewal_due', 'sms', {'plan': 'Oga', 'total_kobo': 645000, 'due_at': '2026-12-02T10:00:00Z', 'card': True}, 'Ada Provisions')
+    assert subject == 'Your CACU renewal is due on 2 Dec 2026'
+    assert text == 'CACU: Your Oga Plan renews on 2 Dec 2026. We will charge NGN 6,450 to your saved card.'
+    _, email = render('card_declined', 'email', {'total_kobo': 161250}, 'Ada Provisions')
+    assert email.startswith('Hello Ada Provisions,') and '₦1,612.50' in email and 'CACU Technologies Limited' in email
+    assert [nigerian_number(n) for n in ('08031234567', '+234 803 123 4567', '2348031234567', '12345', None)] == \
+        ['2348031234567', '2348031234567', '2348031234567', None, None]
