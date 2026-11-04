@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { BaseService } from './base-service';
 import { NotificationService } from './notification-service';
 import { logger } from '@/lib/logger';
+import { READ_ONLY_MESSAGE, isReadOnlyRefusal } from '@/lib/read-only';
 
 /**
  * @fileOverview SalesService handles POS checkouts and atomic retail operations.
@@ -46,6 +47,7 @@ export class SalesService extends BaseService {
 
     if (error) {
       this.logError('Checkout Failed', error, { input, businessId });
+      if (isReadOnlyRefusal(error)) throw new Error(READ_ONLY_MESSAGE);
       if (error.message.includes('Insufficient stock')) {
           throw new Error(`Inventory Error: ${error.message}`);
       }

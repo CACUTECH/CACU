@@ -161,6 +161,18 @@ Migration `20261104120000_billing_notifications.sql`, `backend/cacu/billing/noti
 
 After applying in production, check that `cron.job` also lists `cacu-billing-queue-notifications`.
 
+## Suspension is read-only (SUB-10)
+
+Migration `20261105090000_suspension_write_gate.sql` and `backend/cacu/accounting/session.py`.
+
+- **What a read-only business can't do:** while its subscription is suspended, cancelled or closed, a business can't add sales, invoices, expenses, stock movements, appointments or jobs. It also can't add or change customers, suppliers, catalogue items, categories or outlets, and it can't invite staff, bring staff back, or add employees.
+- **What still works:** viewing and exporting everything, recording payments received against existing invoices (legacy and native), and removing staff. Grace and payment-due states keep full access.
+- **Database layer:** triggers on the tables refuse new rows with `SUBSCRIPTION_READ_ONLY`. This covers the legacy functions, management actions, direct Data API writes and the native core alike. Tables that predate the tracked migrations get the trigger only where they exist.
+- **Native core:** `library_transaction` refuses native writes before posting, except receipts (the `/receipts` route and postings of kind `receipt`).
+- **Unaffected:** businesses with no subscription.
+- **On screen:** every service shows the same message: "Your workspace is read-only until the subscription is paid. You can still record payments received and export."
+- **Tests:** `backend/tests/test_suspension_gate_postgres.py`, on the shared library database with the real native ledger.
+
 ## Billing screen
 
 `/settings/billing` shows:

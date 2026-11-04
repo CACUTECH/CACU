@@ -1,12 +1,14 @@
 
 import { usesPythonAccounting } from '@/lib/accounting-client';
 import { BaseService } from './base-service';
+import { READ_ONLY_MESSAGE } from '@/lib/read-only';
 
 /** Messages are reviewed and safe to show; `uncertain` means the entry may have been recorded. */
 export class LedgerEntryError extends Error {
   constructor(message: string, public readonly uncertain: boolean) { super(message); this.name = 'LedgerEntryError'; }
 }
 const LEDGER_MESSAGES: Record<string, string> = {
+  SUBSCRIPTION_READ_ONLY: READ_ONLY_MESSAGE,
   ACCESS_DENIED: 'Only Owners, Admins and Editors can record ledger entries.',
   INVALID_LEDGER_ENTRY: 'Enter a description, an amount above zero with at most two decimal places, and a date that is not in the future.',
   USE_ACCOUNTING_POSTINGS: 'Use balanced accounting postings with reviewed account mappings; single-entry records are disabled after cutover',

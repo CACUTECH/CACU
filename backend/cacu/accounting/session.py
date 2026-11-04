@@ -34,8 +34,11 @@ def take_write_slot(engine, user_id: UUID, business_id: UUID):
     if wait:
         raise HTTPException(429, f'Too many changes in a short time. Try again in {wait} seconds.', headers={'Retry-After': str(wait)})
 
+READ_ONLY_MESSAGE = 'Your workspace is read-only until the subscription is paid. You can still record payments received and export.'
+
 @contextmanager
-def library_transaction(user_id: UUID, business_id: UUID, write=False):
+def library_transaction(user_id: UUID, business_id: UUID, write=False, while_read_only=False):
+    """while_read_only: the write is one a suspended business may still make (Doc 14 SUB-10), such as a receipt."""
     dsn = os.environ.get('CACU_DATABASE_URL')
     if not dsn:
         raise HTTPException(503, 'Accounting database unavailable')
@@ -63,6 +66,8 @@ def library_transaction(user_id: UUID, business_id: UUID, write=False):
             member = connection.exec_driver_sql('SELECT accounting.lock_membership(%s, %s)', (str(business_id), str(user_id))).scalar()
             if member not in {'owner', 'admin', 'editor', 'viewer'} or (write and member == 'viewer'):
                 raise HTTPException(403, 'Business permission required')
+            if write and not while_read_only and not connection.exec_driver_sql('SELECT platform.writes_allowed(%s)', (str(business_id),)).scalar():
+                raise HTTPException(403, READ_ONLY_MESSAGE)
             mapping = connection.exec_driver_sql("SELECT entity_id, timezone FROM accounting.business_map WHERE business_id=%s AND state='active'", (str(business_id),)).first()
             if not mapping:
                 raise HTTPException(409, 'Accounting cutover has not been reconciled for this business')
