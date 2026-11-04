@@ -51,12 +51,14 @@ After the migration is applied in production, check that both jobs are listed in
 
 ## Plan limits (TEST-209)
 
+The users and outlets limits below were confirmed by the owner on 4 November 2026 (migration `20261104130000_plan_limit_values.sql`, logged in `platform.config_changes`).
+
 Migration `20261102130000_plan_limits.sql` enforces three limits with triggers on the tables themselves. The browser, the accounting API and direct Data API writes all meet the same check.
 
 | Limit | General | Oga | Chairman | What counts |
 |---|---|---|---|---|
-| Users | 2 | 5 | 15 | Active members plus invitations still open. An expired invitation frees its seat until it is resent. |
-| Outlets | 1 | 2 | 5 | Active outlets. |
+| Users | 2 | 5 | 50 | Active members plus invitations still open. An expired invitation frees its seat until it is resent. |
+| Outlets | 1 | 5 | 20 | Active outlets. |
 | Catalogue items | 300 | 3,000 | Unlimited | Active items. Archiving an item makes room. |
 
 - Only a new or reactivated row is refused, with `PLAN_LIMIT <key>`. Accepting an invitation fills the seat the invitation already held.
@@ -97,10 +99,10 @@ After applying in production, check that `cron.job` also lists `cacu-billing-iss
 
 Migration `20261104090000_ai_plan_quota.sql`.
 
-- **Monthly allowance:** asking a question now also checks the plan's monthly allowance: General 0, Oga 100, Chairman 500, counted per Lagos calendar month. The existing shared rate limits still apply.
+- **Monthly allowance:** asking a question now also checks the plan's monthly allowance: General 30, Oga 100, Chairman unlimited (owner-confirmed 4 November 2026), counted per Lagos calendar month. The existing shared rate limits still apply.
 - **At the limit:** the question is refused before anything is recorded, so the counter doesn't move. The assistant says, for example, "You've used all 100 AI questions on your plan this month (0 left). They reset on 1 Dec 2026."
 - **Failed answers:** a question whose answer failed doesn't count.
-- **General Plan:** the chat isn't offered; the assistant says AI questions are on the Oga and Chairman Plans.
+- **No AI on the plan:** if a plan's allowance were 0, the chat wouldn't be offered; today every plan includes AI. Chairman's unlimited allowance shows no counter.
 - **Suspended business:** asks no questions until it pays (SUB-10).
 - **Unbilled business:** keeps only the shared limits.
 - **Seeing the allowance:** members see "37 of 100 AI questions left this month" in the assistant (`public.get_ai_chat_quota`). The billing usage panel shows AI questions next to users, outlets and catalogue items.

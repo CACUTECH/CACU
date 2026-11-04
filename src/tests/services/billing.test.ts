@@ -25,6 +25,8 @@ test('plan highlights read like an owner would compare them', () => {
     'Purchasing and supplier bills', 'Cash flow and ageing reports', '100 AI questions a month']);
   expect(highlights({ 'users.max': 1, 'outlets.max': 1, 'catalog.max_items': null, 'module.modes': ['PRODUCT', 'SERVICE', 'HYBRID'], 'ai.queries_per_month': 0 }))
     .toEqual(['1 user', '1 outlet', 'Unlimited catalogue items', 'Products, services or Hybrid']);
+  expect(highlights({ 'users.max': 50, 'outlets.max': 20, 'catalog.max_items': null, 'module.modes': ['PRODUCT', 'SERVICE', 'HYBRID'], 'ai.queries_per_month': null }))
+    .toEqual(['50 users', '20 outlets', 'Unlimited catalogue items', 'Products, services or Hybrid', 'Unlimited AI questions']);
 });
 
 test('usage shows each counted limit and flags a full one', () => {

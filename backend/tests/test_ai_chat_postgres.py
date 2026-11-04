@@ -28,7 +28,7 @@ def database():
         GRANT USAGE ON SCHEMA public,auth TO authenticated,anon;
         GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated,anon;
         ALTER TABLE public.memberships ENABLE ROW LEVEL SECURITY;""")
-        for name in ('20261012132427_guarded_ai_chat.sql','20261102090100_ai_active_members.sql','20261102100000_platform_plans.sql','20261104090000_ai_plan_quota.sql'):
+        for name in ('20261012132427_guarded_ai_chat.sql','20261102090100_ai_active_members.sql','20261102100000_platform_plans.sql','20261104090000_ai_plan_quota.sql','20261104130000_plan_limit_values.sql'):
             c.execute((Path(__file__).resolve().parents[2]/'supabase/migrations'/name).read_text(encoding='utf-8'))
     yield
 
@@ -187,10 +187,16 @@ def test_last_months_questions_do_not_count():
     with psycopg.connect(URL) as c: c.execute("UPDATE ai_private.requests SET created_at=created_at-interval '2 seconds'")
     assert reserve(actor,business)['remaining']==99
 
-def test_general_has_no_ai_questions_and_suspended_businesses_ask_none():
-    actor,business=member(); enable(); subscribe(business,'BASE')
+def test_general_has_30_chairman_is_unlimited_and_suspended_businesses_ask_none():
+    actor,business=member(); enable(business_per_day=200,global_per_day=500); subscribe(business,'BASE')
+    seed_this_month(business,29)
+    assert reserve(actor,business)['remaining']==0
     with pytest.raises(psycopg.errors.RaiseException,match='AI_MONTHLY_LIMIT'): reserve(actor,business)
-    assert rpc(actor,'get_ai_chat_quota',(business,))['limit']==0
+    assert rpc(actor,'get_ai_chat_quota',(business,))['limit']==30
+    actor,business=member(); subscribe(business,'TOP'); seed_this_month(business,150)
+    assert reserve(actor,business)['remaining'] is None  # unlimited
+    quota=rpc(actor,'get_ai_chat_quota',(business,))
+    assert (quota['billed'],quota['limit'],quota['used'])==(True,None,151)
     actor,business=member(); subscribe(business,'TOP','suspended')
     with pytest.raises(psycopg.errors.RaiseException,match='AI_PLAN_SUSPENDED'): reserve(actor,business)
     assert requests(business)==0
