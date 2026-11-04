@@ -1,0 +1,1271 @@
+{
+  "ok": false,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "filesScanned": 7
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": false,
+    "errorCount": 7,
+    "warningCount": 0,
+    "infoCount": 22,
+    "findings": [
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 20.112,
+        "selector": "#books-content > div:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 236,
+          "top": 146.48,
+          "right": 727.58,
+          "bottom": 180.48,
+          "width": 491.58,
+          "height": 34
+        },
+        "containerSelector": "#team-content > div:nth-of-type(1)",
+        "text": "CACU BUSINESS MANAGEMENT",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply.",
+        "dataAttributes": {
+          "data-hf-id": "hf-3tp6"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 236,
+          "y": 146.48,
+          "width": 491.58,
+          "height": 34
+        },
+        "firstSeen": 20.112,
+        "lastSeen": 20.866,
+        "occurrences": 4,
+        "heldMs": 754.0000000000014,
+        "times": [
+          20.112,
+          20.363,
+          20.615,
+          20.866
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 20.112,
+        "selector": "#books-content > div:nth-of-type(2) > div:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 170,
+          "top": 229.48,
+          "right": 616.13,
+          "bottom": 263.48,
+          "width": 446.13,
+          "height": 34
+        },
+        "containerSelector": "#team-content > div:nth-of-type(2)",
+        "text": "02 / KNOW THE NUMBERS",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply.",
+        "dataAttributes": {
+          "data-hf-id": "hf-i1ho"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 229.48,
+          "width": 446.13,
+          "height": 34
+        },
+        "firstSeen": 20.112,
+        "lastSeen": 20.866,
+        "occurrences": 4,
+        "heldMs": 754.0000000000014,
+        "times": [
+          20.112,
+          20.363,
+          20.615,
+          20.866
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 20.112,
+        "selector": "#books-content > div:nth-of-type(2) > h2:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 170,
+          "top": 279.48,
+          "right": 695.73,
+          "bottom": 458.56,
+          "width": 525.73,
+          "height": 179.08
+        },
+        "containerSelector": "#team-content > h2:nth-of-type(1)",
+        "text": "Transactions. Clearer reports.",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply.",
+        "dataAttributes": {
+          "data-hf-id": "hf-xx99"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 279.48,
+          "width": 525.73,
+          "height": 179.08
+        },
+        "firstSeen": 20.112,
+        "lastSeen": 20.866,
+        "occurrences": 4,
+        "heldMs": 754.0000000000014,
+        "times": [
+          20.112,
+          20.363,
+          20.615,
+          20.866
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 20.112,
+        "selector": "#books-content > div:nth-of-type(2) > p:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 170,
+          "top": 487.64,
+          "right": 532.81,
+          "bottom": 613.64,
+          "width": 362.81,
+          "height": 126
+        },
+        "containerSelector": "#team-hr > p:nth-of-type(1)",
+        "text": "Double-entry accounting. Financial statements. PDF & Excel exports.",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply.",
+        "dataAttributes": {
+          "data-hf-id": "hf-u9pq"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 487.64,
+          "width": 362.81,
+          "height": 126
+        },
+        "firstSeen": 20.112,
+        "lastSeen": 20.866,
+        "occurrences": 4,
+        "heldMs": 754.0000000000014,
+        "times": [
+          20.112,
+          20.363,
+          20.615,
+          20.866
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 20.363,
+        "selector": "#books-content > div:nth-of-type(2) > p:nth-of-type(2)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 170,
+          "top": 639.27,
+          "right": 583.36,
+          "bottom": 673.27,
+          "width": 413.36,
+          "height": 34
+        },
+        "containerSelector": "#team-hr > p:nth-of-type(1)",
+        "text": "Accounting activation required.",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply.",
+        "dataAttributes": {
+          "data-hf-id": "hf-jywq"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 639.27,
+          "width": 413.36,
+          "height": 34
+        },
+        "firstSeen": 20.363,
+        "lastSeen": 20.866,
+        "occurrences": 3,
+        "heldMs": 503.0000000000001,
+        "times": [
+          20.363,
+          20.615,
+          20.866
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(4) > span:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 170,
+          "top": 981,
+          "right": 928.09,
+          "bottom": 1015,
+          "width": 758.09,
+          "height": 34
+        },
+        "containerSelector": "#outro-content > div:nth-of-type(2) > span:nth-of-type(1)",
+        "text": "Income Statement · Balance Sheet · Cash Flow Statement",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply.",
+        "dataAttributes": {
+          "data-hf-id": "hf-n97s"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 981,
+          "width": 758.09,
+          "height": 34
+        },
+        "firstSeen": 20.112,
+        "lastSeen": 24.888,
+        "occurrences": 21,
+        "heldMs": 4776.000000000004,
+        "times": [
+          20.112,
+          20.363,
+          20.615,
+          20.866,
+          21.117,
+          21.369,
+          21.62,
+          21.872,
+          22.123,
+          22.374,
+          22.626,
+          22.877,
+          23.128,
+          23.38,
+          23.631,
+          23.883,
+          24,
+          24.134,
+          24.385,
+          24.637,
+          24.888
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(4) > span:nth-of-type(2)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 1654.45,
+          "top": 981,
+          "right": 1750,
+          "bottom": 1015,
+          "width": 95.55,
+          "height": 34
+        },
+        "containerSelector": "#outro-content > div:nth-of-type(2) > span:nth-of-type(2)",
+        "text": "02 / 03",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply.",
+        "dataAttributes": {
+          "data-hf-id": "hf-voxv"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1654.45,
+          "y": 981,
+          "width": 95.55,
+          "height": 34
+        },
+        "firstSeen": 20.112,
+        "lastSeen": 24.888,
+        "occurrences": 21,
+        "heldMs": 4776.000000000004,
+        "times": [
+          20.112,
+          20.363,
+          20.615,
+          20.866,
+          21.117,
+          21.369,
+          21.62,
+          21.872,
+          22.123,
+          22.374,
+          22.626,
+          22.877,
+          23.128,
+          23.38,
+          23.631,
+          23.883,
+          24,
+          24.134,
+          24.385,
+          24.637,
+          24.888
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 236,
+          "top": 135,
+          "right": 727.58,
+          "bottom": 169,
+          "width": 491.58,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "CACU BUSINESS MANAGEMENT",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-3tp6"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 236,
+          "y": 135,
+          "width": 491.58,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(2) > div:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 170,
+          "top": 218,
+          "right": 616.13,
+          "bottom": 252,
+          "width": 446.13,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "02 / Know the numbers",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-i1ho"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 218,
+          "width": 446.13,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(2) > h2:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 170,
+          "top": 268,
+          "right": 695.73,
+          "bottom": 447.08,
+          "width": 525.73,
+          "height": 179.08
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Transactions.Clearer reports.",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-xx99"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 268,
+          "width": 525.73,
+          "height": 179.08
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(2) > p:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 170,
+          "top": 476.16,
+          "right": 532.81,
+          "bottom": 602.16,
+          "width": 362.81,
+          "height": 126
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Double-entry accounting.Financial statements.PDF & Excel exports.",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-u9pq"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 476.16,
+          "width": 362.81,
+          "height": 126
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(2) > p:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 170,
+          "top": 639.16,
+          "right": 583.36,
+          "bottom": 673.16,
+          "width": 413.36,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Accounting activation required.",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-jywq"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 639.16,
+          "width": 413.36,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(3) > div:nth-of-type(1) > span:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 962,
+          "top": 169,
+          "right": 1041.56,
+          "bottom": 203,
+          "width": 79.56,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "CACU",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-yxb9"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 962,
+          "y": 169,
+          "width": 79.56,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(3) > div:nth-of-type(1) > span:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1490.2,
+          "top": 169,
+          "right": 1718,
+          "bottom": 203,
+          "width": 227.8,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Financial Reports",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-edu3"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1490.2,
+          "y": 169,
+          "width": 227.8,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(3) > div:nth-of-type(2) > h3:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 967,
+          "top": 260,
+          "right": 1252.23,
+          "bottom": 306,
+          "width": 285.23,
+          "height": 46
+        },
+        "containerSelector": "#outro-logo",
+        "text": "Financial Reports",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-ah4c"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 967,
+          "y": 260,
+          "width": 285.23,
+          "height": 46
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "div.screen-body > div:nth-of-type(1) > b:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 967,
+          "top": 331,
+          "right": 1216.38,
+          "bottom": 365,
+          "width": 249.38,
+          "height": 34
+        },
+        "containerSelector": "#outro-logo",
+        "text": "Income Statement",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-eokq"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 967,
+          "y": 331,
+          "width": 249.38,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "div.screen-body > div:nth-of-type(1) > span:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1228.38,
+          "top": 331,
+          "right": 1418,
+          "bottom": 365,
+          "width": 189.63,
+          "height": 34
+        },
+        "containerSelector": "#outro-logo",
+        "text": "Balance Sheet",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-b188"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1228.38,
+          "y": 331,
+          "width": 189.63,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "div.screen-body > div:nth-of-type(1) > span:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1430,
+          "top": 331,
+          "right": 1567.91,
+          "bottom": 365,
+          "width": 137.91,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Cash Flow",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-q9jq"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1430,
+          "y": 331,
+          "width": 137.91,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 967,
+          "top": 412,
+          "right": 1385.36,
+          "bottom": 446,
+          "width": 418.36,
+          "height": 34
+        },
+        "containerSelector": "#outro-logo",
+        "text": "Sample management statement",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-2du4"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 967,
+          "y": 412,
+          "width": 418.36,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-row1 > span:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 967,
+          "top": 471,
+          "right": 1064.7,
+          "bottom": 505,
+          "width": 97.7,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Income",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-r90a"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 967,
+          "y": 471,
+          "width": 97.7,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-row1 > strong:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1572.36,
+          "top": 471,
+          "right": 1713,
+          "bottom": 505,
+          "width": 140.64,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "₦480,000",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-kpz8"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1572.36,
+          "y": 471,
+          "width": 140.64,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-row2 > span:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 967,
+          "top": 556,
+          "right": 1095.02,
+          "bottom": 590,
+          "width": 128.02,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Expenses",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-8nvc"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 967,
+          "y": 556,
+          "width": 128.02,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-row2 > strong:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1573.81,
+          "top": 556,
+          "right": 1713,
+          "bottom": 590,
+          "width": 139.19,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "₦320,000",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-ykn7"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1573.81,
+          "y": 556,
+          "width": 139.19,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-row3 > b:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 967,
+          "top": 641,
+          "right": 1096.67,
+          "bottom": 675,
+          "width": 129.67,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Net profit",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-ehzm"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 967,
+          "y": 641,
+          "width": 129.67,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-row3 > strong:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1579.27,
+          "top": 641,
+          "right": 1713,
+          "bottom": 675,
+          "width": 133.73,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "₦160,000",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-s2nx"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1579.27,
+          "y": 641,
+          "width": 133.73,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(6) > span:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 986,
+          "top": 738,
+          "right": 1040.75,
+          "bottom": 772,
+          "width": 54.75,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "PDF",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-ak22"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 986,
+          "y": 738,
+          "width": 54.75,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(6) > span:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1093.75,
+          "top": 738,
+          "right": 1166.25,
+          "bottom": 772,
+          "width": 72.5,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Excel",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-bhnj"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1093.75,
+          "y": 738,
+          "width": 72.5,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(4) > span:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 170,
+          "top": 981,
+          "right": 928.09,
+          "bottom": 1015,
+          "width": 758.09,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "Income Statement · Balance Sheet · Cash Flow Statement",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-n97s"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 170,
+          "y": 981,
+          "width": 758.09,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 24,
+        "selector": "#books-content > div:nth-of-type(4) > span:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 1654.45,
+          "top": 981,
+          "right": 1750,
+          "bottom": 1015,
+          "width": 95.55,
+          "height": 34
+        },
+        "containerSelector": "#outro > div:nth-of-type(1)",
+        "text": "02 / 03",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {
+          "data-hf-id": "hf-voxv"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1654.45,
+          "y": 981,
+          "width": 95.55,
+          "height": 34
+        },
+        "firstSeen": 24,
+        "lastSeen": 24,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          24
+        ]
+      }
+    ],
+    "duration": 45,
+    "samples": [
+      2,
+      8,
+      16,
+      24,
+      34,
+      42
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 29,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 1,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "contrast_aa_failure",
+        "severity": "warning",
+        "message": "Contrast is 1.86:1; WCAG AA requires 3:1.",
+        "text": "Balance Sheet",
+        "fg": "rgb(9,0,108)",
+        "bg": "rgb(69,60,142)",
+        "ratio": 1.86,
+        "requiredRatio": 3,
+        "suggestedColor": "rgb(147,143,190)",
+        "large": true,
+        "selector": "div > div:nth-of-type(3) > div > div > div > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1)",
+        "dataAttributes": {
+          "data-hf-id": "hf-b188"
+        },
+        "sourceFile": "compositions/books.html",
+        "bbox": {
+          "x": 1228.375,
+          "y": 331,
+          "width": 189.625,
+          "height": 34
+        },
+        "time": 24,
+        "times": [
+          24
+        ]
+      }
+    ],
+    "enabled": true,
+    "samples": [
+      2,
+      8,
+      16,
+      24,
+      42
+    ],
+    "checked": 68,
+    "passed": 67
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 2,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "dead_stretch",
+        "severity": "warning",
+        "message": "Nothing on screen changes for 5.00 s (8.88–13.88 s): start the next move within 3 s, or put data-hold on the element whose stillness is deliberate; see references/motion.md.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 8.875,
+        "seconds": 5,
+        "floorSeconds": 3,
+        "until": 13.875
+      },
+      {
+        "code": "dead_stretch",
+        "severity": "warning",
+        "message": "Nothing on screen changes for 16.63 s (25.38–42.00 s): start the next move within 3 s, or put data-hold on the element whose stillness is deliberate; see references/motion.md.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 25.375,
+        "seconds": 16.625,
+        "floorSeconds": 3,
+        "until": 42
+      }
+    ],
+    "enabled": true,
+    "step": 0.125,
+    "samples": 360
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": true,
+    "files": [
+      ".hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\frame-00-at-2.0s.png",
+      ".hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\frame-01-at-8.0s.png",
+      ".hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\frame-02-at-16.0s.png",
+      ".hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\frame-03-at-24.0s.png",
+      ".hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\frame-04-at-42.0s.png"
+    ],
+    "times": [
+      2,
+      8,
+      16,
+      24,
+      42
+    ],
+    "findingFiles": [
+      "C:\\Users\\olayiwolao\\CACU_NEW\\brag-output-2026-11-02-grow-with-ease\\composition\\.hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\finding-00-content_overlap.png",
+      "C:\\Users\\olayiwolao\\CACU_NEW\\brag-output-2026-11-02-grow-with-ease\\composition\\.hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\finding-01-content_overlap.png",
+      "C:\\Users\\olayiwolao\\CACU_NEW\\brag-output-2026-11-02-grow-with-ease\\composition\\.hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\finding-02-content_overlap.png",
+      "C:\\Users\\olayiwolao\\CACU_NEW\\brag-output-2026-11-02-grow-with-ease\\composition\\.hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\finding-03-content_overlap.png",
+      "C:\\Users\\olayiwolao\\CACU_NEW\\brag-output-2026-11-02-grow-with-ease\\composition\\.hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\finding-04-content_overlap.png",
+      "C:\\Users\\olayiwolao\\CACU_NEW\\brag-output-2026-11-02-grow-with-ease\\composition\\.hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\finding-05-content_overlap.png",
+      "C:\\Users\\olayiwolao\\CACU_NEW\\brag-output-2026-11-02-grow-with-ease\\composition\\.hyperframes\\artifacts\\snapshots\\8bd2b12c-16c7-4a72-998d-214cc34e97c7\\finding-06-content_overlap.png"
+    ]
+  }
+}

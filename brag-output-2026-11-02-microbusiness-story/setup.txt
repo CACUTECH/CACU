@@ -1,0 +1,1 @@
+Begin with the correct business mode, clean item and party records, and reviewed opening balances and account mappings. Keep the internet connection active while saving. Advanced scheduling, storefront publishing, offline sync and online subscription billing are not available in this release.

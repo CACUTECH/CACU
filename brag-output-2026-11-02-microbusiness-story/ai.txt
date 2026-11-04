@@ -1,0 +1,1 @@
+With the server side provider configured, the CACU AI assistant can help answer questions using business and financial context. Start with a practical question about the records. Treat its response as assistance to review, not an accountant signing off the books.

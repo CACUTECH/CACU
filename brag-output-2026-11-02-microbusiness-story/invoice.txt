@@ -1,0 +1,1 @@
+For a customer who buys on account, Bisi records the invoice and later records the payment. Customer records, invoices, receipts and supported credit documents help her follow the transaction, instead of relying on memory or a crossed out name.

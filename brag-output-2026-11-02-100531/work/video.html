@@ -1,0 +1,252 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Inter;src:url(inter-latin-variable.woff2) format('woff2');font-weight:100 900}
+@font-face{font-family:Grotesk;src:url(space-grotesk-latin-variable.woff2) format('woff2');font-weight:300 700}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#F7F7F7}
+body{font-family:Inter,sans-serif;color:#14123a;-webkit-font-smoothing:antialiased}
+.scene{position:absolute;inset:0;visibility:hidden}
+.navy{background:#09006C}.light{background:#F7F7F7}
+/* exercise book */
+.book{position:absolute;width:720px;height:900px;border-radius:10px;background:#FFF8E1;box-shadow:0 40px 80px -20px rgba(0,0,0,.55);overflow:hidden;
+  background-image:repeating-linear-gradient(to bottom,transparent 0 63px,rgba(60,110,200,.35) 63px 65px);background-position:0 120px}
+.book:before{content:'';position:absolute;top:0;bottom:0;left:110px;width:3px;background:rgba(220,60,60,.55)}
+.bk-h{position:absolute;left:140px;top:44px;font-family:Grotesk;font-weight:700;font-size:30px;letter-spacing:3px;color:#9a8a5a}
+.bk-l{position:absolute;left:140px;right:40px;font-family:Inter;font-style:italic;font-weight:500;font-size:34px;color:#1F3FA8;white-space:nowrap}
+.bk-l span{float:right}
+.strike{text-decoration:line-through;text-decoration-color:#d23c3c;text-decoration-thickness:3px}
+.ink-red{color:#c0392b}
+/* type */
+.big{position:absolute;font-family:Grotesk;font-weight:700;letter-spacing:-3px;line-height:1.05}
+.cap{position:absolute;left:150px;top:330px;width:780px}
+.num{font-family:Grotesk;font-weight:700;font-size:30px;color:#5C40FF;letter-spacing:2px;margin-bottom:22px}
+.num span{display:inline-block;width:56px;height:4px;background:#5C40FF;vertical-align:middle;margin-right:18px;border-radius:2px}
+.ttl{font-family:Grotesk;font-weight:700;font-size:96px;line-height:1.03;color:#09006C;letter-spacing:-3px}
+.ttl em{font-style:normal;color:#5C40FF}
+.card{position:absolute;background:#fff;border-radius:30px;box-shadow:0 40px 90px -30px rgba(9,0,108,.35),0 0 0 1.5px #ebeaf3;padding:38px 44px}
+.ct{font-family:Grotesk;font-weight:700;font-size:32px;color:#09006C}
+.cs{font-size:22px;color:#5d5b7a;margin-top:8px}
+.row{display:flex;justify-content:space-between;align-items:center;height:76px;border-bottom:1.5px solid #f0eff6;font-size:26px}
+.amt{font-family:Grotesk;font-weight:600;font-variant-numeric:tabular-nums}
+.pill{font-size:19px;font-weight:600;color:#5C40FF;background:#efecff;padding:9px 16px;border-radius:999px;white-space:nowrap}
+/* tiles */
+.tile{position:absolute;top:470px;width:470px;height:250px;border-radius:28px;background:#15107f;box-shadow:0 0 0 1.5px #2c2696;padding:36px 38px;color:#fff}
+.tile .k{font-size:24px;color:#c9c2ff;font-weight:600}
+.tile .v{font-family:Grotesk;font-weight:700;font-size:72px;margin-top:22px;letter-spacing:-1px}
+.neq{position:absolute;top:545px;font-family:Grotesk;font-weight:700;font-size:96px;color:#A99BFF}
+/* phone */
+#phone{position:absolute;left:1180px;top:70px;width:440px;height:940px;border-radius:64px;background:#0e0c26;padding:14px;box-shadow:0 50px 100px -30px rgba(9,0,108,.45)}
+#screen{position:relative;width:100%;height:100%;border-radius:52px;background:#fff;overflow:hidden}
+.sb{display:flex;justify-content:space-between;padding:18px 34px 0;font-size:17px;font-weight:600;color:#111}
+.ph{padding:26px 28px 0}.ph h3{font-family:Grotesk;font-size:32px;font-weight:700;color:#09006C}.ph p{font-size:17px;color:#5d5b7a;margin-top:4px}
+.search{margin:20px 28px 0;height:54px;border:1.5px solid #e4e4ee;border-radius:14px;display:flex;align-items:center;padding:0 18px;color:#77769a;font-size:17px}
+.item{margin:14px 28px 0;height:96px;border:1.5px solid #ececf3;border-radius:18px;display:flex;align-items:center;padding:0 18px;gap:14px}
+.thumb{width:58px;height:58px;border-radius:14px;flex:none}
+.nm{font-weight:600;font-size:19px;color:#111}.st{font-size:15px;color:#77769a;margin-top:3px}.st b{color:#09006C}
+.plus{margin-left:auto;width:44px;height:44px;border-radius:50%;background:#5C40FF;color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;flex:none;position:relative}
+.badge{position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;background:#09006C;color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center}
+#cart{position:absolute;left:0;right:0;bottom:0;height:420px;background:#fff;border-radius:30px 30px 0 0;box-shadow:0 -18px 40px rgba(9,0,108,.12);padding:16px 28px 0}
+.grab{width:56px;height:6px;border-radius:3px;background:#dddbe9;margin:0 auto 18px}
+.cl{display:flex;justify-content:space-between;margin-top:14px;font-size:19px;color:#222}
+.tot{display:flex;justify-content:space-between;margin-top:16px;padding-top:16px;border-top:1.5px dashed #e2e1ec;font-family:Grotesk;font-weight:700;font-size:28px;color:#09006C}
+.pay{display:flex;gap:12px;margin-top:18px}
+.chip{flex:1;height:52px;border-radius:14px;border:1.5px solid #e2e1ec;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:18px;color:#333}
+#confirm{margin-top:18px;height:62px;border-radius:16px;background:#5C40FF;color:#fff;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center}
+#toast{position:absolute;left:24px;right:24px;top:120px;height:110px;border-radius:22px;background:#09006C;color:#fff;display:flex;align-items:center;gap:18px;padding:0 24px;box-shadow:0 24px 50px rgba(9,0,108,.35)}
+.ok{width:54px;height:54px;border-radius:50%;background:#2fd18a;display:flex;align-items:center;justify-content:center;flex:none}
+#toast .a{font-family:Grotesk;font-weight:700;font-size:26px}#toast .b{font-size:17px;color:#cfcaff;margin-top:3px}
+#finger{position:absolute;width:64px;height:64px;border-radius:50%;background:rgba(9,0,108,.22);border:3px solid rgba(255,255,255,.9);box-shadow:0 6px 18px rgba(9,0,108,.3);transform:translate(-50%,-50%)}
+#ripple{position:absolute;border-radius:50%;border:4px solid #5C40FF;transform:translate(-50%,-50%)}
+#iris{position:absolute;left:50%;top:50%;border-radius:50%;background:#F7F7F7;transform:translate(-50%,-50%)}
+.wm{position:absolute;width:1000px;left:460px;top:250px}
+</style></head><body>
+
+<!-- 1 hook -->
+<div id="s1" class="scene navy">
+  <div class="book" id="b1" style="left:150px;top:90px;transform:rotate(-2deg)">
+    <div class="bk-h">SALES · OCTOBER</div>
+    <div class="bk-l" id="l1" style="top:150px">Milk, tin × 2<span>1,300</span></div>
+    <div class="bk-l" id="l2" style="top:215px">Garri 1kg<span>1,800</span></div>
+    <div class="bk-l" id="l3" style="top:280px">Noodles ctn<span>9,500</span></div>
+    <div class="bk-h" id="l4" style="top:420px;color:#c0392b">CREDIT</div>
+    <div class="bk-l" id="l5" style="top:475px">Mama T<span>₦4,500</span></div>
+    <div class="bk-l" id="l6" style="top:540px">Bro Sule — 2 ctns</div>
+    <div class="bk-l" id="l7" style="top:605px">will pay <span class="strike" id="fri" style="float:none">Friday</span></div>
+  </div>
+  <div class="big" id="h1" style="left:1000px;top:330px;font-size:110px;color:#fff;width:820px">“Will pay<br>Friday.”</div>
+  <div class="big" id="h2" style="left:1000px;top:600px;font-size:58px;letter-spacing:-1.5px;color:#A99BFF;width:820px">Friday was three<br>Fridays ago.</div>
+</div>
+
+<!-- 2 three numbers -->
+<div id="s2" class="scene navy">
+  <div class="big" id="n0" style="left:150px;top:200px;font-size:100px;color:#fff">Three numbers. <span style="color:#A99BFF">None agree.</span></div>
+  <div class="tile" id="t1" style="left:150px"><div class="k">Cash in the bucket</div><div class="v">₦38,200</div></div>
+  <div class="neq" id="q1" style="left:640px">≠</div>
+  <div class="tile" id="t2" style="left:725px"><div class="k">Transfer alerts</div><div class="v">₦61,250</div></div>
+  <div class="neq" id="q2" style="left:1215px">≠</div>
+  <div class="tile" id="t3" style="left:1300px"><div class="k">The exercise book</div><div class="v">₦94,000</div></div>
+  <div id="iris"></div>
+</div>
+
+<!-- 3 reveal -->
+<div id="s3" class="scene light">
+  <img class="wm" id="dome" src="logo-wordmark.jpg"><img class="wm" id="bowl" src="logo-wordmark.jpg"><img class="wm" id="letters" src="logo-wordmark.jpg">
+  <div class="big" id="g1" style="left:0;right:0;top:580px;text-align:center;font-size:110px;color:#09006C">Grow With <span style="color:#5C40FF">Ease.</span></div>
+  <div class="big" id="g2" style="left:0;right:0;top:740px;text-align:center;font-size:44px;font-weight:600;letter-spacing:-1px;color:#5d5b7a">Sell. CACU keeps the books.</div>
+</div>
+
+<!-- 4 sell -->
+<div id="s4" class="scene light">
+  <div class="cap" id="c4"><div class="num"><span></span>01</div><div class="ttl">Ring up<br><em>a sale.</em></div>
+    <div class="cs" style="font-size:36px;margin-top:30px">Prices come from your list.</div></div>
+  <div id="phone"><div id="screen">
+    <div class="sb"><span>9:41</span><span>●●● 4G</span></div>
+    <div class="ph"><h3>POS Checkout</h3><p>Ada Provisions · Ikorodu</p></div>
+    <div class="search">⌕&nbsp; Search inventory or scan SKU...</div>
+    <div class="item"><div class="thumb" style="background:linear-gradient(135deg,#fff1c9,#ffd36b)"></div><div><div class="nm">Milk, tin</div><div class="st"><b>₦650</b> · 24 in stock</div></div><div class="plus">+<div class="badge" id="qty">1</div></div></div>
+    <div class="item"><div class="thumb" style="background:linear-gradient(135deg,#ffe0d1,#ff9e6b)"></div><div><div class="nm">Noodles, carton</div><div class="st"><b>₦9,500</b> · 8 in stock</div></div><div class="plus">+</div></div>
+    <div class="item"><div class="thumb" style="background:linear-gradient(135deg,#f3ead9,#d9c08f)"></div><div><div class="nm">Garri, 1 kg</div><div class="st"><b>₦1,800</b> · 31 in stock</div></div><div class="plus">+</div></div>
+    <div id="cart"><div class="grab"></div><div class="ct" style="font-size:22px">Cart</div>
+      <div class="cl"><span>Milk, tin × 2</span><span>₦1,300</span></div>
+      <div class="tot"><span>Total</span><span>₦1,300</span></div>
+      <div class="pay"><div class="chip" id="cash">Cash</div><div class="chip">Transfer</div></div>
+      <div id="confirm">Confirm &amp; Record Sale</div></div>
+    <div id="toast"><div class="ok"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><div class="a">Sale Recorded</div><div class="b">₦1,300 · Cash · Sale #0042</div></div></div>
+    <div id="ripple"></div><div id="finger"></div>
+  </div></div>
+</div>
+
+<!-- 5 owed -->
+<div id="s5" class="scene light">
+  <div class="cap" id="c5"><div class="num"><span></span>02</div><div class="ttl">Know who<br><em>owes you.</em></div></div>
+  <div class="card" id="k5" style="left:1000px;top:200px;width:780px">
+    <div style="display:flex;justify-content:space-between;align-items:center"><div class="ct">Invoice · Mama T</div><div class="pill">Issued</div></div>
+    <div class="cs">Ada Provisions · credit sale</div>
+    <div style="margin-top:18px"><div class="row"><span>Invoice total</span><span class="amt">₦4,500</span></div>
+    <div class="row" id="pd" style="border:none"><span>Paid today · cash</span><span class="amt" style="color:#0b7a4b">−₦1,500</span></div></div>
+  </div>
+  <div class="card" id="ow" style="left:1000px;top:640px;width:780px;padding:30px 44px;background:#09006C;box-shadow:0 40px 90px -30px rgba(9,0,108,.5)">
+    <div style="font-size:24px;color:#c9c2ff">Mama T still owes</div>
+    <div style="font-family:Grotesk;font-weight:700;font-size:84px;color:#fff;margin-top:4px">₦3,000</div>
+  </div>
+</div>
+
+<!-- 6 books -->
+<div id="s6" class="scene light">
+  <div class="cap" id="c6"><div class="num"><span></span>03</div><div class="ttl">Your books<br><em>keep themselves.</em></div></div>
+  <div class="card" id="k6a" style="left:1000px;top:130px;width:780px;padding:30px 40px">
+    <div class="pill" style="display:inline-block">Start your books</div>
+    <div class="ct" style="margin-top:18px;font-size:30px">How much cash is in the till and safe now?</div>
+    <div style="margin-top:14px;height:60px;border:2px solid #e4e3ef;border-radius:14px;display:flex;align-items:center;padding:0 20px;font-size:26px">₦85,000</div>
+  </div>
+  <div class="card" id="k6b" style="left:1000px;top:520px;width:780px;padding:30px 40px">
+    <div style="font-size:24px;color:#5d5b7a">Profit this month</div>
+    <div style="display:flex;align-items:baseline;gap:18px"><div style="font-family:Grotesk;font-weight:700;font-size:80px;color:#09006C">₦92,900</div><div style="font-size:22px;color:#5C40FF;font-weight:600">from your books</div></div>
+    <div style="display:flex;gap:16px;margin-top:18px;align-items:center"><div id="pdf" style="height:62px;padding:0 26px;border-radius:16px;background:#09006C;color:#fff;display:flex;align-items:center;font-weight:700;font-size:22px">⤓&nbsp;PDF for the bank</div><div class="pill">Management statements</div></div>
+  </div>
+</div>
+
+<!-- 7 punchline -->
+<div id="s7" class="scene navy">
+  <div class="book" id="b7" style="left:150px;top:90px;transform:rotate(-2deg)">
+    <div class="bk-h">HOMEWORK · MATHS</div>
+    <div class="bk-l" style="top:150px">2 + 3 = 5 <span class="ink-red" style="float:none">✓</span></div>
+    <div class="bk-l" style="top:215px">4 + 4 = 8 <span class="ink-red" style="float:none">✓</span></div>
+    <div class="bk-l" style="top:280px">10 − 6 = 4 <span class="ink-red" style="float:none">✓</span></div>
+    <div class="bk-l" style="top:410px;font-size:40px">☆ Excellent!</div>
+  </div>
+  <div class="big" id="p1" style="left:1000px;top:380px;font-size:84px;color:#fff;width:820px">Her daughter does<br><span style="color:#A99BFF">homework in it now.</span></div>
+</div>
+
+<!-- 8 outro -->
+<div id="s8" class="scene light">
+  <img id="wm8" src="logo-wordmark.jpg" style="position:absolute;left:510px;top:260px;width:900px">
+  <div class="big" id="o1" style="left:0;right:0;top:580px;text-align:center;font-size:120px;color:#09006C">Grow With <span style="color:#5C40FF">Ease.</span></div>
+  <div class="big" id="o2" style="left:0;right:0;top:750px;text-align:center;font-size:44px;font-weight:600;letter-spacing:-1px;color:#5d5b7a">Sell. CACU keeps the books.</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)), p=(t,a,b)=>cl((t-a)/(b-a));
+const out3=x=>1-Math.pow(1-x,3), inout=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=x=>{const c=1.6;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+function show(id,a,b,t){const on=t>=a&&t<b;$(id).style.visibility=on?'visible':'hidden';return on}
+function set(el,o,tx=0,ty=0,s=1,extra=''){el.style.opacity=o;el.style.transform=`translate(${tx}px,${ty}px) scale(${s}) ${extra}`}
+function rise(el,t,a,dy=26,dur=.35){const k=out3(p(t,a,a+dur));set(el,k,0,dy*(1-k));return k}
+function cap(el,t,a,b){const i=out3(p(t,a,a+.35)),o=inout(p(t,b-.25,b));set(el,i*(1-o),-40*(1-i)-50*o,0)}
+// exit everything in a scene: fade over last 0.25s
+function fadeOut(ids,t,b){const o=1-inout(p(t,b-.25,b));ids.forEach(i=>{$(i).style.opacity=parseFloat($(i).style.opacity||1)*o});}
+
+window.render=function(t){
+  // 1 hook 0-3.5
+  if(show('s1',0,3.5,t)){
+    const b=out3(p(t,0,.4));set($('b1'),b,-60*(1-b),0,1,'rotate(-2deg)');
+    ['l1','l2','l3','l4','l5','l6','l7'].forEach((l,i)=>{const k=p(t,.1+i*.12,.25+i*.12);$(l).style.opacity=k;});
+    $('fri').style.textDecorationColor=`rgba(210,60,60,${p(t,1.0,1.2)})`;
+    rise($('h1'),t,.3);rise($('h2'),t,1.05);
+    fadeOut(['b1','h1','h2'],t,3.5);
+  }
+  // 2 three numbers 3.5-6.5
+  if(show('s2',3.5,6.75,t)){
+    rise($('n0'),t,3.55);
+    [['t1',4.0],['q1',4.3],['t2',4.5],['q2',4.8],['t3',5.0]].forEach(([e,a])=>{const k=back(p(t,a,a+.35));set($(e),cl(k*2),0,40*(1-k))});
+    const r=inout(p(t,6.2,6.5))*2400;$('iris').style.width=$('iris').style.height=r+'px';
+  }
+  // 3 reveal 6.5-10
+  if(show('s3',6.5,10,t)){
+    const ex=inout(p(t,9.75,10));
+    const d=back(p(t,6.6,7.0)),b=back(p(t,6.75,7.15));
+    $('dome').style.clipPath='inset(0 76% 64% 0)';set($('dome'),cl(d*3)*(1-ex),0,-260*(1-d)-50*ex);
+    $('bowl').style.clipPath='inset(44% 76% 0 0)';set($('bowl'),cl(b*3)*(1-ex),0,260*(1-b)-50*ex);
+    const w=inout(p(t,7.05,7.45));$('letters').style.clipPath=`inset(0 ${73*(1-w)}% 0 27%)`;set($('letters'),1-ex,0,-50*ex);
+    const g=rise($('g1'),t,7.45);$('g1').style.opacity=g*(1-ex);
+    const h=rise($('g2'),t,7.85,18);$('g2').style.opacity=h*(1-ex);
+  }
+  // 4 sell 10-14
+  if(show('s4',10,14,t)){
+    cap($('c4'),t,10.05,13.98);
+    const ph=out3(p(t,10.05,10.5)),po=inout(p(t,13.72,13.98));set($('phone'),ph*(1-po),-60*po,140*(1-ph));
+    $('qty').textContent=t>=11.25?2:1;$('qty').style.transform=`scale(${t>=10.75?back(p(t,10.75,11)):0})`;
+    $('cart').style.transform=`translateY(${(1-out3(p(t,11.35,11.7)))*440}px)`;
+    const c=t>=12.0;$('cash').style.background=c?'#efecff':'#fff';$('cash').style.borderColor=c?'#5C40FF':'#e2e1ec';$('cash').style.color=c?'#5C40FF':'#333';
+    $('confirm').style.transform=`scale(${t>=12.5&&t<12.62?.96:1})`;
+    const tb=back(p(t,13.0,13.35));set($('toast'),cl(tb*2),0,-30*(1-tb),.85+.15*tb);
+    const path=[[10.4,280,560],[10.7,343,265],[11.4,343,265],[11.8,114,710],[12.1,114,710],[12.4,206,785],[12.7,206,785]];
+    let fx=path[0][1],fy=path[0][2];
+    for(let i=0;i<path.length-1;i++){const[a,x1,y1]=path[i],[b2,x2,y2]=path[i+1];if(t>=a){const k=inout(p(t,a,b2));fx=x1+(x2-x1)*k;fy=y1+(y2-y1)*k}}
+    const fo=p(t,10.4,10.55)*(1-p(t,12.7,12.95)),press=[10.75,11.25,12.0,12.5].some(x=>t>=x&&t<x+.12);
+    Object.assign($('finger').style,{left:fx+'px',top:fy+'px',opacity:fo,transform:`translate(-50%,-50%) scale(${press?.82:1})`});
+    let rp=-1;for(const x of [10.75,11.25,12.0,12.5]) if(t>=x&&t<x+.4) rp=(t-x)/.4;
+    const rs=40+80*out3(Math.max(rp,0));Object.assign($('ripple').style,{left:fx+'px',top:fy+'px',width:rs+'px',height:rs+'px',opacity:rp<0?0:(1-rp)*.8});
+  }
+  // 5 owed 14-17
+  if(show('s5',14,17,t)){
+    cap($('c5'),t,14.05,16.98);
+    const k=out3(p(t,14.1,14.45)),ko=inout(p(t,16.72,16.98));set($('k5'),k*(1-ko),60*(1-k)-40*ko,0);
+    const r=out3(p(t,14.7,14.95));set($('pd'),r,30*(1-r),0);
+    const o=back(p(t,15.2,15.55));set($('ow'),cl(o*2)*(1-ko),-40*ko,40*(1-o));
+  }
+  // 6 books 17-20
+  if(show('s6',17,20,t)){
+    cap($('c6'),t,17.05,19.98);
+    const ko=inout(p(t,19.72,19.98));
+    const a=out3(p(t,17.2,17.55));set($('k6a'),a*(1-ko),60*(1-a)-40*ko,0);
+    const b=out3(p(t,18.2,18.55));set($('k6b'),b*(1-ko),60*(1-b)-40*ko,0);
+    const d=back(p(t,18.8,19.1));$('pdf').style.transform=`scale(${.6+.4*d})`;$('pdf').style.opacity=cl(d*2);
+  }
+  // 7 punchline 20-22.5
+  if(show('s7',20,22.5,t)){
+    const b=out3(p(t,20.0,20.4)),ex=inout(p(t,22.25,22.5));set($('b7'),b*(1-ex),-60*(1-b),0,1,'rotate(-2deg)');
+    const h=rise($('p1'),t,20.1);$('p1').style.opacity=h*(1-ex);
+  }
+  // 8 outro 22.5-25
+  if(show('s8',22.5,99,t)){
+    const a=out3(p(t,22.55,22.95));set($('wm8'),a,0,20*(1-a),.96+.04*a);
+    rise($('o1'),t,22.7);rise($('o2'),t,23.05,18);
+  }
+};
+window.ready=Promise.all([document.fonts.load('700 50px Grotesk'),document.fonts.load('italic 500 30px Inter'),document.fonts.load('600 20px Inter'),document.fonts.ready,
+  ...[...document.images].map(i=>i.decode())]).then(()=>{window.render(0);return true});
+</script></body></html>

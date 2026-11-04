@@ -10,6 +10,11 @@ port = 54321
 [studio]
 port = 54323
 
+# Doc 16 SEC-013: passwords of at least 10 characters. The sign-up and reset forms check the same; hosted projects
+# take it from the dashboard (Authentication > Sign In / Providers > Password requirements), which must match.
+[auth]
+minimum_password_length = 10
+
 # Invitation acceptance trusts email_confirmed_at as proof of inbox ownership (security audit run 1, lead 2),
 # so confirmation and secure email change must stay on. Hosted projects take these from the dashboard:
 # Authentication > Providers > Email must match.

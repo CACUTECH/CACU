@@ -28,7 +28,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
-  password: z.string().min(6, "New password must be at least 6 characters"),
+  password: z.string().min(10, "New password must be at least 10 characters"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",

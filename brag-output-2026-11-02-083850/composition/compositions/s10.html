@@ -1,0 +1,72 @@
+<template>
+<style>
+@font-face{font-family:'CACU Display';src:url('assets/fonts/space-grotesk-latin-variable.woff2') format('woff2');font-weight:300 700}
+@font-face{font-family:'CACU Text';src:url('assets/fonts/inter-latin-variable.woff2') format('woff2');font-weight:100 900}
+#root{position:absolute;inset:0;overflow:hidden;font-family:'CACU Text',sans-serif;color:#14123a}
+#root *{box-sizing:border-box;margin:0;padding:0}
+.ground{position:absolute;inset:0}
+.light{background:#F7F7F7}.navy{background:#09006C}
+.all{position:absolute;inset:0}
+.eyebrow{position:absolute;left:150px;top:300px;font-family:'CACU Display';font-weight:700;font-size:26px;letter-spacing:4px;color:#5C40FF}
+.eyebrow i{display:inline-block;width:56px;height:4px;border-radius:2px;background:#5C40FF;vertical-align:middle;margin-right:18px}
+.title{position:absolute;left:150px;top:350px;width:780px;font-family:'CACU Display';font-weight:700;font-size:88px;line-height:1.04;letter-spacing:-3px;color:#09006C}
+.title em{font-style:normal;color:#5C40FF}
+.navy .eyebrow,.onnavy .eyebrow{color:#A99BFF}.onnavy .eyebrow i{background:#A99BFF}
+.onnavy .title{color:#fff}.onnavy .title em{color:#A99BFF}
+.card{position:absolute;background:#fff;border-radius:30px;box-shadow:0 40px 90px -30px rgba(9,0,108,.35),0 0 0 1.5px #ebeaf3;padding:36px 42px}
+.ncard{position:absolute;background:#15107f;border-radius:28px;box-shadow:0 0 0 1.5px #2c2696;padding:32px 36px;color:#fff}
+.ch{display:flex;justify-content:space-between;align-items:center;gap:20px}
+.ct{font-family:'CACU Display';font-weight:700;font-size:30px;color:#09006C}
+.cs{font-size:20px;color:#5d5b7a;margin-top:8px}
+.pill{font-size:18px;font-weight:600;color:#5C40FF;background:#efecff;padding:9px 16px;border-radius:999px;white-space:nowrap}
+.pill.ok{color:#0b7a4b;background:#dcf7ea}.pill.wait{color:#8a5a00;background:#fff1cc}
+.row{display:flex;justify-content:space-between;align-items:center;height:70px;border-bottom:1.5px solid #f0eff6;font-size:23px;color:#1a1840}
+.row:last-child{border-bottom:none}
+.amt{font-family:'CACU Display';font-weight:600;font-variant-numeric:tabular-nums}
+.btn{display:flex;align-items:center;justify-content:center;height:64px;border-radius:16px;background:#5C40FF;color:#fff;font-weight:700;font-size:22px}
+.chip{display:inline-flex;align-items:center;height:56px;padding:0 24px;border-radius:999px;background:#fff;box-shadow:0 0 0 1.5px #e4e3ef;font-weight:600;font-size:22px;color:#09006C}
+.check{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:#2fd18a;flex:none}
+.sub{position:absolute;left:150px;width:760px;font-size:30px;line-height:1.4;color:#5d5b7a}
+
+#s10-tabs{position:absolute;left:1000px;top:170px;width:820px;display:flex;gap:9px}
+.s10-tab{height:50px;padding:0 15px;border-radius:999px;background:#fff;box-shadow:0 0 0 1.5px #e4e3ef;display:flex;align-items:center;font-weight:600;font-size:17px;white-space:nowrap;color:#5d5b7a;position:relative}
+.s10-on{position:absolute;inset:0;border-radius:999px;background:#5C40FF;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px}
+#s10-pl{left:1000px;top:270px;width:800px;padding:30px 40px}
+.s10-g{display:grid;grid-template-columns:1fr 170px 170px;align-items:center;height:62px;border-bottom:1.5px solid #f0eff6;font-size:22px}
+.s10-g div:not(:first-child){text-align:right}
+.s10-hd{height:44px;font-size:16px;font-weight:600;letter-spacing:1.5px;color:#77769a;text-transform:uppercase}
+.s10-np{font-family:'CACU Display';font-weight:700;font-size:28px;color:#5C40FF;border:none}
+#s10-ex{position:absolute;left:1000px;top:740px;display:flex;gap:16px}
+.s10-b{height:62px;padding:0 26px;border-radius:16px;border:2px solid #09006C;display:flex;align-items:center;font-weight:700;font-size:22px;color:#09006C}
+#s10-wa{position:absolute;left:150px;top:640px}
+</style>
+<div data-hf-id="hf-8bl1" id="root" data-composition-id="s10" data-width="1920" data-height="1080" data-layout-allow-overlap>
+<div data-hf-id="hf-m0sx" class="ground light"></div>
+
+<div data-hf-id="hf-c1l4" class="all" id="s10-all" data-hold><div data-hf-id="hf-ve75" class="eyebrow" id="s10-eb"><i data-hf-id="hf-wt6k"></i>LIVE TODAY · STATEMENTS</div><div data-hf-id="hf-592k" class="title" id="s10-tt">Statements a<br data-hf-id="hf-x5px"><em data-hf-id="hf-j0k1">lender can read.</em></div>
+<div data-hf-id="hf-sabw" id="s10-tabs"><div data-hf-id="hf-stko" class="s10-tab" id="s10-t1">Trial balance<div data-hf-id="hf-l9nj" class="s10-on" id="s10-o1">Trial balance</div></div><div data-hf-id="hf-v47m" class="s10-tab" id="s10-t2">General ledger<div data-hf-id="hf-23mj" class="s10-on" id="s10-o2">General ledger</div></div><div data-hf-id="hf-mxmw" class="s10-tab" id="s10-t3">Profit or loss<div data-hf-id="hf-wd6d" class="s10-on" id="s10-o3">Profit or loss</div></div><div data-hf-id="hf-84rg" class="s10-tab" id="s10-t4">Balance sheet<div data-hf-id="hf-lsh3" class="s10-on" id="s10-o4">Balance sheet</div></div><div data-hf-id="hf-787x" class="s10-tab" id="s10-t5">Cash flow<div data-hf-id="hf-426e" class="s10-on" id="s10-o5">Cash flow</div></div></div>
+<div data-hf-id="hf-qowh" class="card" id="s10-pl"><div data-hf-id="hf-dwy1" class="ch"><div data-hf-id="hf-zhg2" class="ct">Profit or loss · Ada Provisions</div><span data-hf-id="hf-12zb" class="pill">Management statements</span></div>
+<div data-hf-id="hf-i49o" class="s10-g s10-hd" style="margin-top:14px"><div data-hf-id="hf-yeow"></div><div data-hf-id="hf-uys4">Oct 2026</div><div data-hf-id="hf-72ny">Sep 2026</div></div>
+<div data-hf-id="hf-wtuo" class="s10-g"><div data-hf-id="hf-1ze8">Revenue</div><div data-hf-id="hf-soap" class="amt">₦486,500</div><div data-hf-id="hf-bt65" class="amt">₦441,200</div></div>
+<div data-hf-id="hf-1grc" class="s10-g"><div data-hf-id="hf-zuwy">Cost of sales</div><div data-hf-id="hf-7m36" class="amt">(₦331,200)</div><div data-hf-id="hf-z82c" class="amt">(₦305,900)</div></div>
+<div data-hf-id="hf-09u9" class="s10-g"><div data-hf-id="hf-5x0l">Expenses</div><div data-hf-id="hf-5e73" class="amt">(₦62,400)</div><div data-hf-id="hf-tlxd" class="amt">(₦58,100)</div></div>
+<div data-hf-id="hf-e9pv" class="s10-g s10-np"><div data-hf-id="hf-en7f">Net profit</div><div data-hf-id="hf-k610" class="amt">₦92,900</div><div data-hf-id="hf-gehg" class="amt">₦77,200</div></div></div>
+<div data-hf-id="hf-2s5b" id="s10-ex"><div data-hf-id="hf-wasp" class="s10-b" id="s10-pdf" style="background:#09006C;color:#fff">⤓&nbsp;PDF</div><div data-hf-id="hf-yonl" class="s10-b" id="s10-xls">⤓&nbsp;Excel</div></div>
+<span data-hf-id="hf-6okv" class="chip" id="s10-wa">Stock at weighted-average cost</span>
+</div>
+</div>
+<script>
+const tl=gsap.timeline({paused:true});
+const IN=(s,t,d={})=>tl.fromTo(s,{opacity:0,y:d.y??22,rotation:d.rot??0,filter:'blur(8px)'},{opacity:1,y:0,rotation:d.rot??0,filter:'blur(0px)',duration:d.dur??0.6,ease:'expo.out',stagger:d.st??0},t);
+
+IN('#s10-eb',0.1);IN('#s10-tt',0.2);
+IN('#s10-tabs .s10-tab',0.3,{y:12,st:.05});
+const T=[0.700,1.722,2.813,3.972,5.199];
+T.forEach((t,i)=>{tl.fromTo('#s10-o'+(i+1),{opacity:0},{opacity:1,duration:.15},t);if(i<4)tl.fromTo('#s10-o'+(i+1),{opacity:1},{opacity:0,duration:.15,immediateRender:false},T[i+1]);});
+IN('#s10-pl',2.813,{y:40});
+IN('#s10-pdf',7.857,{y:14});IN('#s10-xls',8.335,{y:14});IN('#s10-wa',10.720-0.3,{y:20});
+tl.fromTo('#s10-all',{opacity:1,filter:'blur(0px)'},{opacity:0,filter:'blur(8px)',duration:.25,ease:'power3.in',immediateRender:false},13.033);
+tl.to({},{duration:13.333},0);
+window.__timelines["s10"]=tl;
+</script>
+</template>

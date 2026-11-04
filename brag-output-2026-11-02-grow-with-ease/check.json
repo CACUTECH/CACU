@@ -1,0 +1,116 @@
+{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "filesScanned": 7
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "duration": 45,
+    "samples": [
+      2,
+      8,
+      16,
+      24,
+      42
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 0,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      2,
+      8,
+      16,
+      24,
+      42
+    ],
+    "checked": 65,
+    "passed": 65
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "step": 0.125,
+    "samples": 360
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": true,
+    "files": [
+      ".hyperframes\\artifacts\\snapshots\\afc16080-2c4b-498a-b477-acecc89e8010\\frame-00-at-2.0s.png",
+      ".hyperframes\\artifacts\\snapshots\\afc16080-2c4b-498a-b477-acecc89e8010\\frame-01-at-8.0s.png",
+      ".hyperframes\\artifacts\\snapshots\\afc16080-2c4b-498a-b477-acecc89e8010\\frame-02-at-16.0s.png",
+      ".hyperframes\\artifacts\\snapshots\\afc16080-2c4b-498a-b477-acecc89e8010\\frame-03-at-24.0s.png",
+      ".hyperframes\\artifacts\\snapshots\\afc16080-2c4b-498a-b477-acecc89e8010\\frame-04-at-42.0s.png"
+    ],
+    "times": [
+      2,
+      8,
+      16,
+      24,
+      42
+    ],
+    "findingFiles": []
+  },
+  "saved": {
+    "id": "2da47a35-7d3e-4c48-8567-4b7560ac99bd",
+    "revision": "02cf1cbf-ebd9-43de-9482-d39a1285d588",
+    "report": "C:\\Users\\olayiwolao\\CACU_NEW\\brag-output-2026-11-02-grow-with-ease\\composition\\.hyperframes\\artifacts\\checks\\2da47a35-7d3e-4c48-8567-4b7560ac99bd.json",
+    "attribution": "recorded-revision"
+  },
+  "_meta": {
+    "version": "0.9.1",
+    "latestVersion": "0.9.0",
+    "updateAvailable": false
+  }
+}

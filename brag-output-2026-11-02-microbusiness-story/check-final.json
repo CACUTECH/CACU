@@ -1,0 +1,138 @@
+{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "filesScanned": 20
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "duration": 322.03,
+    "samples": [
+      4.129,
+      12.386,
+      20.643,
+      28.9,
+      37.157,
+      45.414,
+      53.672,
+      61.929,
+      70.186,
+      78.443,
+      86.7,
+      94.958,
+      103.215,
+      111.472,
+      119.729,
+      127.986,
+      136.243,
+      144.501,
+      152.758,
+      161.015,
+      169.272,
+      177.529,
+      185.787,
+      194.044,
+      202.301,
+      210.558,
+      218.815,
+      227.072,
+      235.33,
+      243.587,
+      251.844,
+      260.101,
+      268.358,
+      276.616,
+      284.873,
+      293.13,
+      301.387,
+      309.644,
+      317.901
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 0,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      4.129,
+      78.443,
+      161.015,
+      235.33,
+      317.901
+    ],
+    "checked": 58,
+    "passed": 58
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "step": 0.5379999999999825,
+    "samples": 599
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  },
+  "saved": {
+    "id": "20cb3e40-29c3-4ca9-a623-cabf6cd09983",
+    "revision": "c90a484e-50df-475a-9d3b-0206a87677a2",
+    "report": "C:\\Users\\olayiwolao\\CACU_NEW\\brag-output-2026-11-02-microbusiness-story\\composition\\.hyperframes\\artifacts\\checks\\20cb3e40-29c3-4ca9-a623-cabf6cd09983.json",
+    "attribution": "recorded-revision"
+  },
+  "_meta": {
+    "version": "0.9.0",
+    "latestVersion": "0.9.0",
+    "updateAvailable": false
+  }
+}

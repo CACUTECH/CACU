@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   Users,
   Wallet,
-  TrendingUp,
   Loader2,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
@@ -141,16 +140,14 @@ export default function CustomersPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-headline text-3xl font-bold tracking-tight">Customer Relationships</h1>
-                    <p className="text-muted-foreground mt-1">Manage profiles and loyalty in a relational PostgreSQL backend.</p>
+                    <p className="text-muted-foreground mt-1">Your customers and what they have bought from you.</p>
                 </div>
                 <AddCustomerDialog onSave={handleAddCustomer} />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <CRMStatCard title="Total Customers" value={customers.length.toString()} subtext="Syncing via Supabase" icon={Users} />
-                <CRMStatCard title="Portfolio LTV" value={`₦${(totalLtv / 1000000).toFixed(2)}M`} subtext="Real-time aggregation" icon={Wallet} />
-                <CRMStatCard title="Active Tier" value="GOLD" subtext="Top segment" icon={TrendingUp} />
-                <CRMStatCard title="Security" value="ACTIVE" subtext="RLS Partitioning" icon={CheckCircle2} />
+            <div className="grid gap-4 sm:grid-cols-2">
+                <CRMStatCard title="Customers" value={customers.length.toLocaleString('en-NG')} subtext="Saved in this business" icon={Users} />
+                <CRMStatCard title="Recorded spend" value={`₦${(totalLtv / 1000000).toFixed(2)}M`} subtext="What these customers have spent with you" icon={Wallet} />
             </div>
 
             <Card className="shadow-xl shadow-primary/5 border-primary/10">

@@ -1,0 +1,416 @@
+{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "filesScanned": 20
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 12,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target #brand-content .reveal not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target  not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target #finish-content .reveal not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target  not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target #sources-content .reveal not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target  not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target  not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 45.414,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target  not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 53.672,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target  not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 293.13,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target  not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 301.387,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target  not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 309.644,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      },
+      {
+        "code": "console_warning",
+        "severity": "warning",
+        "message": "GSAP target  not found. https://gsap.com",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "322.03",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 317.901,
+        "url": "http://127.0.0.1:56652/",
+        "line": 65
+      }
+    ]
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "duration": 322.03,
+    "samples": [
+      4.129,
+      12.386,
+      20.643,
+      28.9,
+      37.157,
+      45.414,
+      53.672,
+      61.929,
+      70.186,
+      78.443,
+      86.7,
+      94.958,
+      103.215,
+      111.472,
+      119.729,
+      127.986,
+      136.243,
+      144.501,
+      152.758,
+      161.015,
+      169.272,
+      177.529,
+      185.787,
+      194.044,
+      202.301,
+      210.558,
+      218.815,
+      227.072,
+      235.33,
+      243.587,
+      251.844,
+      260.101,
+      268.358,
+      276.616,
+      284.873,
+      293.13,
+      301.387,
+      309.644,
+      317.901
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 0,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      4.129,
+      78.443,
+      161.015,
+      235.33,
+      317.901
+    ],
+    "checked": 58,
+    "passed": 58
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "step": 0.5379999999999825,
+    "samples": 599
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": true,
+    "files": [
+      ".hyperframes\\artifacts\\snapshots\\ea7363d6-5367-44b9-bbe4-0b0502cf00a2\\frame-00-at-4.1s.png",
+      ".hyperframes\\artifacts\\snapshots\\ea7363d6-5367-44b9-bbe4-0b0502cf00a2\\frame-01-at-78.4s.png",
+      ".hyperframes\\artifacts\\snapshots\\ea7363d6-5367-44b9-bbe4-0b0502cf00a2\\frame-02-at-161.0s.png",
+      ".hyperframes\\artifacts\\snapshots\\ea7363d6-5367-44b9-bbe4-0b0502cf00a2\\frame-03-at-235.3s.png",
+      ".hyperframes\\artifacts\\snapshots\\ea7363d6-5367-44b9-bbe4-0b0502cf00a2\\frame-04-at-317.9s.png"
+    ],
+    "times": [
+      4.129,
+      78.443,
+      161.015,
+      235.33,
+      317.901
+    ],
+    "findingFiles": []
+  }
+}

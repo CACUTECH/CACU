@@ -1,0 +1,1 @@
+After the accounting setup and opening position are reviewed, supported transactions flow into balanced double entry records. The chart of accounts, journals, general ledger and trial balance give the accountant a traceable structure beneath the owner friendly screens.
