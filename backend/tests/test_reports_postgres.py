@@ -10,6 +10,7 @@ from cacu.accounting.stock import request_adjustment
 from cacu.accounting.workflows import expense_create
 import cacu.accounting.reports as reports
 from cacu.accounting.reports import cash_flow, general_ledger, trial_balance
+from cacu.accounting.reconcile import check_books
 from test_corrections_postgres import live, call, expense, adjustment, URL
 from test_opening_position_postgres import books
 from test_default_chart_postgres import charted
@@ -106,3 +107,14 @@ def test_statements_show_profit_by_section_and_a_balanced_position_with_comparat
     assert last_year['periods'][1]['start_date'][:4] == str(TODAY.year - 1)
     with pytest.raises(HTTPException, match='prior or last_year'):
         call(live, 'viewer', lambda s, a: statements(s, TODAY, TODAY, 'quarter'))
+
+
+def test_the_daily_check_passes_clean_books_and_names_a_control_account_that_disagrees(live):  # TEST-402
+    as_of, problems = call(live, 'viewer', lambda s, a: check_books(s))
+    assert as_of == TODAY and problems == []
+    key = uuid4()
+    journal = PostingCommand(request_key=key, kind='adjustment', source_id=key, main_account_id=live.codes['1100'], entry_date=TODAY,
+                             narration='Owed by Ada, no invoice', credited=False, lines=[{'account_id': live.codes['4900'], 'amount': '5000', 'credited': True}])
+    call(live, 'owner', lambda s, a: post_command(s, a, journal))
+    _, problems = call(live, 'viewer', lambda s, a: check_books(s))
+    assert [(p['check'], p['difference']) for p in problems] == [('receivables', '5000.00')]

@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import json
 import os
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -36,6 +36,7 @@ def database(monkeypatch):
           CREATE TABLE public.business_invitations(business_id uuid, status text, expires_at timestamptz);
           CREATE TABLE public.business_locations(business_id uuid, is_active boolean NOT NULL DEFAULT true, id uuid NOT NULL DEFAULT gen_random_uuid(), name text, created_at timestamptz NOT NULL DEFAULT clock_timestamp());
           CREATE TABLE public.catalog_items(business_id uuid, is_active boolean);
+          CREATE SCHEMA accounting; CREATE TABLE accounting.business_map(business_id uuid PRIMARY KEY, state text NOT NULL);
           GRANT USAGE ON SCHEMA public, auth TO authenticated, anon, cacu_runtime;
           GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, anon;""")
         for name in ('20261012132427_guarded_ai_chat.sql', '20261102090100_ai_active_members.sql',
@@ -43,7 +44,8 @@ def database(monkeypatch):
                      '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql', '20261102150000_renewals.sql',
                      '20261104090000_ai_plan_quota.sql', '20261104100000_interval_changes.sql',
                      '20261104110000_billing_history_details.sql', '20261104120000_billing_notifications.sql', '20261104130000_plan_limit_values.sql',
-                     '20261105100000_cancel_and_downgrade_choices.sql'):
+                     '20261105100000_cancel_and_downgrade_choices.sql',
+                     '20261106090000_daily_reconciliation.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -862,3 +864,58 @@ def test_a_trial_ending_on_general_applies_the_choice_too_and_only_managers_see_
         c.execute("UPDATE platform.subscriptions SET current_period_start=now()-interval '14 days', current_period_end=now()-interval '1 minute' WHERE business_id=%s", (ident,))
         c.execute('SELECT platform.end_trials()')
     assert active_members(ident) == {owner, extra[1]} and status(ident) == ('incomplete', False)
+
+
+def activated(ident):
+    with psycopg.connect(URL) as c:
+        c.execute("INSERT INTO accounting.business_map VALUES(%s,'active')", (ident,))
+
+
+def test_activated_businesses_are_checked_as_their_owner_and_differences_remind_the_owner_once_a_day():  # TEST-402
+    ident, owner, _ = business()
+    legacy, _, _ = business()  # not on the native ledger: not checked
+    activated(ident)
+    with psycopg.connect(URL) as c:
+        assert c.execute('SELECT ops.books_to_check()').fetchone()[0] == [{'business_id': str(ident), 'actor': str(owner)}]
+        c.execute("SELECT ops.record_reconciliation(%s, CURRENT_DATE, '[]')", (ident,))
+        problems = json.dumps([{'check': 'stock', 'message': 'Stock differs', 'difference': '1200.00'}, {'check': 'cash', 'message': 'Cash differs'}])
+        for _ in range(2):
+            c.execute('SELECT ops.record_reconciliation(%s, CURRENT_DATE, %s)', (ident, problems))
+        runs = c.execute('SELECT ok, jsonb_array_length(exceptions) FROM ops.reconciliation_runs WHERE business_id=%s ORDER BY id', (ident,)).fetchall()
+        reminders = c.execute("SELECT channel, details->'checks' FROM platform.notifications WHERE business_id=%s AND kind='books_exception'", (ident,)).fetchall()
+        for role in ('authenticated', 'cacu_runtime'):
+            assert not c.execute("SELECT has_table_privilege(%s, 'ops.reconciliation_runs', 'SELECT')", (role,)).fetchone()[0]
+    assert runs == [(True, 0), (False, 2), (False, 2)]
+    assert reminders == [('email', ['cash', 'stock'])]
+
+
+def test_the_operator_checks_each_business_records_results_and_keeps_going_after_a_failure(monkeypatch, capsys):
+    from contextlib import contextmanager
+    from cacu.accounting import reconcile
+    from tools.reconcile_books import main
+    good, broken, uneven = (business()[0] for _ in range(3))
+    for ident in (good, broken, uneven):
+        activated(ident)
+
+    @contextmanager
+    def fake_session(actor, business_id, write=False):
+        if business_id == broken:
+            raise RuntimeError('database unavailable')
+        yield business_id
+    monkeypatch.setattr(reconcile, 'library_transaction', fake_session)
+    monkeypatch.setattr(reconcile, 'check_books', lambda session: (date.today(), [] if session == good else [{'check': 'trial_balance', 'message': 'Debits and credits differ'}]))
+    assert main(['--apply', '--json']) == 1  # differences and a failure must fail the scheduled run
+    assert json.loads(capsys.readouterr().out) == {'mode': 'apply', 'status': 'attention_required', 'checked': 2, 'clean': 1, 'exceptions': 1, 'failed': 1}
+    with psycopg.connect(URL) as c:
+        assert dict(c.execute('SELECT business_id, ok FROM ops.reconciliation_runs').fetchall()) == {good: True, uneven: False}
+    assert main(['--json']) == 0 and json.loads(capsys.readouterr().out)['businesses'] == 3
+    assert main(['--apply', '--json', '--business', str(good)]) == 0  # one business, straight after activation
+    assert json.loads(capsys.readouterr().out)['checked'] == 1
+    assert main(['--json', '--business', str(uneven)]) == 0 and json.loads(capsys.readouterr().out)['businesses'] == 1
+
+
+def test_books_reminder_wording():
+    from cacu.billing.notify import render
+    subject, text = render('books_exception', 'email', {'as_of': '2026-11-06', 'checks': ['stock', 'cash']}, 'Ada Provisions')
+    assert subject == 'Your CACU books need a check'
+    assert 'found a difference in stock value, cash (as of 6 Nov 2026)' in text and 'Nothing has been changed.' in text

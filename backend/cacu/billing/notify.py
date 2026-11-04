@@ -49,6 +49,13 @@ def render(kind: str, channel: str, details: dict, business: str) -> tuple[str, 
     elif kind == 'payment_due':
         subject = 'Your CACU payment is due'
         body = f"Your CACU payment is due. Pay by {_date(details['pay_by'])} to keep full access: {url}."
+    elif kind == 'books_exception':
+        checks = {'trial_balance': 'the trial balance', 'receivables': 'customer balances', 'payables': 'supplier balances',
+                  'stock': 'stock value', 'cash': 'cash'}
+        named = ', '.join(checks.get(c, c) for c in details.get('checks') or []) or 'your books'
+        subject = 'Your CACU books need a check'
+        body = (f"Today's check of your books found a difference in {named} (as of {_date(details['as_of'])}). "
+                'Open your reports in CACU to see it, or ask your accountant. Nothing has been changed.')
     elif kind == 'suspended':
         subject = 'Your CACU workspace is read-only'
         body = f"Your CACU workspace is read-only until you pay. Nothing has been deleted. Pay to reopen it: {url}."
