@@ -17,18 +17,18 @@ def database():
     parsed = urlparse(URL)
     assert parsed.hostname in {'127.0.0.1','localhost'} and parsed.path.endswith('_test')
     with psycopg.connect(URL, autocommit=True) as c:
-        c.execute('DROP SCHEMA IF EXISTS ai_private CASCADE; DROP SCHEMA IF EXISTS public CASCADE; DROP SCHEMA IF EXISTS auth CASCADE; CREATE SCHEMA public; CREATE SCHEMA auth')
+        c.execute('DROP SCHEMA IF EXISTS ai_private CASCADE; DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS public CASCADE; DROP SCHEMA IF EXISTS auth CASCADE; CREATE SCHEMA public; CREATE SCHEMA auth')
         for role in ('anon','authenticated'):
             if not c.execute('SELECT 1 FROM pg_roles WHERE rolname=%s',(role,)).fetchone():
                 c.execute(psycopg.sql.SQL('CREATE ROLE {} NOLOGIN').format(psycopg.sql.Identifier(role)))
         c.execute("""CREATE TABLE auth.users(id uuid PRIMARY KEY);
-        CREATE TABLE public.businesses(id uuid PRIMARY KEY);
+        CREATE TABLE public.businesses(id uuid PRIMARY KEY,business_type text NOT NULL DEFAULT 'PRODUCT');
         CREATE TABLE public.memberships(user_id uuid NOT NULL,business_id uuid NOT NULL REFERENCES public.businesses(id),role text NOT NULL,is_active boolean NOT NULL DEFAULT true,PRIMARY KEY(user_id,business_id));
         CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
         GRANT USAGE ON SCHEMA public,auth TO authenticated,anon;
         GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated,anon;
         ALTER TABLE public.memberships ENABLE ROW LEVEL SECURITY;""")
-        for name in ('20261012132427_guarded_ai_chat.sql','20261102090100_ai_active_members.sql'):
+        for name in ('20261012132427_guarded_ai_chat.sql','20261102090100_ai_active_members.sql','20261102100000_platform_plans.sql','20261104090000_ai_plan_quota.sql'):
             c.execute((Path(__file__).resolve().parents[2]/'supabase/migrations'/name).read_text(encoding='utf-8'))
     yield
 
@@ -152,3 +152,53 @@ def test_deactivated_member_cannot_reserve_or_finish():
     with psycopg.connect(URL) as c: c.execute('UPDATE public.memberships SET is_active=false WHERE user_id=%s',(actor,))
     with pytest.raises(psycopg.errors.InsufficientPrivilege): reserve(actor,business)
     with pytest.raises(psycopg.errors.InsufficientPrivilege): rpc(actor,'finish_ai_chat',(business,key,'completed'))
+
+
+def subscribe(business,plan,status='active'):
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.actor_kind','system',true),set_config('platform.reason','AI quota test',true)")
+        c.execute('INSERT INTO platform.subscriptions(business_id,plan_code,status) VALUES(%s,%s,%s)',(business,plan,status))
+
+def seed_this_month(business,n,status='completed'):
+    """n questions from another member earlier this month (Lagos), so per-actor caps are untouched."""
+    with psycopg.connect(URL) as c:
+        c.execute("""INSERT INTO ai_private.requests(actor_id,request_key,business_id,fingerprint,model,status,created_at)
+          SELECT gen_random_uuid(),gen_random_uuid(),%s,%s,%s,%s,(date_trunc('month',now() AT TIME ZONE 'Africa/Lagos') AT TIME ZONE 'Africa/Lagos')+interval '1 second'
+          FROM generate_series(1,%s)""",(business,FINGERPRINT,MODEL,status,n))
+
+def requests(business):
+    with psycopg.connect(URL) as c:
+        return c.execute('SELECT count(*) FROM ai_private.requests WHERE business_id=%s',(business,)).fetchone()[0]
+
+def test_oga_allows_100_questions_a_month_then_refuses_without_counting():  # TEST-210
+    actor,business=member(); enable(business_per_day=200,global_per_day=500); subscribe(business,'GROW')
+    seed_this_month(business,98); seed_this_month(business,5,'failed')  # failed answers are not counted
+    assert reserve(actor,business)['remaining']==1
+    assert reserve(actor,business)['remaining']==0
+    before=requests(business)
+    with pytest.raises(psycopg.errors.RaiseException,match='AI_MONTHLY_LIMIT'): reserve(actor,business)
+    assert requests(business)==before
+    quota=rpc(actor,'get_ai_chat_quota',(business,))
+    assert (quota['limit'],quota['used'],quota['remaining'],quota['billed'])==(100,100,0,True)
+
+def test_last_months_questions_do_not_count():
+    actor,business=member(); enable(business_per_day=200,global_per_day=500); subscribe(business,'GROW')
+    seed_this_month(business,100)
+    with psycopg.connect(URL) as c: c.execute("UPDATE ai_private.requests SET created_at=created_at-interval '2 seconds'")
+    assert reserve(actor,business)['remaining']==99
+
+def test_general_has_no_ai_questions_and_suspended_businesses_ask_none():
+    actor,business=member(); enable(); subscribe(business,'BASE')
+    with pytest.raises(psycopg.errors.RaiseException,match='AI_MONTHLY_LIMIT'): reserve(actor,business)
+    assert rpc(actor,'get_ai_chat_quota',(business,))['limit']==0
+    actor,business=member(); subscribe(business,'TOP','suspended')
+    with pytest.raises(psycopg.errors.RaiseException,match='AI_PLAN_SUSPENDED'): reserve(actor,business)
+    assert requests(business)==0
+
+def test_unbilled_businesses_keep_the_shared_limits_only_and_quota_is_members_only():
+    actor,business=member(); enable()
+    assert reserve(actor,business)['remaining'] is None
+    quota=rpc(actor,'get_ai_chat_quota',(business,))
+    assert (quota['billed'],quota['limit'],quota['used'])==(False,None,1)
+    other,_=member()
+    with pytest.raises(psycopg.errors.InsufficientPrivilege): rpc(other,'get_ai_chat_quota',(business,))

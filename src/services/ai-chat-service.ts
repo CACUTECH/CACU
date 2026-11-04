@@ -2,12 +2,13 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { BaseService } from './base-service';
 import { generateOpenAIText } from '@/ai/openai';
+import { AI_NOT_ON_PLAN, AI_SUSPENDED, allowanceLine, limitReachedLine } from '@/lib/ai-quota';
 
 const requestSchema = z.object({ businessId: z.string().uuid(), requestKey: z.string().uuid(),
   question: z.string().trim().min(1).max(2000) }).strict();
 export type AIChatRequest = z.infer<typeof requestSchema>;
-export type AIChatResult = { ok: true; answer: string } | { ok: false;
-  code: 'unavailable' | 'rate_limit' | 'duplicate' | 'invalid' | 'failed' | 'access_denied'; message: string };
+export type AIChatResult = { ok: true; answer: string; allowance?: string | null } | { ok: false;
+  code: 'unavailable' | 'rate_limit' | 'plan_limit' | 'duplicate' | 'invalid' | 'failed' | 'access_denied'; message: string };
 export const AI_SETUP_MESSAGE = 'AI chat is not enabled for this deployment. Please ask your administrator to complete the OpenAI pilot setup.';
 const validRoles = ['owner', 'admin', 'editor', 'viewer'];
 function configuredModel() {
@@ -23,14 +24,21 @@ export class AIChatService extends BaseService {
       || !context.role || !validRoles.includes(context.role)) throw new Error('AI_ACCESS_DENIED');
     return context;
   }
-  async status(businessId: string): Promise<{ ready: boolean; message: string }> {
+  private async allowance(supabase: Awaited<ReturnType<AIChatService['context']>>['supabase'], businessId: string) {
+    try { const { data, error } = await supabase.rpc('get_ai_chat_quota', { p_business_id: businessId }); return error ? null : data; }
+    catch { return null; }
+  }
+  async status(businessId: string): Promise<{ ready: boolean; message: string; allowance?: string | null }> {
     try {
       const { supabase } = await this.context(businessId);
       const model = configuredModel();
       if (!model) return { ready: false, message: AI_SETUP_MESSAGE };
       const { data, error } = await supabase.rpc('get_ai_chat_status', { p_business_id: businessId, p_model: model });
-      return data === true && !error ? { ready: true, message: 'General guidance only. No financial or employee records are read.' }
-        : { ready: false, message: AI_SETUP_MESSAGE };
+      if (data !== true || error) return { ready: false, message: AI_SETUP_MESSAGE };
+      // The plan's monthly allowance (TEST-210). A plan without AI questions is not offered the chat at all.
+      const allowance = allowanceLine(await this.allowance(supabase, businessId));
+      if (allowance === AI_NOT_ON_PLAN) return { ready: false, message: AI_NOT_ON_PLAN };
+      return { ready: true, message: 'General guidance only. No financial or employee records are read.', allowance };
     } catch { return { ready: false, message: 'Select a business you can access before using the assistant.' }; }
   }
   async ask(input: AIChatRequest): Promise<AIChatResult> {
@@ -57,6 +65,8 @@ export class AIChatService extends BaseService {
       if (error) {
         if (error.message === 'AI_RATE_LIMIT') return { ok: false, code: 'rate_limit', message: 'The shared AI request limit has been reached. Please try later.' };
         if (error.message === 'AI_DISABLED') return { ok: false, code: 'unavailable', message: AI_SETUP_MESSAGE };
+        if (error.message === 'AI_MONTHLY_LIMIT') return { ok: false, code: 'plan_limit', message: limitReachedLine(await this.allowance(supabase, businessId)) };
+        if (error.message === 'AI_PLAN_SUSPENDED') return { ok: false, code: 'plan_limit', message: AI_SUSPENDED };
         return { ok: false, code: 'failed', message: 'Request reservation could not be confirmed. Check this same request before starting another.' };
       }
       if (data?.reserved === false) return { ok: false, code: 'duplicate', message: 'This question was already submitted. Its answer is not stored for recovery. Start a new question only if you intend another request.' };
@@ -73,7 +83,7 @@ export class AIChatService extends BaseService {
       if (current.user.id !== user.id) throw new Error('Identity changed');
       const { data: finished, error: finishError } = await supabase.rpc('finish_ai_chat', { ...request, p_status: 'completed' });
       if (finishError || finished !== true) throw new Error('Completion not confirmed');
-      return { ok: true, answer };
+      return { ok: true, answer, allowance: allowanceLine(await this.allowance(supabase, businessId)) };
     } catch {
       if (reserved) {
         try { await supabase.rpc('finish_ai_chat', { p_business_id: businessId, p_request_key: input.requestKey, p_status: 'failed' }); }

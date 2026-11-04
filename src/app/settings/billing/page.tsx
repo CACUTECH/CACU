@@ -135,7 +135,7 @@ export default function BillingPage() {
           </CardContent>)}
         {current.subscribed && usageLines(current).length > 0 && (
           <CardContent>
-            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+            <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
               {usageLines(current).map(line => (
                 <div key={line.key} className="rounded-md border p-3">
                   <dt className="text-muted-foreground">{line.label}</dt>

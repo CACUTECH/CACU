@@ -39,7 +39,7 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 - **Monthly to yearly mid-period** (SUB-07). Doc 14 prorates it; today it waits for renewal.
 - **Owner notifications** for renewals and declined cards (email, WhatsApp). Today they show on the billing screen only.
 - **Downgrade choices:** before a downgrade applies, Doc 14 has the owner choose which users and outlets stay active. Today nothing is deactivated; the owner just can't add more while over the limit.
-- **Usage counters:** AI questions and messages a month (TEST-210).
+- **Message counter:** `messages.per_month` waits until CACU sends email or WhatsApp messages; nothing sends any yet.
 - **PDFs:** PDF invoices and receipts that show CACU's legal name, address and TIN.
 
 ## Scheduled jobs (M-10 part 1)
@@ -95,6 +95,19 @@ Migration `20261102150000_renewals.sql`, the operator `backend/tools/renew_subsc
 - **Tests:** 6 cases in `test_platform_billing_postgres.py`, with Paystack replaced by a stand-in; screen and action tests in Jest.
 
 After applying in production, check that `cron.job` also lists `cacu-billing-issue-renewals`.
+
+## AI questions a month (TEST-210)
+
+Migration `20261104090000_ai_plan_quota.sql`.
+
+- **Monthly allowance:** asking a question now also checks the plan's monthly allowance: General 0, Oga 100, Chairman 500, counted per Lagos calendar month. The existing shared rate limits still apply.
+- **At the limit:** the question is refused before anything is recorded, so the counter doesn't move. The assistant says, for example, "You've used all 100 AI questions on your plan this month (0 left). They reset on 1 Dec 2026."
+- **Failed answers:** a question whose answer failed doesn't count.
+- **General Plan:** the chat isn't offered; the assistant says AI questions are on the Oga and Chairman Plans.
+- **Suspended business:** asks no questions until it pays (SUB-10).
+- **Unbilled business:** keeps only the shared limits.
+- **Seeing the allowance:** members see "37 of 100 AI questions left this month" in the assistant (`public.get_ai_chat_quota`). The billing usage panel shows AI questions next to users, outlets and catalogue items.
+- **Tests:** 4 cases in `test_ai_chat_postgres.py`, plus Jest service and wording tests.
 
 ## Billing screen
 
