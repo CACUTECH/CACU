@@ -57,12 +57,13 @@ export function CatalogWorkspace({ inventory = false, nativeBooks = false }: {
     const [loading, setLoading] = useState(false), [error, setError] = useState(''), [busy, setBusy] = useState(false), [revision, setRevision] = useState(0), [notice, setNotice] = useState('');
     const [mode, setMode] = useState<'edit' | 'view' | 'adjust' | 'category' | null>(null), [selected, setSelected] = useState<Item | null>(null), [fields, setFields] = useState<Fields>(initial(type)), [key, setKey] = useState(''), [attempt, setAttempt] = useState(false);
     const [categoryEdit, setCategoryEdit] = useState<Category | null>(null);
+    const [loadError, setLoadError] = useState('');
     const generation = useRef(0);
     const pending = useRef<ManagementMutation | null>(null);
     const load = useCallback(async () => {
         const token = ++generation.current;
         setLoading(true);
-        setError('');
+        setLoadError('');
         setItems([]);
         try {
             const [result, options] = await Promise.all([readCatalogAction({ type, search, category, status, low_stock: low, limit: 20, offset: page * 20 }), catalogOptionsAction()]);
@@ -75,7 +76,7 @@ export function CatalogWorkspace({ inventory = false, nativeBooks = false }: {
         }
         catch (e) {
             if (token === generation.current)
-                setError(e instanceof Error ? e.message : 'Catalog unavailable');
+                setLoadError(e instanceof Error ? e.message : 'Catalog unavailable');
         }
         finally {
             if (token === generation.current)
@@ -177,7 +178,7 @@ export function CatalogWorkspace({ inventory = false, nativeBooks = false }: {
    {manager && <details><summary className="cursor-pointer text-sm">Manage categories</summary><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => open('category')}>New category</Button>{categories.filter(c => c.item_type === type).map(c => <Button key={c.id} size="sm" variant="outline" onClick={() => open('category', null, c)}>{c.name}{!c.is_active ? ' (archived)' : ''}</Button>)}</div></details>}
    {loading ? <p role="status">Loading catalog...</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{['Name / code', 'Category', 'Price (NGN)', 'Stock', 'Status', 'Actions'].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead><tbody>{items.map(item => <tr key={item.id} className="border-t"><td className="p-3 font-medium">{item.name}<span className="block text-xs text-muted-foreground">{item.sku || 'No code'}</span></td><td className="p-3">{item.category}</td><td className="p-3">{item.unit_price}</td><td className="p-3">{item.item_type === 'SERVICE' ? 'Service' : !item.track_stock ? 'Not tracked' : `${item.stock_quantity ?? 0} ${item.unit_of_measure}`} {item.item_type === 'PRODUCT' && item.track_stock && item.is_active && (item.stock_quantity ?? 0) <= item.reorder_level && <span className="text-destructive">Low stock</span>}</td><td className="p-3">{item.is_active ? 'Active' : 'Archived'}</td><td className="p-3"><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => open('view', item)}>View</Button>{manager && <Button size="sm" variant="outline" onClick={() => open('edit', item)}>Edit</Button>}</div></td></tr>)}</tbody></table>{!items.length && <p className="p-4">No matching items.</p>}</div>}
    <div className="flex items-center justify-between"><p className="text-sm">{total} items</p><div className="flex gap-2"><Button variant="outline" disabled={page === 0 || loading} onClick={() => setPage(p => p - 1)}>Previous</Button><Button variant="outline" disabled={(page + 1) * 20 >= total || loading} onClick={() => setPage(p => p + 1)}>Next</Button></div></div>
-  </CardContent></Card>{error && <p role="alert" className="text-destructive">{error}</p>}{notice && <p role="status">{notice}</p>}
+  </CardContent></Card>{loadError && <p role="alert" className="text-destructive">{loadError}</p>}{error && <p role="alert" className="text-destructive">{error}</p>}{notice && <p role="status">{notice}</p>}
   {inventory && nativeBooks && <StockApprovals revision={revision} onDecided={() => setRevision(n => n + 1)}/>}
   <Dialog open={mode !== null} onOpenChange={value => { if (!value && !busy)
         setMode(null); }}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{mode === 'view' ? selected?.name : mode === 'adjust' ? 'Adjust stock' : mode === 'category' ? 'Category' : selected ? 'Edit item' : 'Add item'}</DialogTitle></DialogHeader>
