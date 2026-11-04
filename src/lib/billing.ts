@@ -85,7 +85,8 @@ export function highlights(entitlements: Entitlements): string[] {
   if (n('module.purchasing') === true) lines.push('Purchasing and supplier bills');
   if (n('reports.advanced') === true) lines.push('Cash flow and ageing reports');
   const ai = n('ai.queries_per_month');
-  if (typeof ai === 'number' && ai > 0) lines.push(`${ai} AI questions a month`);
+  if (ai === null) lines.push('Unlimited AI questions');
+  else if (typeof ai === 'number' && ai > 0) lines.push(`${ai} AI questions a month`);
   return lines;
 }
 

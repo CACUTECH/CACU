@@ -29,6 +29,7 @@ def database():
           -- Mirror hosted Supabase: members may update their business row (mode changes go through it).
           GRANT SELECT, UPDATE ON public.businesses TO authenticated;""")
         c.execute(MIGRATION.read_text(encoding='utf-8'))
+        c.execute((MIGRATION.parent / '20261104130000_plan_limit_values.sql').read_text(encoding='utf-8'))
     yield
 
 
@@ -171,3 +172,13 @@ def test_members_read_their_own_plan_and_nothing_else():
         for table in ('plans', 'plan_entitlements', 'subscriptions', 'subscription_changes', 'config_changes'):
             for privilege in ('SELECT', 'INSERT', 'UPDATE', 'DELETE'):
                 assert not c.execute('SELECT has_table_privilege(%s,%s,%s)', ('authenticated', 'platform.' + table, privilege)).fetchone()[0]
+
+
+def test_owner_confirmed_limits_and_every_change_is_logged():
+    with psycopg.connect(URL) as c:
+        rows = c.execute("""SELECT key, jsonb_object_agg(plan_code, value) FROM platform.plan_entitlements
+                             WHERE key IN ('users.max','outlets.max','catalog.max_items','ai.queries_per_month') GROUP BY key""").fetchall()
+        logged = c.execute("SELECT count(*) FROM platform.config_changes WHERE table_name='plan_entitlements' AND old_value IS NOT NULL").fetchone()[0]
+    assert dict(rows) == {'users.max': {'BASE': 2, 'GROW': 5, 'TOP': 50}, 'outlets.max': {'BASE': 1, 'GROW': 5, 'TOP': 20},
+                          'catalog.max_items': {'BASE': 300, 'GROW': 3000, 'TOP': None}, 'ai.queries_per_month': {'BASE': 30, 'GROW': 100, 'TOP': None}}
+    assert logged == 5  # AI for General and Chairman, outlets for Oga and Chairman, users for Chairman

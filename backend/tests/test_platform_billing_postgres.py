@@ -42,7 +42,7 @@ def database(monkeypatch):
                      '20261102100000_platform_plans.sql', '20261102110000_platform_billing.sql', '20261102120000_ops_scheduled_jobs.sql',
                      '20261102130000_plan_limits.sql', '20261102140000_plan_changes.sql', '20261102150000_renewals.sql',
                      '20261104090000_ai_plan_quota.sql', '20261104100000_interval_changes.sql',
-                     '20261104110000_billing_history_details.sql', '20261104120000_billing_notifications.sql'):
+                     '20261104110000_billing_history_details.sql', '20261104120000_billing_notifications.sql', '20261104130000_plan_limit_values.sql'):
             c.execute((MIGRATIONS / name).read_text(encoding='utf-8'))
 
     def runtime():
@@ -336,7 +336,7 @@ def test_an_upgrade_charges_the_prorated_difference_and_keeps_the_period_end(gat
     assert service.verify_return(ident, owner, Verification(reference=invoice['reference']))['outcome'] == 'activated'
     after = subscription(ident)
     assert after[:2] == ('TOP', 'active') and after[2:4] == before[2:4]
-    assert count("SELECT platform.entitlement(%s,'users.max')", ident) == 15
+    assert count("SELECT platform.entitlement(%s,'users.max')", ident) == 50
 
 
 def test_only_upgrades_on_the_same_interval_are_paid_mid_period(gateway):

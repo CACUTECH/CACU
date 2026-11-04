@@ -1,7 +1,7 @@
 // A business's AI allowance this month, as public.get_ai_chat_quota returns it (Doc 14 TEST-210).
 export type AIQuota = { billed: boolean; limit: number | null; used: number; remaining: number | null; resets_at: string };
 
-export const AI_NOT_ON_PLAN = 'AI questions are on the Oga and Chairman Plans. Upgrade in Billing to use them.';
+export const AI_NOT_ON_PLAN = 'AI questions are not on your plan. Upgrade in Billing to use them.';
 export const AI_SUSPENDED = 'Your workspace is read-only until the subscription is paid. AI questions resume after payment.';
 
 const isQuota = (value: unknown): value is AIQuota =>

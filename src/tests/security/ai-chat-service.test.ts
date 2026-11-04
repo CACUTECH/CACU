@@ -144,5 +144,5 @@ test('an answer returns the allowance left, and a plan without AI is not offered
   expect(await new AIChatService().ask(input)).toEqual(expect.objectContaining({ ok: true, allowance: '36 of 100 AI questions left this month. Resets on 1 Dec 2026.' }));
   client.from.mockReturnValueOnce(query({ business_id: businessId, role: 'owner' }));
   client.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === 'get_ai_chat_quota' ? { billed: true, limit: 0, used: 0, remaining: 0, resets_at: '2026-11-30T23:00:00Z' } : true }));
-  expect(await new AIChatService().status(businessId)).toEqual({ ready: false, message: 'AI questions are on the Oga and Chairman Plans. Upgrade in Billing to use them.' });
+  expect(await new AIChatService().status(businessId)).toEqual({ ready: false, message: 'AI questions are not on your plan. Upgrade in Billing to use them.' });
 });
