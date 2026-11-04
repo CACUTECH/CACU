@@ -13,6 +13,7 @@ test.each([
     ['INVITATION_LIMIT_REACHED', 'Too many invitations sent recently. Try again in an hour.'],
     ['PLEASE_WAIT_BEFORE_RESENDING', 'This invitation was just sent. Wait a minute before resending it.'],
     ['MEMBER_ALREADY_EXISTS', 'That person is already a member of this business.'],
+    ['SUBSCRIPTION_READ_ONLY', 'Your workspace is read-only until the subscription is paid. You can still record payments received and export.'],
     ['PLAN_LIMIT users.max', 'Your plan has no free user seats. Open invitations hold a seat too. Cancel one, deactivate someone, or upgrade in Billing.'],
 ])('%s is shown in plain words and known not to have been saved', async (code, message) => {
     client.rpc.mockResolvedValueOnce({ data: null, error: { message: code, code: 'P0001' } });

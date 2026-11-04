@@ -36,7 +36,6 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 
 ## Not yet
 
-- **Downgrade choices:** before a downgrade applies, Doc 14 has the owner choose which users and outlets stay active. Today nothing is deactivated; the owner just can't add more while over the limit.
 - **Message counter:** `messages.per_month` waits until CACU sends email or WhatsApp messages; nothing sends any yet.
 
 ## Scheduled jobs (M-10 part 1)
@@ -160,6 +159,36 @@ Migration `20261104120000_billing_notifications.sql`, `backend/cacu/billing/noti
 - **Tests:** 6 cases in `test_platform_billing_postgres.py`, with Resend and Termii replaced by stand-ins.
 
 After applying in production, check that `cron.job` also lists `cacu-billing-queue-notifications`.
+
+## Suspension is read-only (SUB-10)
+
+Migration `20261105090000_suspension_write_gate.sql` and `backend/cacu/accounting/session.py`.
+
+- **What a read-only business can't do:** while its subscription is suspended, cancelled or closed, a business can't add sales, invoices, expenses, stock movements, appointments or jobs. It also can't add or change customers, suppliers, catalogue items, categories or outlets, and it can't invite staff, bring staff back, or add employees.
+- **What still works:** viewing and exporting everything, recording payments received against existing invoices (legacy and native), and removing staff. Grace and payment-due states keep full access.
+- **Database layer:** triggers on the tables refuse new rows with `SUBSCRIPTION_READ_ONLY`. This covers the legacy functions, management actions, direct Data API writes and the native core alike. Tables that predate the tracked migrations get the trigger only where they exist.
+- **Native core:** `library_transaction` refuses native writes before posting, except receipts (the `/receipts` route and postings of kind `receipt`).
+- **Unaffected:** businesses with no subscription.
+- **On screen:** every service shows the same message: "Your workspace is read-only until the subscription is paid. You can still record payments received and export."
+- **Tests:** `backend/tests/test_suspension_gate_postgres.py`, on the shared library database with the real native ledger.
+
+## Cancellation (SUB-11) and who stays on a smaller plan (SUB-06)
+
+Migration `20261105100000_cancel_and_downgrade_choices.sql` and `src/app/settings/billing/plan-ending.tsx`.
+
+- **Cancel:** only the Owner can cancel (`public.cancel_subscription`), during a paid period or a trial.
+  - Access continues to the period end. Then the subscription becomes `cancelled` and the workspace read-only (SUB-10). Nothing is deleted.
+  - Cancelling voids the open renewal invoice, and no new one is issued, so no card is charged.
+  - The cancellation can be taken back before the period ends, and choosing a plan reopens the same business (SUB-12).
+  - A cancelled trial ends as `cancelled`, not on General.
+- **Who stays:** when the next period is on a smaller plan (a scheduled downgrade, or a trial ending on General), an Owner or Admin ticks which people and outlets stay (`public.downgrade_choices`, `public.save_downgrade_choices`).
+  - Owners always stay and count as seats; choices over the new limits are refused.
+  - When the period ends, the rest are deactivated, never deleted, and open invitations are cancelled once the seats are full.
+  - Without a choice, the earliest added stay.
+  - Scheduling a different plan clears an earlier choice.
+  - Catalogue items are not deactivated; the limit stops only new ones.
+- **Not built yet:** the 12-month read-only window after cancellation and the FR-210 closure flow.
+- **Tests:** 5 cases in `test_platform_billing_postgres.py`; screen and action tests in Jest.
 
 ## Billing screen
 

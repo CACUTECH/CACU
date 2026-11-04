@@ -112,7 +112,8 @@ from cacu.accounting.posting import PostingCommand,post_command
 
 @app.post('/api/v1/businesses/{business_id}/postings')
 def accounting_posting(business_id:UUID,command:PostingCommand,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    # Collecting what customers already owe stays open while the subscription is suspended (SUB-10).
+    with library_transaction(user_id,business_id,write=True,while_read_only=command.kind=='receipt') as session:
         return post_command(session,user_id,command)
 
 from cacu.accounting.workflows import InvoiceCreate,ReceiptCreate,SaleCreate,invoice_create,receipt_create,sale_create
@@ -130,7 +131,7 @@ def create_invoice(business_id:UUID,data:InvoiceCreate,user_id:UUID=Depends(curr
 
 @app.post('/api/v1/businesses/{business_id}/receipts')
 def create_receipt(business_id:UUID,data:ReceiptCreate,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,while_read_only=True) as session:
         return receipt_create(session,user_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/sales')

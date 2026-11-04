@@ -20,7 +20,7 @@ def charted(boundary):
         # Mirror hosted columns used by the chart.
         c.execute("""ALTER TABLE public.accounts ADD COLUMN code text, ADD COLUMN account_type text, ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now(),
             ALTER COLUMN id SET DEFAULT gen_random_uuid(), ADD CONSTRAINT accounts_business_id_code_key UNIQUE (business_id, code);
-          ALTER TABLE public.businesses ADD COLUMN business_type text NOT NULL DEFAULT 'PRODUCT';
+          ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS business_type text NOT NULL DEFAULT 'PRODUCT';
           DROP SCHEMA IF EXISTS onboarding_private CASCADE; CREATE SCHEMA onboarding_private""")
         c.execute("INSERT INTO businesses(id,name,business_type) VALUES(%s,'Salon','SERVICE')", (service,))
         c.execute("INSERT INTO memberships(business_id,user_id,role,is_active) VALUES(%s,%s,'owner',true)", (service, people['owner']))
