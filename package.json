@@ -8,12 +8,13 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "postinstall": "patch-package",
+    "postinstall": "patch-package --error-on-fail",
     "test": "jest",
     "test:watch": "jest --watch",
-    "ci": "npm run lint && npm run typecheck && npm run test",
+    "ci": "npm run lint && npm run typecheck && npm run test:security && npm run test",
     "test:browser": "playwright test -c playwright-ct.config.ts",
-    "ai:check": "node scripts/check-openai.mjs"
+    "ai:check": "node scripts/check-openai.mjs",
+    "test:security": "node --test scripts/dependency-security.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -88,6 +89,8 @@
     "sharp": "^0.35.5",
     "next": {
       "postcss": "8.5.29"
-    }
+    },
+    "minimatch@>=7.0.0 <11.0.1": "11.0.1",
+    "deepmerge": "4.3.1"
   }
 }
