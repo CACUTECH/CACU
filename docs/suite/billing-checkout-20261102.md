@@ -36,7 +36,6 @@ The VAT rate, the trial and the grace period are stored in `platform.settings`, 
 
 ## Not yet
 
-- **Monthly to yearly mid-period** (SUB-07). Doc 14 prorates it; today it waits for renewal.
 - **Owner notifications** for renewals and declined cards (email, WhatsApp). Today they show on the billing screen only.
 - **Downgrade choices:** before a downgrade applies, Doc 14 has the owner choose which users and outlets stay active. Today nothing is deactivated; the owner just can't add more while over the limit.
 - **Message counter:** `messages.per_month` waits until CACU sends email or WhatsApp messages; nothing sends any yet.
@@ -108,6 +107,16 @@ Migration `20261104090000_ai_plan_quota.sql`.
 - **Unbilled business:** keeps only the shared limits.
 - **Seeing the allowance:** members see "37 of 100 AI questions left this month" in the assistant (`public.get_ai_chat_quota`). The billing usage panel shows AI questions next to users, outlets and catalogue items.
 - **Tests:** 4 cases in `test_ai_chat_postgres.py`, plus Jest service and wording tests.
+
+## Monthly and yearly switches (SUB-07) and quotes (SUB-R05)
+
+Migration `20261104100000_interval_changes.sql`.
+
+- **Monthly to yearly** is paid now, for the same plan or a bigger one. The charge is the yearly price less the unused value of the current month, rounded to the nearest naira, plus VAT. For example, Oga monthly with 20 of 30 days left switches to Oga yearly for ₦56,000 + ₦4,200 VAT, after a ₦4,000 credit. The year starts when the payment is verified.
+- **Yearly to monthly** is scheduled for the end of the year (`scheduled_interval`), alone or with a smaller plan. A smaller plan without a yearly price, such as General, renews monthly. The renewal invoice, card charges and period end all use the scheduled plan and interval. Choosing the current plan and interval cancels it.
+- **A bigger plan monthly from a yearly plan** waits for the year to end.
+- **Quotes:** every change paid mid-period is quoted first by `public.billing_quote` (Owners and Admins). It uses the same calculation as checkout, `platform.change_charge`. The screen shows, for example, "Pay ₦60,200 now: ₦56,000 + ₦4,200 VAT, after ₦4,000 for your unused days" before anything goes to Paystack.
+- **Tests:** 4 database cases in `test_platform_billing_postgres.py`; screen and action tests in Jest.
 
 ## Billing screen
 

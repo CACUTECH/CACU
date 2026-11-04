@@ -8,7 +8,7 @@ export type SubscriptionStatus = 'trialing' | 'incomplete' | 'active' | 'past_du
 export type CurrentPlan = { subscribed: false } | {
   subscribed: true; plan: PlanCode; plan_name: string; status: SubscriptionStatus; billing_interval: BillingInterval;
   current_period_end: string | null; grace_ends_at: string | null; writes_allowed: boolean; entitlements: Entitlements;
-  usage?: Partial<Record<LimitKey, number>>; scheduled_plan?: PlanCode | null;
+  usage?: Partial<Record<LimitKey, number>>; scheduled_plan?: PlanCode | null; scheduled_interval?: BillingInterval | null;
   card?: SavedCard | null; renewal?: Renewal | null;
 };
 export type SavedCard = { card_type: string | null; bank: string | null; last4: string | null; exp_month: string | null; exp_year: string | null };
@@ -17,7 +17,8 @@ export type LimitKey = 'users.max' | 'outlets.max' | 'catalog.max_items' | 'ai.q
 export type BillingInvoice = { invoice: string; plan: PlanCode; billing_interval: BillingInterval; subtotal_kobo: number; vat_kobo: number;
   total_kobo: number; status: 'open' | 'paid' | 'review' | 'void'; created_at: string; paid_at: string | null; receipt: string | null; kind?: 'subscription' | 'upgrade' | 'renewal' };
 export type CheckoutResult = { invoice: string; reference: string; total_kobo: number; vat_kobo: number; subtotal_kobo: number; authorization_url: string };
-export type ScheduleResult = { scheduled_plan: PlanCode | null; effective_at: string | null; over_limits: Partial<Record<LimitKey, { used: number; limit: number }>> };
+export type Quote = { kind: 'subscription' | 'upgrade'; subtotal_kobo: number; vat_kobo: number; total_kobo: number; credit_kobo: number | null; period_end: string | null };
+export type ScheduleResult = { scheduled_plan: PlanCode | null; scheduled_interval?: BillingInterval | null; effective_at: string | null; over_limits: Partial<Record<LimitKey, { used: number; limit: number }>> };
 export type VerifyOutcome = { outcome: string };
 
 export const VAT_NOTE = 'Prices exclude 7.5% VAT, added at checkout.';
@@ -58,9 +59,11 @@ export function nextStep(current: Extract<CurrentPlan, { subscribed: true }>) {
   const grace = current.grace_ends_at && day(current.grace_ends_at);
   switch (current.status) {
     case 'trialing': return `Your free trial of the ${current.plan_name} Plan ends on ${end}. Choose a plan to keep going; otherwise you move to the General Plan.`;
-    case 'active': return current.scheduled_plan
-      ? `Paid until ${end}. You move to the ${PLAN_NAME[current.scheduled_plan]} Plan then.`
-      : `Paid until ${end}.`;
+    case 'active': {
+      const moves = [current.scheduled_plan && `move to the ${PLAN_NAME[current.scheduled_plan]} Plan`,
+        current.scheduled_interval && `switch to ${current.scheduled_interval === 'annual' ? 'yearly' : 'monthly'} billing`].filter(Boolean);
+      return moves.length ? `Paid until ${end}. You ${moves.join(' and ')} then.` : `Paid until ${end}.`;
+    }
     case 'incomplete': case 'past_due': case 'grace':
       return `Pay by ${grace ?? end} to keep full access. Nothing is deleted if you pay late.`;
     case 'suspended': return 'Your workspace is read-only until you pay. You can still view and export everything.';
@@ -102,21 +105,37 @@ export function usageLines(current: Extract<CurrentPlan, { subscribed: true }>) 
 
 export type PlanAction = { kind: 'checkout' | 'upgrade' | 'schedule' | 'cancel' | 'current' | 'none'; label: string; note?: string };
 
-/** What choosing a plan does (Doc 14 SUB-05, SUB-06). Without a paid period, any plan is bought outright. During one,
- * a bigger plan is paid for the days left on the same interval; a smaller one waits for the period to end. */
+/** What choosing a plan and interval does (Doc 14 SUB-05 to SUB-07). Without a paid period, any plan is bought outright.
+ * During one: a bigger plan on the same interval, or monthly to yearly, is paid now; a smaller plan or yearly to
+ * monthly waits for the period to end. */
 export function planAction(current: CurrentPlan, plan: Plan, period: BillingInterval): PlanAction {
   const name = PLAN_NAME[plan.code];
   if (!current.subscribed || current.status !== 'active') {
     return { kind: price(plan, period) === null ? 'none' : 'checkout', label: `Choose ${name}` };
   }
-  if (plan.code === current.plan) return { kind: 'current', label: 'Current plan' };
-  if (RANK[plan.code] > RANK[current.plan]) {
-    if (period !== current.billing_interval) return { kind: 'none', label: `Switch to ${period === 'annual' ? 'yearly' : 'monthly'} at renewal` };
+  if (price(plan, period) === null) return { kind: 'none', label: `Choose ${name}` };
+  const rank = RANK[plan.code] - RANK[current.plan], from = current.billing_interval;
+  if (rank === 0 && period === from) return { kind: 'current', label: 'Current plan' };
+  if (period === 'annual' && from === 'monthly' && rank >= 0) {
+    return { kind: 'upgrade', label: rank === 0 ? 'Switch to yearly' : `Upgrade to ${name} yearly`,
+      note: 'Your unused days this month count toward the year. You see the exact amount before paying.' };
+  }
+  if (rank > 0) {
+    if (period !== from) return { kind: 'none', label: 'Available when your year ends' };
     return { kind: 'upgrade', label: `Upgrade to ${name}`, note: 'You pay the difference for the days left in this period, plus VAT.' };
   }
   const end = current.current_period_end ? day(current.current_period_end) : 'the end of this period';
-  if (current.scheduled_plan === plan.code) return { kind: 'cancel', label: 'Keep my current plan', note: `Moving to ${name} on ${end}.` };
-  return { kind: 'schedule', label: `Move to ${name} on ${end}`, note: 'No charge now. Your current plan runs until then.' };
+  const scheduledPlan = current.scheduled_plan ?? current.plan, scheduledInterval = current.scheduled_interval ?? from;
+  const pending = Boolean(current.scheduled_plan || current.scheduled_interval);
+  const change = rank === 0 ? `Switch to ${period === 'annual' ? 'yearly' : 'monthly'}` : `Move to ${name}${period !== from ? ` ${period === 'annual' ? 'yearly' : 'monthly'}` : ''}`;
+  if (pending && scheduledPlan === plan.code && scheduledInterval === period) return { kind: 'cancel', label: 'Keep my current plan', note: `${change} on ${end} is scheduled.` };
+  return { kind: 'schedule', label: `${change} on ${end}`, note: 'No charge now. Your current plan runs until then.' };
+}
+
+/** The confirmation before paying mid-period (SUB-R05): the exact amount, VAT and any credit for unused days. */
+export function quoteLine(quote: Quote) {
+  const credit = quote.credit_kobo ? `, after ${naira(quote.credit_kobo)} for your unused days` : '';
+  return `Pay ${naira(quote.total_kobo)} now: ${naira(quote.subtotal_kobo)} + ${naira(quote.vat_kobo)} VAT${credit}.`;
 }
 
 const LIMIT_NOUN: Record<LimitKey, string> = { 'users.max': 'users', 'outlets.max': 'outlets', 'catalog.max_items': 'catalogue items', 'ai.queries_per_month': 'AI questions a month' };

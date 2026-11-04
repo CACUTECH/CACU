@@ -24,7 +24,7 @@ ERRORS = {
     'BILLING_ALREADY_ON_PLAN': (409, 'This business is already on that plan'),
     'BILLING_DOWNGRADE_IS_SCHEDULED': (409, 'A move to a smaller plan is scheduled for the end of the period, not paid now'),
     'BILLING_UPGRADE_NEEDS_CHECKOUT': (409, 'A move to a bigger plan is paid through checkout'),
-    'BILLING_INTERVAL_CHANGES_AT_RENEWAL': (409, 'Switch between monthly and yearly when the current period ends'),
+    'BILLING_INTERVAL_CHANGES_AT_RENEWAL': (409, 'Switching from yearly to monthly is scheduled for the end of the year, not paid now'),
     'BILLING_RENEW_FIRST': (409, 'This period ends within a day. Renew first, then upgrade'),
     'BILLING_SCHEDULE_NEEDS_ACTIVE_PLAN': (409, 'Choose and pay for a plan instead; there is no paid period to change'),
     'BILLING_REQUEST_KEY_REUSED': (409, 'This checkout request was already used for another plan'),
@@ -44,6 +44,7 @@ class Checkout(BaseModel):
 class PlanChange(BaseModel):
     model_config = ConfigDict(extra='forbid')
     plan: Literal['BASE', 'GROW', 'TOP']
+    interval: Literal['monthly', 'annual'] | None = None
 
 
 class Verification(BaseModel):
@@ -114,9 +115,9 @@ def _checkout_link(business_id: UUID, invoice: dict) -> dict:
 
 
 def schedule(business_id: UUID, actor: UUID, data: PlanChange) -> dict:
-    """SUB-06: schedule a smaller plan for the end of the paid period, or cancel one by choosing the current plan."""
+    """SUB-06, SUB-07: schedule a smaller plan or yearly-to-monthly for the period end; the current plan and interval cancel it."""
     with platform_transaction() as cursor:
-        return call(cursor, 'SELECT platform.schedule_plan_change(%s,%s,%s)', (business_id, actor, data.plan))
+        return call(cursor, 'SELECT platform.schedule_plan_change(%s,%s,%s,%s)', (business_id, actor, data.plan, data.interval))
 
 
 def apply_verified(reference: str, event_key: str | None = None) -> dict:

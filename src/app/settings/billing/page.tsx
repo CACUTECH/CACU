@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { VAT_NOTE, cardLine, highlights, naira, nextStep, overLimitNotes, planAction, planLine, price, renewalLine, returnedReference, statusOf, usageLines,
-  type BillingInterval, type BillingInvoice, type CurrentPlan, type Plan, type PlanCode } from '@/lib/billing';
-import { getBillingAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from './actions';
+import { VAT_NOTE, quoteLine, cardLine, highlights, naira, nextStep, overLimitNotes, planAction, planLine, price, renewalLine, returnedReference, statusOf, usageLines,
+  type BillingInterval, type BillingInvoice, type CurrentPlan, type Plan, type PlanCode, type Quote } from '@/lib/billing';
+import { getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from './actions';
 
 type State = { plans: Plan[]; current: CurrentPlan; history: BillingInvoice[] | null };
 const OUTCOME: Record<string, string> = {
@@ -31,6 +31,7 @@ export default function BillingPage() {
   const [period, setPeriod] = useState<BillingInterval>('monthly');
   const [busy, setBusy] = useState<PlanCode | 'renewal' | 'card' | null>(null), [message, setMessage] = useState(''), [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [confirming, setConfirming] = useState<{ plan: PlanCode; interval: BillingInterval; quote: Quote } | null>(null);
   // One request key per plan choice, kept across retries so a lost response never opens a second invoice.
   const keys = useRef(new Map<string, string>());
   const verified = useRef(false);
@@ -56,12 +57,12 @@ export default function BillingPage() {
     });
   }, [business, load]);
 
-  async function choose(plan: PlanCode) {
-    const choice = `${plan}:${period}`;
+  async function choose(plan: PlanCode, interval: BillingInterval = period) {
+    const choice = `${plan}:${interval}`;
     const requestKey = keys.current.get(choice) ?? crypto.randomUUID();
     keys.current.set(choice, requestKey);
     setBusy(plan); setError(''); setMessage('');
-    const result = await startCheckoutAction({ request_key: requestKey, plan, interval: period });
+    const result = await startCheckoutAction({ request_key: requestKey, plan, interval });
     if (result.success) { window.location.assign(result.data.authorization_url); return; }
     setBusy(null); setError(result.error);
   }
@@ -81,11 +82,19 @@ export default function BillingPage() {
   }
 
   // A smaller plan is scheduled, not paid; choosing the current plan again cancels it.
-  async function schedule(plan: PlanCode) {
-    setBusy(plan); setError(''); setMessage(''); setWarnings([]);
-    const result = await schedulePlanAction(plan);
+  // A change paid mid-period is quoted first, so the owner sees the exact amount before Paystack (SUB-R05).
+  async function confirm(plan: PlanCode) {
+    setBusy(plan); setError(''); setMessage(''); setConfirming(null);
+    const result = await quoteAction(plan, period);
+    setBusy(null);
+    if (result.success) setConfirming({ plan, interval: period, quote: result.data }); else setError(result.error);
+  }
+
+  async function schedule(plan: PlanCode, interval: BillingInterval = period) {
+    setBusy(plan); setError(''); setMessage(''); setWarnings([]); setConfirming(null);
+    const result = await schedulePlanAction(plan, interval);
     if (result.success) {
-      setMessage(result.data.scheduled_plan ? 'Plan change scheduled.' : 'Scheduled change cancelled. Your plan stays as it is.');
+      setMessage(result.data.scheduled_plan || result.data.scheduled_interval ? 'Plan change scheduled.' : 'Scheduled change cancelled. Your plan stays as it is.');
       setWarnings(overLimitNotes(result.data));
       await load();
     } else setError(result.error);
@@ -107,6 +116,17 @@ export default function BillingPage() {
 
       {message && <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">{message}</p>}
       {warnings.map(line => <p key={line} className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{line}</p>)}
+      {confirming && (
+        <div role="dialog" aria-label="Confirm payment" className="space-y-3 rounded-md border border-primary p-4 text-sm">
+          <p className="font-medium">{plans.find(p => p.code === confirming.plan)?.name} Plan, {confirming.interval === 'annual' ? 'yearly' : 'monthly'}</p>
+          <p>{quoteLine(confirming.quote)}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={busy !== null} onClick={() => choose(confirming.plan, confirming.interval)}>
+              {busy === confirming.plan ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening Paystack…</> : `Pay ${naira(confirming.quote.total_kobo)} with Paystack`}
+            </Button>
+            <Button variant="outline" disabled={busy !== null} onClick={() => setConfirming(null)}>Not now</Button>
+          </div>
+        </div>)}
       {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
 
       <Card>
@@ -179,7 +199,8 @@ export default function BillingPage() {
                   <Button className="w-full" variant={action.kind === 'cancel' || action.kind === 'schedule' ? 'outline' : 'default'}
                     disabled={['current', 'none'].includes(action.kind) || busy !== null}
                     onClick={() => action.kind === 'schedule' ? schedule(plan.code)
-                      : action.kind === 'cancel' && current.subscribed ? schedule(current.plan) : choose(plan.code)}>
+                      : action.kind === 'cancel' && current.subscribed ? schedule(current.plan, current.billing_interval)
+                      : action.kind === 'upgrade' ? confirm(plan.code) : choose(plan.code)}>
                     {busy === plan.code ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {['schedule', 'cancel'].includes(action.kind) ? 'Saving…' : 'Opening Paystack…'}</>
                       : action.label}
                   </Button>

@@ -2,11 +2,11 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BillingPage from '@/app/settings/billing/page';
-import { getBillingAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
+import { getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from '@/app/settings/billing/actions';
 import { useBusiness } from '@/components/business-provider';
 import type { Plan } from '@/lib/billing';
 
-jest.mock('@/app/settings/billing/actions', () => ({ getBillingAction: jest.fn(), payRenewalAction: jest.fn(), removeCardAction: jest.fn(), schedulePlanAction: jest.fn(), startCheckoutAction: jest.fn(), verifyPaymentAction: jest.fn() }));
+jest.mock('@/app/settings/billing/actions', () => ({ getBillingAction: jest.fn(), quoteAction: jest.fn(), payRenewalAction: jest.fn(), removeCardAction: jest.fn(), schedulePlanAction: jest.fn(), startCheckoutAction: jest.fn(), verifyPaymentAction: jest.fn() }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: jest.fn() }));
 jest.mock('lucide-react', () => ({ Check: () => null, Loader2: () => null }));
 
@@ -99,7 +99,7 @@ test('an active plan offers an upgrade and schedules a smaller plan with a warni
   expect(screen.getByText('You pay the difference for the days left in this period, plus VAT.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Current plan' })).toBeDisabled();
   await userEvent.click(screen.getByRole('button', { name: 'Move to General on 2 Dec 2026' }));
-  expect(schedulePlanAction).toHaveBeenCalledWith('BASE');
+  expect(schedulePlanAction).toHaveBeenCalledWith('BASE', 'monthly');
   expect(await screen.findByText(/You have 4 users; the General Plan allows 2/)).toBeInTheDocument();
   expect(await screen.findByText('Paid until 2 Dec 2026. You move to the General Plan then.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Keep my current plan' })).toBeEnabled();
@@ -132,4 +132,21 @@ test('editors never see the card or the renewal', async () => {
   expect(await screen.findByText('Oga Plan')).toBeInTheDocument();
   expect(screen.queryByText(/4081/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Renewal of/)).not.toBeInTheDocument();
+});
+
+test('a mid-period change shows the exact amount first and only then opens Paystack (SUB-R05)', async () => {
+  as('owner');
+  const active = { ...trial, status: 'active', current_period_end: '2026-12-02T10:00:00Z', scheduled_plan: null, scheduled_interval: null };
+  (getBillingAction as jest.Mock).mockResolvedValue({ success: true, data: { plans, current: active, history: [] } });
+  (quoteAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { kind: 'upgrade', subtotal_kobo: 5600000, vat_kobo: 420000, total_kobo: 6020000, credit_kobo: 400000, period_end: null } });
+  (startCheckoutAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { authorization_url: 'https://checkout.paystack.com/y' } });
+  render(<BillingPage />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Yearly (2 months free)' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Switch to yearly' }));
+  expect(quoteAction).toHaveBeenCalledWith('GROW', 'annual');
+  expect(await screen.findByText('Pay ₦60,200 now: ₦56,000 + ₦4,200 VAT, after ₦4,000 for your unused days.')).toBeInTheDocument();
+  expect(startCheckoutAction).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole('button', { name: 'Pay ₦60,200 with Paystack' }));
+  await waitFor(() => expect(assign).toHaveBeenCalledWith('https://checkout.paystack.com/y'));
+  expect(startCheckoutAction).toHaveBeenCalledWith({ request_key: expect.any(String), plan: 'GROW', interval: 'annual' });
 });
