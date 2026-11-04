@@ -1,5 +1,6 @@
 
 import { BaseService } from './base-service';
+import { READ_ONLY_MESSAGE, isReadOnlyRefusal } from '@/lib/read-only';
 
 export type SupplierInput = Record<string, unknown>;
 
@@ -39,6 +40,7 @@ export class SupplierService extends BaseService {
       .select()
       .single();
 
+    if (isReadOnlyRefusal(error)) throw new Error(READ_ONLY_MESSAGE);
     if (error) throw error;
     return data;
   }

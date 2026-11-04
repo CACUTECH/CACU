@@ -1,5 +1,6 @@
 
 import { BaseService } from './base-service';
+import { READ_ONLY_MESSAGE, isReadOnlyRefusal } from '@/lib/read-only';
 
 /** Customer columns from the form; `phone` is stored as `phone_number`. */
 export type CustomerInput = Record<string, unknown> & { phone?: string };
@@ -38,6 +39,7 @@ export class CustomerService extends BaseService {
       .select()
       .single();
 
+    if (isReadOnlyRefusal(error)) throw new Error(READ_ONLY_MESSAGE);
     if (error) throw error;
     return data;
   }

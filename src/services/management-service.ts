@@ -1,4 +1,5 @@
 import { BaseService } from './base-service';
+import { READ_ONLY_MESSAGE } from '@/lib/read-only';
 import { accountingRequest, usesPythonAccounting } from '@/lib/accounting-client';
 export class ManagementWriteError extends Error {
     constructor(message: string, public readonly uncertain: boolean) { super(message); this.name = 'ManagementWriteError'; }
@@ -36,6 +37,7 @@ export class ManagementService extends BaseService {
 }
 /** Plain wording for refusals people meet while managing their team; other codes pass through unchanged. */
 const MANAGEMENT_MESSAGES: Record<string, string> = {
+    SUBSCRIPTION_READ_ONLY: READ_ONLY_MESSAGE,
     INVITATION_LIMIT_REACHED: 'Too many invitations sent recently. Try again in an hour.',
     PLEASE_WAIT_BEFORE_RESENDING: 'This invitation was just sent. Wait a minute before resending it.',
     MEMBER_ALREADY_EXISTS: 'That person is already a member of this business.',

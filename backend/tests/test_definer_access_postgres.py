@@ -20,6 +20,8 @@ REVIEWED = {
     'adopt_default_chart': 'management_private.authorize owner/admin',
     'approve_opening_position': 'management_private.authorize owner/admin',
     'chart_of_accounts': 'management_private.authorize any member',
+    'billing_plans': 'public price list: plans and limits only, no tenant data',
+    'business_plan': 'active membership of the business required',
     'opening_position': 'management_private.authorize owner/admin',
     'save_opening_position': 'management_private.authorize owner/admin',
     'accounting_mode': 'is_business_member',
@@ -42,7 +44,7 @@ REVIEWED = {
     'reserve_upload': 'active membership with purpose role',
     'update_invoice_status_safe': 'has_business_role owner/admin/editor',
 }
-NO_TENANT_INPUT = {'hr_payroll_defaults'}
+NO_TENANT_INPUT = {'hr_payroll_defaults', 'billing_plans'}
 SAMPLE = {'uuid': None, 'text': "'x'", 'jsonb': "'{}'::jsonb", 'date': 'CURRENT_DATE', 'numeric': '1', 'integer': '1',
           'bigint': '1', 'boolean': 'false', 'membership_role[]': "ARRAY['owner']::public.membership_role[]"}
 

@@ -26,8 +26,8 @@ def database():
     assert DSN and urlparse(DSN).hostname in {'127.0.0.1','localhost','postgres'}, 'Refuse non-local disposable test database'
     assert DSN and DSN.rsplit('/',1)[-1].split('?')[0].endswith('_test'), 'Refuse non-test database'
     with psycopg.connect(DSN) as c:
-        c.execute('DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
-        c.execute("""CREATE TABLE public.businesses(id uuid primary key,name text);
+        c.execute('DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+        c.execute("""CREATE TABLE public.businesses(id uuid primary key,name text,business_type text NOT NULL DEFAULT 'PRODUCT');
           CREATE TABLE public.memberships(business_id uuid,user_id uuid,role text,is_active boolean NOT NULL DEFAULT true);
           CREATE TABLE public.accounts(id uuid primary key,business_id uuid,name text,is_active boolean default true);
           CREATE TABLE public.customers(id uuid primary key,business_id uuid,name text);
@@ -57,6 +57,9 @@ def database():
             c.execute(migration.read_text(encoding='utf-8'))
         for migration in Path('../supabase/migrations').glob('*_ifrs_inventory_and_reporting_close.sql'):
             c.execute(migration.read_text(encoding='utf-8'))
+        # Plans and the suspension write gate (Doc 14 SUB-10): native writes check platform.writes_allowed.
+        for name in ['20261102100000_platform_plans.sql','20261105090000_suspension_write_gate.sql']:
+            c.execute(Path(f'../supabase/migrations/{name}').read_text(encoding='utf-8'))
         for tab in ['memberships','accounts','customers','suppliers','catalog_items','invoices','invoice_items','payments','transactions','transaction_items']:
             c.execute(f'ALTER TABLE public.{tab} ENABLE ROW LEVEL SECURITY')
     engine=create_engine(DSN.replace('postgresql://','postgresql+psycopg://'),poolclass=NullPool)

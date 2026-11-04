@@ -314,8 +314,8 @@ def test_invitations_are_rate_limited_per_person_and_per_business(managed):
 def limited(managed):
     """The managed business with plans and plan limits (TEST-209), subscribed to the given plan by subscribe()."""
     with psycopg.connect(URL) as c:
-        c.execute("DROP SCHEMA IF EXISTS platform CASCADE;ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS business_type text NOT NULL DEFAULT 'PRODUCT'")
-        for name in ['20261102100000_platform_plans.sql','20261102130000_plan_limits.sql','20261104130000_plan_limit_values.sql']:
+        # The shared library database already carries the plans migration; add the limits on top.
+        for name in ['20261102130000_plan_limits.sql','20261104130000_plan_limit_values.sql']:
             c.execute(Path(f'../supabase/migrations/{name}').read_text(encoding='utf-8'))
     return managed
 
