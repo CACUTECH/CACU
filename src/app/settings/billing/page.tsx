@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { VAT_NOTE, quoteLine, cardLine, highlights, naira, nextStep, overLimitNotes, planAction, planLine, price, renewalLine, returnedReference, statusOf, usageLines,
   type BillingInterval, type BillingInvoice, type CurrentPlan, type Plan, type PlanCode, type Quote } from '@/lib/billing';
 import { invoiceDocument, receiptDocument, savePdf } from '@/lib/billing-pdf';
+import { PlanEnding } from './plan-ending';
 import { getBillingAction, quoteAction, payRenewalAction, removeCardAction, schedulePlanAction, startCheckoutAction, verifyPaymentAction } from './actions';
 
 type State = { plans: Plan[]; current: CurrentPlan; history: BillingInvoice[] | null };
@@ -165,6 +166,9 @@ export default function BillingPage() {
             </dl>
           </CardContent>)}
       </Card>
+
+      {current.subscribed && (
+        <PlanEnding current={current} owner={business?.userRole === 'owner'} manager={manager} onChanged={load} />)}
 
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold">Plans</h2>
