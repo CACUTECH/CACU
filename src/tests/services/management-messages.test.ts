@@ -34,3 +34,20 @@ test('unknown refusals keep their original text', async () => {
     client.rpc.mockResolvedValueOnce({ data: null, error: { message: 'VERSION_CONFLICT', code: 'P0001' } });
     await expect(invite()).rejects.toThrow('VERSION_CONFLICT');
 });
+
+test('an invitation with a template goes through invite_member with the same request key', async () => {
+    client.rpc.mockResolvedValueOnce({ data: { id: 'I', role: 'editor' }, error: null });
+    await service.write({ request_key: key, operation: 'invitation.create', details: { email: 'a@example.com', template_id: 'T' } });
+    expect(client.rpc).toHaveBeenCalledWith('invite_member', { p_business_id: 'B', p_request_key: key, p_data: { email: 'a@example.com', template_id: 'T' } });
+});
+
+test.each([
+    ['TEMPLATE_EXCEEDS_YOUR_ACCESS', 'You can only give someone access you have yourself. Ask the business owner.'],
+    ['TEMPLATE_IN_USE', 'Move everyone off this profile, and cancel invitations that use it, before deleting it.'],
+    ['PLAN_LIMIT module.custom_roles', 'Custom profiles are on the Oga and Chairman plans. Upgrade in Billing to create one.'],
+    ['PERMISSION_DENIED settings.edit', 'You do not have permission to do this in this business. Ask the business owner.'],
+    ['SOMETHING_ELSE', 'That change was not saved. Refresh and try again.'],
+])('template change refusal %s reads in plain words', async (code, message) => {
+    client.rpc.mockResolvedValueOnce({ data: null, error: { message: code, code: '42501' } });
+    await expect(service.assignTemplate('U', 'T')).rejects.toThrow(message);
+});
