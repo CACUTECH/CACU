@@ -1,6 +1,6 @@
 """CACU document workflows calculate amounts from authoritative records."""
 from datetime import date,datetime
-from decimal import Decimal
+from decimal import Decimal,ROUND_HALF_UP
 import hashlib,json
 from uuid import UUID,uuid5,NAMESPACE_URL
 from typing import Literal
@@ -39,14 +39,23 @@ class ReceiptCreate(BaseModel):
     method:str=Field(pattern=r'^(Cash|Transfer|Card)$')
     bank_account_id:UUID|None=None
 
+class SaleLine(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    item_id:UUID
+    quantity:int=Field(gt=0,le=1000000)
+    discount_percent:str=Field(default='0',pattern=r'^[0-9]{1,3}(\.[0-9]{1,2})?$')
+
 class SaleCreate(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
-    items:list[StockLine]=Field(min_length=1,max_length=100)
+    items:list[SaleLine]=Field(min_length=1,max_length=100)
     entry_date:date
-    method:str=Field(pattern=r'^(Cash|Transfer|Card)$')
+    method:str=Field(pattern=r'^(Cash|Transfer|Card|Split|Credit)$')
     bank_account_id:UUID|None=None
     quoted_total:str=Field(pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
+    cash_received:str|None=Field(default=None,pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
+    transfer_amount:str|None=Field(default=None,pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
+    customer_id:UUID|None=None
 
 
 def purpose(session,name):
@@ -59,6 +68,11 @@ def party_account(session,kind,party_id):
     to the receivables or payables account the first time they are used (accounting.map_party)."""
     library=raw(session,'SELECT accounting.map_party(%s,%s,%s)',(str(session.business_id),kind,str(party_id))).scalar()
     return raw(session,'SELECT account_id FROM accounting.account_map WHERE business_id=%s AND library_id=%s',(str(session.business_id),library)).scalar()
+
+def clearing_account(session):
+    rows=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='transfer_clearing'",(str(session.business_id),)).all()
+    if len(rows)!=1:raise HTTPException(409,'Set up the Transfers awaiting confirmation account in your chart before taking transfers')
+    return rows[0].account_id
 
 def collection_account(session,method,bank_account_id):
     if method=='Card':raise HTTPException(409,'Card payments require verified gateway settlement')
@@ -140,41 +154,122 @@ def invoice_create(session,actor,data:InvoiceCreate):
         return {'id':str(data.request_key),'posting':result}
     return durable(session,actor,'invoice',data,execute)
 
+def receipt_posting(session,actor,request_key,invoice_id,amount,method,collection,entry_date):
+    """Posts a receipt against an issued invoice into the given cash or bank account."""
+    tenant=str(session.business_id)
+    row=raw(session,"SELECT i.customer_id,m.account_id FROM public.invoices i JOIN accounting.document_map d ON d.business_id=i.business_id AND d.source_id=i.id AND d.source_type='invoice' JOIN accounting.\"transaction\" t ON t.id=d.transaction_id AND t.business_id=d.business_id JOIN accounting.account_map m ON m.business_id=t.business_id AND m.library_id=t.account_id WHERE i.business_id=%s AND i.id=%s FOR UPDATE OF i",
+            (tenant,str(invoice_id))).first()
+    if not row:raise HTTPException(409,'Invoice must be issued before payment')
+    cmd=PostingCommand(request_key=uuid5(request_key,'posting'),kind='receipt',source_id=request_key,target_id=invoice_id,
+        main_account_id=row.account_id,counterparty_id=row.customer_id,entry_date=entry_date,narration='Manual '+method+' receipt',payment_method=method,
+        lines=[{'account_id':collection,'amount':amount}])
+    return post_command(session,actor,cmd)
+
+def invoice_outstanding(session,invoice_id):
+    """What the customer still owes on an issued invoice, less transfers already waiting for confirmation."""
+    from python_accounting.models import Transaction
+    tenant=str(session.business_id)
+    mapped=raw(session,"SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type='invoice' AND source_id=%s",(tenant,str(invoice_id))).scalar()
+    if not mapped:raise HTTPException(409,'Invoice must be issued before payment')
+    raw(session,'SELECT 1 FROM public.invoices WHERE business_id=%s AND id=%s FOR UPDATE',(tenant,str(invoice_id)))
+    target=session.get(Transaction,mapped)
+    waiting=raw(session,"SELECT coalesce(sum(amount),0) FROM accounting.pending_transfer WHERE business_id=%s AND invoice_id=%s AND status='pending'",(tenant,str(invoice_id))).scalar()
+    return target.amount-target.cleared(session),Decimal(waiting)
+
 def receipt_create(session,actor,data:ReceiptCreate):
     def execute():
-        tenant=str(session.business_id)
-        row=raw(session,"SELECT i.customer_id,m.account_id FROM public.invoices i JOIN accounting.document_map d ON d.business_id=i.business_id AND d.source_id=i.id AND d.source_type='invoice' JOIN accounting.\"transaction\" t ON t.id=d.transaction_id AND t.business_id=d.business_id JOIN accounting.account_map m ON m.business_id=t.business_id AND m.library_id=t.account_id WHERE i.business_id=%s AND i.id=%s FOR UPDATE OF i",
-                (tenant,str(data.invoice_id))).first()
-        if not row:raise HTTPException(409,'Invoice must be issued before payment')
+        if data.method=='Transfer':
+            # BR-010: a transfer receipt is held until the owner confirms the money arrived; the invoice stays outstanding.
+            if data.bank_account_id is not None:collection_account(session,'Transfer',data.bank_account_id)
+            outstanding,waiting=invoice_outstanding(session,data.invoice_id)
+            if Decimal(data.amount)<=0:raise HTTPException(422,'Enter an amount above zero')
+            if Decimal(data.amount)>outstanding-waiting:raise HTTPException(409,'Amount exceeds outstanding balance, including transfers waiting for confirmation')
+            customer=raw(session,'SELECT customer_id FROM public.invoices WHERE business_id=%s AND id=%s',(str(session.business_id),str(data.invoice_id))).scalar()
+            raw(session,"""INSERT INTO accounting.pending_transfer(business_id,id,source_type,amount,entry_date,invoice_id,customer_id,expected_bank_account_id,created_by)
+              VALUES(%s,%s,'receipt',%s,%s,%s,%s,%s,%s)""",(str(session.business_id),str(data.request_key),Decimal(data.amount),data.entry_date,str(data.invoice_id),
+              str(customer) if customer else None,str(data.bank_account_id) if data.bank_account_id else None,str(actor)))
+            return {'source_id':str(data.request_key),'status':'awaiting_confirmation','amount':format(Decimal(data.amount),'.2f'),
+                    'outstanding':format(outstanding,'.2f'),'payment_method':'Transfer'}
         collection=collection_account(session,data.method,data.bank_account_id)
-        cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='receipt',source_id=data.request_key,target_id=data.invoice_id,
-            main_account_id=row.account_id,counterparty_id=row.customer_id,entry_date=data.entry_date,narration='Manual '+data.method+' receipt',payment_method=data.method,
-            lines=[{'account_id':collection,'amount':data.amount}])
-        return post_command(session,actor,cmd)
+        return receipt_posting(session,actor,data.request_key,data.invoice_id,data.amount,data.method,collection,data.entry_date)
     return durable(session,actor,'receipt',data,execute)
 
+CENT=Decimal('0.01')
+
+def sales_policy(session):
+    row=raw(session,'SELECT allow_oversell FROM accounting.sales_policy WHERE business_id=%s',(str(session.business_id),)).first()
+    return {'allow_oversell':bool(row and row.allow_oversell)}
+
 def sale_create(session,actor,data:SaleCreate):
+    """Doc 10 checkout: prices from the catalogue; line discounts within the member's cap (sales.edit); cash, transfer
+    (waits for confirmation, BR-010), split cash and transfer, or credit to a named customer (an issued invoice)."""
     def execute():
-        tenant=str(session.business_id)
-        collection=collection_account(session,data.method,data.bank_account_id)
+        tenant=str(session.business_id);method=data.method
+        if method=='Card':raise HTTPException(409,'Card payments are not available yet')
         if len({i.item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate sale item')
-        total=Decimal('0');items=[];stock=[]
+        if data.customer_id is not None and method!='Credit':raise HTTPException(422,'Only a credit sale names a customer here')
+        cap=Decimal(raw(session,'SELECT authz.discount_cap(%s)',(tenant,)).scalar() or 0)
+        total=Decimal('0');discounts=Decimal('0');items=[];stock=[]
         for item in sorted(data.items,key=lambda x:str(x.item_id)):
             row=raw(session,"SELECT name,unit_price,item_type,coalesce((to_jsonb(catalog_items)->>'track_stock')::boolean,true) AS track_stock FROM public.catalog_items WHERE id=%s AND business_id=%s AND is_active FOR UPDATE",(str(item.item_id),tenant)).first()
             if not row or row.unit_price<=0:raise HTTPException(409,'Sale item unavailable')
-            value=row.unit_price*item.quantity;total+=value;items.append((item,row,value))
-            if row.item_type=='PRODUCT' and row.track_stock:stock.append(item)
-        if total!=Decimal(data.quoted_total):raise HTTPException(409,'Checkout total differs from authoritative tax-free prices')
-        raw(session,"INSERT INTO public.transactions(id,business_id,created_by,status,payment_method,total,subtotal) VALUES(%s,%s,%s,'completed',%s,%s,%s)",(str(data.request_key),tenant,str(actor),data.method.lower(),total,total))
-        for item,row,value in items:
-            raw(session,'INSERT INTO public.transaction_items(id,business_id,transaction_id,catalog_item_id,description,quantity,unit_price,line_total) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
-                (str(uuid5(data.request_key,str(item.item_id))),tenant,str(data.request_key),str(item.item_id),row.name,item.quantity,row.unit_price,value))
+            percent=Decimal(item.discount_percent)
+            if percent>0:
+                if method=='Credit':raise HTTPException(422,'Discounts are not available on credit sales yet')
+                if percent>cap:raise HTTPException(403,'Your discount limit is '+format(cap.normalize(),'f')+'%. Ask the business owner for a bigger discount.')
+            gross=row.unit_price*item.quantity
+            discount=(gross*percent/100).quantize(CENT,rounding=ROUND_HALF_UP)
+            value=gross-discount;total+=value;discounts+=discount;items.append((item,row,value,discount))
+            if row.item_type=='PRODUCT' and row.track_stock:stock.append(StockLine(item_id=item.item_id,quantity=item.quantity))
+        if total!=Decimal(data.quoted_total):raise HTTPException(409,'Checkout total differs from catalogue prices and discounts')
+        if total<=0:raise HTTPException(422,'A sale must be for more than zero')
+        if method=='Credit':
+            # Credit to a named customer is an issued invoice: receivables, receipts and ageing work as for any invoice.
+            if data.customer_id is None:raise HTTPException(422,'Choose the customer who owes for this sale')
+            if data.cash_received or data.transfer_amount or data.bank_account_id:raise HTTPException(422,'A credit sale takes no payment now')
+            invoice=InvoiceCreate(request_key=uuid5(data.request_key,'credit'),customer_id=data.customer_id,invoice_number='POS-'+str(data.request_key)[:8].upper(),
+                entry_date=data.entry_date,items=[{'catalog_item_id':item.item_id,'quantity':item.quantity,'unit_price':format(row.unit_price,'.2f')} for item,row,_,_ in items])
+            created=invoice_create(session,actor,invoice)
+            return {'saleId':created['id'],'status':'credit','invoice_id':created['id'],'invoice_number':invoice.invoice_number,'posting':created['posting']}
+        cash_part=transfer_part=None;change=None
+        if method=='Split':
+            if data.transfer_amount is None:raise HTTPException(422,'Enter how much was paid by transfer')
+            transfer_part=Decimal(data.transfer_amount);cash_part=total-transfer_part
+            if transfer_part<=0 or cash_part<=0:raise HTTPException(422,'A split sale has both a cash part and a transfer part')
+        elif data.transfer_amount is not None:raise HTTPException(422,'Only a split sale has a transfer amount')
+        if data.cash_received is not None:
+            if method not in {'Cash','Split'}:raise HTTPException(422,'Cash received applies to cash and split sales')
+            due=total if method=='Cash' else cash_part
+            if Decimal(data.cash_received)<due:raise HTTPException(422,'Cash received is less than the cash due')
+            change=Decimal(data.cash_received)-due
+        if method in {'Transfer','Split'}:
+            # BR-010: the transfer waits in Transfers awaiting confirmation. A bank named here is only the one expected.
+            if data.bank_account_id is not None:collection_account(session,'Transfer',data.bank_account_id)
+        elif data.bank_account_id is not None:raise HTTPException(422,'Cash payments cannot select a bank account')
+        main=clearing_account(session) if method=='Transfer' else collection_account(session,'Cash',None)
+        pending=method in {'Transfer','Split'}
+        raw(session,"""INSERT INTO public.transactions(id,business_id,created_by,status,payment_method,total,subtotal,cash_received,change_given,transfer_amount,discount_total)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",(str(data.request_key),tenant,str(actor),'pending_payment' if pending else 'completed',method.lower(),
+            total,total+discounts,Decimal(data.cash_received) if data.cash_received is not None else None,change,
+            transfer_part if method=='Split' else (total if method=='Transfer' else None),discounts))
+        for item,row,value,discount in items:
+            raw(session,'INSERT INTO public.transaction_items(id,business_id,transaction_id,catalog_item_id,description,quantity,unit_price,line_total,discount) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (str(uuid5(data.request_key,str(item.item_id))),tenant,str(data.request_key),str(item.item_id),row.name,item.quantity,row.unit_price,value,discount))
+        lines=[{'account_id':purpose(session,'revenue'),'amount':format(total,'.2f'),'credited':pending}]
+        if method=='Split':lines.append({'account_id':clearing_account(session),'amount':format(transfer_part,'.2f'),'credited':False})
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='pos',source_id=data.request_key,
-            main_account_id=collection,entry_date=data.entry_date,narration='POS sale',payment_method=data.method,
-            lines=[{'account_id':purpose(session,'revenue'),'amount':format(total,'.2f')}],stock=stock)
-        return {'saleId':str(data.request_key),'posting':post_command(session,actor,cmd)}
+            main_account_id=main,entry_date=data.entry_date,narration='POS sale',payment_method=method,
+            main_amount=format(cash_part,'.2f') if method=='Split' else None,lines=lines,stock=stock)
+        posting=post_command(session,actor,cmd,allow_shortfall=sales_policy(session)['allow_oversell'])
+        if pending:
+            waiting=transfer_part if method=='Split' else total
+            raw(session,"""INSERT INTO accounting.pending_transfer(business_id,id,source_type,amount,entry_date,expected_bank_account_id,created_by)
+              VALUES(%s,%s,'pos',%s,%s,%s,%s)""",(tenant,str(data.request_key),waiting,data.entry_date,str(data.bank_account_id) if data.bank_account_id else None,str(actor)))
+        shortfalls=raw(session,'SELECT item_id,quantity FROM accounting.stock_shortfall WHERE business_id=%s AND sale_id=%s',(tenant,str(data.request_key))).all()
+        return {'saleId':str(data.request_key),'status':'pending_payment' if pending else 'completed','posting':posting,
+                'change':format(change,'.2f') if change is not None else None,'discount_total':format(discounts,'.2f'),
+                'shortfalls':[{'item_id':str(r.item_id),'quantity':r.quantity} for r in shortfalls]}
     return durable(session,actor,'pos',data,execute)
-
 
 EXPENSE_TYPES={Account.AccountType.OPERATING_EXPENSE,Account.AccountType.OVERHEAD_EXPENSE,Account.AccountType.OTHER_EXPENSE,Account.AccountType.DIRECT_EXPENSE}
 # Cost of sales and stock write-offs change only with stock movements (Doc 09 controls).

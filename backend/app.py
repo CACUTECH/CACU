@@ -118,7 +118,7 @@ POSTING_PERMISSIONS={'invoice':'invoices.post','receipt':'invoices.post','credit
 @app.post('/api/v1/businesses/{business_id}/postings')
 def accounting_posting(business_id:UUID,command:PostingCommand,user_id:UUID=Depends(current_user)):
     # Collecting what customers already owe stays open while the subscription is suspended (SUB-10).
-    with library_transaction(user_id,business_id,write=True,while_read_only=command.kind=='receipt',permission=POSTING_PERMISSIONS[command.kind]) as session:
+    with library_transaction(user_id,business_id,write=True,while_read_only=command.kind=='receipt',permission=POSTING_PERMISSIONS.get(command.kind,'ledger.post')) as session:
         return post_command(session,user_id,command)
 
 from cacu.accounting.workflows import InvoiceCreate,ReceiptCreate,SaleCreate,invoice_create,receipt_create,sale_create
@@ -369,3 +369,55 @@ def approve_reporting_close(business_id:UUID,close_id:UUID,data:Approval,user_id
 
 from cacu.billing.routes import billing_router
 app.include_router(billing_router(current_user))
+
+# Transfers awaiting confirmation and the owner's daily reconciliation (BR-010, Doc 10, Doc 11 R1 transfer endpoints).
+from cacu.accounting.transfers import TransferConfirm,TransferNotReceived,confirm as confirm_transfer,not_received as transfer_not_received,list_transfers,daily as daily_reconciliation
+
+@app.get('/api/v1/businesses/{business_id}/transfers')
+def pending_transfers(business_id:UUID,status:str='pending',user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='banking.view') as session:
+        return list_transfers(session,status)
+
+@app.post('/api/v1/businesses/{business_id}/transfers/{transfer_id}/confirm')
+def confirm_pending_transfer(business_id:UUID,transfer_id:UUID,data:TransferConfirm,user_id:UUID=Depends(current_user)):
+    # Recording money that arrived is allowed while the workspace is read-only, like receipts.
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='banking.post') as session:
+        return confirm_transfer(session,user_id,transfer_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/transfers/{transfer_id}/not-received')
+def reject_pending_transfer(business_id:UUID,transfer_id:UUID,data:TransferNotReceived,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='banking.post') as session:
+        return transfer_not_received(session,user_id,transfer_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/reconciliation/daily')
+def daily_reconciliation_report(business_id:UUID,day:date,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='banking.view') as session:
+        return daily_reconciliation(session,day)
+
+# POS checkout settings, shortfalls and receipts (Doc 10, BR-022).
+from cacu.accounting.checkout import SalesPolicy,options as checkout_options,save_policy as save_sales_policy,shortfalls as stock_shortfalls,review_shortfall,receipt as sale_receipt
+
+@app.get('/api/v1/businesses/{business_id}/sales/options')
+def sales_options(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='sales.view') as session:
+        return checkout_options(session)
+
+@app.post('/api/v1/businesses/{business_id}/sales/policy')
+def save_sales_options(business_id:UUID,data:SalesPolicy,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='settings.edit') as session:
+        return save_sales_policy(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/sales/{sale_id}/receipt')
+def sales_receipt(business_id:UUID,sale_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='sales.view') as session:
+        return sale_receipt(session,sale_id)
+
+@app.get('/api/v1/businesses/{business_id}/stock/shortfalls')
+def list_stock_shortfalls(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return stock_shortfalls(session)
+
+@app.post('/api/v1/businesses/{business_id}/stock/shortfalls/{sale_id}/{item_id}/review')
+def review_stock_shortfall(business_id:UUID,sale_id:UUID,item_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.approve') as session:
+        return review_shortfall(session,user_id,sale_id,item_id)

@@ -1,6 +1,6 @@
 """Doc 09 / Doc 19 minimum financial tests before an accounting release (gate G2), on a business turned on from an
 approved opening position. TEST-103, TEST-104 and TEST-106 live with the engine and workflow tests; see
-docs/suite/release-gate-tests-20261101.md for the full map. TEST-107 waits for transfer clearing (BL-024)."""
+docs/suite/release-gate-tests-20261101.md for the full map. TEST-107 covers transfer clearing (BL-024)."""
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, time
 from decimal import Decimal
@@ -15,7 +15,8 @@ from cacu.accounting.workflows import (InvoiceCreate, ReceiptCreate, SaleCreate,
 from cacu.accounting.bills import BillCreate, SupplierPaymentCreate, bill_create, list_bills, payment_create
 from cacu.accounting.stock import request_adjustment
 from cacu.accounting.reports import cash_flow, statements, trial_balance
-from test_corrections_postgres import live, call, balance, expense, adjustment, URL
+from cacu.accounting.transfers import TransferConfirm, TransferNotReceived, confirm, not_received, daily, list_transfers
+from test_corrections_postgres import live, call, balance, expense, adjustment, stock, URL
 from test_opening_position_postgres import books
 from test_default_chart_postgres import charted
 from test_legacy_write_boundary_postgres import boundary
@@ -125,3 +126,47 @@ def test_110_posted_ledger_rows_cannot_be_changed_or_deleted_by_any_role(engine_
                 c.execute(statement)
     with psycopg.connect(DSN) as c:
         assert c.execute("SELECT count(*), sum(amount) FILTER (WHERE entry_type::text='DEBIT') FROM accounting.ledger").fetchone() == (2, Decimal('1000'))
+
+
+def test_107_transfer_sale_confirmation_and_unconfirmed_transfer_reversed(live):
+    """BR-010, PR-03 to PR-05: revenue and stock at checkout; money banked only when confirmed; a transfer that never
+    arrives reverses the sale and returns its stock at the cost it left at."""
+    owner = lambda work: call(live, 'owner', work)
+    start = {code: balance(live, code) for code in ('1000', '1010', '1020', '4000', '5000', '1200')}
+    on_hand = stock(live, 'Rice')[0]
+    sales = []
+    for _ in range(2):
+        sale = SaleCreate(request_key=uuid4(), items=[{'item_id': live.items['Rice'], 'quantity': 1}], entry_date=TODAY, method='Transfer', quoted_total='65000')
+        assert owner(lambda s, a: sale_create(s, a, sale))['status'] == 'pending_payment'
+        sales.append(sale.request_key)
+    cost = balance(live, '5000') - start['5000']
+    assert balance(live, '1020') - start['1020'] == Decimal('130000') and balance(live, '1010') == start['1010']
+    assert -(balance(live, '4000') - start['4000']) == Decimal('130000') and stock(live, 'Rice')[0] == on_hand - 2
+    waiting = owner(lambda s, a: daily(s, TODAY))
+    assert waiting['by_method']['transfer'] == {'sales': 2, 'total': '130000.00', 'awaiting': '130000.00', 'reversed': '0.00'}
+    assert waiting['pending_total'] == '130000.00' and [p['age_days'] for p in waiting['pending']] == [0, 0]
+
+    owner(lambda s, a: confirm(s, a, sales[0], TransferConfirm(request_key=uuid4(), bank_account_id=live.ids['bank'])))
+    gone = owner(lambda s, a: not_received(s, a, sales[1], TransferNotReceived(request_key=uuid4(), note='Customer reversed the transfer')))
+    assert Decimal(gone['stock_cost_restored']) == cost / 2
+
+    assert balance(live, '1010') - start['1010'] == Decimal('65000') and balance(live, '1020') == start['1020']  # nothing left waiting
+    assert -(balance(live, '4000') - start['4000']) == Decimal('65000')  # one sale's revenue
+    assert balance(live, '5000') - start['5000'] == cost / 2 and stock(live, 'Rice')[0] == on_hand - 1  # the other's stock came back
+    assert balance(live, '1200') - start['1200'] == -cost / 2
+    with psycopg.connect(URL) as c:
+        assert dict(c.execute('SELECT id,status FROM transactions WHERE id = ANY(%s)', (sales,)).fetchall()) == {sales[0]: 'completed', sales[1]: 'reversed'}
+    assert owner(lambda s, a: list_transfers(s, 'pending')) == []
+    with pytest.raises(HTTPException) as again:
+        owner(lambda s, a: not_received(s, a, sales[0], TransferNotReceived(request_key=uuid4(), note='Changed my mind')))
+    assert again.value.status_code == 409
+    with pytest.raises(HTTPException) as generic:  # only the reconciliation workflow posts these
+        owner(lambda s, a: post_command(s, a, PostingCommand(request_key=uuid4(), kind='transfer_confirmation', source_id=uuid4(),
+              main_account_id=live.ids['bank'], entry_date=TODAY, narration='Sneaky', credited=False,
+              lines=[{'account_id': live.codes['1020'], 'amount': '1.00', 'credited': True}])))
+    assert generic.value.status_code == 422
+
+    tb = call(live, 'viewer', lambda s, a: trial_balance(s, TODAY))
+    assert tb['controls_checked'] and tb['exceptions'] == [] and tb['difference'] == '0.00'
+    flow = call(live, 'viewer', lambda s, a: cash_flow(s, TODAY, TODAY))
+    assert flow['reconciled'] and flow['difference'] == '0.00'

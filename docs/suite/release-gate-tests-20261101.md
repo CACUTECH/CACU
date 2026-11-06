@@ -36,7 +36,7 @@ There is one migration, `20261101200000_api_rate_limits.sql`. If Supabase record
 | TEST-104 | Same request key twice; changed amount | `test_idempotency_and_conflict` and every workflow's replay check | Passes |
 | TEST-105 | 50 concurrent sales of the last 10 units | `test_105_fifty_concurrent_sales_of_the_last_ten_units` | Passes: exactly 10 sold, 40 refused, stock 0 |
 | TEST-106 | Receipt above the outstanding balance | Activation, bills and `test_concurrent_allocation_cannot_overpay` | Passes: refused (R1) |
-| TEST-107 | Transfer sale, confirmation, unconfirmed transfer reversed | Not built | Waits for transfer clearing (BL-024) |
+| TEST-107 | Transfer sale, confirmation, unconfirmed transfer reversed | Built | `test_release_gate_postgres.py::test_107_transfer_sale_confirmation_and_unconfirmed_transfer_reversed` (BL-024) |
 | TEST-108 | Posting before cutover or in a closed period | `test_runtime_refuses_postings_before_the_start_date`, `test_108_postings_in_a_closed_period_are_refused_with_the_reason` | Passes |
 | TEST-109 | Cash, receivables, payables and stock reconciliations after mixed activity | `test_109_a_month_of_mixed_activity_reconciles` | Passes: every difference zero |
 | TEST-110 | Update or delete of a posted ledger row as every role | `test_110_...` (runtime, browser roles, service role, table owner) | Passes: refused, rows unchanged |

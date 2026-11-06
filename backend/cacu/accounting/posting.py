@@ -31,7 +31,8 @@ class StockLine(BaseModel):
 class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
-    kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal']
+    kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
+                 'transfer_confirmation','transfer_not_received']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -42,11 +43,13 @@ class PostingCommand(BaseModel):
     lines:list[PostingLine]=Field(min_length=1,max_length=100)
     stock:list[StockLine]=Field(default_factory=list,max_length=100)
     counterparty_id:UUID|None=None
-    payment_method:Literal['Cash','Transfer']|None=None
+    payment_method:Literal['Cash','Transfer','Split']|None=None
 
 CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'supplier_payment':SupplierPayment,
          'expense':CashPurchase,'pos':CashSale,'adjustment':JournalEntry,'credit_note':CreditNote,
-         'transfer':ContraEntry,'reversal':JournalEntry}
+         'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry}
+# Posted only by the transfer workflows (BR-010), never through the generic postings route.
+INTERNAL_KINDS={'transfer_confirmation','transfer_not_received'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
@@ -79,7 +82,8 @@ def native_post(session,cls,main,lines,entry_date,narration,credited=None,main_a
 
 CORRECTION_KINDS={'reversal','credit_note'}
 
-def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False):
+def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False,internal=False,allow_shortfall=False):
+    if command.kind in INTERNAL_KINDS and not internal:raise HTTPException(422,'Transfers are confirmed from the daily reconciliation screen')
     # Corrections are Owner/Admin-only in their workflows; enforce it here too so the
     # generic postings route cannot reach around them, and before a replay returns.
     if command.kind in CORRECTION_KINDS:
@@ -100,7 +104,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     main=account(session,command.main_account_id)
     lines=[(account(session,l.account_id),Decimal(l.amount),l.credited,l.description or command.narration) for l in command.lines]
     amount=Decimal(command.main_amount) if command.main_amount is not None else sum((l[1] for l in lines),Decimal('0'))
-    if command.main_amount is not None and command.kind!='adjustment':raise HTTPException(422,'Compound amounts are only valid for adjustments')
+    split_sale=command.kind=='pos' and command.payment_method=='Split'
+    if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
+    if split_sale and command.main_amount is None:raise HTTPException(422,'A split sale names its cash part')
     if command.main_amount is not None and amount<=0:raise HTTPException(422,'Compound main amount must be positive')
     if command.entry_date<raw(session,'SELECT cutover_date FROM accounting.business_map WHERE business_id=%s',(tenant,)).scalar():
         raise HTTPException(409,'Posting predates accounting cutover')
@@ -155,10 +161,31 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     if command.payment_method:
         if command.kind not in {'receipt','pos'} or (command.kind=='receipt' and len(command.lines)!=1):
             raise HTTPException(422,'Collection method requires a single sale or receipt collection account')
-        from cacu.accounting.workflows import collection_account
+        from cacu.accounting.workflows import collection_account,purpose
         selected=command.main_account_id if command.kind=='pos' else command.lines[0].account_id
-        reviewed=collection_account(session,command.payment_method,selected if command.payment_method=='Transfer' else None)
-        if str(reviewed)!=str(selected):raise HTTPException(422,'Collection method/account mismatch')
+        if split_sale:
+            # Cash part into the till, transfer part into Transfers awaiting confirmation (BR-010), revenue credited.
+            clearing=str(purpose(session,'transfer_clearing'))
+            debits=[l for l in command.lines if not l.credited]
+            if str(collection_account(session,'Cash',None))!=str(selected) or len(debits)!=1 or str(debits[0].account_id)!=clearing:
+                raise HTTPException(422,'A split sale takes cash into the till and the transfer into Transfers awaiting confirmation')
+        elif command.kind=='pos' and command.payment_method=='Transfer':
+            # BR-010: a transfer sale waits in "Transfers awaiting confirmation" until the owner confirms it.
+            if str(purpose(session,'transfer_clearing'))!=str(selected) or any(not l.credited for l in command.lines):
+                raise HTTPException(422,'Transfer sales post to Transfers awaiting confirmation')
+        else:
+            reviewed=collection_account(session,command.payment_method,selected if command.payment_method=='Transfer' else None)
+            if str(reviewed)!=str(selected):raise HTTPException(422,'Collection method/account mismatch')
+    if command.kind in INTERNAL_KINDS:
+        from cacu.accounting.workflows import collection_account,purpose
+        clearing=str(purpose(session,'transfer_clearing'))
+        if command.kind=='transfer_confirmation':
+            # PR-04: debit the chosen bank, credit Transfers awaiting confirmation.
+            if str(collection_account(session,'Transfer',command.main_account_id))!=str(command.main_account_id) or command.credited                or len(command.lines)!=1 or str(command.lines[0].account_id)!=clearing or not command.lines[0].credited:
+                raise HTTPException(422,'A confirmed transfer moves money from Transfers awaiting confirmation to a bank account')
+        elif str(command.main_account_id)!=clearing or not command.credited or len([l for l in command.lines if not l.credited])!=1              or any(l.credited and str(l.account_id)!=str(collection_account(session,'Cash',None)) for l in command.lines):
+            # PR-05: debit revenue, credit Transfers awaiting confirmation (and, for a split sale, the cash refunded).
+            raise HTTPException(422,'An unconfirmed transfer reverses its sale from Transfers awaiting confirmation')
     if not managed_stock:
         controlled=raw(session,"""SELECT m.library_id FROM accounting.account_map m
           JOIN accounting.inventory_policy p ON p.business_id=m.business_id
@@ -166,8 +193,10 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         protected={r.library_id for r in controlled}
         if main.id in protected or any(line[0].id in protected for line in lines):
             raise HTTPException(409,'Adopted inventory and NRV control accounts require the inventory valuation workflows')
-    tx=native_post(session,CLASSES[command.kind],main,lines,command.entry_date,command.narration,
-                   command.credited if command.kind in {'adjustment','reversal'} else None,compound)
+    transfer_sale=command.kind=='pos' and command.payment_method in {'Transfer','Split'}
+    cls=JournalEntry if transfer_sale else CLASSES[command.kind]
+    side=False if transfer_sale else command.credited if command.kind in {'adjustment','reversal'}|INTERNAL_KINDS else None
+    tx=native_post(session,cls,main,lines,command.entry_date,command.narration,side,compound)
     if target:
         assignment=Assignment(transaction_id=tx.id,assigned_id=target.id,assigned_type=target.__class__.__name__,
                               assignment_date=tx.transaction_date,amount=amount,entity_id=session.entity.id)
@@ -192,8 +221,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if any(Decimal(r.quantity)!=int(r.quantity) for r in actual_stock) or {s.item_id:s.quantity for s in command.stock}!=expected:
             raise HTTPException(422,'Fulfillment must match authoritative document items')
     if command.kind=='pos':
+        sold=sum((l[1] for l in lines if l[2]),Decimal('0')) if split_sale else amount
         document=raw(session,'SELECT total FROM public.transactions WHERE id=%s AND business_id=%s FOR UPDATE',(str(command.source_id),tenant)).first()
-        if not document or document.total!=amount:raise HTTPException(409,'Sale source total mismatch')
+        if not document or document.total!=sold:raise HTTPException(409,'Sale source total mismatch')
     secondary_transactions=[]
     if command.stock:
         if command.kind not in {'invoice','pos'}:raise HTTPException(422,'Stock fulfillment requires a sale')
@@ -202,15 +232,24 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         from cacu.accounting.inventory import consume, allowance_post
         for item in sorted(command.stock,key=lambda x:str(x.item_id)):
             row=raw(session,"SELECT stock_quantity,cost_price FROM public.catalog_items WHERE id=%s AND business_id=%s AND item_type='PRODUCT' AND is_active FOR UPDATE",(str(item.item_id),tenant)).first()
-            if not row or row.cost_price is None or row.cost_price<0 or (row.stock_quantity or 0)<item.quantity:
-                raise HTTPException(409,'Stock or authoritative cost unavailable')
-            valued=consume(session,actor,command.source_id,item.item_id,item.quantity,command.entry_date)
-            cost+=valued[0] if valued is not None else row.cost_price*item.quantity
+            if not row or row.cost_price is None or row.cost_price<0:raise HTTPException(409,'Stock or authoritative cost unavailable')
+            on_hand=max(row.stock_quantity or 0,0);issued=item.quantity
+            if on_hand<item.quantity:
+                # BR-022: only when the owner allows overselling, and never for adopted valuations. Stock stops at zero;
+                # only the units on hand are costed; the rest is listed for review before period close (RSK-027).
+                adopted=raw(session,'SELECT 1 FROM accounting.inventory_valuation WHERE business_id=%s AND item_id=%s',(tenant,str(item.item_id))).first()
+                if not allow_shortfall or adopted or command.kind!='pos':raise HTTPException(409,'Stock or authoritative cost unavailable')
+                issued=on_hand
+                raw(session,'INSERT INTO accounting.stock_shortfall(business_id,sale_id,item_id,quantity) VALUES(%s,%s,%s,%s)',
+                    (tenant,str(command.source_id),str(item.item_id),item.quantity-on_hand))
+            if issued==0:continue
+            valued=consume(session,actor,command.source_id,item.item_id,issued,command.entry_date)
+            cost+=valued[0] if valued is not None else row.cost_price*issued
             if valued is not None and valued[1]:
                 allowance_post(session,actor,uuid5(command.source_id,'allowance:'+str(item.item_id)),command.entry_date,-valued[1],'Fulfillment of inventory allowance')
-            raw(session,'UPDATE public.catalog_items SET stock_quantity=stock_quantity-%s WHERE id=%s AND business_id=%s',(item.quantity,str(item.item_id),tenant))
+            raw(session,'UPDATE public.catalog_items SET stock_quantity=stock_quantity-%s WHERE id=%s AND business_id=%s',(issued,str(item.item_id),tenant))
             raw(session,'INSERT INTO accounting.stock_event(business_id,source_id,item_id,quantity,unit_cost) VALUES(%s,%s,%s,%s,%s)',
-                (tenant,str(command.source_id),str(item.item_id),-item.quantity,row.cost_price))
+                (tenant,str(command.source_id),str(item.item_id),-issued,row.cost_price))
         if cost:
             mappings=raw(session,"SELECT purpose,library_id FROM accounting.account_map WHERE business_id=%s AND purpose IN ('inventory','cogs')",(tenant,)).all()
             mapped=dict(mappings)

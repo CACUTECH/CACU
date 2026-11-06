@@ -44,16 +44,21 @@ export class ManagementService extends BaseService {
         const { supabase, businessId } = await this.getContext();
         if (!businessId)
             throw new Error('Select a business');
-        const { data, error } = await supabase.rpc('role_templates', { p_business_id: businessId });
+        const [{ data, error }, caps] = await Promise.all([supabase.rpc('role_templates', { p_business_id: businessId }),
+            supabase.rpc('discount_caps', { p_business_id: businessId })]);
         if (error)
             throw new Error(templateMessage(error));
-        return data as TemplateCatalogue;
+        // Discount limits (Doc 10): unavailable before the checkout migration, so an error leaves them out.
+        return { ...(data as TemplateCatalogue), discount_caps: caps.error ? {} : (caps.data ?? {}) as Record<string, number | null> };
     }
     async assignTemplate(userId: string, templateId: string) {
         return this.templateCall('assign_role_template', { p_user_id: userId, p_template_id: templateId });
     }
     async saveTemplate(templateId: string | null, name: string, permissions: string[]) {
         return this.templateCall('save_role_template', { p_template_id: templateId, p_name: name, p_permissions: permissions });
+    }
+    async saveDiscountCap(templateId: string, maxPercent: number) {
+        return this.templateCall('save_discount_cap', { p_template_id: templateId, p_max_percent: maxPercent });
     }
     async deleteTemplate(templateId: string) {
         return this.templateCall('delete_role_template', { p_template_id: templateId });
@@ -69,7 +74,7 @@ export class ManagementService extends BaseService {
     }
 }
 export type AccessTemplate = { id: string; code: string; name: string; builtin: boolean; legacy: boolean; role: string; permissions: string[]; members: number };
-export type TemplateCatalogue = { custom_allowed: boolean; templates: AccessTemplate[]; assigned: Record<string, string | null> };
+export type TemplateCatalogue = { custom_allowed: boolean; templates: AccessTemplate[]; assigned: Record<string, string | null>; discount_caps?: Record<string, number | null> };
 export function templateMessage(error: { message?: string | null }) {
     return isPermissionRefusal(error) ? PERMISSION_MESSAGE : MANAGEMENT_MESSAGES[error.message ?? ''] ?? 'That change was not saved. Refresh and try again.';
 }
@@ -89,6 +94,7 @@ const MANAGEMENT_MESSAGES: Record<string, string> = {
     INVALID_PERMISSIONS: 'Choose at least one permission. Billing changes stay with the owner.',
     DUPLICATE_TEMPLATE_NAME: 'Another template already has that name.',
     TEMPLATE_IN_USE: 'Move everyone off this profile, and cancel invitations that use it, before deleting it.',
+    INVALID_DISCOUNT_CAP: 'Enter a discount limit from 0 to 100 percent.',
     'PLAN_LIMIT module.custom_roles': 'Custom profiles are on the Oga and Chairman plans. Upgrade in Billing to create one.',
     'PLAN_LIMIT users.max': 'Your plan has no free user seats. Open invitations hold a seat too. Cancel one, deactivate someone, or upgrade in Billing.',
     'PLAN_LIMIT outlets.max': 'Your plan has no room for another outlet. Upgrade in Billing to add one.',
