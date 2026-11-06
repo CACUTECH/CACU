@@ -56,7 +56,7 @@ def test_the_screen_lists_every_template_with_what_it_allows(team):
     listed = call(d, d[2], 'SELECT public.role_templates(%s)', d[1])
     by_code = {t['code']: t for t in listed['templates']}
     assert listed['custom_allowed'] is True and 'owner' in by_code and by_code['editor_legacy']['legacy'] is True
-    assert by_code['cashier']['permissions'] == sorted(['sales.view', 'sales.create', 'sales.post', 'invoices.view', 'invoices.create',
+    assert by_code['cashier']['permissions'] == sorted(['sales.view', 'sales.create', 'sales.edit', 'sales.post', 'invoices.view', 'invoices.create',
                                                          'invoices.post', 'customers.view', 'customers.create', 'inventory.view',
                                                          'services.view', 'services.create'])
     assert {code: by_code[code]['role'] for code in ('cashier', 'auditor', 'accountant', 'editor_legacy', 'admin_legacy')} == \
