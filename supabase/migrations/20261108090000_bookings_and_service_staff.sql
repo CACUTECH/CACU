@@ -96,6 +96,8 @@ ALTER TABLE public.appointments
 -- Legacy bookings were kept only in the browser; none are stored. Any old status reads as confirmed.
 UPDATE public.appointments SET status = 'confirmed' WHERE status NOT IN ('confirmed', 'checked_in', 'completed', 'cancelled', 'no_show');
 ALTER TABLE public.appointments ALTER COLUMN status SET DEFAULT 'confirmed';
+-- The legacy check allowed 'scheduled' but not 'checked_in'; the new one replaces it.
+ALTER TABLE public.appointments DROP CONSTRAINT IF EXISTS appointments_status_check;
 ALTER TABLE public.appointments ADD CONSTRAINT appointments_status_valid
  CHECK (status IN ('confirmed', 'checked_in', 'completed', 'cancelled', 'no_show'));
 -- New bookings name a staff member and a service; NOT VALID leaves any legacy row alone.
