@@ -17,3 +17,16 @@ catch {
 } }
 
 export async function readAdjustmentHistoryAction(itemId:string,page=0){const response=await fetch('/test/stock-history?'+new URLSearchParams({item:itemId,page:String(page)}));if(!response.ok)throw new Error('History unavailable');return response.json();}
+
+// Access templates (permissions part 4). Unrouted in a test, the screen falls back to the plain role picker.
+export async function readTemplatesAction() { const response = await fetch('/test/templates'); if (!response.ok) throw new Error('Templates unavailable'); return response.json(); }
+async function templateChange(body: unknown) { try {
+    const response = await fetch('/test/template-change', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return await response.json();
+}
+catch {
+    return { success: false as const, error: 'That change was not saved. Refresh and try again.' };
+} }
+export async function assignTemplateAction(userId: string, templateId: string) { return templateChange({ action: 'assign', userId, templateId }); }
+export async function saveTemplateAction(templateId: string | null, name: string, permissions: string[]) { return templateChange({ action: 'save', templateId, name, permissions }); }
+export async function deleteTemplateAction(templateId: string) { return templateChange({ action: 'delete', templateId }); }

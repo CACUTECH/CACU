@@ -13,6 +13,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel,ConfigDict,Field
 from python_accounting.models import ReportingPeriod
 from cacu.accounting.posting import PostingCommand,post_command,raw
+from cacu.accounting.session import PERMISSION_MESSAGE,allowed
 from cacu.accounting.workflows import business_today,durable,purpose,role
 
 class AdjustmentRequest(BaseModel):
@@ -135,7 +136,7 @@ def request_adjustment(session,actor,data:AdjustmentRequest):
         raw(session,'INSERT INTO accounting.stock_adjustment(business_id,id,item_id,delta,reason,entry_date,unit_cost,value,requested_by) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (tenant,str(data.request_key),str(data.item_id),data.delta,data.reason.strip(),entry_date,cost,value,str(actor)))
         rule=policy(session)
-        direct=member in {'owner','admin'} and (rule['stock_threshold'] is None or value<=Decimal(rule['stock_threshold']))
+        direct=member in {'owner','admin'} and allowed(session,'inventory.approve') and (rule['stock_threshold'] is None or value<=Decimal(rule['stock_threshold']))
         result={'item':None,'posting':None}
         if direct:
             result['item'],result['posting']=_post(session,actor,data.request_key,'Within the approval limit')
@@ -152,6 +153,7 @@ def decide(session,actor,adjustment_id:UUID,approve:bool,data:Decision):
     own=str(row.requested_by)==str(actor)
     # The requester may withdraw their own request; deciding anyone else's needs an Owner or Admin.
     if member not in {'owner','admin'} and not(own and not approve):raise HTTPException(403,'Only an Owner or Admin can decide stock adjustments')
+    if not(own and not approve) and not allowed(session,'inventory.approve'):raise HTTPException(403,PERMISSION_MESSAGE)
     if row.status!='pending':raise HTTPException(409,f'This adjustment was already {row.status}')
     if approve and own and policy(session)['separation_of_duties']:raise HTTPException(403,'Someone other than the requester must approve this adjustment')
     if not approve and not data.note.strip() and not own:raise HTTPException(422,'Say why the adjustment is rejected')

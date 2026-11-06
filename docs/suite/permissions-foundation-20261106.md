@@ -25,7 +25,7 @@ Migration `20261106100000_authz_foundation.sql`, in a private `authz` schema tha
 - **Cashier discount cap:** 5% by default; the owner can change it (Doc 10, decided 6 November 2026).
 - **Separation of duties** is on by default for Oga and Chairman, and can be switched off on General (Doc 08).
 - **Plan changes become Owner-only:** Doc 08 says only the Owner changes the plan, but checkout and scheduling currently allow Admins as well. This is corrected when billing switches to the new check.
-- **HR approvals:** the Admin template has no approve or post on HR (Doc 08), but payroll approval currently allows Admins. Decide when HR switches: follow Doc 08, or give Admin `hr.approve`.
+- **HR approvals:** settled in part 3. The Doc 08 Admin row includes `hr.approve` (V C E A X), so admins keep payroll approval; payroll is approved with `hr.approve`.
 - **"Own records" and "own outlet":** the Doc 08 table limits some templates to their own records or outlet. Outlet scope is in the decision function; "own records" is applied in each module as it switches.
 
 ## Part 2: sales, invoices, expenses, catalogue and staff (M-08)
@@ -60,10 +60,55 @@ Migration `20261106110000_permissions_sales_invoices_expenses.sql`. During the s
   - `test_permissions_switch_postgres.py` (5 cases): each function switched once and the migration safe to rerun; editors keep exactly what they had; a Cashier template sells and invoices but can't record expenses, void or change the catalogue; overrides reach the functions while owners are unaffected; the native API asks for each action's permission.
   - A policy case in `test_authz_postgres.py`: the old rule and the permission both apply.
 
-## Next parts
+## Part 3: inventory approvals, ledger and reports, HR, settings and billing (M-08)
 
-1. Switch inventory and approvals, ledger and reports, HR, settings and billing.
-2. Screens: choose a template and outlet when inviting, see what each template allows, and custom profiles on Oga and Chairman.
+Migration `20261106120000_permissions_ledger_hr_settings_billing.sql`. Both checks still apply.
+
+- **Admin (legacy):** existing admins move to a new compatibility template, the Doc 08 Admin row plus `ledger.create`, `ledger.edit`, `ledger.approve`, `ledger.post` and `billing.post`. They keep reversals, period close, chart and opening balances, and paying a due renewal. The Doc 08 Admin template (ledger view and export only) is for people assigned it on screen.
+- **Plan changes are Owner-only** (decided earlier, Doc 08 §5). Choosing or changing the plan, cancelling, saving downgrade choices and removing the saved card need `billing.edit`, which only the Owner holds. Admins still see billing and invoices and can pay a due renewal. The billing screen shows plan buttons and "Remove card" to the owner only.
+- **Actor-aware check:** `authz.has_permission_for(actor, …)` and `authz.require_for` serve the billing functions that run on the runtime connection with the actor as an argument. `has_permission` now calls it with the signed-in user. Neither is granted to anyone.
+- **Database functions** (patched from their live definitions, as in part 2):
+
+  | Function | Permission |
+  |---|---|
+  | `hr_write` | new employee, attendance, payroll run `hr.create`; payroll approve or cancel `hr.approve`; other changes `hr.edit` |
+  | `hr_history` | `hr.view` |
+  | `management_read` | catalogue and options `inventory.view`; staff, outlets, teams, sign-ins, usage `settings.view` |
+  | `adopt_default_chart`, `save_account` | `ledger.edit` |
+  | `save_opening_position` / `approve_opening_position` / `opening_position` | `ledger.create` / `ledger.approve` / `ledger.view` |
+  | `get_business_kpis`, `get_revenue_trend` | `sales.view` |
+  | `legacy_invoice_balances` | `invoices.view` |
+  | `billing_quote`, `business_billing_history`, `downgrade_choices` | `billing.view` |
+  | `save_downgrade_choices`, `remove_payment_method`, `cancel_subscription`, `platform.open_checkout`, `platform.schedule_plan_change` | `billing.edit` |
+  | `platform.renewal_checkout` | `billing.post` |
+
+- **HR rows** read through the Data API (employees, attendance, payroll rules, runs and payslips) also need `hr.view`, so a plan without staff records shows none.
+- **Python core:**
+  - reports, journals and period close: `ledger.view`; submitting a close `ledger.create`, approving it `ledger.approve`; chart accounts and cash-flow classification `ledger.edit`;
+  - expenses, expense accounts and supplier bills lists `expenses.view`; invoice balances `invoices.view`;
+  - stock adjustment list, approval policy and valuation `inventory.view`; approving a stock adjustment, valuation policy, adoption and NRV `inventory.approve`; goods receipts and returns `inventory.post`; approval rules `settings.edit`;
+  - a requester may still withdraw their own stock adjustment; posting within the limit without approval also needs `inventory.approve`.
+- **Tests:** `test_permissions_part3_postgres.py` (5 cases) and `test_permissions_billing_postgres.py` (2 cases).
+
+## Part 4: templates on screen (M-07)
+
+Migration `20261106130000_permission_templates_on_screen.sql` and the Team screen (`src/components/access-templates.tsx`).
+
+- **Inviting:** the invite form asks "What they can do" and shows, area by area, what the chosen template allows. `invite_member` creates the same invitation as before and remembers the template; accepting it gives the new member that template.
+- **Changing someone's access:** an "Access" button on each member (not the owner, not yourself) calls `assign_role_template`.
+- **Access templates tab:** every template with what it allows and how many people hold it. Legacy templates appear only while someone holds them.
+- **Custom profiles** on Oga and Chairman (`module.custom_roles`): create, edit or delete (only when nobody holds it and no open invitation uses it). Editing a profile changes the access of everyone on it at once. Billing changes cannot be included.
+- **No escalation:** anyone but the Owner can only hand out, or build a profile from, permissions they hold themselves.
+- **Role envelope:** while the old role checks still run, each assignment also sets the role that covers the template. View-only templates are viewers; templates that approve, delete, manage staff, settings or HR, or change the chart are admins (and work across all outlets); the rest are editors. Legacy templates keep their own role. The remaining write policies that only checked the role (businesses, storefront settings, memberships, employees, attendance, payroll, accounts, ledger tables, invoice and sale lines) now also check the permission, so a wider role never opens more than the template allows.
+- **A chosen template is kept** when other member details change. Changing the role on the Edit form still resets access to that role's standard template, and the form says so.
+- **Tests:** `test_permission_templates_postgres.py` (5 cases), plus Jest for the descriptions, invite routing and messages.
+
+### Not done in part 4, and why
+
+- **Cashier 5% discount cap:** CACU has no discounts yet. Sales and invoices use catalogue prices, so there is nothing to cap. The cap (5% by default, owner can change) is built with POS discounts in R2.
+- **Editor (legacy) tightening:** checked against today's editor at every switched function and policy. Editors update customers, suppliers, catalogue items, invoices and jobs through row security, post journals and submit period closes, so every permission in the template is in use. Nothing was removed.
+- **Still role-only:** file uploads (logo), the chart-of-accounts list, collection accounts and AI chat. These are reads or owner/admin-only today; switch them when those modules are next touched.
+- **Removing the old role checks** comes after templates have been used for a while. Until then both checks apply.
 
 ## Tests
 

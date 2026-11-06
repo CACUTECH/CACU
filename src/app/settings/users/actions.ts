@@ -33,3 +33,26 @@ export async function acceptInvitationAction(id: string) {
     await selectBusinessAction(data);
     return data as string;
 }
+export async function readTemplatesAction() {
+    return new ManagementService().templates();
+}
+type TemplateResult = { success: true; data: unknown } | { success: false; error: string };
+async function templateChange(work: (service: ManagementService) => Promise<unknown>): Promise<TemplateResult> {
+    try {
+        const data = await work(new ManagementService());
+        revalidatePath('/settings/users');
+        return { success: true, data };
+    }
+    catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : 'That change was not saved. Refresh and try again.' };
+    }
+}
+export async function assignTemplateAction(userId: string, templateId: string) {
+    return templateChange(service => service.assignTemplate(userId, templateId));
+}
+export async function saveTemplateAction(templateId: string | null, name: string, permissions: string[]) {
+    return templateChange(service => service.saveTemplate(templateId, name, permissions));
+}
+export async function deleteTemplateAction(templateId: string) {
+    return templateChange(service => service.deleteTemplate(templateId));
+}

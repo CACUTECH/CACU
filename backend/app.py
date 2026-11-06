@@ -82,30 +82,30 @@ async def library_database_error(request, exc):
 
 @app.get('/api/v1/businesses/{business_id}/reports/cash-flow')
 def cash_flow_report(business_id: UUID,start_date:date,end_date:date,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return cash_flow(session,start_date,end_date)
 
 @app.get('/api/v1/businesses/{business_id}/reports/summary')
 def accounting_summary(business_id: UUID,start_date:date,end_date:date,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return financial_summary(session,start_date,end_date)
 
 @app.get('/api/v1/businesses/{business_id}/reports/trial-balance')
 def trial_balance_report(business_id:UUID,as_of:date,user_id:UUID=Depends(current_user)):
     from cacu.accounting.reports import trial_balance
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return trial_balance(session,as_of)
 
 @app.get('/api/v1/businesses/{business_id}/reports/statements')
 def financial_statements(business_id:UUID,start_date:date,end_date:date,compare:str|None=None,user_id:UUID=Depends(current_user)):
     from cacu.accounting.reports import statements
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return statements(session,start_date,end_date,compare)
 
 @app.get('/api/v1/businesses/{business_id}/reports/general-ledger')
 def general_ledger_report(business_id:UUID,account_id:UUID,start_date:date,end_date:date,page:int=0,user_id:UUID=Depends(current_user)):
     from cacu.accounting.reports import general_ledger
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return general_ledger(session,account_id,start_date,end_date,page)
 
 from cacu.accounting.posting import PostingCommand,post_command
@@ -169,7 +169,7 @@ def post_balanced_journal(business_id:UUID,draft:JournalPosting,user_id:UUID=Dep
 @app.get('/api/v1/businesses/{business_id}/invoices/balances')
 def invoice_balances(business_id:UUID,user_id:UUID=Depends(current_user)):
     from python_accounting.models import Transaction
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='invoices.view') as session:
         rows=session.connection().exec_driver_sql("SELECT source_id,transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type='invoice'",(str(business_id),)).all()
         result=[]
         for row in rows:
@@ -210,12 +210,12 @@ from cacu.accounting.workflows import ExpenseCreate,ReversalCreate,expense_accou
 
 @app.get('/api/v1/businesses/{business_id}/expense-accounts')
 def list_expense_accounts(business_id:UUID,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='expenses.view') as session:
         return expense_accounts(session)
 
 @app.get('/api/v1/businesses/{business_id}/expenses')
 def list_expenses(business_id:UUID,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='expenses.view') as session:
         return recent_documents(session,'expense')
 
 @app.post('/api/v1/businesses/{business_id}/expenses')
@@ -225,7 +225,7 @@ def create_expense(business_id:UUID,data:ExpenseCreate,user_id:UUID=Depends(curr
 
 @app.get('/api/v1/businesses/{business_id}/journals')
 def list_journals(business_id:UUID,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return recent_documents(session,'adjustment')
 
 @app.post('/api/v1/businesses/{business_id}/journals/{journal_id}/reversal')
@@ -242,7 +242,7 @@ from cacu.accounting.stock import AdjustmentRequest,Decision,Policy,decide,list_
 
 @app.get('/api/v1/businesses/{business_id}/stock/adjustments')
 def stock_adjustments(business_id:UUID,status:str|None=None,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
         return list_adjustments(session,status,actor=user_id)
 
 @app.post('/api/v1/businesses/{business_id}/stock/adjustments')
@@ -259,19 +259,19 @@ def reject_stock_adjustment(business_id:UUID,adjustment_id:UUID,data:Decision,us
 
 @app.get('/api/v1/businesses/{business_id}/approval-policy')
 def approval_policy(business_id:UUID,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
         return policy(session)
 
 @app.post('/api/v1/businesses/{business_id}/approval-policy')
 def save_approval_policy(business_id:UUID,data:Policy,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='settings.edit') as session:
         return set_policy(session,user_id,data)
 
 from cacu.accounting.bills import BillCreate,SupplierPaymentCreate,bill_create,list_bills,payment_create
 
 @app.get('/api/v1/businesses/{business_id}/supplier-bills')
 def supplier_bills(business_id:UUID,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='expenses.view') as session:
         return list_bills(session)
 
 @app.post('/api/v1/businesses/{business_id}/supplier-bills')
@@ -293,7 +293,7 @@ ACCOUNT_MESSAGES={'DUPLICATE_ACCOUNT_NAME':'Another account already has that nam
 @app.post('/api/v1/businesses/{business_id}/accounts')
 def add_account(business_id:UUID,data:AccountCreate,user_id:UUID=Depends(current_user)):
     try:
-        with library_transaction(user_id,business_id,write=True) as session:
+        with library_transaction(user_id,business_id,write=True,permission='ledger.edit') as session:
             return account_create(session,user_id,data)
     except SQLAlchemyError as exc:
         code=getattr(exc.orig,'sqlstate',None);reason=str(getattr(exc,'orig',exc)).splitlines()[0]
@@ -311,42 +311,42 @@ from cacu.accounting.close import CloseDraft,Approval,save_close,load_close,appr
 
 @app.get('/api/v1/businesses/{business_id}/inventory/valuation')
 def inventory_valuation_report(business_id:UUID,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
         return inventory_overview(session)
 
 @app.post('/api/v1/businesses/{business_id}/inventory/policy')
 def approve_inventory_policy(business_id:UUID,data:InventoryPolicy,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='inventory.approve') as session:
         return inventory_policy_save(session,user_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/inventory/adopt')
 def adopt_inventory_valuation(business_id:UUID,data:AdoptItem,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='inventory.approve') as session:
         return inventory_adopt(session,user_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/inventory/receipts')
 def receive_inventory(business_id:UUID,data:GoodsReceipt,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='inventory.post') as session:
         return goods_receipt(session,user_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/inventory/nrv')
 def review_inventory_nrv(business_id:UUID,data:NrvAssessment,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='inventory.approve') as session:
         return assess_nrv(session,user_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/inventory/returns')
 def return_inventory(business_id:UUID,data:StockReturn,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='inventory.post') as session:
         return restore_return(session,user_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/cash-flow-classifications')
 def classify_cash_flows(business_id:UUID,data:CashClassification,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='ledger.edit') as session:
         return save_classification(session,user_id,data)
 
 @app.get('/api/v1/businesses/{business_id}/reporting-close')
 def reporting_closes(business_id:UUID,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
         accounts=session.connection().exec_driver_sql("SELECT m.account_id::text AS id,a.name,to_jsonb(a)->>'code' AS code,n.account_type::text AS type,m.flow_section FROM accounting.account_map m JOIN public.accounts a ON a.id=m.account_id AND a.business_id=m.business_id JOIN accounting.account n ON n.id=m.library_id AND n.business_id=m.business_id WHERE m.business_id=%s",(str(business_id),)).mappings().all()
         suppliers=session.connection().exec_driver_sql('SELECT id::text,name FROM public.suppliers WHERE business_id=%s ORDER BY name LIMIT 500',(str(business_id),)).mappings().all()
         policies=session.connection().exec_driver_sql('SELECT account_id::text,effective_from,nature,section,cash_eligible,restricted,evidence FROM accounting.cash_flow_classification WHERE business_id=%s ORDER BY effective_from DESC,account_id LIMIT 200',(str(business_id),)).mappings().all()
@@ -354,17 +354,17 @@ def reporting_closes(business_id:UUID,user_id:UUID=Depends(current_user)):
 
 @app.post('/api/v1/businesses/{business_id}/reporting-close')
 def submit_reporting_close(business_id:UUID,data:CloseDraft,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='ledger.create') as session:
         return save_close(session,user_id,data)
 
 @app.get('/api/v1/businesses/{business_id}/reporting-close/{close_id}')
 def reporting_close_detail(business_id:UUID,close_id:UUID,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id) as session:
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return load_close(session,close_id)
 
 @app.post('/api/v1/businesses/{business_id}/reporting-close/{close_id}/approve')
 def approve_reporting_close(business_id:UUID,close_id:UUID,data:Approval,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='ledger.approve') as session:
         return approve_close(session,user_id,close_id,data)
 
 from cacu.billing.routes import billing_router

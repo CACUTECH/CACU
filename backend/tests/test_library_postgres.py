@@ -61,7 +61,8 @@ def database():
         c.execute("""CREATE SCHEMA IF NOT EXISTS auth;
           CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
           GRANT USAGE ON SCHEMA auth TO PUBLIC; GRANT EXECUTE ON FUNCTION auth.uid() TO PUBLIC""")
-        for name in ['20261102100000_platform_plans.sql','20261105090000_suspension_write_gate.sql','20261106100000_authz_foundation.sql']:
+        for name in ['20261102100000_platform_plans.sql','20261105090000_suspension_write_gate.sql','20261106100000_authz_foundation.sql',
+                     '20261106110000_permissions_sales_invoices_expenses.sql','20261106120000_permissions_ledger_hr_settings_billing.sql']:
             c.execute(Path(f'../supabase/migrations/{name}').read_text(encoding='utf-8'))
         for tab in ['memberships','accounts','customers','suppliers','catalog_items','invoices','invoice_items','payments','transactions','transaction_items']:
             c.execute(f'ALTER TABLE public.{tab} ENABLE ROW LEVEL SECURITY')

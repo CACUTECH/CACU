@@ -35,6 +35,11 @@ def take_write_slot(engine, user_id: UUID, business_id: UUID):
         raise HTTPException(429, f'Too many changes in a short time. Try again in {wait} seconds.', headers={'Retry-After': str(wait)})
 
 PERMISSION_MESSAGE = 'You do not have permission to do this in this business. Ask the business owner.'
+
+
+def allowed(session, permission: str) -> bool:
+    """Whether the signed-in member holds the permission in the session's business (Doc 08 §6)."""
+    return bool(session.connection().exec_driver_sql('SELECT authz.has_permission(%s, %s)', (str(session.business_id), permission)).scalar())
 READ_ONLY_MESSAGE = 'Your workspace is read-only until the subscription is paid. You can still record payments received and export.'
 
 @contextmanager
