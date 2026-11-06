@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const parsed = fileUuid.safeParse(query.get('resource_id'));
     if (!parsed.success) throw new UploadError(422,'Invalid attachment resource');
     const body = await boundedBody(request,uploadPolicy.purposes[purpose].max_bytes);
-    const response = await fileRequest(context,`?${new URLSearchParams({purpose,resource_id:parsed.data})}`,{
+    const response = await fileRequest(context,null,{purpose,resource_id:parsed.data},{
       method:'POST',body:body as BodyInit,headers:{'Content-Type':request.headers.get('content-type') || '', 'X-Upload-Filename':request.headers.get('x-upload-filename') || ''},
     });
     const result = await response.json();
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     if (purpose==='logo') {
       const { error } = await context.supabase.from('businesses').update({logo_url:`/api/files/${ident.data}?preview=true`}).eq('id',context.businessId);
       if (error) {
-        await fileRequest(context,`/${ident.data}`,{method:'DELETE'}).catch(() => undefined);
+        await fileRequest(context,ident.data,undefined,{method:'DELETE'}).catch(() => undefined);
         throw new UploadError(503,'Logo could not be saved. Please retry.');
       }
     }
