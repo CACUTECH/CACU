@@ -110,10 +110,15 @@ def general_ledger_report(business_id:UUID,account_id:UUID,start_date:date,end_d
 
 from cacu.accounting.posting import PostingCommand,post_command
 
+# Doc 08 permission each posting kind needs. Corrections (reversal, credit note) are also Owner/Admin-only in post_command.
+POSTING_PERMISSIONS={'invoice':'invoices.post','receipt':'invoices.post','credit_note':'invoices.post','pos':'sales.post',
+    'expense':'expenses.post','bill':'expenses.post','supplier_payment':'expenses.post','adjustment':'ledger.post',
+    'reversal':'ledger.post','transfer':'banking.post'}
+
 @app.post('/api/v1/businesses/{business_id}/postings')
 def accounting_posting(business_id:UUID,command:PostingCommand,user_id:UUID=Depends(current_user)):
     # Collecting what customers already owe stays open while the subscription is suspended (SUB-10).
-    with library_transaction(user_id,business_id,write=True,while_read_only=command.kind=='receipt') as session:
+    with library_transaction(user_id,business_id,write=True,while_read_only=command.kind=='receipt',permission=POSTING_PERMISSIONS[command.kind]) as session:
         return post_command(session,user_id,command)
 
 from cacu.accounting.workflows import InvoiceCreate,ReceiptCreate,SaleCreate,invoice_create,receipt_create,sale_create
@@ -126,17 +131,17 @@ def collection_accounts(business_id:UUID,user_id:UUID=Depends(current_user)):
 
 @app.post('/api/v1/businesses/{business_id}/invoices')
 def create_invoice(business_id:UUID,data:InvoiceCreate,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='invoices.post' if data.issue else 'invoices.create') as session:
         return invoice_create(session,user_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/receipts')
 def create_receipt(business_id:UUID,data:ReceiptCreate,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True,while_read_only=True) as session:
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='invoices.post') as session:
         return receipt_create(session,user_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/sales')
 def create_sale(business_id:UUID,data:SaleCreate,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='sales.post') as session:
         return sale_create(session,user_id,data)
 
 from python_accounting.exceptions import AccountingExeption
@@ -150,7 +155,7 @@ class JournalPosting(JournalDraft):
 
 @app.post('/api/v1/businesses/{business_id}/journals')
 def post_balanced_journal(business_id:UUID,draft:JournalPosting,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='ledger.post') as session:
         validate_journal(draft)
         if len(draft.lines)>101:
             raise HTTPException(422,'At most 101 journal lines are supported')
@@ -185,9 +190,9 @@ CATALOG_MESSAGES={'VERSION_CONFLICT':'Item changed. Refresh before editing.', 'D
     'CATEGORY_INVALID':'Select an active category for this item type.', 'SUPPLIER_INVALID':'Select a supplier in this business.',
     'PLAN_LIMIT catalog.max_items':'Your plan has no room for more catalogue items. Archive items you no longer sell, or upgrade in Billing.'}
 
-def catalog_write(business_id,user_id,work):
+def catalog_write(business_id,user_id,work,permission=None):
     try:
-        with library_transaction(user_id,business_id,write=True) as session:
+        with library_transaction(user_id,business_id,write=True,permission=permission) as session:
             return work(session)
     except SQLAlchemyError as exc:
         code=getattr(exc.orig,'sqlstate',None)
@@ -198,7 +203,8 @@ def catalog_write(business_id,user_id,work):
 
 @app.post('/api/v1/businesses/{business_id}/catalog')
 def save_catalog(business_id:UUID,data:CatalogMutation,user_id:UUID=Depends(current_user)):
-    return catalog_write(business_id,user_id,lambda session:catalog_mutate(session,user_id,data))
+    permission='inventory.create' if data.operation=='stock.adjust' or data.item_id is None else 'inventory.edit'
+    return catalog_write(business_id,user_id,lambda session:catalog_mutate(session,user_id,data),permission)
 
 from cacu.accounting.workflows import ExpenseCreate,ReversalCreate,expense_accounts,expense_create,recent_documents,reversal_create
 
@@ -214,7 +220,7 @@ def list_expenses(business_id:UUID,user_id:UUID=Depends(current_user)):
 
 @app.post('/api/v1/businesses/{business_id}/expenses')
 def create_expense(business_id:UUID,data:ExpenseCreate,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='expenses.post') as session:
         return expense_create(session,user_id,data)
 
 @app.get('/api/v1/businesses/{business_id}/journals')
@@ -224,12 +230,12 @@ def list_journals(business_id:UUID,user_id:UUID=Depends(current_user)):
 
 @app.post('/api/v1/businesses/{business_id}/journals/{journal_id}/reversal')
 def reverse_journal(business_id:UUID,journal_id:UUID,data:ReversalCreate,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='ledger.post') as session:
         return reversal_create(session,user_id,journal_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/expenses/{expense_id}/reversal')
 def reverse_expense(business_id:UUID,expense_id:UUID,data:ReversalCreate,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='expenses.post') as session:
         return reversal_create(session,user_id,expense_id,data)
 
 from cacu.accounting.stock import AdjustmentRequest,Decision,Policy,decide,list_adjustments,policy,request_adjustment,set_policy
@@ -241,7 +247,7 @@ def stock_adjustments(business_id:UUID,status:str|None=None,user_id:UUID=Depends
 
 @app.post('/api/v1/businesses/{business_id}/stock/adjustments')
 def request_stock_adjustment(business_id:UUID,data:AdjustmentRequest,user_id:UUID=Depends(current_user)):
-    return catalog_write(business_id,user_id,lambda session:request_adjustment(session,user_id,data))
+    return catalog_write(business_id,user_id,lambda session:request_adjustment(session,user_id,data),'inventory.create')
 
 @app.post('/api/v1/businesses/{business_id}/stock/adjustments/{adjustment_id}/approve')
 def approve_stock_adjustment(business_id:UUID,adjustment_id:UUID,data:Decision,user_id:UUID=Depends(current_user)):
@@ -270,12 +276,12 @@ def supplier_bills(business_id:UUID,user_id:UUID=Depends(current_user)):
 
 @app.post('/api/v1/businesses/{business_id}/supplier-bills')
 def create_supplier_bill(business_id:UUID,data:BillCreate,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='expenses.post') as session:
         return bill_create(session,user_id,data)
 
 @app.post('/api/v1/businesses/{business_id}/supplier-bills/{bill_id}/payments')
 def pay_supplier_bill(business_id:UUID,bill_id:UUID,data:SupplierPaymentCreate,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True) as session:
+    with library_transaction(user_id,business_id,write=True,permission='expenses.post') as session:
         return payment_create(session,user_id,bill_id,data)
 
 from cacu.accounting.accounts import AccountCreate,account_create

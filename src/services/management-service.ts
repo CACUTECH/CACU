@@ -1,5 +1,6 @@
 import { BaseService } from './base-service';
 import { READ_ONLY_MESSAGE } from '@/lib/read-only';
+import { PERMISSION_MESSAGE, isPermissionRefusal } from '@/lib/permission';
 import { accountingRequest, usesPythonAccounting } from '@/lib/accounting-client';
 export class ManagementWriteError extends Error {
     constructor(message: string, public readonly uncertain: boolean) { super(message); this.name = 'ManagementWriteError'; }
@@ -31,7 +32,7 @@ export class ManagementService extends BaseService {
         const { data, error } = await supabase.rpc('management_write', { p_business_id: businessId, p_request_key: input.request_key,
             p_operation: input.operation, p_id: input.item_id ?? null, p_version: input.expected_version ?? null, p_data: input.details });
         if (error)
-            throw new ManagementWriteError(MANAGEMENT_MESSAGES[error.message] ?? error.message, !/^(22|23|42|P0001)/.test(error.code || ''));
+            throw new ManagementWriteError(isPermissionRefusal(error) ? PERMISSION_MESSAGE : MANAGEMENT_MESSAGES[error.message] ?? error.message, !/^(22|23|42|P0001)/.test(error.code || ''));
         return data;
     }
 }

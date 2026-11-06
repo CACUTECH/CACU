@@ -23,6 +23,13 @@ test.each([
     expect(failure.uncertain).toBe(false);
 });
 
+test('a missing permission reads in plain words whatever permission it names', async () => {
+    client.rpc.mockResolvedValueOnce({ data: null, error: { message: 'PERMISSION_DENIED settings.create', code: '42501' } });
+    const failure = await invite().catch(e => e);
+    expect(failure.message).toBe('You do not have permission to do this in this business. Ask the business owner.');
+    expect(failure.uncertain).toBe(false);
+});
+
 test('unknown refusals keep their original text', async () => {
     client.rpc.mockResolvedValueOnce({ data: null, error: { message: 'VERSION_CONFLICT', code: 'P0001' } });
     await expect(invite()).rejects.toThrow('VERSION_CONFLICT');
