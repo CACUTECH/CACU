@@ -56,6 +56,9 @@ def confirm(session,actor,transfer_id:UUID,data:TransferConfirm):
                 source_id=data.request_key,main_account_id=bank,entry_date=day,credited=False,narration='Transfer received for sale '+str(transfer_id)[:8],
                 lines=[{'account_id':clearing_account(session),'amount':amount,'credited':True}]),internal=True)
             raw(session,"UPDATE public.transactions SET status='completed' WHERE business_id=%s AND id=%s",(str(session.business_id),str(transfer_id)))
+        elif row.source_type=='deposit':
+            from cacu.accounting.bookings import deposit_confirmed
+            posting=deposit_confirmed(session,transfer_id,bank,actor,day)
         else:
             # The held receipt posts now, into the chosen bank, and clears the invoice by that amount.
             posting=receipt_posting(session,actor,transfer_id,row.invoice_id,amount,'Transfer',bank,day)
@@ -91,6 +94,9 @@ def not_received(session,actor,transfer_id:UUID,data:TransferNotReceived):
                 from cacu.accounting.shifts import tag
                 tag(session,[actor],'sale_reversed',transfer_id,-(sale.total-row.amount))
             raw(session,"UPDATE public.transactions SET status='reversed' WHERE business_id=%s AND id=%s",(str(session.business_id),str(transfer_id)))
+        elif row.source_type=='deposit':
+            from cacu.accounting.bookings import deposit_not_received
+            posting=deposit_not_received(session,transfer_id,actor,day,data.note)
         _decide(session,actor,transfer_id,'not_received',day,None,data.note)
         return {'id':str(transfer_id),'status':'not_received','posting':posting,'stock_cost_restored':format(restored,'.2f'),
                 'cash_to_refund':format(sale.total-row.amount,'.2f') if row.source_type=='pos' and sale.payment_method=='split' else None}
@@ -104,7 +110,8 @@ def list_transfers(session,status='pending',limit=200):
       LEFT JOIN public.invoices i ON i.business_id=p.business_id AND i.id=p.invoice_id
       LEFT JOIN public.customers c ON c.business_id=p.business_id AND c.id=p.customer_id
       WHERE p.business_id=%s AND p.status=%s ORDER BY p.entry_date,p.created_at LIMIT %s""",(str(session.business_id),status,limit)).all()
-    return [{'id':str(r.id),'kind':'sale' if r.source_type=='pos' else 'invoice payment','amount':format(r.amount,'.2f'),
+    kinds={'pos':'sale','receipt':'invoice payment','deposit':'booking deposit'}
+    return [{'id':str(r.id),'kind':kinds[r.source_type],'amount':format(r.amount,'.2f'),
              'entry_date':r.entry_date.isoformat(),'age_days':(today-r.entry_date).days,'invoice_number':r.invoice_number,
              'customer':r.customer_name,'expected_bank_account_id':str(r.expected_bank_account_id) if r.expected_bank_account_id else None,
              'status':r.status,'decided_on':r.decided_on.isoformat() if r.decided_on else None} for r in rows]

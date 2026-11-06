@@ -67,7 +67,8 @@ export default function DailyReconciliationPage() {
             <tbody>{report.pending.map(t => <tr key={t.id} className="border-t">
               <td className="p-2">{t.entry_date}</td>
               <td className="p-2"><Badge variant={t.age_days >= 2 ? 'destructive' : 'secondary'}>{waitingFor(t.age_days)}</Badge></td>
-              <td className="p-2">{t.kind === 'sale' ? `Sale #${t.id.slice(0, 8)}` : `${t.invoice_number ?? 'Invoice'}${t.customer ? `, ${t.customer}` : ''}`}</td>
+              <td className="p-2">{t.kind === 'sale' ? `Sale #${t.id.slice(0, 8)}` : t.kind === 'booking deposit' ? `Booking deposit${t.customer ? `, ${t.customer}` : ''}`
+                : `${t.invoice_number ?? 'Invoice'}${t.customer ? `, ${t.customer}` : ''}`}</td>
               <td className="p-2 font-medium">{naira(t.amount)}</td>
               <td className="p-2"><div className="flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setDecision({ transfer: t, kind: 'confirm' })}>Confirm</Button>
@@ -97,13 +98,14 @@ function DecisionDialog({ decision, banks, onClose, onDone }: { decision: Decisi
     setBusy(false);
     if (!result.success) { setError(result.error); if (!result.uncertain) key.current = crypto.randomUUID(); return; }
     onDone(kind === 'confirm' ? `${naira(transfer.amount)} confirmed and moved to the bank.`
-      : transfer.kind === 'sale' ? `Marked not received. The sale was reversed and its goods returned to stock.` : 'Marked not received. The invoice is still outstanding.');
+      : transfer.kind === 'sale' ? `Marked not received. The sale was reversed and its goods returned to stock.`
+      : transfer.kind === 'booking deposit' ? 'Marked not received. The booking no longer has a deposit.' : 'Marked not received. The invoice is still outstanding.');
   }
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}>
     <DialogContent>
       <DialogHeader>
         <DialogTitle>{kind === 'confirm' ? 'Confirm transfer received' : 'Transfer not received'}</DialogTitle>
-        <DialogDescription>{naira(transfer.amount)} {transfer.kind === 'sale' ? `for sale #${transfer.id.slice(0, 8)}` : `for ${transfer.invoice_number ?? 'an invoice'}`}, made {transfer.entry_date}.</DialogDescription>
+        <DialogDescription>{naira(transfer.amount)} {transfer.kind === 'sale' ? `for sale #${transfer.id.slice(0, 8)}` : transfer.kind === 'booking deposit' ? 'for a booking deposit' : `for ${transfer.invoice_number ?? 'an invoice'}`}, made {transfer.entry_date}.</DialogDescription>
       </DialogHeader>
       <form className="space-y-4" onSubmit={e => void submit(e)}>
         {kind === 'confirm' ? <label className="block space-y-1 text-sm"><span>Bank account it arrived in</span>
@@ -115,6 +117,7 @@ function DecisionDialog({ decision, banks, onClose, onDone }: { decision: Decisi
         </label> : <>
           <p className="text-sm">{transfer.kind === 'sale'
             ? 'The sale will be reversed: its revenue is taken back and the goods return to stock. This cannot be undone.'
+            : transfer.kind === 'booking deposit' ? 'The deposit is taken off the booking. The booking itself stays. This cannot be undone.'
             : 'The payment is dropped and the invoice stays outstanding. This cannot be undone.'}</p>
           <label className="block space-y-1 text-sm"><span>What happened</span>
             <Input required minLength={3} maxLength={500} value={note} disabled={busy} onChange={e => setNote(e.target.value)} placeholder="For example: customer's transfer failed" /></label>

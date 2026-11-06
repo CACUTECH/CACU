@@ -2,6 +2,8 @@
 // Bookings day view (Doc 10 services, bookings and jobs rules; Doc 12 SCR-15). Each staff member's bookings for the
 // day, a new-booking dialog that offers only free times, and the booking's next step. The database enforces every
 // rule (no overlaps, working hours, time off, the booking states); this screen only avoids offering what it refuses.
+// Once the books are on, bookings can hold a deposit (PR-12); cancelling or marking no-show then goes through the
+// accounting API so the deposit is settled with the booking.
 import * as React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -11,24 +13,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
-import { lagosToday } from '@/lib/transfers';
+import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
+import { closeBookingAction, getBookingMoneyAction, takeDepositAction } from './actions';
+import { useKeyedRequest } from '@/hooks/use-keyed-request';
+import { formatKobo, kobo, nairaText } from '@/lib/checkout';
+import { lagosToday, naira } from '@/lib/transfers';
 import {
-  STATUS_LABELS, addDays, bookingError, freeSlots, lagosDay, lagosInstant, lagosTime, serviceMinutes,
-  type Booking, type Hours, type Service, type Staff, type StaffService, type TimeOff,
+  DEPOSIT_LABELS, STATUS_LABELS, addDays, bookingError, expectedDepositKobo, freeSlots, freeToCancel, lagosDay, lagosInstant, lagosTime, serviceMinutes,
+  type Booking, type BookingSettings, type Deposit, type Hours, type Service, type Staff, type StaffService, type TimeOff,
 } from '@/lib/bookings';
 
 type Customer = { id: string; name: string };
+type Bank = { id: string; name: string };
 type Data = { staff: Staff[]; services: Service[]; links: StaffService[]; hours: Hours[]; timeOff: TimeOff[]; bookings: Booking[]; customers: Customer[] };
+type Money = { settings: BookingSettings; deposits: Deposit[] };
 const BOOKING_COLUMNS = 'id, staff_id, service_id, scheduled_at, ends_at, duration_minutes, title, status, customer_id, customer_name, customer_phone, notes, cancel_reason';
+const OPEN = ['awaiting_transfer', 'held'];
 
 export default function AppointmentsPage() {
   const [supabase] = React.useState(() => createClient());
   const [businessId, setBusinessId] = React.useState<string | null>(null);
   const [day, setDay] = React.useState(lagosToday());
   const [data, setData] = React.useState<Data | null>(null);
+  const [money, setMoney] = React.useState<Money | null>(null);
+  const [banks, setBanks] = React.useState<Bank[]>([]);
   const [error, setError] = React.useState(''), [message, setMessage] = React.useState('');
   const [editing, setEditing] = React.useState<{ booking?: Booking } | null>(null);
-  const [cancelling, setCancelling] = React.useState<Booking | null>(null);
+  const [closing, setClosing] = React.useState<{ booking: Booking; how: 'cancel' | 'no-show' } | null>(null);
+  const [paying, setPaying] = React.useState<Booking | null>(null);
   const [version, setVersion] = React.useState(0);
 
   React.useEffect(() => {
@@ -40,7 +52,7 @@ export default function AppointmentsPage() {
         setBusinessId(id);
         // A day's bookings, plus a day either side so the free times account for anything crossing midnight.
         const from = lagosInstant(addDays(day, -1), '00:00'), to = lagosInstant(addDays(day, 2), '00:00');
-        const [staff, services, links, hours, timeOff, bookings, customers] = await Promise.all([
+        const [staff, services, links, hours, timeOff, bookings, customers, deposits, accounts] = await Promise.all([
           supabase.from('service_staff').select('id, name, is_active').eq('business_id', id).order('name'),
           supabase.from('catalog_items').select('id, name, duration, unit_price').eq('business_id', id).eq('item_type', 'SERVICE').eq('is_active', true).order('name'),
           supabase.from('service_staff_services').select('staff_id, service_id').eq('business_id', id),
@@ -48,6 +60,8 @@ export default function AppointmentsPage() {
           supabase.from('service_staff_time_off').select('id, staff_id, starts_at, ends_at, reason').eq('business_id', id).gte('ends_at', from).lte('starts_at', to),
           supabase.from('appointments').select(BOOKING_COLUMNS).eq('business_id', id).gte('scheduled_at', from).lt('scheduled_at', to).order('scheduled_at'),
           supabase.from('customers').select('id, name').eq('business_id', id).order('name').limit(500),
+          getBookingMoneyAction(addDays(day, -1), addDays(day, 1)),
+          getCollectionAccountsAction().catch(() => ({ native: false, accounts: [] })),
         ]);
         if (!live) return;
         const failed = [staff, services, links, hours, timeOff, bookings].find(r => r.error);
@@ -55,21 +69,22 @@ export default function AppointmentsPage() {
         setError('');
         setData({ staff: staff.data as Staff[], services: services.data as Service[], links: links.data as StaffService[], hours: hours.data as Hours[],
           timeOff: timeOff.data as TimeOff[], bookings: bookings.data as Booking[], customers: (customers.data as Customer[] | null) ?? [] });
+        setMoney(deposits.success ? deposits.data : null);
+        setBanks(accounts.accounts);
       } catch { if (live) setError('Bookings are unavailable. Refresh to try again.'); }
     })();
     return () => { live = false; };
   }, [supabase, businessId, day, version]);
 
-  const refresh = (text: string) => { setMessage(text); setVersion(v => v + 1); };
+  const refresh = (text: string) => { setMessage(text); setError(''); setVersion(v => v + 1); };
 
-  // Moves a booking to its next state. Row security hides the change from people without services.edit, so an empty
-  // result means they were not allowed.
+  // Check-in and completion through the Data API. Row security hides the change from people without services.edit,
+  // so an empty result means they were not allowed.
   const advance = async (booking: Booking, status: Booking['status'], extra: Record<string, string> = {}) => {
     setMessage('');
     const { data: rows, error: failed } = await supabase.from('appointments').update({ status, ...extra }).eq('id', booking.id).select('id');
     if (failed) { setError(bookingError(failed)); return false; }
     if (!rows?.length) { setError('You do not have permission to change bookings. Ask the business owner.'); return false; }
-    setError('');
     refresh(`${booking.customer_name || 'Booking'}: ${STATUS_LABELS[status].toLowerCase()}.`);
     return true;
   };
@@ -78,7 +93,13 @@ export default function AppointmentsPage() {
   const customers = new Map((data?.customers ?? []).map(c => [c.id, c.name]));
   const todays = (data?.bookings ?? []).filter(b => lagosDay(b.scheduled_at) === day);
   const shown = (data?.staff ?? []).filter(s => s.is_active || todays.some(b => b.staff_id === s.id));
-  const now = Date.now();
+  const depositOf = (b: Booking) => money?.deposits.find(d => d.appointment_id === b.id && OPEN.includes(d.status))
+    ?? money?.deposits.find(d => d.appointment_id === b.id);
+  const dueKobo = (b: Booking) => {
+    const service = services.get(b.service_id);
+    return service ? expectedDepositKobo(money?.settings.rules.find(r => r.service_id === b.service_id), Number(service.unit_price)) : 0;
+  };
+  const [now] = React.useState(() => Date.now());
 
   return <div className="space-y-6">
     <div className="flex flex-wrap items-end justify-between gap-3">
@@ -89,6 +110,7 @@ export default function AppointmentsPage() {
         <label className="space-y-1 text-sm"><span>Day</span><Input type="date" value={day} onChange={e => e.target.value && setDay(e.target.value)} /></label>
         <Button variant="outline" aria-label="Next day" onClick={() => setDay(d => addDays(d, 1))}>›</Button>
         <Button asChild variant="outline"><Link href="/appointments/staff">Staff and hours</Link></Button>
+        {money && <Button asChild variant="outline"><Link href="/appointments/settings">Deposits and cancellations</Link></Button>}
         <Button disabled={!data || data.staff.length === 0} onClick={() => { setMessage(''); setEditing({}); }}>New booking</Button>
       </div>
     </div>
@@ -111,6 +133,9 @@ export default function AppointmentsPage() {
             {mine.length === 0 ? <p className="text-sm text-muted-foreground">Nothing booked.</p> : <ul className="space-y-2 text-sm" aria-label={`${person.name}'s bookings`}>
               {mine.map(b => {
                 const closed = b.status === 'cancelled' || b.status === 'no_show';
+                const deposit = depositOf(b);
+                const due = dueKobo(b);
+                const canPay = money?.settings.deposits_ready && ['confirmed', 'checked_in'].includes(b.status) && !(deposit && OPEN.includes(deposit.status));
                 return <li key={b.id} className={`rounded border p-2 ${closed ? 'opacity-60' : ''}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-semibold">{lagosTime(b.scheduled_at)}–{lagosTime(b.ends_at)} {services.get(b.service_id)?.name ?? b.title}</span>
@@ -119,14 +144,17 @@ export default function AppointmentsPage() {
                   <p>{(b.customer_id && customers.get(b.customer_id)) || b.customer_name || 'Customer'}{b.customer_phone ? `, ${b.customer_phone}` : ''}</p>
                   {b.notes && <p className="text-muted-foreground">{b.notes}</p>}
                   {b.cancel_reason && <p className="text-muted-foreground">Cancelled: {b.cancel_reason}</p>}
+                  {deposit ? <p>Deposit {naira(deposit.amount)} {deposit.method === 'cash' ? 'in cash' : 'by transfer'}: {DEPOSIT_LABELS[deposit.status]}</p>
+                    : canPay && due > 0 && <p className="text-muted-foreground">Deposit due: {nairaText(due)}</p>}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {b.status === 'confirmed' && <>
                       <Button size="sm" onClick={() => void advance(b, 'checked_in')}>Check in</Button>
                       <Button size="sm" variant="outline" onClick={() => { setMessage(''); setEditing({ booking: b }); }}>Reschedule</Button>
-                      <Button size="sm" variant="outline" onClick={() => { setMessage(''); setCancelling(b); }}>Cancel</Button>
-                      {new Date(b.scheduled_at).getTime() <= now && <Button size="sm" variant="outline" onClick={() => void advance(b, 'no_show')}>No-show</Button>}
+                      <Button size="sm" variant="outline" onClick={() => { setMessage(''); setClosing({ booking: b, how: 'cancel' }); }}>Cancel</Button>
+                      {new Date(b.scheduled_at).getTime() <= now && <Button size="sm" variant="outline" onClick={() => { setMessage(''); setClosing({ booking: b, how: 'no-show' }); }}>No-show</Button>}
                     </>}
                     {b.status === 'checked_in' && <Button size="sm" onClick={() => void advance(b, 'completed')}>Complete</Button>}
+                    {canPay && <Button size="sm" variant="outline" onClick={() => { setMessage(''); setPaying(b); }}>Take deposit</Button>}
                   </div>
                 </li>;
               })}
@@ -137,8 +165,11 @@ export default function AppointmentsPage() {
     </div>
     {editing && data && businessId && <BookingDialog key={editing.booking?.id ?? 'new'} data={data} businessId={businessId} day={day} booking={editing.booking}
       onClose={() => setEditing(null)} onDone={text => { setEditing(null); refresh(text); }} />}
-    {cancelling && <CancelDialog booking={cancelling} onClose={() => setCancelling(null)}
-      onCancel={async reason => { if (await advance(cancelling, 'cancelled', { cancel_reason: reason })) setCancelling(null); }} />}
+    {paying && <DepositDialog booking={paying} banks={banks} dueKobo={dueKobo(paying)} onClose={() => setPaying(null)}
+      onDone={text => { setPaying(null); refresh(text); }} />}
+    {closing && <CloseDialog {...closing} deposit={depositOf(closing.booking)} settings={money?.settings ?? null}
+      onClose={() => setClosing(null)} onDone={text => { setClosing(null); refresh(text); }}
+      onDataApi={async reason => { if (await advance(closing.booking, closing.how === 'cancel' ? 'cancelled' : 'no_show', closing.how === 'cancel' ? { cancel_reason: reason } : {})) setClosing(null); }} />}
   </div>;
 }
 
@@ -231,15 +262,81 @@ function BookingDialog({ data, businessId, day: initialDay, booking, onClose, on
   </Dialog>;
 }
 
-function CancelDialog({ booking, onClose, onCancel }: { booking: Booking; onClose: () => void; onCancel: (reason: string) => Promise<void> }) {
-  const [reason, setReason] = React.useState(''), [busy, setBusy] = React.useState(false);
-  const submit = async () => { setBusy(true); await onCancel(reason.trim()); setBusy(false); };
-  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}>
+function DepositDialog({ booking, banks, dueKobo, onClose, onDone }: { booking: Booking; banks: Bank[]; dueKobo: number; onClose: () => void; onDone: (text: string) => void }) {
+  const [amount, setAmount] = React.useState(dueKobo > 0 ? formatKobo(dueKobo) : '');
+  const [method, setMethod] = React.useState<'Cash' | 'Transfer'>('Cash');
+  const [bank, setBank] = React.useState('');
+  const { attempt, run, reset } = useKeyedRequest();
+  const locked = attempt.busy || attempt.uncertain;
+  const problem = !/^\d{1,13}(\.\d{1,2})?$/.test(amount.trim()) || kobo(amount) <= 0 ? 'Enter the deposit in naira, for example 3000.' : '';
+  const submit = async () => {
+    const taken = await run(key => takeDepositAction(booking.id, { requestKey: key, amount: amount.trim(), method, bankAccountId: method === 'Transfer' ? bank || undefined : undefined }));
+    if (taken) onDone(taken.status === 'held' ? `Deposit of ${naira(taken.amount)} taken in cash.` : `Deposit of ${naira(taken.amount)} recorded. The transfer waits for confirmation on Daily reconciliation.`);
+  };
+  return <Dialog open onOpenChange={open => { if (!open && !attempt.busy) { reset(); onClose(); } }}>
     <DialogContent className="sm:max-w-sm">
-      <DialogHeader><DialogTitle>Cancel booking</DialogTitle>
+      <DialogHeader><DialogTitle>Take a deposit</DialogTitle>
+        <DialogDescription>{booking.customer_name || 'The customer'}, {lagosTime(booking.scheduled_at)} on {lagosDay(booking.scheduled_at)}. It is held until the service, and refunded if they cancel in time.</DialogDescription></DialogHeader>
+      <div className="grid gap-3 text-sm">
+        <label className="space-y-1"><span>Amount (₦)</span><Input inputMode="decimal" value={amount} disabled={locked} onChange={e => setAmount(e.target.value)} /></label>
+        <div role="radiogroup" aria-label="Paid by" className="grid grid-cols-2 gap-2">
+          {(['Cash', 'Transfer'] as const).map(m => <Button key={m} type="button" role="radio" aria-checked={method === m} disabled={locked}
+            variant={method === m ? 'default' : 'outline'} onClick={() => setMethod(m)}>{m === 'Cash' ? 'Cash' : 'Bank transfer'}</Button>)}
+        </div>
+        {method === 'Transfer' && <label className="space-y-1"><span>Bank account you expect it in (optional)</span>
+          <select className="h-11 w-full rounded-md border bg-background px-3" value={bank} disabled={locked} onChange={e => setBank(e.target.value)}>
+            <option value="">Not sure yet: choose when confirming</option>
+            {banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select></label>}
+        {(attempt.error || problem) && <p role="alert" className="text-destructive">{attempt.error || problem}</p>}
+      </div>
+      <DialogFooter><Button className="w-full" disabled={attempt.busy || !!problem} onClick={() => void submit()}>{attempt.busy ? 'Saving…' : 'Take deposit'}</Button></DialogFooter>
+    </DialogContent>
+  </Dialog>;
+}
+
+function CloseDialog({ booking, how, deposit, settings, onClose, onDone, onDataApi }: {
+  booking: Booking; how: 'cancel' | 'no-show'; deposit?: Deposit; settings: BookingSettings | null;
+  onClose: () => void; onDone: (text: string) => void; onDataApi: (reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = React.useState('');
+  const open = deposit && ['awaiting_transfer', 'held'].includes(deposit.status) ? deposit : undefined;
+  const free = how === 'cancel' && settings !== null && freeToCancel(booking.scheduled_at, settings.free_cancel_hours);
+  const [outcome, setOutcome] = React.useState<'keep' | 'refund'>(free ? 'refund' : settings?.late_deposit ?? 'keep');
+  const { attempt, run, reset } = useKeyedRequest();
+  const [busy, setBusy] = React.useState(false);
+  const locked = attempt.busy || attempt.uncertain || busy;
+  const problem = how === 'cancel' && reason.trim().length < 3 ? 'Say why the booking is cancelled.'
+    : open?.status === 'awaiting_transfer' ? "The deposit transfer is still awaiting confirmation. Confirm it or mark it not received on Daily reconciliation first." : '';
+  const submit = async () => {
+    if (!settings) { setBusy(true); await onDataApi(reason.trim()); setBusy(false); return; }
+    const closed = await run(key => closeBookingAction(booking.id, how, { requestKey: key, reason: reason.trim(), deposit: open && !free ? outcome : undefined }));
+    if (!closed) return;
+    const what = how === 'cancel' ? 'Booking cancelled.' : 'Marked no-show.';
+    onDone(closed.deposit === 'refund' ? `${what} Refund the ${naira(closed.deposit_amount ?? 0)} deposit ${open?.method === 'cash' ? 'from the till' : 'by transfer'}.`
+      : closed.deposit === 'keep' ? `${what} The ${naira(closed.deposit_amount ?? 0)} deposit is kept as income.` : what);
+  };
+  const title = how === 'cancel' ? 'Cancel booking' : 'Mark no-show';
+  return <Dialog open onOpenChange={o => { if (!o && !attempt.busy && !busy) { reset(); onClose(); } }}>
+    <DialogContent className="sm:max-w-sm">
+      <DialogHeader><DialogTitle>{title}</DialogTitle>
         <DialogDescription>{booking.customer_name || 'The customer'} at {lagosTime(booking.scheduled_at)} on {lagosDay(booking.scheduled_at)}. The time becomes free again.</DialogDescription></DialogHeader>
-      <label className="space-y-1 text-sm"><span>Reason</span><Input maxLength={500} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label>
-      <DialogFooter><Button className="w-full" variant="destructive" disabled={busy || reason.trim().length < 3} onClick={() => void submit()}>{busy ? 'Cancelling…' : 'Cancel booking'}</Button></DialogFooter>
+      <div className="grid gap-3 text-sm">
+        <label className="space-y-1"><span>{how === 'cancel' ? 'Reason' : 'Note (optional)'}</span>
+          <Input maxLength={500} value={reason} disabled={locked} onChange={e => setReason(e.target.value)} /></label>
+        {open?.status === 'held' && (free
+          ? <p>Cancelled in time: the {naira(open.amount)} deposit is refunded {open.method === 'cash' ? 'from the till' : 'by transfer'}.</p>
+          : <div role="radiogroup" aria-label="Deposit" className="space-y-1">
+              <p>{how === 'cancel' ? 'Cancelled late' : 'No-show'}: your rule is to {settings?.late_deposit === 'refund' ? 'refund' : 'keep'} the {naira(open.amount)} deposit.</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(['keep', 'refund'] as const).map(o => <Button key={o} type="button" role="radio" aria-checked={outcome === o} disabled={locked}
+                  variant={outcome === o ? 'default' : 'outline'} onClick={() => setOutcome(o)}>{o === 'keep' ? 'Keep deposit' : 'Refund deposit'}</Button>)}
+              </div>
+              {outcome !== settings?.late_deposit && <p className="text-muted-foreground">Going against your rule needs someone who can approve sales.</p>}
+            </div>)}
+        {(attempt.error || problem) && <p role="alert" className="text-destructive">{attempt.error || problem}</p>}
+      </div>
+      <DialogFooter><Button className="w-full" variant="destructive" disabled={attempt.busy || busy || !!problem} onClick={() => void submit()}>{attempt.busy || busy ? 'Saving…' : title}</Button></DialogFooter>
     </DialogContent>
   </Dialog>;
 }

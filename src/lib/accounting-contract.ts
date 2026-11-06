@@ -1084,6 +1084,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/bookings/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Booking Settings */
+        get: operations["get_booking_settings_api_v1_businesses__business_id__bookings_settings_get"];
+        put?: never;
+        /** Save Bookings Settings */
+        post: operations["save_bookings_settings_api_v1_businesses__business_id__bookings_settings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/bookings/deposits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Booking Deposits */
+        get: operations["booking_deposits_api_v1_businesses__business_id__bookings_deposits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/bookings/{appointment_id}/deposit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Booking Deposit */
+        post: operations["booking_deposit_api_v1_businesses__business_id__bookings__appointment_id__deposit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/bookings/{appointment_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Booking Cancel */
+        post: operations["booking_cancel_api_v1_businesses__business_id__bookings__appointment_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/bookings/{appointment_id}/no-show": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Booking Mark No Show */
+        post: operations["booking_mark_no_show_api_v1_businesses__business_id__bookings__appointment_id__no_show_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1197,6 +1283,35 @@ export interface components {
              * @default
              */
             description: string;
+        };
+        /** BookingClose */
+        BookingClose: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Deposit */
+            deposit?: ("keep" | "refund") | null;
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+        };
+        /** BookingSettings */
+        BookingSettings: {
+            /** Free Cancel Hours */
+            free_cancel_hours: number;
+            /**
+             * Late Deposit
+             * @enum {string}
+             */
+            late_deposit: "keep" | "refund";
+            /** Rules */
+            rules?: components["schemas"]["DepositRule"][];
         };
         /** CashClassification */
         CashClassification: {
@@ -1361,6 +1476,41 @@ export interface components {
              * @default
              */
             note: string;
+        };
+        /** DepositRule */
+        DepositRule: {
+            /**
+             * Service Id
+             * Format: uuid
+             */
+            service_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "none" | "fixed" | "percent";
+            /**
+             * Value
+             * @default 0
+             */
+            value: string;
+        };
+        /** DepositTake */
+        DepositTake: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "Cash" | "Transfer";
+            /** Bank Account Id */
+            bank_account_id?: string | null;
         };
         /** EquityClassification */
         EquityClassification: {
@@ -1662,7 +1812,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance";
+            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement";
             /**
              * Source Id
              * Format: uuid
@@ -4475,6 +4625,214 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ShiftClose"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_booking_settings_api_v1_businesses__business_id__bookings_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_bookings_settings_api_v1_businesses__business_id__bookings_settings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    booking_deposits_api_v1_businesses__business_id__bookings_deposits_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    booking_deposit_api_v1_businesses__business_id__bookings__appointment_id__deposit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                appointment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositTake"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    booking_cancel_api_v1_businesses__business_id__bookings__appointment_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                appointment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingClose"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    booking_mark_no_show_api_v1_businesses__business_id__bookings__appointment_id__no_show_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                appointment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingClose"];
             };
         };
         responses: {

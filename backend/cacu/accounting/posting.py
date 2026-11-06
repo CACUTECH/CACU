@@ -32,7 +32,7 @@ class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
-                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance']
+                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -48,9 +48,10 @@ class PostingCommand(BaseModel):
 CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'supplier_payment':SupplierPayment,
          'expense':CashPurchase,'pos':CashSale,'adjustment':JournalEntry,'credit_note':CreditNote,
          'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry,'sale_refund':JournalEntry,
-         'shift_variance':JournalEntry}
-# Posted only by the transfer (BR-010), refund (PR-16) and shift (PR-22) workflows, never through the generic postings route.
-INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance'}
+         'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry}
+# Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
+# through the generic postings route.
+INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
@@ -188,6 +189,21 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 raise HTTPException(422,'A refund is paid from the till or a bank account')
             if not command.credited or len(command.lines)!=1 or command.lines[0].credited or str(command.lines[0].account_id)!=str(purpose(session,'revenue')):
                 raise HTTPException(422,'A refund takes back revenue only')
+        elif command.kind in {'booking_deposit','deposit_settlement'}:
+            deposits=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='customer_deposits'",(tenant,)).all()
+            if len(deposits)!=1:raise HTTPException(409,'Set up deposits before taking one')
+            deposits=str(deposits[0].account_id);main_id=str(command.main_account_id);line=command.lines[0] if len(command.lines)==1 else None
+            cash=str(collection_account(session,'Cash',None))
+            if command.kind=='booking_deposit':
+                # PR-12: debit the till (or Transfers awaiting confirmation), credit Customer deposits and advances.
+                if line is None or command.credited or not line.credited or str(line.account_id)!=deposits or main_id not in {cash,clearing}:
+                    raise HTTPException(422,'A deposit moves money into the till or Transfers awaiting confirmation and holds it as a customer deposit')
+            else:
+                # A refund debits the deposit and credits the till or a bank; a forfeit debits it and credits income.
+                income={str(r.account_id) for r in raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose IN ('revenue','service_revenue')",(tenant,)).all()}
+                refund=line is not None and command.credited and not line.credited and str(line.account_id)==deposits and (main_id==cash or str(collection_account(session,'Transfer',command.main_account_id))==main_id)
+                forfeit=line is not None and main_id==deposits and not command.credited and line.credited and str(line.account_id) in income
+                if not(refund or forfeit):raise HTTPException(422,'A deposit is either refunded or kept as income')
         elif command.kind=='shift_variance':
             # PR-22: a shortage debits Cash over and short and credits the till; a surplus the reverse.
             variance=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='cash_variance'",(tenant,)).all()

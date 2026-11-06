@@ -496,3 +496,38 @@ def close_till_shift(business_id:UUID,shift_id:UUID,data:ShiftClose,user_id:UUID
     # The cashier closes their own shift (sales.post); closing someone else's needs sales.approve, checked inside.
     with library_transaction(user_id,business_id,write=True,permission='sales.post') as session:
         return close_shift(session,user_id,shift_id,data)
+
+# Booking deposits (Doc 10 services rules, Doc 09 PR-12), bookings part 2.
+from cacu.accounting.bookings import (BookingClose,BookingSettings,DepositTake,cancel as cancel_booking,deposits_between,no_show as booking_no_show,
+    save_settings as save_booking_settings,settings as booking_settings,take as take_deposit)
+
+@app.get('/api/v1/businesses/{business_id}/bookings/settings')
+def get_booking_settings(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='services.view') as session:
+        return booking_settings(session)
+
+@app.post('/api/v1/businesses/{business_id}/bookings/settings')
+def save_bookings_settings(business_id:UUID,data:BookingSettings,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='settings.edit') as session:
+        return save_booking_settings(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/bookings/deposits')
+def booking_deposits(business_id:UUID,start:date,end:date,user_id:UUID=Depends(current_user)):
+    if (end-start).days>62:raise HTTPException(422,'Choose at most two months')
+    with library_transaction(user_id,business_id,permission='services.view') as session:
+        return deposits_between(session,start,end)
+
+@app.post('/api/v1/businesses/{business_id}/bookings/{appointment_id}/deposit')
+def booking_deposit(business_id:UUID,appointment_id:UUID,data:DepositTake,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='sales.post') as session:
+        return take_deposit(session,user_id,appointment_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/bookings/{appointment_id}/cancel')
+def booking_cancel(business_id:UUID,appointment_id:UUID,data:BookingClose,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='services.edit') as session:
+        return cancel_booking(session,user_id,appointment_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/bookings/{appointment_id}/no-show')
+def booking_mark_no_show(business_id:UUID,appointment_id:UUID,data:BookingClose,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='services.edit') as session:
+        return booking_no_show(session,user_id,appointment_id,data)
