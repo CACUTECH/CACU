@@ -9,7 +9,7 @@ export type TimeOff = { id: string; staff_id: string; starts_at: string; ends_at
 export type Booking = {
   id: string; staff_id: string; service_id: string; scheduled_at: string; ends_at: string; duration_minutes: number; title: string;
   status: BookingStatus; customer_id: string | null; customer_name: string | null; customer_phone: string | null; notes: string | null;
-  cancel_reason: string | null;
+  cancel_reason: string | null; bill_kind?: 'sale' | 'invoice' | null;
 };
 
 // Deposits (Doc 10, PR-12): set per service by the owner, held in Customer deposits and advances.
@@ -19,6 +19,11 @@ export type Deposit = {
   id: string; appointment_id: string; amount: string; method: 'cash' | 'transfer';
   status: 'awaiting_transfer' | 'held' | 'not_received' | 'refunded' | 'forfeited' | 'applied';
   received_on: string; settled_on: string | null; bank_account_id: string | null;
+};
+export type BookingBill = {
+  id: string; status: BookingStatus; customer_id: string | null; customer_name: string | null; service_id: string; service: string | null;
+  price: string | null; bill_kind: 'sale' | 'invoice' | null; bill_id: string | null;
+  deposit: { amount: string; method: 'cash' | 'transfer'; status: 'awaiting_transfer' | 'held' } | null;
 };
 export const DEPOSIT_LABELS: Record<Deposit['status'], string> = {
   awaiting_transfer: 'transfer awaiting confirmation', held: 'held', not_received: 'transfer not received',

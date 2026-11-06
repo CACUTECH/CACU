@@ -104,7 +104,7 @@ SHIFT_SELECT="""SELECT s.*,coalesce((SELECT nullif(to_jsonb(m)->>'display_name',
     coalesce(sum(e.cash) FILTER (WHERE e.kind='pay_in'),0) AS pay_ins,
     coalesce(sum(e.cash) FILTER (WHERE e.kind='pay_out'),0) AS pay_outs,
     coalesce(sum(e.cash) FILTER (WHERE e.kind='sale_reversed'),0) AS handed_back,
-    coalesce(sum(e.cash) FILTER (WHERE e.kind IN ('deposit','deposit_refund')),0) AS deposits,
+    coalesce(sum(e.cash) FILTER (WHERE e.kind IN ('deposit','deposit_refund','deposit_applied')),0) AS deposits,
     count(*) FILTER (WHERE e.kind='sale') AS sales
   FROM accounting.till_shift s
   LEFT JOIN accounting.till_shift_entry e ON e.business_id=s.business_id AND e.shift_id=s.id"""

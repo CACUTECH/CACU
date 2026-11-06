@@ -2,7 +2,7 @@
 // Booking deposits and the bookings that hold them (Doc 10 services rules, PR-12). Deposits need the books turned on.
 import { revalidatePath } from 'next/cache';
 import { AccountingRequestError, accountingRequest, usesPythonAccounting } from '@/lib/accounting-client';
-import type { BookingSettings, Deposit } from '@/lib/bookings';
+import type { BookingBill, BookingSettings, Deposit } from '@/lib/bookings';
 
 type Result<T> = { success: true; data: T } | { success: false; error: string; uncertain: boolean };
 function failed(error: unknown, fallback = 'The change was not confirmed. Refresh before trying again.'): { success: false; error: string; uncertain: boolean } {
@@ -60,6 +60,24 @@ export async function closeBookingAction(bookingId: string, how: 'cancel' | 'no-
     const data = await accountingRequest<Closed>(`bookings/${encodeURIComponent(bookingId)}/${how}`, { method: 'POST', body: {
       request_key: input.requestKey, reason: input.reason, deposit: input.deposit ?? null, bank_account_id: input.bankAccountId || null } });
     revalidatePath('/appointments'); revalidatePath('/pos');
+    return { success: true, data };
+  } catch (error) { return failed(error); }
+}
+
+/** What the till needs to bill a completed booking: its service, price and any deposit to apply. */
+export async function getBookingBillAction(bookingId: string): Promise<Result<BookingBill>> {
+  try { return { success: true, data: await accountingRequest<BookingBill>(`bookings/${encodeURIComponent(bookingId)}/bill`) }; }
+  catch (error) { return failed(error, 'The booking is unavailable. Refresh to try again.'); }
+}
+
+export type Invoiced = { appointment_id: string; invoice_id: string; invoice_number: string; total: string; deposit_applied: string; outstanding: string };
+
+/** PR-11: an invoice for the service to the booking's customer, with any held deposit applied. */
+export async function billByInvoiceAction(bookingId: string, input: { requestKey: string; customerId?: string }): Promise<Result<Invoiced>> {
+  try {
+    const data = await accountingRequest<Invoiced>(`bookings/${encodeURIComponent(bookingId)}/invoice`, { method: 'POST',
+      body: { request_key: input.requestKey, customer_id: input.customerId || null } });
+    revalidatePath('/appointments'); revalidatePath('/invoices');
     return { success: true, data };
   } catch (error) { return failed(error); }
 }

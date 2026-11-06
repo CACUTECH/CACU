@@ -10,7 +10,7 @@ import { PERMISSION_MESSAGE, isPermissionRefusal } from '@/lib/permission';
  * @fileOverview SalesService handles POS checkouts and atomic retail operations.
  */
 export type SaleResult = { saleId: string; status?: 'completed' | 'pending_payment' | 'credit'; change?: string | null;
-  invoice_number?: string; shortfalls?: { item_id: string; quantity: number }[] };
+  invoice_number?: string; shortfalls?: { item_id: string; quantity: number }[]; deposit_applied?: string; paid_now?: string };
 
 export class SalesService extends BaseService {
   async processCheckout(input: {
@@ -22,6 +22,8 @@ export class SalesService extends BaseService {
     customerId?: string;
     requestKey?: string;
     bankAccountId?: string;
+    bookingId?: string;
+    jobId?: string;
   }) {
     const startTime = Date.now();
     const { supabase, businessId } = await this.getContext();
@@ -34,6 +36,8 @@ export class SalesService extends BaseService {
       bank_account_id: input.bankAccountId || null,
       cash_received: input.cashReceived || null, transfer_amount: input.transferAmount || null,
       customer_id: input.paymentMethod === 'Credit' ? input.customerId || null : null,
+      booking_id: input.bookingId || null,
+      job_id: input.jobId || null,
       entry_date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()),
     } });
     if (input.bankAccountId) throw new Error('Selected bank accounts require native accounting');

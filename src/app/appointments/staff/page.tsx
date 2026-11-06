@@ -10,6 +10,9 @@ import { createClient } from '@/lib/supabase/client';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { WEEKDAYS, bookingError, lagosDay, lagosInstant, lagosTime, type Hours, type Service, type Staff, type StaffService, type TimeOff } from '@/lib/bookings';
 import { lagosToday } from '@/lib/transfers';
+import { useBusiness } from '@/components/business-provider';
+import { getCostRatesAction, saveCostRatesAction } from '@/app/jobs/actions';
+import type { CostRates } from '@/lib/jobs';
 
 type Data = { staff: Staff[]; services: Service[]; links: StaffService[]; hours: Hours[]; timeOff: TimeOff[] };
 type Day = { on: boolean; starts: string; ends: string };
@@ -75,6 +78,7 @@ export default function StaffPage() {
       <Button type="submit" disabled={busy || !name.trim()}>Add staff</Button>
     </form>}
     {data && data.services.length === 0 && <p className="text-sm text-muted-foreground">Add services in the catalogue first, then choose who does each one.</p>}
+    {data && <CostRatesCard staff={data.staff.filter(s => s.is_active)} />}
     <div className="grid gap-4 lg:grid-cols-2">
       {data?.staff.map(person => <StaffCard key={person.id} person={person} data={data} businessId={businessId!} onDone={done} onFail={fail} />)}
     </div>
@@ -159,4 +163,37 @@ function StaffCard({ person, data, businessId, onDone, onFail }: {
       <Button size="sm" variant="outline" disabled={busy} onClick={() => void setActive(!person.is_active)}>{person.is_active ? 'No longer works here' : 'Bring back'}</Button>
     </CardContent>
   </Card>;
+}
+
+/** Job profit (Chairman): what an hour of each person's time costs the business. Only the owner sees and sets these. */
+function CostRatesCard({ staff }: { staff: Staff[] }) {
+  const { business } = useBusiness();
+  const owner = business?.userRole === 'owner';
+  const [rates, setRates] = React.useState<CostRates | null>(null);
+  const [draft, setDraft] = React.useState<Record<string, string>>({});
+  const [busy, setBusy] = React.useState(false), [note, setNote] = React.useState('');
+  React.useEffect(() => {
+    if (!owner) return;
+    let live = true;
+    void getCostRatesAction().then(r => { if (live && r.success && r.data) { setRates(r.data); setDraft(Object.fromEntries(Object.entries(r.data.rates).map(([k, v]) => [k, String(Number(v))]))); } });
+    return () => { live = false; };
+  }, [owner]);
+  if (!owner || !rates?.available || staff.length === 0) return null;
+  const bad = Object.values(draft).some(v => v.trim() && !/^\d{1,13}(\.\d{1,2})?$/.test(v.trim()));
+  const save = async () => {
+    setBusy(true); setNote('');
+    const result = await saveCostRatesAction(staff.filter(s => draft[s.id]?.trim()).map(s => ({ staffId: s.id, hourly: draft[s.id].trim() })));
+    setBusy(false);
+    setNote(result.success ? 'Cost rates saved. Job profit uses them for labour.' : result.error);
+  };
+  return <Card><CardHeader><CardTitle className="text-lg">Cost per hour, for job profit</CardTitle>
+    <CardDescription>What an hour of each person&apos;s time costs you. Only you can see these. They are not linked to payroll.</CardDescription></CardHeader>
+    <CardContent className="space-y-2 text-sm">
+      {staff.map(s => <label key={s.id} className="flex items-center gap-2"><span className="w-40">{s.name}</span>
+        <Input aria-label={`Cost per hour for ${s.name} (₦)`} inputMode="decimal" className="h-9 w-32" value={draft[s.id] ?? ''} disabled={busy}
+          onChange={e => setDraft(d => ({ ...d, [s.id]: e.target.value }))} /></label>)}
+      {bad && <p role="alert" className="text-destructive">Enter each rate in naira, for example 1500.</p>}
+      {note && <p role="status">{note}</p>}
+      <Button size="sm" disabled={busy || bad} onClick={() => void save()}>{busy ? 'Saving…' : 'Save cost rates'}</Button>
+    </CardContent></Card>;
 }

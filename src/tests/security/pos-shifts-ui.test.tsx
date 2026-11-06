@@ -13,6 +13,8 @@ import { highlights } from '@/lib/billing';
 
 jest.mock('@/app/pos/shift-actions', () => ({ getShiftAction: jest.fn(), listShiftsAction: jest.fn(), openShiftAction: jest.fn(),
   cashMovementAction: jest.fn(), closeShiftAction: jest.fn(), saveShiftPolicyAction: jest.fn() }));
+jest.mock('@/app/appointments/actions', () => ({ getBookingBillAction: jest.fn() }));
+jest.mock('@/app/jobs/actions', () => ({ getJobMoneyAction: jest.fn() }));
 jest.mock('@/app/pos/actions', () => ({ getCheckoutOptionsAction: jest.fn(), processCheckoutAction: jest.fn() }));
 jest.mock('@/app/accounting/collection-actions', () => ({ getCollectionAccountsAction: jest.fn() }));
 jest.mock('@/app/business-actions', () => ({ getActiveBusinessIdAction: jest.fn().mockResolvedValue('b1') }));

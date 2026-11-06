@@ -288,3 +288,89 @@ def _awaiting(session, transfer_id):
               (str(session.business_id), str(transfer_id))).first()
     if not row: raise HTTPException(409, 'This deposit is no longer waiting for its transfer')
     return row
+
+
+# Billing a completed booking (part 3, PR-13 and PR-11) -----------------------------------------------------------------
+
+class BookingInvoice(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_key: UUID
+    customer_id: UUID | None = None
+
+
+def bill_info(session, appointment_id: UUID):
+    """What the till or an invoice needs to bill a booking: the service, its price, and any deposit to apply."""
+    booking = _booking(session, appointment_id)
+    extra = raw(session, 'SELECT bill_kind,bill_id FROM public.appointments WHERE business_id=%s AND id=%s',
+                (str(session.business_id), str(appointment_id))).one()
+    deposit = _open_deposit(session, appointment_id)
+    return {'id': str(booking.id), 'status': booking.status, 'customer_id': str(booking.customer_id) if booking.customer_id else None,
+            'customer_name': booking.customer_name, 'service_id': str(booking.service_id), 'service': booking.service,
+            'price': _money(booking.unit_price), 'bill_kind': extra.bill_kind, 'bill_id': str(extra.bill_id) if extra.bill_id else None,
+            'deposit': {'amount': _money(deposit.amount), 'method': deposit.method, 'status': deposit.status} if deposit else None}
+
+
+def billable(session, appointment_id):
+    """Locks a completed, unbilled booking and returns it with its held deposit (or None)."""
+    booking = _booking(session, appointment_id, lock=True)
+    billed = raw(session, 'SELECT bill_kind FROM public.appointments WHERE business_id=%s AND id=%s',
+                 (str(session.business_id), str(appointment_id))).scalar()
+    if booking.status != 'completed': raise HTTPException(409, 'Complete the booking before billing it')
+    if billed: raise HTTPException(409, 'This booking has already been billed')
+    deposit = _open_deposit(session, appointment_id, lock=True)
+    if deposit and deposit.status == 'awaiting_transfer':
+        raise HTTPException(409, "This booking's deposit transfer is still awaiting confirmation. Confirm it on Daily reconciliation first.")
+    return booking, deposit
+
+
+def mark_billed(session, appointment_id, kind, bill_id, deposit, actor, settlement):
+    tenant = str(session.business_id)
+    raw(session, 'UPDATE public.appointments SET bill_kind=%s,bill_id=%s,billed_at=now() WHERE business_id=%s AND id=%s',
+        (kind, str(bill_id), tenant, str(appointment_id)))
+    if deposit:
+        raw(session, """UPDATE accounting.booking_deposit SET status='applied',settled_by=%s,settled_at=now(),settled_on=%s,settle_note=%s,settlement=%s::jsonb
+          WHERE business_id=%s AND id=%s""", (str(actor), business_today(session), f'Applied to the {"sale" if kind == "sale" else "invoice"}',
+          json.dumps(settlement), tenant, str(deposit.id)))
+
+
+def apply_at_till(session, actor, appointment_id, deposit, sale_id, method, day):
+    """PR-13 at the till: the deposit leaves Customer deposits against the till or Transfers awaiting confirmation the
+    full-price sale went into, so the customer pays only the rest."""
+    into = collection_account(session, 'Cash', None) if method == 'Cash' else clearing_account(session)
+    posting = post_command(session, actor, PostingCommand(request_key=uuid5(sale_id, 'deposit'), kind='deposit_application', source_id=sale_id,
+        main_account_id=deposits_account(session), entry_date=day, credited=False, narration='Booking deposit applied to the sale',
+        lines=[{'account_id': into, 'amount': format(deposit.amount, '.2f'), 'credited': True}]), internal=True)
+    if method == 'Cash':
+        from cacu.accounting.shifts import tag
+        tag(session, [actor], 'deposit_applied', sale_id, -deposit.amount)
+    mark_billed(session, appointment_id, 'sale', sale_id, deposit, actor, {'transaction_no': posting.get('transaction_no'), 'sale_id': str(sale_id)})
+
+
+def bill_invoice(session, actor, appointment_id: UUID, data: BookingInvoice):
+    """Issues an invoice for a completed booking to its customer and applies any held deposit to it (PR-11)."""
+    def execute():
+        from cacu.accounting.workflows import InvoiceCreate, invoice_create, invoice_outstanding, party_account
+        booking_id = UUID(str(appointment_id)); booking, deposit = billable(session, booking_id)
+        customer = booking.customer_id or data.customer_id
+        if customer is None: raise HTTPException(422, 'Choose the customer to invoice')
+        if booking.customer_id and data.customer_id and str(data.customer_id) != str(booking.customer_id):
+            raise HTTPException(422, 'This booking is for another customer')
+        if booking.unit_price is None or booking.unit_price <= 0: raise HTTPException(409, 'The booked service has no price to invoice')
+        day = business_today(session)
+        invoice = invoice_create(session, actor, InvoiceCreate(request_key=uuid5(data.request_key, 'invoice'), customer_id=customer,
+            invoice_number='BK-' + str(data.request_key)[:8].upper(), entry_date=day,
+            items=[{'catalog_item_id': booking.service_id, 'quantity': 1, 'unit_price': format(booking.unit_price, '.2f')}]))
+        settlement = {'invoice_id': invoice['id']}
+        if deposit:
+            posting = post_command(session, actor, PostingCommand(request_key=uuid5(data.request_key, 'deposit'), kind='deposit_application',
+                source_id=data.request_key, target_id=UUID(invoice['id']), main_account_id=party_account(session, 'customers', customer),
+                entry_date=day, credited=True, narration='Booking deposit applied to invoice ' + 'BK-' + str(data.request_key)[:8].upper(),
+                lines=[{'account_id': deposits_account(session), 'amount': format(deposit.amount, '.2f'), 'credited': False}]), internal=True)
+            settlement['transaction_no'] = posting.get('transaction_no')
+        mark_billed(session, booking_id, 'invoice', invoice['id'], deposit, actor, settlement)
+        _audit(session, actor, data.request_key, 'booking_invoiced', {'appointment_id': str(booking_id), 'invoice_id': invoice['id'],
+               'deposit_applied': _money(deposit.amount) if deposit else '0.00'})
+        return {'appointment_id': str(booking_id), 'invoice_id': invoice['id'], 'invoice_number': 'BK-' + str(data.request_key)[:8].upper(),
+                'total': _money(booking.unit_price), 'deposit_applied': _money(deposit.amount) if deposit else '0.00',
+                'outstanding': format(invoice_outstanding(session, invoice['id'])[0], '.2f')}
+    return durable(session, actor, 'booking_invoice:' + str(appointment_id), data, execute)

@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { createClient } from '@/lib/supabase/client';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
-import { closeBookingAction, getBookingMoneyAction, takeDepositAction } from './actions';
+import { billByInvoiceAction, closeBookingAction, getBookingMoneyAction, takeDepositAction } from './actions';
 import { useKeyedRequest } from '@/hooks/use-keyed-request';
 import { formatKobo, kobo, nairaText } from '@/lib/checkout';
 import { lagosToday, naira } from '@/lib/transfers';
@@ -27,7 +27,7 @@ type Customer = { id: string; name: string };
 type Bank = { id: string; name: string };
 type Data = { staff: Staff[]; services: Service[]; links: StaffService[]; hours: Hours[]; timeOff: TimeOff[]; bookings: Booking[]; customers: Customer[] };
 type Money = { settings: BookingSettings; deposits: Deposit[] };
-const BOOKING_COLUMNS = 'id, staff_id, service_id, scheduled_at, ends_at, duration_minutes, title, status, customer_id, customer_name, customer_phone, notes, cancel_reason';
+const BOOKING_COLUMNS = 'id, staff_id, service_id, scheduled_at, ends_at, duration_minutes, title, status, customer_id, customer_name, customer_phone, notes, cancel_reason, bill_kind';
 const OPEN = ['awaiting_transfer', 'held'];
 
 export default function AppointmentsPage() {
@@ -41,6 +41,7 @@ export default function AppointmentsPage() {
   const [editing, setEditing] = React.useState<{ booking?: Booking } | null>(null);
   const [closing, setClosing] = React.useState<{ booking: Booking; how: 'cancel' | 'no-show' } | null>(null);
   const [paying, setPaying] = React.useState<Booking | null>(null);
+  const [invoicing, setInvoicing] = React.useState<Booking | null>(null);
   const [version, setVersion] = React.useState(0);
 
   React.useEffect(() => {
@@ -154,6 +155,11 @@ export default function AppointmentsPage() {
                       {new Date(b.scheduled_at).getTime() <= now && <Button size="sm" variant="outline" onClick={() => { setMessage(''); setClosing({ booking: b, how: 'no-show' }); }}>No-show</Button>}
                     </>}
                     {b.status === 'checked_in' && <Button size="sm" onClick={() => void advance(b, 'completed')}>Complete</Button>}
+                    {b.status === 'completed' && money && !b.bill_kind && <>
+                      <Button asChild size="sm"><Link href={`/pos?booking=${b.id}`}>Take payment</Link></Button>
+                      <Button size="sm" variant="outline" onClick={() => { setMessage(''); setInvoicing(b); }}>Bill by invoice</Button>
+                    </>}
+                    {b.bill_kind && <Badge variant="secondary">{b.bill_kind === 'sale' ? 'Paid at the till' : 'Invoiced'}</Badge>}
                     {canPay && <Button size="sm" variant="outline" onClick={() => { setMessage(''); setPaying(b); }}>Take deposit</Button>}
                   </div>
                 </li>;
@@ -165,6 +171,8 @@ export default function AppointmentsPage() {
     </div>
     {editing && data && businessId && <BookingDialog key={editing.booking?.id ?? 'new'} data={data} businessId={businessId} day={day} booking={editing.booking}
       onClose={() => setEditing(null)} onDone={text => { setEditing(null); refresh(text); }} />}
+    {invoicing && <InvoiceDialog booking={invoicing} customers={data?.customers ?? []} onClose={() => setInvoicing(null)}
+      onDone={text => { setInvoicing(null); refresh(text); }} />}
     {paying && <DepositDialog booking={paying} banks={banks} dueKobo={dueKobo(paying)} onClose={() => setPaying(null)}
       onDone={text => { setPaying(null); refresh(text); }} />}
     {closing && <CloseDialog {...closing} deposit={depositOf(closing.booking)} settings={money?.settings ?? null}
@@ -337,6 +345,33 @@ function CloseDialog({ booking, how, deposit, settings, onClose, onDone, onDataA
         {(attempt.error || problem) && <p role="alert" className="text-destructive">{attempt.error || problem}</p>}
       </div>
       <DialogFooter><Button className="w-full" variant="destructive" disabled={attempt.busy || busy || !!problem} onClick={() => void submit()}>{attempt.busy || busy ? 'Saving…' : title}</Button></DialogFooter>
+    </DialogContent>
+  </Dialog>;
+}
+
+function InvoiceDialog({ booking, customers, onClose, onDone }: { booking: Booking; customers: Customer[]; onClose: () => void; onDone: (text: string) => void }) {
+  const [customerId, setCustomerId] = React.useState('');
+  const { attempt, run, reset } = useKeyedRequest();
+  const problem = !booking.customer_id && !customerId ? 'Choose the customer to invoice. Add them in Customers if they are new.' : '';
+  const submit = async () => {
+    const billed = await run(key => billByInvoiceAction(booking.id, { requestKey: key, customerId: booking.customer_id ? undefined : customerId }));
+    if (billed) onDone(Number(billed.deposit_applied) > 0
+      ? `Invoice ${billed.invoice_number} issued for ${naira(billed.total)}. The ${naira(billed.deposit_applied)} deposit was applied; ${naira(billed.outstanding)} is still owed.`
+      : `Invoice ${billed.invoice_number} issued for ${naira(billed.total)}.`);
+  };
+  return <Dialog open onOpenChange={o => { if (!o && !attempt.busy) { reset(); onClose(); } }}>
+    <DialogContent className="sm:max-w-sm">
+      <DialogHeader><DialogTitle>Bill by invoice</DialogTitle>
+        <DialogDescription>An invoice for the service is issued now, and any deposit held for this booking is taken off it. The customer pays the rest later.</DialogDescription></DialogHeader>
+      <div className="grid gap-3 text-sm">
+        {!booking.customer_id && <label className="space-y-1"><span>Customer</span>
+          <select className="h-11 w-full rounded-md border bg-background px-3" value={customerId} disabled={attempt.busy || attempt.uncertain} onChange={e => setCustomerId(e.target.value)}>
+            <option value="">Choose a customer</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select></label>}
+        {(attempt.error || problem) && <p role="alert" className="text-destructive">{attempt.error || problem}</p>}
+      </div>
+      <DialogFooter><Button className="w-full" disabled={attempt.busy || !!problem} onClick={() => void submit()}>{attempt.busy ? 'Issuing…' : 'Issue invoice'}</Button></DialogFooter>
     </DialogContent>
   </Dialog>;
 }

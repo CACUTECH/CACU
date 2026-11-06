@@ -3,7 +3,7 @@ export type CheckoutOptions = { discount_cap: string; allow_oversell: boolean; r
 export type SaleReceipt = {
   id: string; number: string; date: string; status: string; method: string;
   subtotal: string; discount_total: string; total: string; cash_received: string | null; change: string | null; transfer_amount: string | null;
-  refunded_total?: string | null;
+  refunded_total?: string | null; deposit_applied?: string | null; paid_now?: string | null;
   items: { name: string; quantity: number; unit_price: string; discount: string; total: string }[];
 };
 
@@ -38,7 +38,8 @@ export function receiptText(r: SaleReceipt, business: string) {
   const lines = r.items.map(i => `${i.quantity} x ${i.name}: ₦${i.total}`);
   const paid = r.status === 'pending_payment' ? 'Transfer awaiting confirmation' : `Paid by ${r.method}`;
   return [business, `Receipt ${r.number}, ${r.date}`, ...lines, Number(r.discount_total) > 0 ? `Discount: ₦${r.discount_total}` : null,
-    `Total: ₦${r.total}`, paid, r.change ? `Change: ₦${r.change}` : null,
+    `Total: ₦${r.total}`, Number(r.deposit_applied ?? 0) > 0 ? `Deposit paid earlier: ₦${r.deposit_applied}\nPaid now: ₦${r.paid_now}` : null,
+    paid, r.change ? `Change: ₦${r.change}` : null,
     Number(r.refunded_total ?? 0) > 0 ? `Refunded: ₦${r.refunded_total}` : null].filter(Boolean).join('\n');
 }
 

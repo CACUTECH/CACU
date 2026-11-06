@@ -15,7 +15,8 @@ export async function processCheckoutAction(data: Parameters<SalesService['proce
     revalidatePath('/transactions');
     revalidatePath('/');
     
-    return { success: true as const, saleId: result.saleId, status: result.status ?? 'completed', change: result.change ?? null,
+    revalidatePath('/appointments'); revalidatePath('/jobs');
+    return { success: true as const, saleId: result.saleId, status: result.status ?? 'completed', change: result.change ?? null, paidNow: result.paid_now ?? null,
       invoiceNumber: result.invoice_number ?? null, shortfalls: result.shortfalls ?? [] };
   } catch (error) {
     return { success: false as const, error: error instanceof Error ? error.message : 'Checkout failed' };

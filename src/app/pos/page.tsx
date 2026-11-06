@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +21,10 @@ import { CollectionAccountPicker } from '@/components/collection-account-picker'
 import { formatKobo, kobo, lineKobo, nairaText, validDiscount, type CheckoutOptions, type ParkedSale } from '@/lib/checkout';
 import { ShiftBar } from '@/components/shift-bar';
 import type { ShiftStatus } from '@/lib/shifts';
+import { getBookingBillAction } from '@/app/appointments/actions';
+import type { BookingBill } from '@/lib/bookings';
+import { getJobMoneyAction } from '@/app/jobs/actions';
+import { matchesJob, type JobMoney } from '@/lib/jobs';
 
 type CatalogItem = { id: string; name: string; price: number; sku?: string; quantity?: number; type?: string; track_stock?: boolean; status: string; }
 type CartItem = CatalogItem & { cartQuantity: number; discount: string }
@@ -33,7 +38,12 @@ const METHODS: { value: Method; label: string }[] = [
 
 const tracked = (item: CatalogItem) => item.type === 'PRODUCT' && item.track_stock !== false;
 
+// useSearchParams needs a Suspense boundary for the production build.
 export default function POSPage() {
+    return <React.Suspense fallback={null}><PointOfSale /></React.Suspense>
+}
+
+function PointOfSale() {
     const [supabase] = React.useState(() => createClient());
     const { toast } = useToast()
 
@@ -58,6 +68,13 @@ export default function POSPage() {
     const [parkOpen, setParkOpen] = React.useState(false), [parkedOpen, setParkedOpen] = React.useState(false);
     const [parkLabel, setParkLabel] = React.useState(''), [parking, setParking] = React.useState(false);
     const [shiftStatus, setShiftStatus] = React.useState<ShiftStatus | null>(null);
+    // Doc 10 / PR-13: paying for a completed booking (/pos?booking=...); a held deposit comes off what is due.
+    const search = useSearchParams();
+    const bookingId = search?.get('booking') ?? null;
+    // A completed job (/pos?job=...) is sold exactly as its lines; its materials already left stock.
+    const jobId = search?.get('job') ?? null;
+    const [job, setJob] = React.useState<JobMoney | null>(null);
+    const [bill, setBill] = React.useState<BookingBill | null>(null);
 
     const native = collectionChoices?.native === true;
     const cap = Number(options?.discount_cap ?? 0);
@@ -100,6 +117,44 @@ export default function POSPage() {
     }, [supabase, businessId]);
     React.useEffect(() => { void loadParked(); }, [loadParked]);
 
+    React.useEffect(() => {
+        if (!bookingId || loading || !native) return;
+        let live = true;
+        void getBookingBillAction(bookingId).then(result => {
+            if (!live) return;
+            if (!result.success) { toast({ variant: "destructive", title: "Booking unavailable", description: result.error }); return; }
+            const booking = result.data;
+            if (booking.bill_kind) { toast({ title: "Already billed", description: "This booking has already been paid or invoiced." }); return; }
+            if (booking.status !== 'completed') { toast({ variant: "destructive", title: "Complete the booking first", description: "Mark the booking completed on Appointments, then take payment." }); return; }
+            const service = inventory.find(i => i.id === booking.service_id);
+            if (!service) { toast({ variant: "destructive", title: "Service unavailable", description: "The booked service is not active in your catalogue." }); return; }
+            setBill(booking);
+            setCart([{ ...service, cartQuantity: 1, discount: '0' }]);
+        });
+        return () => { live = false; };
+    }, [bookingId, loading, native, inventory, toast]);
+
+    React.useEffect(() => {
+        if (!jobId || loading || !native) return;
+        let live = true;
+        void getJobMoneyAction(jobId).then(result => {
+            if (!live) return;
+            if (!result.success || !result.data) { toast({ variant: "destructive", title: "Job unavailable", description: result.success ? 'Turn on your books to bill jobs.' : result.error }); return; }
+            const found = result.data;
+            if (found.bill_kind) { toast({ title: "Already billed", description: "This job has already been paid or invoiced." }); return; }
+            if (found.status !== 'completed') { toast({ variant: "destructive", title: "Complete the job first", description: "Complete the job, then take payment." }); return; }
+            const restored: CartItem[] = [];
+            for (const line of found.lines) {
+                const item = inventory.find(i => i.id === line.item_id);
+                if (!item) { toast({ variant: "destructive", title: "Item unavailable", description: `${line.name} is no longer active in your catalogue.` }); return; }
+                restored.push({ ...item, cartQuantity: line.quantity, discount: '0' });
+            }
+            setJob(found);
+            setCart(restored);
+        });
+        return () => { live = false; };
+    }, [jobId, loading, native, inventory, toast]);
+
     const filteredInventory = inventory.filter(item =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -132,12 +187,19 @@ export default function POSPage() {
     const shortBy = (item: CartItem) => tracked(item) ? Math.max(0, item.cartQuantity - Math.max(item.quantity || 0, 0)) : 0;
 
     // What is still missing before the sale can be recorded, in plain words; empty when ready.
+    const depositKobo = bill?.deposit?.status === 'held' ? kobo(bill.deposit.amount) : 0;
     const transferKobo = paymentMethod === 'Split' && /^\d+(\.\d{1,2})?$/.test(transferAmount) ? kobo(transferAmount) : 0;
-    const cashDue = paymentMethod === 'Cash' ? totalKobo : paymentMethod === 'Split' ? totalKobo - transferKobo : 0;
+    const cashDue = paymentMethod === 'Cash' ? totalKobo - depositKobo : paymentMethod === 'Split' ? totalKobo - transferKobo : 0;
     const cashKobo = /^\d+(\.\d{1,2})?$/.test(cashReceived) ? kobo(cashReceived) : null;
     // Doc 10 shifts: when the owner requires one, nobody sells without an open shift.
     const needsShift = native && shiftStatus?.available === true && shiftStatus.require_shift && !shiftStatus.shift;
     const problem = !native ? '' : needsShift ? 'Open your shift before selling. The owner requires a shift for every sale.'
+        : bill?.deposit?.status === 'awaiting_transfer' ? "This booking's deposit transfer is still awaiting confirmation. Confirm it on Daily reconciliation first."
+        : depositKobo > 0 && !['Cash', 'Transfer'].includes(paymentMethod) ? 'A booking with a deposit is paid in cash or by transfer. Bill it by invoice for credit.'
+        : depositKobo > totalKobo ? 'The deposit is more than this sale. Add the booked service at its full price.'
+        : depositKobo > 0 && paymentMethod === 'Transfer' && depositKobo === totalKobo ? 'The deposit covers the whole bill. Choose Cash to finish.'
+        : bill && !cart.some(i => i.id === bill.service_id) ? 'Add the booked service back to the cart.'
+        : job && !matchesJob(cart.map(i => ({ id: i.id, quantity: i.cartQuantity })), job.lines) ? "The sale must be exactly the job's services and materials. Change the job instead." 
         : badDiscount ? `Discounts can be at most ${cap}%.`
         : paymentMethod === 'Split' && (transferKobo <= 0 || transferKobo >= totalKobo) ? 'Enter a transfer amount less than the total.'
         : paymentMethod === 'Credit' && !customerId ? 'Choose the customer who owes for this sale.'
@@ -190,12 +252,15 @@ export default function POSPage() {
             cashReceived: native && ['Cash', 'Split'].includes(paymentMethod) && cashReceived ? cashReceived : undefined,
             transferAmount: native && paymentMethod === 'Split' ? formatKobo(transferKobo) : undefined,
             customerId: native && paymentMethod === 'Credit' ? customerId : undefined,
+            bookingId: bill?.id,
+            jobId: job?.id,
             totalAmount: totalKobo / 100,
         });
         if (result.success) {
             setDone({ saleId: result.saleId, status: result.status, change: result.change, invoiceNumber: result.invoiceNumber, shortfalls: result.shortfalls });
             checkoutKey.current = crypto.randomUUID();
             setCart([]); setCashReceived(''); setTransferAmount(''); setCustomerId('');
+            if (bill || job) { setBill(null); setJob(null); window.history.replaceState(null, '', '/pos'); }
             setIsCheckoutOpen(false);
             fetchInventory();
         } else {
@@ -220,6 +285,15 @@ export default function POSPage() {
             </div>
 
             {native && <ShiftBar banks={collectionChoices?.accounts ?? []} refreshKey={done?.saleId} onStatus={setShiftStatus} />}
+
+            {job && <div role="status" className="rounded-xl border bg-card p-4 text-sm">
+                <p className="font-semibold">Taking payment for {job.number ?? 'a job'}.</p>
+                <p>Its materials already left stock when the job was completed.</p>
+            </div>}
+            {bill && <div role="status" className="rounded-xl border bg-card p-4 text-sm">
+                <p className="font-semibold">Paying for {bill.customer_name || 'the customer'}&apos;s {bill.service ?? 'booking'}.</p>
+                {depositKobo > 0 && <p>The {nairaText(depositKobo)} deposit paid earlier comes off the bill.</p>}
+            </div>}
 
             {done && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -316,6 +390,10 @@ export default function POSPage() {
                                 <span className="text-lg font-bold">Total Amount</span>
                                 <span className="text-2xl font-bold font-headline text-primary">{nairaText(totalKobo)}</span>
                             </div>
+                            {depositKobo > 0 && <>
+                                <div className="flex justify-between text-sm text-muted-foreground"><span>Deposit paid earlier</span><span>−{nairaText(depositKobo)}</span></div>
+                                <div className="flex justify-between font-bold"><span>To pay</span><span>{nairaText(Math.max(totalKobo - depositKobo, 0))}</span></div>
+                            </>}
                         </div>
 
                         <Button variant="outline" className="w-full" disabled={cart.length === 0 || isProcessing} onClick={() => setParkOpen(true)}>Park sale</Button>
@@ -326,7 +404,7 @@ export default function POSPage() {
                             <DialogContent className="sm:max-w-md">
                                 <DialogHeader>
                                     <DialogTitle className="text-2xl">Payment</DialogTitle>
-                                    <DialogDescription>Total {nairaText(totalKobo)}{discountKobo > 0 ? `, after ${nairaText(discountKobo)} discount` : ''}.</DialogDescription>
+                                    <DialogDescription>Total {nairaText(totalKobo)}{discountKobo > 0 ? `, after ${nairaText(discountKobo)} discount` : ''}.{depositKobo > 0 ? ` To pay now: ${nairaText(totalKobo - depositKobo)}.` : ''}</DialogDescription>
                                 </DialogHeader>
                                 <div className="grid gap-4 py-2">
                                     {!collectionChoices ? <p role="alert">Payment accounts unavailable. Refresh to retry.</p>

@@ -117,7 +117,7 @@ export function CloseShiftDialog({ shift, open, onClose, onDone }: { shift: Shif
         {Number(shift.pay_ins) > 0 && <><dt>Paid in</dt><dd className="text-right">{naira(shift.pay_ins)}</dd></>}
         {Number(shift.pay_outs) > 0 && <><dt>Paid out</dt><dd className="text-right">−{naira(shift.pay_outs)}</dd></>}
         {Number(shift.cash_handed_back) > 0 && <><dt>Handed back on reversed sales</dt><dd className="text-right">−{naira(shift.cash_handed_back)}</dd></>}
-        {Number(shift.deposits ?? 0) !== 0 && <><dt>Booking deposits (less refunds)</dt><dd className="text-right">{naira(shift.deposits ?? 0)}</dd></>}
+        {Number(shift.deposits ?? 0) !== 0 && <><dt>Booking deposits (less refunds and deposits used at the till)</dt><dd className="text-right">{naira(shift.deposits ?? 0)}</dd></>}
         <dt className="font-semibold">Expected cash</dt><dd className="text-right font-semibold">{naira(shift.expected_cash)}</dd>
       </dl>
       <label className="space-y-1 text-sm"><span>Cash counted (₦)</span>

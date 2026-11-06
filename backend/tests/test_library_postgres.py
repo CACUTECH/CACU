@@ -43,6 +43,10 @@ def database():
             status text NOT NULL DEFAULT 'scheduled',scheduled_at timestamptz NOT NULL,notes text,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),
             CONSTRAINT appointments_status_check CHECK (status IN ('scheduled','confirmed','completed','cancelled','no_show')),
             CONSTRAINT appointments_title_check CHECK (char_length(btrim(title)) > 0));
+          CREATE TABLE public.jobs(id uuid primary key default gen_random_uuid(),business_id uuid NOT NULL,customer_id uuid,title text NOT NULL,
+            status text NOT NULL DEFAULT 'open',description text,due_date date,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),
+            CONSTRAINT jobs_status_check CHECK (status IN ('open','in_progress','completed','cancelled')),
+            CONSTRAINT jobs_title_check CHECK (char_length(btrim(title)) > 0));
           CREATE TABLE public.financial_transactions(id uuid primary key,business_id uuid);
           CREATE TABLE public.journal_entries(id uuid primary key,business_id uuid);
           CREATE TABLE public.journal_lines(id uuid primary key,business_id uuid);
@@ -69,7 +73,7 @@ def database():
         for name in ['20261102100000_platform_plans.sql','20261105090000_suspension_write_gate.sql','20261106100000_authz_foundation.sql',
                      '20261106110000_permissions_sales_invoices_expenses.sql','20261106120000_permissions_ledger_hr_settings_billing.sql',
                      '20261107090000_transfer_clearing.sql','20261107100000_pos_checkout.sql','20261107110000_pos_parked_sales_and_refunds.sql','20261107120000_pos_cashier_shifts.sql',
-                     '20261108090000_bookings_and_service_staff.sql','20261108100000_booking_deposits.sql']:
+                     '20261108090000_bookings_and_service_staff.sql','20261108100000_booking_deposits.sql','20261108110000_booking_billing.sql','20261108120000_jobs.sql']:
             c.execute(Path(f'../supabase/migrations/{name}').read_text(encoding='utf-8'))
         for tab in ['memberships','accounts','customers','suppliers','catalog_items','invoices','invoice_items','payments','transactions','transaction_items']:
             c.execute(f'ALTER TABLE public.{tab} ENABLE ROW LEVEL SECURITY')

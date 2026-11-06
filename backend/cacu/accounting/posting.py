@@ -32,7 +32,7 @@ class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
-                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement']
+                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -48,10 +48,11 @@ class PostingCommand(BaseModel):
 CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'supplier_payment':SupplierPayment,
          'expense':CashPurchase,'pos':CashSale,'adjustment':JournalEntry,'credit_note':CreditNote,
          'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry,'sale_refund':JournalEntry,
-         'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry}
+         'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry,
+         'deposit_application':JournalEntry}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
-INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement'}
+INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
@@ -84,7 +85,8 @@ def native_post(session,cls,main,lines,entry_date,narration,credited=None,main_a
 
 CORRECTION_KINDS={'reversal','credit_note'}
 
-def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False,internal=False,allow_shortfall=False):
+def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False,internal=False,allow_shortfall=False,preissued=frozenset()):
+    # preissued: tracked items a completed job already issued from stock; its invoice or sale charges them without issuing them again.
     if command.kind in INTERNAL_KINDS and not internal:raise HTTPException(422,'Transfers are confirmed from the daily reconciliation screen')
     # Corrections are Owner/Admin-only in their workflows; enforce it here too so the
     # generic postings route cannot reach around them, and before a replay returns.
@@ -125,7 +127,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if not source or source.status!='draft' or source.total!=amount or (source.tax or 0)!=0:
             raise HTTPException(409,'Invoice must be a reconciled tax-free draft matching its authoritative total')
         if str(source.customer_id)!=str(command.counterparty_id):raise HTTPException(422,'Invoice customer mismatch')
-    if command.kind in {'receipt','supplier_payment','credit_note'}:
+    if command.kind in {'receipt','supplier_payment','credit_note'} or (command.kind=='deposit_application' and command.target_id):
         if not command.target_id:raise HTTPException(422,'Allocation target required')
         kind='bill' if command.kind=='supplier_payment' else 'invoice'
         mapped=raw(session,'SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type=%s AND source_id=%s',
@@ -189,7 +191,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 raise HTTPException(422,'A refund is paid from the till or a bank account')
             if not command.credited or len(command.lines)!=1 or command.lines[0].credited or str(command.lines[0].account_id)!=str(purpose(session,'revenue')):
                 raise HTTPException(422,'A refund takes back revenue only')
-        elif command.kind in {'booking_deposit','deposit_settlement'}:
+        elif command.kind in {'booking_deposit','deposit_settlement','deposit_application'}:
             deposits=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='customer_deposits'",(tenant,)).all()
             if len(deposits)!=1:raise HTTPException(409,'Set up deposits before taking one')
             deposits=str(deposits[0].account_id);main_id=str(command.main_account_id);line=command.lines[0] if len(command.lines)==1 else None
@@ -198,6 +200,12 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 # PR-12: debit the till (or Transfers awaiting confirmation), credit Customer deposits and advances.
                 if line is None or command.credited or not line.credited or str(line.account_id)!=deposits or main_id not in {cash,clearing}:
                     raise HTTPException(422,'A deposit moves money into the till or Transfers awaiting confirmation and holds it as a customer deposit')
+            elif command.kind=='deposit_application':
+                # PR-13 at the till: debit the deposit, credit the till or Transfers awaiting confirmation the sale went
+                # into. PR-11 on an invoice: debit the deposit, credit the customer's receivable, allocated to the invoice.
+                at_till=main_id==deposits and not command.credited and line is not None and line.credited and str(line.account_id) in {cash,clearing} and not command.target_id
+                on_invoice=command.target_id is not None and command.credited and line is not None and not line.credited and str(line.account_id)==deposits
+                if not(at_till or on_invoice):raise HTTPException(422,'A deposit is applied to a till sale or an invoice')
             else:
                 # A refund debits the deposit and credits the till or a bank; a forfeit debits it and credits income.
                 income={str(r.account_id) for r in raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose IN ('revenue','service_revenue')",(tenant,)).all()}
@@ -247,7 +255,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         table='invoice_items' if command.kind=='invoice' else 'transaction_items'
         fk='invoice_id' if command.kind=='invoice' else 'transaction_id'
         actual_stock=raw(session,f"SELECT i.catalog_item_id,sum(i.quantity) quantity FROM public.{table} i JOIN public.catalog_items c ON c.id=i.catalog_item_id AND c.business_id=i.business_id WHERE i.business_id=%s AND i.{fk}=%s AND c.item_type='PRODUCT' AND coalesce((to_jsonb(c)->>'track_stock')::boolean,true) GROUP BY i.catalog_item_id",(tenant,str(command.source_id))).all()
-        expected={r.catalog_item_id:int(r.quantity) for r in actual_stock}
+        expected={r.catalog_item_id:int(r.quantity) for r in actual_stock if str(r.catalog_item_id) not in {str(i) for i in preissued}}
         if any(Decimal(r.quantity)!=int(r.quantity) for r in actual_stock) or {s.item_id:s.quantity for s in command.stock}!=expected:
             raise HTTPException(422,'Fulfillment must match authoritative document items')
     if command.kind=='pos':
