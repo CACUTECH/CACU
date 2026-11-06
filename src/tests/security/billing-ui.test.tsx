@@ -48,7 +48,7 @@ test('the trial, prices before VAT and the yearly prices are shown', async () =>
 });
 
 test('choosing a plan opens Paystack, and a retry reuses the same request key', async () => {
-  as('admin');
+  as('owner');
   (startCheckoutAction as jest.Mock).mockResolvedValueOnce({ success: false, error: 'Checkout could not start. Try again; you have not been charged.' })
     .mockResolvedValueOnce({ success: true, data: { authorization_url: 'https://checkout.paystack.com/abc' } });
   render(<BillingPage />);
@@ -61,10 +61,16 @@ test('choosing a plan opens Paystack, and a retry reuses the same request key', 
   expect(second.request_key).toBe(first.request_key);
 });
 
-test('editors and viewers see plans but cannot choose or see invoices', async () => {
+test('admins, editors and viewers see plans but only the owner chooses (Doc 08 billing.edit)', async () => {
+  as('admin');
+  const { unmount } = render(<BillingPage />);
+  expect(await screen.findAllByText('Only the business owner can change the plan.')).toHaveLength(3);
+  expect(screen.queryByRole('button', { name: /Choose/ })).not.toBeInTheDocument();
+  expect(getBillingAction).toHaveBeenLastCalledWith(true);  // admins still see invoices
+  unmount();
   as('editor');
   render(<BillingPage />);
-  expect(await screen.findAllByText('Only an Owner or Admin can change the plan.')).toHaveLength(3);
+  expect(await screen.findAllByText('Only the business owner can change the plan.')).toHaveLength(3);
   expect(screen.queryByRole('button', { name: /Choose/ })).not.toBeInTheDocument();
   expect(getBillingAction).toHaveBeenCalledWith(false);
 });
@@ -195,8 +201,8 @@ test('admins see no cancel button', async () => {
   expect(screen.queryByRole('button', { name: 'Cancel subscription' })).not.toBeInTheDocument();
 });
 
-test('before a downgrade, managers choose who stays; owners always stay and seats are counted (SUB-06)', async () => {
-  as('admin');
+test('before a downgrade, the owner chooses who stays; owners always stay and seats are counted (SUB-06)', async () => {
+  as('owner');
   const active = { ...trial, status: 'active', current_period_end: '2026-12-02T10:00:00Z', scheduled_plan: 'BASE', cancel_at_period_end: false };
   (getBillingAction as jest.Mock).mockResolvedValue({ success: true, data: { plans, current: active, history: [] } });
   const choices = { plan: 'BASE', plan_name: 'General', seats: 2, outlets_limit: 1, chosen: false,

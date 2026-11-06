@@ -20,6 +20,8 @@ PAYMENT_REFERENCE = re.compile(r'^CACU-(SUB|REN)-[0-9a-f]{32}$')
 ERRORS = {
     'ACCESS_DENIED': (403, 'Business membership required'),
     'BILLING_OWNER_OR_ADMIN_REQUIRED': (403, 'Only an Owner or Admin can manage the subscription'),
+    'PERMISSION_DENIED billing.edit': (403, 'Only the business owner can choose or change the plan'),
+    'PERMISSION_DENIED billing.post': (403, 'You do not have permission to pay for this business. Ask the business owner.'),
     'PLAN_LIMIT module.modes': (403, 'Hybrid mode is on the Chairman Plan only. Switch to Products or Services first.'),
     'BILLING_ALREADY_ON_PLAN': (409, 'This business is already on that plan'),
     'BILLING_DOWNGRADE_IS_SCHEDULED': (409, 'A move to a smaller plan is scheduled for the end of the period, not paid now'),
