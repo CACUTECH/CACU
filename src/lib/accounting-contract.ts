@@ -742,6 +742,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pending Transfers */
+        get: operations["pending_transfers_api_v1_businesses__business_id__transfers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/transfers/{transfer_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Pending Transfer */
+        post: operations["confirm_pending_transfer_api_v1_businesses__business_id__transfers__transfer_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/transfers/{transfer_id}/not-received": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Pending Transfer */
+        post: operations["reject_pending_transfer_api_v1_businesses__business_id__transfers__transfer_id__not_received_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/reconciliation/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Daily Reconciliation Report */
+        get: operations["daily_reconciliation_report_api_v1_businesses__business_id__reconciliation_daily_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/sales/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sales Options */
+        get: operations["sales_options_api_v1_businesses__business_id__sales_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/sales/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Sales Options */
+        post: operations["save_sales_options_api_v1_businesses__business_id__sales_policy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/sales/{sale_id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sales Receipt */
+        get: operations["sales_receipt_api_v1_businesses__business_id__sales__sale_id__receipt_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/stock/shortfalls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Stock Shortfalls */
+        get: operations["list_stock_shortfalls_api_v1_businesses__business_id__stock_shortfalls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/stock/shortfalls/{sale_id}/{item_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Stock Shortfall */
+        post: operations["review_stock_shortfall_api_v1_businesses__business_id__stock_shortfalls__sale_id___item_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1299,7 +1452,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal";
+            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received";
             /**
              * Source Id
              * Format: uuid
@@ -1333,7 +1486,7 @@ export interface components {
             /** Counterparty Id */
             counterparty_id?: string | null;
             /** Payment Method */
-            payment_method?: ("Cash" | "Transfer") | null;
+            payment_method?: ("Cash" | "Transfer" | "Split") | null;
         };
         /** PostingLine */
         PostingLine: {
@@ -1434,7 +1587,7 @@ export interface components {
              */
             request_key: string;
             /** Items */
-            items: components["schemas"]["StockLine"][];
+            items: components["schemas"]["SaleLine"][];
             /**
              * Entry Date
              * Format: date
@@ -1446,6 +1599,32 @@ export interface components {
             bank_account_id?: string | null;
             /** Quoted Total */
             quoted_total: string;
+            /** Cash Received */
+            cash_received?: string | null;
+            /** Transfer Amount */
+            transfer_amount?: string | null;
+            /** Customer Id */
+            customer_id?: string | null;
+        };
+        /** SaleLine */
+        SaleLine: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Quantity */
+            quantity: number;
+            /**
+             * Discount Percent
+             * @default 0
+             */
+            discount_percent: string;
+        };
+        /** SalesPolicy */
+        SalesPolicy: {
+            /** Allow Oversell */
+            allow_oversell: boolean;
         };
         /** Schedule */
         Schedule: {
@@ -1540,6 +1719,34 @@ export interface components {
             method: string;
             /** Bank Account Id */
             bank_account_id?: string | null;
+        };
+        /** TransferConfirm */
+        TransferConfirm: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Bank Account Id
+             * Format: uuid
+             */
+            bank_account_id: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** TransferNotReceived */
+        TransferNotReceived: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Note */
+            note: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -3230,6 +3437,306 @@ export interface operations {
                 "x-paystack-signature"?: string | null;
             };
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pending_transfers_api_v1_businesses__business_id__transfers_get: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_pending_transfer_api_v1_businesses__business_id__transfers__transfer_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_pending_transfer_api_v1_businesses__business_id__transfers__transfer_id__not_received_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferNotReceived"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    daily_reconciliation_report_api_v1_businesses__business_id__reconciliation_daily_get: {
+        parameters: {
+            query: {
+                day: string;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sales_options_api_v1_businesses__business_id__sales_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_sales_options_api_v1_businesses__business_id__sales_policy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesPolicy"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sales_receipt_api_v1_businesses__business_id__sales__sale_id__receipt_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                sale_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_stock_shortfalls_api_v1_businesses__business_id__stock_shortfalls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_stock_shortfall_api_v1_businesses__business_id__stock_shortfalls__sale_id___item_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                sale_id: string;
+                item_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

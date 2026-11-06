@@ -30,3 +30,4 @@ catch {
 export async function assignTemplateAction(userId: string, templateId: string) { return templateChange({ action: 'assign', userId, templateId }); }
 export async function saveTemplateAction(templateId: string | null, name: string, permissions: string[]) { return templateChange({ action: 'save', templateId, name, permissions }); }
 export async function deleteTemplateAction(templateId: string) { return templateChange({ action: 'delete', templateId }); }
+export async function saveDiscountCapAction(templateId: string, maxPercent: number) { return templateChange({ action: 'discount-cap', templateId, maxPercent }); }

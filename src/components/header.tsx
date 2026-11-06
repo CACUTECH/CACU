@@ -22,6 +22,8 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/': 'Dashboard',
   '/pos': 'POS Checkout',
   '/transactions': 'Transactions',
+  '/reconciliation': 'Reconciliation',
+  '/reconciliation/daily': 'Daily reconciliation',
   '/invoices': 'Invoices',
   '/inventory': 'Inventory',
   '/storefront': 'Storefront',

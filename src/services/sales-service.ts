@@ -9,10 +9,15 @@ import { PERMISSION_MESSAGE, isPermissionRefusal } from '@/lib/permission';
 /**
  * @fileOverview SalesService handles POS checkouts and atomic retail operations.
  */
+export type SaleResult = { saleId: string; status?: 'completed' | 'pending_payment' | 'credit'; change?: string | null;
+  invoice_number?: string; shortfalls?: { item_id: string; quantity: number }[] };
+
 export class SalesService extends BaseService {
   async processCheckout(input: {
-    items: { id: string; quantity: number; price: number; name: string }[];
-    paymentMethod: 'Cash' | 'Card' | 'Transfer';
+    items: { id: string; quantity: number; price: number; name: string; discountPercent?: string }[];
+    paymentMethod: 'Cash' | 'Card' | 'Transfer' | 'Split' | 'Credit';
+    cashReceived?: string;
+    transferAmount?: string;
     totalAmount: number;
     customerId?: string;
     requestKey?: string;
@@ -22,13 +27,18 @@ export class SalesService extends BaseService {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
 
-    if (await usesPythonAccounting()) return accountingRequest<{ saleId: string }>('sales', { method: 'POST', body: {
-      request_key: input.requestKey || randomUUID(), items: input.items.map(item => ({ item_id: item.id, quantity: item.quantity })),
+    if (await usesPythonAccounting()) return accountingRequest<SaleResult>('sales', { method: 'POST', body: {
+      request_key: input.requestKey || randomUUID(),
+      items: input.items.map(item => ({ item_id: item.id, quantity: item.quantity, discount_percent: item.discountPercent || '0' })),
       quoted_total: decimalInput(input.totalAmount), method: input.paymentMethod,
       bank_account_id: input.bankAccountId || null,
+      cash_received: input.cashReceived || null, transfer_amount: input.transferAmount || null,
+      customer_id: input.paymentMethod === 'Credit' ? input.customerId || null : null,
       entry_date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()),
     } });
     if (input.bankAccountId) throw new Error('Selected bank accounts require native accounting');
+    if (!['Cash', 'Card', 'Transfer'].includes(input.paymentMethod) || input.items.some(item => Number(item.discountPercent || 0) > 0))
+      throw new Error('Split and credit sales and discounts need your books turned on');
     const { data, error } = await supabase.rpc('process_sale_safe', {
       p_business_id: businessId,
       p_customer_id: input.customerId || null,
@@ -61,7 +71,7 @@ export class SalesService extends BaseService {
     // Post-Sale Operations
     void this.checkInventoryThresholds(input.items).catch(() => this.logInfo('Post-sale notification unavailable', { businessId }));
 
-    return { saleId: data };
+    return { saleId: data as string, status: 'completed' as const };
   }
 
   private async checkInventoryThresholds(soldItems: { id: string }[]) {

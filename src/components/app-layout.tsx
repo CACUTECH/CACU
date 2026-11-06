@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
     LayoutDashboard, 
     ArrowLeftRight, 
+    ClipboardCheck,
     Package, 
     FileText, 
     Users, 
@@ -161,6 +162,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/jobs', label: 'Work Orders / Jobs', icon: Wrench },
     ] : []),
     { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+    { href: '/reconciliation/daily', label: 'Daily reconciliation', icon: ClipboardCheck },
     { href: '/invoices', label: 'Invoices & Receipts', icon: Receipt },
     { href: '/catalog', label: 'Inventory', icon: Package },
     { href: '/storefront', label: 'Storefront', icon: Store },

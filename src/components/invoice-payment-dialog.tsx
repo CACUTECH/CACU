@@ -35,14 +35,13 @@ export function InvoicePaymentDialog({ invoice, onClose, onSaved }: { invoice: I
     event.preventDefault();
     if (!invoice || !draft || draft.invoiceId !== invoice.id || !choices || processing) return;
     if (!/^\d{1,13}(\.\d{1,2})?$/.test(draft.amount) || Number(draft.amount) <= 0) { setError('Enter a positive amount with at most two decimal places.'); return; }
-    if (!draft.retryOnly && choices.native && draft.method === 'Transfer' && !choices.accounts.some(account => account.id === draft.bankAccountId)) { setError('Select an available receiving bank account.'); return; }
     setProcessing(true); setError('');
     const attempted = { ...draft, retryOnly: true, choices };
     drafts.current.set(invoice.id, attempted);
     setDraft(attempted);
     try {
       const result = await markAsPaidAction({ invoiceId: invoice.id, customerId: invoice.customer_id, requestKey: draft.requestKey,
-        amount: draft.amount, method: draft.method, bankAccountId: choices.native && draft.method === 'Transfer' ? draft.bankAccountId : undefined });
+        amount: draft.amount, method: draft.method, bankAccountId: choices.native && draft.method === 'Transfer' && draft.bankAccountId ? draft.bankAccountId : undefined });
       if (!result.success) {
         if (result.retryable === false && !draft.retryOnly) { drafts.current.delete(invoice.id); setDraft({ ...draft, retryOnly: false }); }
         setError(result.error || 'Payment failed. Retry using the same payment details.'); return;
@@ -61,7 +60,7 @@ export function InvoicePaymentDialog({ invoice, onClose, onSaved }: { invoice: I
           onMethodChange={method => setDraft({ ...currentDraft, method })} onBankChange={bankAccountId => setDraft({ ...currentDraft, bankAccountId })} /> : !error ? <p role="status">Loading payment accounts...</p> : null}
         {currentDraft?.retryOnly && <p role="status" className="text-sm text-muted-foreground">Retry the original payment details to confirm whether it was recorded.</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="w-full min-h-11" disabled={processing || !choices || !currentDraft || (choices.native && currentDraft.method === 'Transfer' && !currentDraft.bankAccountId)}>{processing ? 'Recording payment...' : currentDraft?.retryOnly ? 'Retry payment' : 'Record payment'}</Button>
+        <Button type="submit" className="w-full min-h-11" disabled={processing || !choices || !currentDraft}>{processing ? 'Recording payment...' : currentDraft?.retryOnly ? 'Retry payment' : 'Record payment'}</Button>
       </form>
     </DialogContent>
   </Dialog>;

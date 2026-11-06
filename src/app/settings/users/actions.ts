@@ -56,3 +56,6 @@ export async function saveTemplateAction(templateId: string | null, name: string
 export async function deleteTemplateAction(templateId: string) {
     return templateChange(service => service.deleteTemplate(templateId));
 }
+export async function saveDiscountCapAction(templateId: string, maxPercent: number) {
+    return templateChange(service => service.saveDiscountCap(templateId, maxPercent));
+}

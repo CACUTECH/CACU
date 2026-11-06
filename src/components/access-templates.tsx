@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { assignTemplateAction, deleteTemplateAction, saveTemplateAction } from '@/app/settings/users/actions';
+import { assignTemplateAction, deleteTemplateAction, saveDiscountCapAction, saveTemplateAction } from '@/app/settings/users/actions';
 import { ACTIONS, MODULES, assignable, describeAccess, selectablePermission } from '@/lib/permission-templates';
 import type { AccessTemplate, TemplateCatalogue } from '@/services/management-service';
 
@@ -61,7 +61,7 @@ export function AccessDialog({ catalogue, member, onClose, onSaved }: {
 }
 
 /** The templates tab: what every template allows, and custom profiles on Oga and Chairman. */
-export function AccessTemplates({ catalogue, onChanged }: { catalogue: TemplateCatalogue; onChanged: (message: string) => void }) {
+export function AccessTemplates({ catalogue, owner = false, onChanged }: { catalogue: TemplateCatalogue; owner?: boolean; onChanged: (message: string) => void }) {
   const [editing, setEditing] = useState<{ id: string | null; name: string; permissions: Set<string> } | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const shown = catalogue.templates.filter(t => t.code !== 'owner' && (!t.legacy || t.members > 0));
@@ -101,6 +101,7 @@ export function AccessTemplates({ catalogue, onChanged }: { catalogue: TemplateC
           <div className="flex gap-1">{!t.builtin && <Badge variant="outline">Custom</Badge>}<Badge variant="secondary">{t.members} {t.members === 1 ? 'person' : 'people'}</Badge></div>
         </div>
         <AccessSummary template={t} />
+        {catalogue.discount_caps?.[t.id] != null && <DiscountLimit template={t} percent={catalogue.discount_caps[t.id] as number} owner={owner} onChanged={onChanged} />}
         {!t.builtin && <div className="flex gap-2">
           <Button size="sm" variant="outline" disabled={busy} onClick={() => setEditing({ id: t.id, name: t.name, permissions: new Set(t.permissions) })}>Edit</Button>
           <Button size="sm" variant="outline" disabled={busy || t.members > 0} onClick={() => void remove(t)}>Delete</Button>
@@ -135,4 +136,29 @@ export function AccessTemplates({ catalogue, onChanged }: { catalogue: TemplateC
       </DialogContent>
     </Dialog>
   </div>;
+}
+
+/** Doc 10: the largest line discount people on this template may give at the till. Only the owner changes it. */
+function DiscountLimit({ template, percent, owner, onChanged }: { template: AccessTemplate; percent: number; owner: boolean; onChanged: (message: string) => void }) {
+  const [value, setValue] = useState(String(percent)), [editing, setEditing] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const valid = /^\d{1,3}(\.\d{1,2})?$/.test(value) && Number(value) <= 100;
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (!valid) return;
+    setBusy(true); setError('');
+    const result = await saveDiscountCapAction(template.id, Number(value));
+    setBusy(false);
+    if (!result.success) { setError(result.error); return; }
+    setEditing(false);
+    onChanged(`${template.name} can now give up to ${Number(value)}% off a line.`);
+  }
+  if (!editing) return <p className="text-xs">Discount limit: <span className="font-medium">{percent}%</span>
+    {owner && <Button size="sm" variant="link" className="h-auto p-0 pl-2 text-xs" onClick={() => setEditing(true)}>Change</Button>}</p>;
+  return <form className="flex flex-wrap items-center gap-2 text-xs" onSubmit={e => void save(e)}>
+    <label className="flex items-center gap-1">Discount limit
+      <Input aria-label={`Discount limit for ${template.name} (%)`} className="h-8 w-20" inputMode="decimal" value={value} disabled={busy} onChange={e => setValue(e.target.value)} />%</label>
+    <Button size="sm" type="submit" disabled={busy || !valid}>Save</Button>
+    <Button size="sm" type="button" variant="ghost" disabled={busy} onClick={() => { setEditing(false); setValue(String(percent)); }}>Cancel</Button>
+    {error && <span role="alert" className="text-destructive">{error}</span>}
+  </form>;
 }
