@@ -55,6 +55,10 @@ export default function ReceiptPage() {
       <hr className="border-dashed border-black" />
       {Number(receipt.discount_total) > 0 && <p className="flex justify-between"><span>Discount</span><span>−{money(receipt.discount_total)}</span></p>}
       <p className="flex justify-between text-sm font-bold"><span>Total</span><span>{money(receipt.total)}</span></p>
+      {Number(receipt.deposit_applied ?? 0) > 0 && <>
+        <p className="flex justify-between"><span>Deposit paid earlier</span><span>−{money(receipt.deposit_applied as string)}</span></p>
+        <p className="flex justify-between font-bold"><span>Paid now</span><span>{money(receipt.paid_now as string)}</span></p>
+      </>}
       <p className="flex justify-between"><span>Paid by</span><span>{METHOD[receipt.method] ?? receipt.method}</span></p>
       {receipt.transfer_amount && receipt.method === 'split' && <p className="flex justify-between"><span>Transfer</span><span>{money(receipt.transfer_amount)}</span></p>}
       {receipt.cash_received && <p className="flex justify-between"><span>Cash received</span><span>{money(receipt.cash_received)}</span></p>}

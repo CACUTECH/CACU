@@ -6,7 +6,7 @@ export async function GET(request: Request, route: Context) {
     const context=await uploadContext(); const ident=fileUuid.safeParse((await route.params).fileId);
     if (!ident.success) throw new UploadError(404,'File not found');
     const preview=new URL(request.url).searchParams.get('preview')==='true';
-    const response=await fileRequest(context,`/${ident.data}${preview?'?preview=true':''}`);
+    const response=await fileRequest(context,ident.data,preview?{preview:'true'}:undefined);
     const mime=response.headers.get('content-type') || '';
     if (!['image/png','image/jpeg'].includes(mime)) throw new UploadError(409,'File requires review');
     const body=await response.arrayBuffer();
@@ -23,7 +23,7 @@ export async function DELETE(request: Request, route: Context) {
   try {
     requireSameOrigin(request); const context=await uploadContext(); const ident=fileUuid.safeParse((await route.params).fileId);
     if (!ident.success) throw new UploadError(404,'File not found');
-    const response=await fileRequest(context,`/${ident.data}`,{method:'DELETE'});
+    const response=await fileRequest(context,ident.data,undefined,{method:'DELETE'});
     return Response.json(await response.json(),{headers:{'Cache-Control':'no-store'}});
   } catch(error) {return uploadFailure(error);}
 }

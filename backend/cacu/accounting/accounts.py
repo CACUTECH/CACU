@@ -20,9 +20,14 @@ class AccountCreate(BaseModel):
     name:str=Field(min_length=1,max_length=100)
 
 def account_create(session,actor,data:AccountCreate):
+    return add_account(session,actor,data.request_key,data.kind,data.name)
+
+def add_account(session,actor,request_key,kind,name):
+    """Adds an account of a kind to live books and its ledger account; also used for system kinds such as customer
+    deposits, which the chart screen does not offer."""
     if role(session,actor) not in {'owner','admin'}:raise HTTPException(403,'Only an Owner or Admin can change the chart of accounts')
     tenant=str(session.business_id)
-    result=raw(session,'SELECT public.save_account(%s,%s,%s,NULL,%s::jsonb)',(tenant,str(data.request_key),'add',json.dumps({'kind':data.kind,'name':data.name}))).scalar()
+    result=raw(session,'SELECT public.save_account(%s,%s,%s,NULL,%s::jsonb)',(tenant,str(request_key),'add',json.dumps({'kind':kind,'name':name}))).scalar()
     if raw(session,'SELECT 1 FROM accounting.account_map WHERE business_id=%s AND account_id=%s',(tenant,result['id'])).first():
         return result  # a retry of an add that already completed
     kind=Account.AccountType[result['library_type']]

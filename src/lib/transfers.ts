@@ -2,7 +2,7 @@
 import type { Refund } from '@/lib/checkout';
 import type { ShiftsDay } from '@/lib/shifts';
 export type PendingTransfer = {
-  id: string; kind: 'sale' | 'invoice payment'; amount: string; entry_date: string; age_days: number;
+  id: string; kind: 'sale' | 'invoice payment' | 'booking deposit'; amount: string; entry_date: string; age_days: number;
   invoice_number: string | null; customer: string | null; expected_bank_account_id: string | null; status: string;
 };
 export type MethodTotals = { sales: number; total: string; awaiting: string; reversed: string };

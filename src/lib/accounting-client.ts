@@ -2,6 +2,7 @@ import 'server-only';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
 import type { CashFlowReport } from '@/lib/cash-flow';
+import { routeParts, serviceUrl } from '@/lib/service-url';
 
 export class AccountingRequestError extends Error {
   constructor(message: string, public readonly status: number) { super(message); this.name = 'AccountingRequestError'; }
@@ -18,7 +19,10 @@ export async function accountingRequest<T>(path: string, options?: { method: 'PO
   const businessId = await getActiveBusinessIdAction();
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !session?.access_token) throw new Error('Valid session required');
-  const response = await fetch(new URL(`/api/v1/businesses/${encodeURIComponent(businessId)}/${path}`, url), {
+  // The host is the configured API; the business id and route are checked segment by segment (no "..", "/" or URLs).
+  const { segments, query } = routeParts(path);
+  const target = serviceUrl(url, ['api', 'v1', 'businesses', businessId, ...segments], query);
+  const response = await fetch(target, {
     method: options?.method || 'GET', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
     body: options ? JSON.stringify(options.body) : undefined, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000),
   });

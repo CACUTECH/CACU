@@ -8,28 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cashMovementAction, closeShiftAction, getShiftAction, openShiftAction } from '@/app/pos/shift-actions';
 import { naira } from '@/lib/transfers';
+import { useKeyedRequest } from '@/hooks/use-keyed-request';
 import { AMOUNT, differenceKobo, differenceText, openedAt, type Shift, type ShiftStatus } from '@/lib/shifts';
 
 type Bank = { id: string; name: string };
-type Attempt = { busy: boolean; error: string; uncertain: boolean };
-const IDLE: Attempt = { busy: false, error: '', uncertain: false };
-
-/** Runs a request under one key; the key changes only after a definite answer, so a lost response is retried safely. */
-function useKeyedRequest() {
-  const key = React.useRef(crypto.randomUUID());
-  const [attempt, setAttempt] = React.useState<Attempt>(IDLE);
-  const run = async <T,>(send: (key: string) => Promise<{ success: true; data: T } | { success: false; error: string; uncertain: boolean }>) => {
-    setAttempt({ ...IDLE, busy: true });
-    const result = await send(key.current);
-    if (result.success) { key.current = crypto.randomUUID(); setAttempt(IDLE); return result.data; }
-    if (!result.uncertain) key.current = crypto.randomUUID();
-    setAttempt({ busy: false, error: result.error, uncertain: result.uncertain });
-    return null;
-  };
-  const reset = () => { key.current = crypto.randomUUID(); setAttempt(IDLE); };
-  return { attempt, run, reset };
-}
-
 function Problem({ text }: { text: string }) {
   return text ? <p role="alert" className="text-sm text-destructive">{text}</p> : null;
 }
@@ -135,6 +117,7 @@ export function CloseShiftDialog({ shift, open, onClose, onDone }: { shift: Shif
         {Number(shift.pay_ins) > 0 && <><dt>Paid in</dt><dd className="text-right">{naira(shift.pay_ins)}</dd></>}
         {Number(shift.pay_outs) > 0 && <><dt>Paid out</dt><dd className="text-right">−{naira(shift.pay_outs)}</dd></>}
         {Number(shift.cash_handed_back) > 0 && <><dt>Handed back on reversed sales</dt><dd className="text-right">−{naira(shift.cash_handed_back)}</dd></>}
+        {Number(shift.deposits ?? 0) !== 0 && <><dt>Booking deposits (less refunds and deposits used at the till)</dt><dd className="text-right">{naira(shift.deposits ?? 0)}</dd></>}
         <dt className="font-semibold">Expected cash</dt><dd className="text-right font-semibold">{naira(shift.expected_cash)}</dd>
       </dl>
       <label className="space-y-1 text-sm"><span>Cash counted (₦)</span>

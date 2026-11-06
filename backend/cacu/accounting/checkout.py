@@ -50,7 +50,7 @@ def receipt(session,sale_id:UUID):
     """Doc 10 receipt (the screen adds the business name): sale number, items, amounts, payment method and, for a pending transfer, that it is
     awaiting confirmation."""
     tenant=str(session.business_id)
-    sale=raw(session,"""SELECT s.id,s.status,s.payment_method,s.total,s.subtotal,s.discount_total,s.cash_received,s.change_given,s.transfer_amount,s.refunded_total,
+    sale=raw(session,"""SELECT s.id,s.status,s.payment_method,s.total,s.subtotal,s.discount_total,s.cash_received,s.change_given,s.transfer_amount,s.refunded_total,s.deposit_applied,
         t.transaction_no,t.transaction_date::date AS sold_on
       FROM public.transactions s JOIN accounting.document_map d ON d.business_id=s.business_id AND d.source_id=s.id AND d.source_type='pos'
       JOIN accounting."transaction" t ON t.id=d.transaction_id AND t.business_id=d.business_id
@@ -62,4 +62,5 @@ def receipt(session,sale_id:UUID):
     return {'id':str(sale.id),'number':sale.transaction_no,'date':sale.sold_on.isoformat(),'status':sale.status,
             'method':sale.payment_method,'subtotal':money(sale.subtotal),'discount_total':money(sale.discount_total),'total':money(sale.total),
             'cash_received':money(sale.cash_received),'change':money(sale.change_given),'transfer_amount':money(sale.transfer_amount),'refunded_total':money(sale.refunded_total),
+            'deposit_applied':money(sale.deposit_applied),'paid_now':money(sale.total-sale.deposit_applied),
             'items':[{'name':i.description,'quantity':int(i.quantity),'unit_price':money(i.unit_price),'discount':money(i.discount),'total':money(i.line_total)} for i in items]}

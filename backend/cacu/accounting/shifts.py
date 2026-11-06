@@ -104,6 +104,7 @@ SHIFT_SELECT="""SELECT s.*,coalesce((SELECT nullif(to_jsonb(m)->>'display_name',
     coalesce(sum(e.cash) FILTER (WHERE e.kind='pay_in'),0) AS pay_ins,
     coalesce(sum(e.cash) FILTER (WHERE e.kind='pay_out'),0) AS pay_outs,
     coalesce(sum(e.cash) FILTER (WHERE e.kind='sale_reversed'),0) AS handed_back,
+    coalesce(sum(e.cash) FILTER (WHERE e.kind IN ('deposit','deposit_refund','deposit_applied')),0) AS deposits,
     count(*) FILTER (WHERE e.kind='sale') AS sales
   FROM accounting.till_shift s
   LEFT JOIN accounting.till_shift_entry e ON e.business_id=s.business_id AND e.shift_id=s.id"""
@@ -111,7 +112,7 @@ SHIFT_GROUP=' GROUP BY s.business_id,s.id'
 
 
 def _expected(row):
-    return row.opening_float+row.cash_sales+row.cash_refunds+row.pay_ins+row.pay_outs+row.handed_back
+    return row.opening_float+row.cash_sales+row.cash_refunds+row.pay_ins+row.pay_outs+row.handed_back+row.deposits
 
 
 def _row(session,r,actor=None,today=None):
@@ -119,7 +120,7 @@ def _row(session,r,actor=None,today=None):
     return {'id':str(r.id),'status':r.status,'opened_by_name':r.opened_by_name,'mine':actor is not None and str(r.opened_by)==str(actor),
             'opened_at':r.opened_at.isoformat(),'opened_on':r.opened_on.isoformat(),'overdue':r.status=='open' and r.opened_on<today,
             'opening_float':_money(r.opening_float),'sales':r.sales,'cash_sales':_money(r.cash_sales),'cash_refunds':_money(-r.cash_refunds),
-            'pay_ins':_money(r.pay_ins),'pay_outs':_money(-r.pay_outs),'cash_handed_back':_money(-r.handed_back),
+            'pay_ins':_money(r.pay_ins),'pay_outs':_money(-r.pay_outs),'cash_handed_back':_money(-r.handed_back),'deposits':_money(r.deposits),
             'expected_cash':_money(r.expected_cash if r.status=='closed' else _expected(r)),
             'counted_cash':_money(r.counted_cash),'variance':_money(r.variance),'close_note':r.close_note,
             'closed_on':r.closed_on.isoformat() if r.closed_on else None,'posting':r.posting}

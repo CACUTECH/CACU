@@ -9,8 +9,39 @@ export type TimeOff = { id: string; staff_id: string; starts_at: string; ends_at
 export type Booking = {
   id: string; staff_id: string; service_id: string; scheduled_at: string; ends_at: string; duration_minutes: number; title: string;
   status: BookingStatus; customer_id: string | null; customer_name: string | null; customer_phone: string | null; notes: string | null;
-  cancel_reason: string | null;
+  cancel_reason: string | null; bill_kind?: 'sale' | 'invoice' | null;
 };
+
+// Deposits (Doc 10, PR-12): set per service by the owner, held in Customer deposits and advances.
+export type DepositRule = { service_id: string; kind: 'fixed' | 'percent'; value: string };
+export type BookingSettings = { free_cancel_hours: number; late_deposit: 'keep' | 'refund'; deposits_ready: boolean; rules: DepositRule[] };
+export type Deposit = {
+  id: string; appointment_id: string; amount: string; method: 'cash' | 'transfer';
+  status: 'awaiting_transfer' | 'held' | 'not_received' | 'refunded' | 'forfeited' | 'applied';
+  received_on: string; settled_on: string | null; bank_account_id: string | null;
+};
+export type BookingBill = {
+  id: string; status: BookingStatus; customer_id: string | null; customer_name: string | null; service_id: string; service: string | null;
+  price: string | null; bill_kind: 'sale' | 'invoice' | null; bill_id: string | null;
+  deposit: { amount: string; method: 'cash' | 'transfer'; status: 'awaiting_transfer' | 'held' } | null;
+};
+export const DEPOSIT_LABELS: Record<Deposit['status'], string> = {
+  awaiting_transfer: 'transfer awaiting confirmation', held: 'held', not_received: 'transfer not received',
+  refunded: 'refunded', forfeited: 'kept', applied: 'applied to the bill',
+};
+
+/** The deposit a service asks for, in kobo: a fixed amount (never more than the price) or a percentage, half up. */
+export function expectedDepositKobo(rule: Pick<DepositRule, 'kind' | 'value'> | undefined, price: number) {
+  if (!rule) return 0;
+  const priceKobo = Math.round(price * 100);
+  if (rule.kind === 'fixed') return Math.min(Math.round(Number(rule.value) * 100), priceKobo);
+  return Math.floor((priceKobo * Math.round(Number(rule.value) * 100) + 5000) / 10000);
+}
+
+/** Whether cancelling now is inside the free-cancellation window, so a held deposit is refunded. */
+export function freeToCancel(startsAt: string, freeHours: number, now = new Date()) {
+  return now.getTime() <= new Date(startsAt).getTime() - freeHours * 3600000;
+}
 
 export const STATUS_LABELS: Record<BookingStatus, string> = {
   confirmed: 'Confirmed', checked_in: 'Checked in', completed: 'Completed', cancelled: 'Cancelled', no_show: 'No-show',
@@ -97,6 +128,7 @@ const MESSAGES: Record<string, string> = {
   BOOKING_STATE_INVALID: 'This booking has already moved on. Refresh to see its latest state.',
   CANCEL_REASON_REQUIRED: 'Say why the booking is cancelled.',
   NO_SHOW_TOO_EARLY: 'A booking can be marked no-show only after its start time.',
+  DEPOSIT_HELD: 'This booking holds a deposit. Cancel it from the booking so the deposit is settled with it.',
   SUBSCRIPTION_READ_ONLY: 'Your workspace is read-only until the subscription is paid.',
 };
 

@@ -8,6 +8,8 @@ import { getCollectionAccountsAction } from '@/app/accounting/collection-actions
 jest.mock('@/app/pos/actions', () => ({ getCheckoutOptionsAction: jest.fn(), processCheckoutAction: jest.fn() }));
 jest.mock('@/app/accounting/collection-actions', () => ({ getCollectionAccountsAction: jest.fn() }));
 jest.mock('@/app/pos/shift-actions', () => ({ getShiftAction: jest.fn().mockResolvedValue({ success: true, data: null }) }));
+jest.mock('@/app/appointments/actions', () => ({ getBookingBillAction: jest.fn() }));
+jest.mock('@/app/jobs/actions', () => ({ getJobMoneyAction: jest.fn() }));
 jest.mock('@/app/business-actions', () => ({ getActiveBusinessIdAction: jest.fn().mockResolvedValue('b1') }));
 const mockToast = { toast: jest.fn() };
 jest.mock('@/hooks/use-toast', () => ({ useToast: () => mockToast }));
