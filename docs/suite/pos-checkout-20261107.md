@@ -72,5 +72,5 @@ Migration `20261107100000_pos_checkout.sql`:
 
 ## Next
 
-- POS part 3: parked sales and refunds (PR-16, FR-044).
-- POS part 4: cashier shifts with float, pay-ins and pay-outs, and over/short (PR-22).
+- POS part 3: parked sales and refunds (PR-16, FR-044). Done; see `pos-parked-sales-refunds-20261107.md`.
+- POS part 4: cashier shifts with float, pay-ins and pay-outs, and over/short (PR-22). Done; see `pos-cashier-shifts-20261107.md`.

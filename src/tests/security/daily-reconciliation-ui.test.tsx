@@ -5,14 +5,16 @@ import DailyReconciliationPage from '@/app/reconciliation/daily/page';
 import { confirmTransferAction, getDailyReconciliationAction, transferNotReceivedAction } from '@/app/reconciliation/daily/actions';
 import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
 import { waitingFor } from '@/lib/transfers';
-import { getStockControlAction, reviewShortfallAction, saveOversellAction } from '@/app/reconciliation/daily/actions';
+import { decideRefundAction, getRefundLimitAction, getStockControlAction, reviewShortfallAction, saveOversellAction, saveRefundLimitAction } from '@/app/reconciliation/daily/actions';
 import { useBusiness } from '@/components/business-provider';
 
 jest.mock('@/app/reconciliation/daily/actions', () => ({ getDailyReconciliationAction: jest.fn(), confirmTransferAction: jest.fn(), transferNotReceivedAction: jest.fn(),
-  getStockControlAction: jest.fn(), saveOversellAction: jest.fn(), reviewShortfallAction: jest.fn() }));
+  getStockControlAction: jest.fn(), saveOversellAction: jest.fn(), reviewShortfallAction: jest.fn(),
+  decideRefundAction: jest.fn(), getRefundLimitAction: jest.fn(), saveRefundLimitAction: jest.fn() }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: jest.fn() }));
 jest.mock('@/app/accounting/collection-actions', () => ({ getCollectionAccountsAction: jest.fn() }));
 jest.mock('lucide-react', () => ({ X: () => null }));
+jest.mock('next/link', () => ({ __esModule: true, default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }));
 
 let keys = 0;
 Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () => `key-${++keys}` });
@@ -27,6 +29,7 @@ beforeEach(() => {
   (getDailyReconciliationAction as jest.Mock).mockResolvedValue({ success: true, data: report });
   (getCollectionAccountsAction as jest.Mock).mockResolvedValue({ native: true, accounts: [{ id: 'gtb', name: 'GTBank' }] });
   (getStockControlAction as jest.Mock).mockResolvedValue({ success: true, data: { allow_oversell: false, shortfalls: [] } });
+  (getRefundLimitAction as jest.Mock).mockResolvedValue({ success: true, data: null });
   (useBusiness as jest.Mock).mockReturnValue({ business: { id: 'b1', name: 'Ada Provisions', userRole: 'owner' } });
 });
 
@@ -95,4 +98,49 @@ test('only the owner sees the overselling switch', async () => {
   render(<DailyReconciliationPage />);
   expect(await screen.findByText('The till stops at recorded stock.')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /selling beyond/ })).not.toBeInTheDocument();
+});
+
+const waitingRefund = { id: 'rf-1', sale_id: 's-1', sale_number: 'JE-0007', amount: '1500.00', method: 'transfer', items: '1 x Beans', reason: 'Damaged tin',
+  status: 'pending', requested_by_name: 'Till 1', requested_at: '2026-11-07T10:00:00Z', decided_on: null, decision_note: null, bank_account_id: null, mine: false };
+
+test('an approver pays a waiting transfer refund from a bank, and a rejection needs a reason', async () => {
+  (getDailyReconciliationAction as jest.Mock).mockResolvedValue({ success: true, data: { ...report, refunds: { cash: { refunds: 2, total: '3000.00' } }, refunds_pending: [waitingRefund] } });
+  (decideRefundAction as jest.Mock).mockResolvedValue({ success: true, data: {} });
+  render(<DailyReconciliationPage />);
+  expect(await screen.findByText('₦3,000.00 by cash (2) paid back.')).toBeInTheDocument();
+  expect(screen.getByText(/Till 1: Damaged tin/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+  expect(screen.getByRole('button', { name: 'Reject' })).toBeDisabled();
+  await userEvent.keyboard('{Escape}');
+  await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Approve and pay' }));  // the only bank account is chosen for them
+  await waitFor(() => expect(decideRefundAction).toHaveBeenCalledWith('rf-1', true, '', 'gtb'));
+  expect(await screen.findByText('Refund of ₦1,500.00 paid by transfer.')).toBeInTheDocument();
+});
+
+test('the requester can only withdraw their own refund, and the owner sets the refund limit', async () => {
+  (getDailyReconciliationAction as jest.Mock).mockResolvedValue({ success: true, data: { ...report, refunds_pending: [{ ...waitingRefund, mine: true }] } });
+  (saveRefundLimitAction as jest.Mock).mockResolvedValue({ success: true, data: { refund_threshold: '5000.00' } });
+  render(<DailyReconciliationPage />);
+  expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+  await userEvent.type(await screen.findByLabelText('Refund limit (₦)'), '5000');
+  await userEvent.click(screen.getByRole('button', { name: 'Save limit' }));
+  expect(saveRefundLimitAction).toHaveBeenCalledWith('5000');
+  expect(await screen.findByText('Refunds above ₦5,000.00 now need a second person to approve.')).toBeInTheDocument();
+});
+
+test('shift differences and shifts left open past midnight are shown to the owner', async () => {
+  const base = { opened_at: '2026-11-07T07:05:00Z', opened_on: '2026-11-07', overdue: false, mine: false, opening_float: '5000.00', sales: 3,
+    cash_sales: '4000.00', cash_refunds: '0.00', pay_ins: '0.00', pay_outs: '0.00', cash_handed_back: '0.00', expected_cash: '9000.00', closed_on: '2026-11-07' };
+  (getDailyReconciliationAction as jest.Mock).mockResolvedValue({ success: true, data: { ...report, shifts: {
+    closed: [{ ...base, id: 'a', status: 'closed', opened_by_name: 'Till 1', counted_cash: '8700.00', variance: '-300.00', close_note: 'Gave too much change' },
+             { ...base, id: 'b', status: 'closed', opened_by_name: 'Till 2', counted_cash: '9000.00', variance: '0.00', close_note: null }],
+    open: [{ ...base, id: 'c', status: 'open', opened_by_name: 'Till 3', opened_on: '2026-11-06', overdue: true, counted_cash: null, variance: null, close_note: null, closed_on: null }],
+    variance_total: '-300.00' } } });
+  render(<DailyReconciliationPage />);
+  expect(await screen.findByText('2 closed. Differences in all: ₦300.00 short.')).toBeInTheDocument();
+  expect(screen.getByRole('list', { name: 'Shift differences' })).toHaveTextContent('Till 1: ₦300.00 short (Gave too much change)');
+  expect(screen.getByRole('list', { name: 'Shifts still open' })).toHaveTextContent('Till 3: open since 2026-11-06');
+  expect(screen.getByText('Open past midnight')).toBeInTheDocument();
 });

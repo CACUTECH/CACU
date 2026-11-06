@@ -32,7 +32,7 @@ class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
-                 'transfer_confirmation','transfer_not_received']
+                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -47,9 +47,10 @@ class PostingCommand(BaseModel):
 
 CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'supplier_payment':SupplierPayment,
          'expense':CashPurchase,'pos':CashSale,'adjustment':JournalEntry,'credit_note':CreditNote,
-         'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry}
-# Posted only by the transfer workflows (BR-010), never through the generic postings route.
-INTERNAL_KINDS={'transfer_confirmation','transfer_not_received'}
+         'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry,'sale_refund':JournalEntry,
+         'shift_variance':JournalEntry}
+# Posted only by the transfer (BR-010), refund (PR-16) and shift (PR-22) workflows, never through the generic postings route.
+INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
@@ -179,7 +180,20 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     if command.kind in INTERNAL_KINDS:
         from cacu.accounting.workflows import collection_account,purpose
         clearing=str(purpose(session,'transfer_clearing'))
-        if command.kind=='transfer_confirmation':
+        if command.kind=='sale_refund':
+            # PR-16: debit revenue, credit the till or the bank the money goes back from.
+            cash=str(collection_account(session,'Cash',None))
+            paid_from=str(command.main_account_id)
+            if paid_from!=cash and str(collection_account(session,'Transfer',command.main_account_id))!=paid_from:
+                raise HTTPException(422,'A refund is paid from the till or a bank account')
+            if not command.credited or len(command.lines)!=1 or command.lines[0].credited or str(command.lines[0].account_id)!=str(purpose(session,'revenue')):
+                raise HTTPException(422,'A refund takes back revenue only')
+        elif command.kind=='shift_variance':
+            # PR-22: a shortage debits Cash over and short and credits the till; a surplus the reverse.
+            variance=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='cash_variance'",(tenant,)).all()
+            if str(command.main_account_id)!=str(collection_account(session,'Cash',None)) or len(command.lines)!=1 or len(variance)!=1                or command.lines[0].credited==command.credited or str(command.lines[0].account_id)!=str(variance[0].account_id):
+                raise HTTPException(422,'A shift difference moves money between the till and Cash over and short')
+        elif command.kind=='transfer_confirmation':
             # PR-04: debit the chosen bank, credit Transfers awaiting confirmation.
             if str(collection_account(session,'Transfer',command.main_account_id))!=str(command.main_account_id) or command.credited                or len(command.lines)!=1 or str(command.lines[0].account_id)!=clearing or not command.lines[0].credited:
                 raise HTTPException(422,'A confirmed transfer moves money from Transfers awaiting confirmation to a bank account')

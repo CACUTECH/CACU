@@ -6,7 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
-import { confirmTransferAction, getDailyReconciliationAction, getStockControlAction, reviewShortfallAction, saveOversellAction, transferNotReceivedAction, type Shortfall } from './actions';
+import Link from 'next/link';
+import { differenceText, openedAt, type ShiftsDay } from '@/lib/shifts';
+import { confirmTransferAction, decideRefundAction, getDailyReconciliationAction, getRefundLimitAction, getStockControlAction, reviewShortfallAction, saveOversellAction,
+  saveRefundLimitAction, transferNotReceivedAction, type Shortfall } from './actions';
+import type { Refund } from '@/lib/checkout';
 import { useBusiness } from '@/components/business-provider';
 import { METHOD_LABELS, lagosToday, naira, waitingFor, type DailyReconciliation, type PendingTransfer } from '@/lib/transfers';
 import type { CollectionAccount } from '@/lib/collection-accounts';
@@ -74,6 +78,8 @@ export default function DailyReconciliationPage() {
         </CardContent>}
       </Card>
     </>}
+    {report?.shifts && <Shifts shifts={report.shifts} />}
+    {report && <Refunds report={report} banks={banks} onMessage={text => { setMessage(text); void load(); }} />}
     {report && <StockControl onMessage={setMessage} />}
     {decision && <DecisionDialog key={decision.transfer.id + decision.kind} decision={decision} banks={banks} onClose={() => setDecision(null)}
       onDone={text => { setDecision(null); setMessage(text); void load(); }} />}
@@ -162,6 +168,118 @@ function StockControl({ onMessage }: { onMessage: (text: string) => void }) {
           <Button size="sm" variant="outline" disabled={busy} onClick={() => void review(s)}>Reviewed</Button>
         </li>)}
       </ul>}
+    </CardContent>
+  </Card>;
+}
+
+/** Doc 10 refunds (PR-16, FR-044): what was paid back on the day, refunds waiting for an approver, and the owner's limit. */
+function Refunds({ report, banks, onMessage }: { report: DailyReconciliation; banks: CollectionAccount[]; onMessage: (text: string) => void }) {
+  const { business } = useBusiness();
+  const owner = business?.userRole === 'owner';
+  const [deciding, setDeciding] = useState<{ refund: Refund; approve: boolean } | null>(null);
+  const paid = Object.entries(report.refunds ?? {}), waiting = report.refunds_pending ?? [];
+  return <Card>
+    <CardHeader><CardTitle>Refunds</CardTitle>
+      <CardDescription>{paid.length === 0 ? 'No refunds paid on this day.'
+        : paid.map(([method, r]) => `${naira(r.total)} by ${(METHOD_LABELS[method] ?? method).toLowerCase()} (${r.refunds})`).join(', ') + ' paid back.'}</CardDescription></CardHeader>
+    <CardContent className="space-y-4">
+      {waiting.length === 0 ? <p className="text-sm text-muted-foreground">No refunds waiting for approval.</p>
+        : <ul className="space-y-2 text-sm" aria-label="Refunds waiting for approval">
+          {waiting.map(r => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2">
+            <span><span className="font-medium">{naira(r.amount)}</span> by {r.method === 'cash' ? 'cash' : 'transfer'} for receipt {r.sale_number}: {r.items}.
+              <span className="block text-muted-foreground">{r.requested_by_name}: {r.reason}</span></span>
+            <span className="flex gap-2">
+              {!r.mine && <Button size="sm" onClick={() => setDeciding({ refund: r, approve: true })}>Approve</Button>}
+              <Button size="sm" variant="outline" onClick={() => setDeciding({ refund: r, approve: false })}>{r.mine ? 'Withdraw' : 'Reject'}</Button>
+            </span>
+          </li>)}
+        </ul>}
+      {owner && <RefundLimit onMessage={onMessage} />}
+    </CardContent>
+    {deciding && <RefundDecisionDialog key={deciding.refund.id + deciding.approve} {...deciding} banks={banks} onClose={() => setDeciding(null)}
+      onDone={text => { setDeciding(null); onMessage(text); }} />}
+  </Card>;
+}
+
+function RefundDecisionDialog({ refund, approve, banks, onClose, onDone }: {
+  refund: Refund; approve: boolean; banks: CollectionAccount[]; onClose: () => void; onDone: (text: string) => void;
+}) {
+  const [bank, setBank] = useState(refund.bank_account_id ?? (banks.length === 1 ? banks[0].id : ''));
+  const [note, setNote] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const needsBank = approve && refund.method === 'transfer', needsNote = !approve && !refund.mine;
+  async function submit(event: React.FormEvent) {
+    event.preventDefault(); setBusy(true); setError('');
+    const result = await decideRefundAction(refund.id, approve, note.trim(), needsBank ? bank : undefined);
+    setBusy(false);
+    if (!result.success) { setError(result.error); return; }
+    onDone(approve ? `Refund of ${naira(refund.amount)} paid ${refund.method === 'cash' ? 'from the till' : 'by transfer'}.` : refund.mine ? 'Refund request withdrawn.' : 'Refund rejected.');
+  }
+  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}>
+    <DialogContent>
+      <DialogHeader><DialogTitle>{approve ? 'Approve refund' : refund.mine ? 'Withdraw refund request' : 'Reject refund'}</DialogTitle>
+        <DialogDescription>{naira(refund.amount)} for receipt {refund.sale_number}: {refund.items}. {refund.reason}</DialogDescription></DialogHeader>
+      <form className="space-y-4" onSubmit={e => void submit(e)}>
+        {needsBank && <label className="block space-y-1 text-sm"><span>Bank account it is paid from</span>
+          <select required className="h-11 w-full rounded-md border bg-background px-3" value={bank} disabled={busy} onChange={e => setBank(e.target.value)}>
+            <option value="">Choose the bank account</option>
+            {banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select></label>}
+        {approve && refund.method === 'cash' && <p className="text-sm">Hand {naira(refund.amount)} back from the till.</p>}
+        <label className="block space-y-1 text-sm"><span>{needsNote ? 'Why it is rejected' : 'Note (optional)'}</span>
+          <Input required={needsNote} maxLength={500} value={note} disabled={busy} onChange={e => setNote(e.target.value)} /></label>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <Button type="submit" variant={approve ? 'default' : 'destructive'} disabled={busy || (needsBank && !bank) || (needsNote && note.trim().length === 0)}>
+          {busy ? 'Saving…' : approve ? 'Approve and pay' : refund.mine ? 'Withdraw' : 'Reject'}</Button>
+      </form>
+    </DialogContent>
+  </Dialog>;
+}
+
+/** The owner's rule (FR-044): approvers refund at once up to this amount; above it a second person approves. */
+function RefundLimit({ onMessage }: { onMessage: (text: string) => void }) {
+  const [saved, setSaved] = useState<string | null | undefined>(undefined), [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  useEffect(() => {
+    void getRefundLimitAction().then(r => { if (r.success) { setSaved(r.data); setValue(r.data ? String(Number(r.data)) : ''); } });
+  }, []);
+  if (saved === undefined) return null;
+  const valid = value === '' || /^\d{1,13}(\.\d{1,2})?$/.test(value);
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (!valid) return;
+    setBusy(true); setError('');
+    const result = await saveRefundLimitAction(value === '' ? null : value);
+    setBusy(false);
+    if (!result.success) { setError(result.error); return; }
+    setSaved(result.data.refund_threshold);
+    onMessage(result.data.refund_threshold ? `Refunds above ${naira(result.data.refund_threshold)} now need a second person to approve.` : 'Approvers can now refund any amount at once.');
+  }
+  return <form className="flex flex-wrap items-end gap-2 border-t pt-3 text-sm" onSubmit={e => void save(e)}>
+    <label className="space-y-1"><span className="block">Refund limit without a second approver (₦, empty for no limit)</span>
+      <Input aria-label="Refund limit (₦)" inputMode="decimal" className="w-40" value={value} disabled={busy} onChange={e => setValue(e.target.value)} /></label>
+    <Button type="submit" variant="outline" disabled={busy || !valid || value === (saved ? String(Number(saved)) : '')}>Save limit</Button>
+    <span className="w-full text-xs text-muted-foreground">Cashiers&apos; refunds always wait for an Owner, Admin or Sales manager.</span>
+    {error && <p role="alert" className="w-full text-destructive">{error}</p>}
+  </form>;
+}
+
+/** Doc 10: shift variances for the day (PR-22), and shifts still open, flagged once they run past midnight. */
+function Shifts({ shifts }: { shifts: ShiftsDay }) {
+  const short = shifts.closed.filter(s => Number(s.variance) !== 0);
+  return <Card>
+    <CardHeader><CardTitle>Shifts</CardTitle>
+      <CardDescription>{shifts.closed.length === 0 ? 'No shifts closed on this day.'
+        : `${shifts.closed.length} closed. ${short.length === 0 ? 'Every till matched its expected cash.' : `Differences in all: ${differenceText(shifts.variance_total)}.`}`}</CardDescription></CardHeader>
+    <CardContent className="space-y-3 text-sm">
+      {short.length > 0 && <ul className="space-y-1" aria-label="Shift differences">
+        {short.map(s => <li key={s.id}><span className="font-medium">{s.opened_by_name}</span>: <span className="font-semibold text-amber-700">{differenceText(s.variance ?? '0')}</span>
+          {s.close_note ? ` (${s.close_note})` : ''}</li>)}
+      </ul>}
+      {shifts.open.length > 0 && <ul className="space-y-1" aria-label="Shifts still open">
+        {shifts.open.map(s => <li key={s.id}>{s.opened_by_name}: open since {s.overdue ? `${s.opened_on}, ` : ''}{openedAt(s)}
+          {s.overdue && <Badge variant="destructive" className="ml-2">Open past midnight</Badge>}</li>)}
+      </ul>}
+      <Link className="underline" href="/pos/shifts">See all shifts</Link>
     </CardContent>
   </Card>;
 }

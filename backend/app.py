@@ -392,7 +392,7 @@ def reject_pending_transfer(business_id:UUID,transfer_id:UUID,data:TransferNotRe
 @app.get('/api/v1/businesses/{business_id}/reconciliation/daily')
 def daily_reconciliation_report(business_id:UUID,day:date,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,permission='banking.view') as session:
-        return daily_reconciliation(session,day)
+        return daily_reconciliation(session,day,user_id)
 
 # POS checkout settings, shortfalls and receipts (Doc 10, BR-022).
 from cacu.accounting.checkout import SalesPolicy,options as checkout_options,save_policy as save_sales_policy,shortfalls as stock_shortfalls,review_shortfall,receipt as sale_receipt
@@ -421,3 +421,78 @@ def list_stock_shortfalls(business_id:UUID,user_id:UUID=Depends(current_user)):
 def review_stock_shortfall(business_id:UUID,sale_id:UUID,item_id:UUID,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True,permission='inventory.approve') as session:
         return review_shortfall(session,user_id,sale_id,item_id)
+
+# Refunds (Doc 10, PR-16, FR-044) and the day's till sales they start from.
+from cacu.accounting.refunds import (RefundDecision,RefundPolicy,RefundRequest,decide as decide_refund,list_refunds,refundable,
+    request as request_refund,sales_on,save_refund_policy)
+
+@app.get('/api/v1/businesses/{business_id}/sales')
+def list_sales(business_id:UUID,day:date,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='sales.view') as session:
+        return sales_on(session,day)
+
+@app.post('/api/v1/businesses/{business_id}/sales/refund-policy')
+def save_sales_refund_policy(business_id:UUID,data:RefundPolicy,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='settings.edit') as session:
+        return save_refund_policy(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/sales/{sale_id}/refundable')
+def sale_refundable(business_id:UUID,sale_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='sales.view') as session:
+        return refundable(session,sale_id)
+
+@app.post('/api/v1/businesses/{business_id}/sales/{sale_id}/refunds')
+def create_refund(business_id:UUID,sale_id:UUID,data:RefundRequest,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='sales.edit') as session:
+        return request_refund(session,user_id,sale_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/refunds')
+def sale_refunds(business_id:UUID,status:str='pending',user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='sales.view') as session:
+        return list_refunds(session,status,user_id)
+
+@app.post('/api/v1/businesses/{business_id}/refunds/{refund_id}/approve')
+def approve_refund(business_id:UUID,refund_id:UUID,data:RefundDecision,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='sales.approve') as session:
+        return decide_refund(session,user_id,refund_id,True,data)
+
+@app.post('/api/v1/businesses/{business_id}/refunds/{refund_id}/reject')
+def reject_refund(business_id:UUID,refund_id:UUID,data:RefundDecision,user_id:UUID=Depends(current_user)):
+    # The requester may withdraw their own request (sales.edit); rejecting anyone else's needs sales.approve, checked inside.
+    with library_transaction(user_id,business_id,write=True,permission='sales.edit') as session:
+        return decide_refund(session,user_id,refund_id,False,data)
+
+# Cashier shifts (Doc 10 shifts, Doc 09 PR-22, Doc 11 /shifts), on the Oga and Chairman plans.
+from cacu.accounting.shifts import (CashMovement,ShiftClose,ShiftOpen,ShiftPolicy,close as close_shift,current as current_shift,
+    list_shifts,move as shift_movement,save_shift_policy,start as open_shift)
+
+@app.get('/api/v1/businesses/{business_id}/shifts/current')
+def my_shift(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='sales.view') as session:
+        return current_shift(session,user_id)
+
+@app.get('/api/v1/businesses/{business_id}/shifts')
+def shifts(business_id:UUID,day:date|None=None,status:str|None=None,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='sales.view') as session:
+        return list_shifts(session,user_id,day,status)
+
+@app.post('/api/v1/businesses/{business_id}/shifts')
+def start_shift(business_id:UUID,data:ShiftOpen,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='sales.post') as session:
+        return open_shift(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/shifts/policy')
+def save_shifts_policy(business_id:UUID,data:ShiftPolicy,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='settings.edit') as session:
+        return save_shift_policy(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/shifts/{shift_id}/movements')
+def shift_cash_movement(business_id:UUID,shift_id:UUID,data:CashMovement,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='sales.post') as session:
+        return shift_movement(session,user_id,shift_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/shifts/{shift_id}/close')
+def close_till_shift(business_id:UUID,shift_id:UUID,data:ShiftClose,user_id:UUID=Depends(current_user)):
+    # The cashier closes their own shift (sales.post); closing someone else's needs sales.approve, checked inside.
+    with library_transaction(user_id,business_id,write=True,permission='sales.post') as session:
+        return close_shift(session,user_id,shift_id,data)

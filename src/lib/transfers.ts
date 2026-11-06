@@ -1,12 +1,18 @@
 // Transfers awaiting confirmation (BR-010) and the owner's daily reconciliation (Doc 10).
+import type { Refund } from '@/lib/checkout';
+import type { ShiftsDay } from '@/lib/shifts';
 export type PendingTransfer = {
   id: string; kind: 'sale' | 'invoice payment'; amount: string; entry_date: string; age_days: number;
   invoice_number: string | null; customer: string | null; expected_bank_account_id: string | null; status: string;
 };
 export type MethodTotals = { sales: number; total: string; awaiting: string; reversed: string };
-export type DailyReconciliation = { date: string; by_method: Record<string, MethodTotals>; pending: PendingTransfer[]; pending_total: string };
+export type DailyReconciliation = {
+  date: string; by_method: Record<string, MethodTotals>; pending: PendingTransfer[]; pending_total: string;
+  refunds?: Record<string, { refunds: number; total: string }>; refunds_pending?: Refund[];
+  shifts?: ShiftsDay | null;
+};
 
-export const METHOD_LABELS: Record<string, string> = { cash: 'Cash', transfer: 'Transfer', card: 'Card' };
+export const METHOD_LABELS: Record<string, string> = { cash: 'Cash', transfer: 'Transfer', card: 'Card', split: 'Cash + transfer' };
 
 /** "today", "1 day", "3 days": how long a transfer has been waiting. */
 export function waitingFor(days: number) {

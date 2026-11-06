@@ -207,6 +207,8 @@ def sale_create(session,actor,data:SaleCreate):
         tenant=str(session.business_id);method=data.method
         if method=='Card':raise HTTPException(409,'Card payments are not available yet')
         if len({i.item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate sale item')
+        from cacu.accounting.shifts import before_sale,tag
+        before_sale(session,actor)
         if data.customer_id is not None and method!='Credit':raise HTTPException(422,'Only a credit sale names a customer here')
         cap=Decimal(raw(session,'SELECT authz.discount_cap(%s)',(tenant,)).scalar() or 0)
         total=Decimal('0');discounts=Decimal('0');items=[];stock=[]
@@ -230,6 +232,7 @@ def sale_create(session,actor,data:SaleCreate):
             invoice=InvoiceCreate(request_key=uuid5(data.request_key,'credit'),customer_id=data.customer_id,invoice_number='POS-'+str(data.request_key)[:8].upper(),
                 entry_date=data.entry_date,items=[{'catalog_item_id':item.item_id,'quantity':item.quantity,'unit_price':format(row.unit_price,'.2f')} for item,row,_,_ in items])
             created=invoice_create(session,actor,invoice)
+            tag(session,[actor],'sale',created['id'],Decimal('0'))
             return {'saleId':created['id'],'status':'credit','invoice_id':created['id'],'invoice_number':invoice.invoice_number,'posting':created['posting']}
         cash_part=transfer_part=None;change=None
         if method=='Split':
@@ -265,6 +268,8 @@ def sale_create(session,actor,data:SaleCreate):
             waiting=transfer_part if method=='Split' else total
             raw(session,"""INSERT INTO accounting.pending_transfer(business_id,id,source_type,amount,entry_date,expected_bank_account_id,created_by)
               VALUES(%s,%s,'pos',%s,%s,%s,%s)""",(tenant,str(data.request_key),waiting,data.entry_date,str(data.bank_account_id) if data.bank_account_id else None,str(actor)))
+        # Doc 10 shifts: the sale, and the cash it brought into the till, belong to the seller's open shift.
+        tag(session,[actor],'sale',data.request_key,total if method=='Cash' else cash_part if method=='Split' else Decimal('0'))
         shortfalls=raw(session,'SELECT item_id,quantity FROM accounting.stock_shortfall WHERE business_id=%s AND sale_id=%s',(tenant,str(data.request_key))).all()
         return {'saleId':str(data.request_key),'status':'pending_payment' if pending else 'completed','posting':posting,
                 'change':format(change,'.2f') if change is not None else None,'discount_total':format(discounts,'.2f'),
