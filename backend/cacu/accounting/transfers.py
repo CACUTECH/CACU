@@ -12,7 +12,6 @@ from fastapi import HTTPException
 from pydantic import BaseModel,ConfigDict,Field
 from cacu.accounting.posting import PostingCommand,post_command,raw
 from cacu.accounting.workflows import (business_today,clearing_account,collection_account,durable,purpose,receipt_posting)
-from cacu.accounting import inventory
 
 ZERO=Decimal('0')
 
@@ -67,35 +66,10 @@ def confirm(session,actor,transfer_id:UUID,data:TransferConfirm):
 
 def _return_stock(session,actor,sale_id,key,day):
     """Returns a reversed sale's stock at the cost it left at; returns the total cost restored."""
-    tenant=str(session.business_id);total=ZERO
-    issued=raw(session,'SELECT item_id,-quantity AS quantity,unit_cost FROM accounting.stock_event WHERE business_id=%s AND source_id=%s AND quantity<0 ORDER BY item_id',
-               (tenant,str(sale_id))).all()
-    for line in issued:
-        valuation=inventory.state(session,line.item_id)
-        if valuation:
-            origin=raw(session,"SELECT * FROM accounting.inventory_value_event WHERE business_id=%s AND source_id=%s AND item_id=%s AND kind='issue'",
-                       (tenant,str(sale_id),str(line.item_id))).first()
-            if not origin:raise HTTPException(409,'The original valued sale is missing; ask your accountant')
-            item=inventory.item(session,line.item_id)
-            if item.stock_quantity!=valuation.quantity:raise HTTPException(409,'Stock quantities do not reconcile to valuation')
-            gross=-origin.gross_change;allowance=-origin.allowance_change
-            inventory.update(session,line.item_id,valuation.quantity+line.quantity,valuation.gross_cost+gross,valuation.allowance+allowance,max(day,valuation.last_date))
-            inventory.event(session,actor,uuid5(key,'return:'+str(line.item_id)),line.item_id,'return',max(day,valuation.last_date),line.quantity,gross,allowance,key,
-                            {'review':'Transfer not received','original_sale':str(sale_id)},origin.id)
-            inventory.allowance_post(session,actor,uuid5(key,'allowance:'+str(line.item_id)),day,allowance,'Return of inventory allowance')
-        else:
-            gross=(line.unit_cost*line.quantity).quantize(Decimal('0.01'))
-        raw(session,'UPDATE public.catalog_items SET stock_quantity=stock_quantity+%s WHERE business_id=%s AND id=%s',(line.quantity,tenant,str(line.item_id)))
-        raw(session,'INSERT INTO accounting.stock_event(business_id,source_id,item_id,quantity,unit_cost) VALUES(%s,%s,%s,%s,%s)',
-            (tenant,str(key),str(line.item_id),line.quantity,line.unit_cost))
-        total+=gross
-    if total:
-        stock_key=uuid5(key,'stock')
-        post_command(session,actor,PostingCommand(request_key=stock_key,source_id=stock_key,kind='adjustment',main_account_id=purpose(session,'inventory'),
-            entry_date=day,narration='Stock returned: transfer not received',credited=False,
-            lines=[{'account_id':purpose(session,'cogs'),'amount':format(total,'.2f'),'credited':True}]),managed_stock=True)
-        raw(session,'INSERT INTO accounting.inventory_journal(business_id,source_id) VALUES(%s,%s)',(tenant,str(stock_key)))
-    return total
+    from cacu.accounting.refunds import return_stock
+    issued=raw(session,'SELECT item_id,-sum(quantity) AS quantity FROM accounting.stock_event WHERE business_id=%s AND source_id=%s AND quantity<0 GROUP BY item_id',
+               (str(session.business_id),str(sale_id))).all()
+    return return_stock(session,actor,sale_id,key,day,{r.item_id:int(r.quantity) for r in issued},'Transfer not received','Stock returned: transfer not received')
 
 
 def not_received(session,actor,transfer_id:UUID,data:TransferNotReceived):
@@ -113,6 +87,9 @@ def not_received(session,actor,transfer_id:UUID,data:TransferNotReceived):
                 main_amount=format(row.amount,'.2f') if sale.payment_method=='split' else None,
                 narration='Transfer not received: '+data.note,lines=lines),internal=True)
             restored=_return_stock(session,actor,transfer_id,data.request_key,day)
+            if sale.payment_method=='split':
+                from cacu.accounting.shifts import tag
+                tag(session,[actor],'sale_reversed',transfer_id,-(sale.total-row.amount))
             raw(session,"UPDATE public.transactions SET status='reversed' WHERE business_id=%s AND id=%s",(str(session.business_id),str(transfer_id)))
         _decide(session,actor,transfer_id,'not_received',day,None,data.note)
         return {'id':str(transfer_id),'status':'not_received','posting':posting,'stock_cost_restored':format(restored,'.2f'),
@@ -133,7 +110,7 @@ def list_transfers(session,status='pending',limit=200):
              'status':r.status,'decided_on':r.decided_on.isoformat() if r.decided_on else None} for r in rows]
 
 
-def daily(session,day:date):
+def daily(session,day:date,actor=None):
     """The owner's daily reconciliation (Doc 10): that day's sales by method and every transfer still waiting."""
     rows=raw(session,"""SELECT s.payment_method,s.status,count(*) AS sales,coalesce(sum(s.total),0) AS total,
         coalesce(sum(coalesce(s.transfer_amount,s.total)),0) AS transfer_part
@@ -147,7 +124,9 @@ def daily(session,day:date):
         if r.status=='pending_payment':entry['awaiting']+=r.transfer_part
         if r.status=='reversed':entry['reversed']+=r.total
     waiting=list_transfers(session,'pending')
-    return {'date':day.isoformat(),
+    from cacu.accounting.refunds import list_refunds,refunds_on
+    from cacu.accounting.shifts import daily as shifts_daily
+    return {'date':day.isoformat(),'shifts':shifts_daily(session,day,actor),'refunds':refunds_on(session,day),'refunds_pending':list_refunds(session,'pending',actor),
             'by_method':{m:{'sales':v['sales'],'total':format(v['total'],'.2f'),'awaiting':format(v['awaiting'],'.2f'),'reversed':format(v['reversed'],'.2f')}
                          for m,v in methods.items()},
             'pending':waiting,'pending_total':format(sum((Decimal(p['amount']) for p in waiting),ZERO),'.2f')}

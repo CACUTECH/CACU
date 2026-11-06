@@ -32,7 +32,30 @@ export async function transferNotReceivedAction(id: string, requestKey: string, 
   } catch (error) { return failed(error); }
 }
 
-export type Shortfall = { sale_id: string; item_id: string; item: string; quantity: number; created_at: string; reviewed: boolean };
+/** FR-044: an approver pays a waiting refund (from the till, or the bank chosen here) or turns it down; the requester may withdraw it. */
+export async function decideRefundAction(id: string, approve: boolean, note: string, bankAccountId?: string): Promise<Result<unknown>> {
+  try {
+    const data = await accountingRequest(`refunds/${encodeURIComponent(id)}/${approve ? 'approve' : 'reject'}`,
+      { method: 'POST', body: { note, bank_account_id: approve && bankAccountId ? bankAccountId : null } });
+    revalidatePath('/reconciliation/daily'); revalidatePath('/pos/sales'); revalidatePath('/catalog');
+    return { success: true, data };
+  } catch (error) { return failed(error); }
+}
+
+/** The owner's current refund limit (null: no limit). */
+export async function getRefundLimitAction(): Promise<Result<string | null>> {
+  try { return { success: true, data: (await accountingRequest<{ refund_threshold?: string | null }>('sales/options')).refund_threshold ?? null }; }
+  catch (error) { return failed(error); }
+}
+
+/** The owner's limit for refunding without a second person; empty for no limit. */
+export async function saveRefundLimitAction(threshold: string | null): Promise<Result<{ refund_threshold: string | null }>> {
+  try {
+    return { success: true, data: await accountingRequest<{ refund_threshold: string | null }>('sales/refund-policy', { method: 'POST', body: { refund_threshold: threshold } }) };
+  } catch (error) { return failed(error); }
+}
+
+export type Shortfall ={ sale_id: string; item_id: string; item: string; quantity: number; created_at: string; reviewed: boolean };
 
 /** Overselling setting and the stock sold beyond records, for the owner's review (BR-022, RSK-027). */
 export async function getStockControlAction(): Promise<Result<{ allow_oversell: boolean; shortfalls: Shortfall[] } | null>> {

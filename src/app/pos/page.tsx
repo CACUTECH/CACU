@@ -17,7 +17,9 @@ import { getCheckoutOptionsAction, processCheckoutAction } from "./actions"
 import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
 import type { CollectionAccounts } from '@/lib/collection-accounts';
 import { CollectionAccountPicker } from '@/components/collection-account-picker';
-import { formatKobo, kobo, lineKobo, nairaText, validDiscount, type CheckoutOptions } from '@/lib/checkout';
+import { formatKobo, kobo, lineKobo, nairaText, validDiscount, type CheckoutOptions, type ParkedSale } from '@/lib/checkout';
+import { ShiftBar } from '@/components/shift-bar';
+import type { ShiftStatus } from '@/lib/shifts';
 
 type CatalogItem = { id: string; name: string; price: number; sku?: string; quantity?: number; type?: string; track_stock?: boolean; status: string; }
 type CartItem = CatalogItem & { cartQuantity: number; discount: string }
@@ -51,6 +53,11 @@ export default function POSPage() {
     const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false)
     const [isProcessing, setIsProcessing] = React.useState(false)
     const [done, setDone] = React.useState<Done | null>(null);
+    const [businessId, setBusinessId] = React.useState<string | null>(null);
+    const [parked, setParked] = React.useState<ParkedSale[]>([]);
+    const [parkOpen, setParkOpen] = React.useState(false), [parkedOpen, setParkedOpen] = React.useState(false);
+    const [parkLabel, setParkLabel] = React.useState(''), [parking, setParking] = React.useState(false);
+    const [shiftStatus, setShiftStatus] = React.useState<ShiftStatus | null>(null);
 
     const native = collectionChoices?.native === true;
     const cap = Number(options?.discount_cap ?? 0);
@@ -65,6 +72,7 @@ export default function POSPage() {
             setOptions(checkout);
             setTaxRate(choices.native ? 0 : 0.075);
             const businessId = await getActiveBusinessIdAction();
+            setBusinessId(businessId);
             const { data, error } = await supabase
                 .from('catalog_items')
                 .select('*, type:item_type, price:unit_price, quantity:stock_quantity').eq('business_id', businessId)
@@ -83,6 +91,14 @@ export default function POSPage() {
     }, [supabase, toast]);
 
     React.useEffect(() => { fetchInventory(); }, [fetchInventory]);
+
+    // Doc 10 parked sales: saved to resume later; nothing is posted, and prices are read again from the catalogue on resume.
+    const loadParked = React.useCallback(async () => {
+        if (!businessId) return;
+        const { data } = await supabase.from('parked_sales').select('id, label, items, created_at').eq('business_id', businessId).order('created_at');
+        setParked((data as ParkedSale[] | null) || []);
+    }, [supabase, businessId]);
+    React.useEffect(() => { void loadParked(); }, [loadParked]);
 
     const filteredInventory = inventory.filter(item =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -119,13 +135,48 @@ export default function POSPage() {
     const transferKobo = paymentMethod === 'Split' && /^\d+(\.\d{1,2})?$/.test(transferAmount) ? kobo(transferAmount) : 0;
     const cashDue = paymentMethod === 'Cash' ? totalKobo : paymentMethod === 'Split' ? totalKobo - transferKobo : 0;
     const cashKobo = /^\d+(\.\d{1,2})?$/.test(cashReceived) ? kobo(cashReceived) : null;
-    const problem = !native ? '' : badDiscount ? `Discounts can be at most ${cap}%.`
+    // Doc 10 shifts: when the owner requires one, nobody sells without an open shift.
+    const needsShift = native && shiftStatus?.available === true && shiftStatus.require_shift && !shiftStatus.shift;
+    const problem = !native ? '' : needsShift ? 'Open your shift before selling. The owner requires a shift for every sale.'
+        : badDiscount ? `Discounts can be at most ${cap}%.`
         : paymentMethod === 'Split' && (transferKobo <= 0 || transferKobo >= totalKobo) ? 'Enter a transfer amount less than the total.'
         : paymentMethod === 'Credit' && !customerId ? 'Choose the customer who owes for this sale.'
         : paymentMethod === 'Credit' && discountKobo > 0 ? 'Discounts are not available on credit sales yet.'
         : cashReceived && cashKobo === null ? 'Enter the cash received in naira, for example 5000.'
         : cashKobo !== null && cashKobo < cashDue ? `Cash received is less than the ${nairaText(cashDue)} due.` : '';
     const change = cashKobo !== null && cashKobo >= cashDue && cashDue > 0 ? cashKobo - cashDue : null;
+
+    const parkSale = async () => {
+        if (!businessId || cart.length === 0 || parking) return;
+        setParking(true);
+        const { error } = await supabase.from('parked_sales').insert({ business_id: businessId, label: parkLabel.trim().slice(0, 60),
+            items: cart.map(item => ({ item_id: item.id, quantity: item.cartQuantity, discount_percent: item.discount || '0' })) });
+        setParking(false);
+        if (error) { toast({ variant: "destructive", title: "Sale not parked", description: "You may not have permission to sell. Try again or ask the owner." }); return; }
+        setCart([]); setParkLabel(''); setParkOpen(false);
+        toast({ title: "Sale parked", description: "Resume it from Parked sales when the customer is ready." });
+        void loadParked();
+    };
+
+    // Resuming or discarding removes the parked sale first, so two tills cannot both take it.
+    const takeParked = async (sale: ParkedSale, resume: boolean) => {
+        const { data, error } = await supabase.from('parked_sales').delete().eq('id', sale.id).select('id');
+        if (error || !data?.length) { toast({ variant: "destructive", title: "Already taken", description: "Another till resumed or discarded this sale." }); void loadParked(); return; }
+        if (resume) {
+            let missing = 0;
+            const restored: CartItem[] = [];
+            for (const line of sale.items) {
+                const item = inventory.find(i => i.id === line.item_id);
+                const quantity = item ? Math.min(line.quantity, limitFor(item)) : 0;
+                if (!item || quantity <= 0) { missing += 1; continue; }
+                restored.push({ ...item, cartQuantity: quantity, discount: native ? line.discount_percent || '0' : '0' });
+            }
+            setCart(restored);
+            if (missing) toast({ title: "Some items were not added back", description: "They are no longer for sale or are out of stock." });
+        }
+        setParkedOpen(false);
+        void loadParked();
+    };
 
     const checkoutKey = React.useRef(crypto.randomUUID());
     const handleCheckout = async () => {
@@ -162,7 +213,13 @@ export default function POSPage() {
                     <h1 className="font-headline text-3xl font-bold tracking-tight">POS Checkout</h1>
                     <p className="text-muted-foreground mt-1">Prices come from your catalogue.{native && cap > 0 ? ` You can give up to ${cap}% off a line.` : ''}</p>
                 </div>
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={() => setParkedOpen(true)}>Parked sales ({parked.length})</Button>
+                    {native && <Button asChild variant="outline"><Link href="/pos/sales">Sales and refunds</Link></Button>}
+                </div>
             </div>
+
+            {native && <ShiftBar banks={collectionChoices?.accounts ?? []} refreshKey={done?.saleId} onStatus={setShiftStatus} />}
 
             {done && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -261,9 +318,10 @@ export default function POSPage() {
                             </div>
                         </div>
 
+                        <Button variant="outline" className="w-full" disabled={cart.length === 0 || isProcessing} onClick={() => setParkOpen(true)}>Park sale</Button>
                         <Dialog open={isCheckoutOpen} onOpenChange={open => { if (!isProcessing) setIsCheckoutOpen(open); }}>
                             <DialogTrigger asChild>
-                                <Button className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/20" disabled={cart.length === 0 || badDiscount}>Complete Checkout</Button>
+                                <Button className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/20" disabled={cart.length === 0 || badDiscount || needsShift}>Complete Checkout</Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-md">
                                 <DialogHeader>
@@ -316,6 +374,33 @@ export default function POSPage() {
                     </CardFooter>
                 </Card>
             </div>
+
+            <Dialog open={parkOpen} onOpenChange={open => { if (!parking) setParkOpen(open); }}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader><DialogTitle>Park this sale</DialogTitle>
+                        <DialogDescription>Save the cart to finish later, for example while the customer fetches money. Nothing is recorded until checkout.</DialogDescription></DialogHeader>
+                    <label className="space-y-1 text-sm"><span>Name (optional)</span>
+                        <Input maxLength={60} value={parkLabel} disabled={parking} placeholder="For example: Ada, blue cap" onChange={e => setParkLabel(e.target.value)} /></label>
+                    <DialogFooter><Button className="w-full" disabled={parking} onClick={() => void parkSale()}>{parking ? 'Parking…' : 'Park sale'}</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={parkedOpen} onOpenChange={setParkedOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader><DialogTitle>Parked sales</DialogTitle>
+                        <DialogDescription>{cart.length > 0 ? 'Finish or park the current cart before resuming another.' : 'Prices are read again from your catalogue when you resume.'}</DialogDescription></DialogHeader>
+                    {parked.length === 0 ? <p className="text-sm text-muted-foreground">No parked sales.</p> : <ul className="space-y-2 text-sm">
+                        {parked.map(p => <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2">
+                            <span><span className="font-medium">{p.label || 'Parked sale'}</span>
+                                <span className="block text-muted-foreground">{p.items.reduce((n, i) => n + i.quantity, 0)} items, parked {new Date(p.created_at).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}</span></span>
+                            <span className="flex gap-2">
+                                <Button size="sm" disabled={cart.length > 0} onClick={() => void takeParked(p, true)}>Resume</Button>
+                                <Button size="sm" variant="outline" onClick={() => { if (window.confirm('Discard this parked sale?')) void takeParked(p, false); }}>Discard</Button>
+                            </span>
+                        </li>)}
+                    </ul>}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -89,6 +89,7 @@ export function highlights(entitlements: Entitlements): string[] {
   const modes = n('module.modes');
   lines.push(Array.isArray(modes) && modes.includes('HYBRID') ? 'Products, services or Hybrid' : 'Products or services');
   if (n('module.purchasing') === true) lines.push('Purchasing and supplier bills');
+  if (n('module.shifts') === true) lines.push('Cashier shifts and cash counts');
   if (n('reports.advanced') === true) lines.push('Cash flow and ageing reports');
   const ai = n('ai.queries_per_month');
   if (ai === null) lines.push('Unlimited AI questions');

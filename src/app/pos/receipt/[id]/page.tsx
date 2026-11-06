@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useBusiness } from '@/components/business-provider';
 import { getReceiptAction } from '@/app/pos/actions';
 import { receiptText, type SaleReceipt } from '@/lib/checkout';
+import { RefundDialog } from '@/components/refund-dialog';
 
 const METHOD: Record<string, string> = { cash: 'Cash', transfer: 'Transfer', split: 'Cash and transfer' };
 const money = (value: string) => `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -16,11 +17,12 @@ export default function ReceiptPage() {
   const { business } = useBusiness();
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null), [error, setError] = useState('');
   const [width, setWidth] = useState<'58mm' | '80mm'>('80mm');
+  const [refunding, setRefunding] = useState(false), [message, setMessage] = useState(''), [version, setVersion] = useState(0);
   useEffect(() => {
     let live = true;
     void getReceiptAction(id).then(result => { if (!live) return; if (result.success) setReceipt(result.data); else setError(result.error); });
     return () => { live = false; };
-  }, [id]);
+  }, [id, version]);
   const name = business?.name || 'Receipt';
   if (error) return <p role="alert">{error}</p>;
   if (!receipt) return <p role="status">Loading receipt…</p>;
@@ -29,12 +31,18 @@ export default function ReceiptPage() {
     <style>{`@media print { @page { size: ${width} auto; margin: 2mm; } body * { visibility: hidden; } #receipt, #receipt * { visibility: visible; } #receipt { position: absolute; left: 0; top: 0; width: ${width}; } }`}</style>
     <div className="flex flex-wrap items-center gap-2 print:hidden">
       <Button asChild variant="outline"><Link href="/pos">Back to till</Link></Button>
+      <Button asChild variant="outline"><Link href="/pos/sales">Sales</Link></Button>
       <div role="radiogroup" aria-label="Paper width" className="inline-flex rounded-md border p-1">
         {(['58mm', '80mm'] as const).map(w => <Button key={w} type="button" size="sm" role="radio" aria-checked={width === w} variant={width === w ? 'default' : 'ghost'} onClick={() => setWidth(w)}>{w}</Button>)}
       </div>
       <Button onClick={() => window.print()}>Print</Button>
       <Button asChild variant="outline"><a href={share} target="_blank" rel="noopener noreferrer">Share on WhatsApp</a></Button>
+      {['completed', 'refunded'].includes(receipt.status) && Number(receipt.refunded_total ?? 0) < Number(receipt.total) &&
+        <Button variant="outline" onClick={() => { setMessage(''); setRefunding(true); }}>Refund</Button>}
     </div>
+    {message && <p role="status" className="print:hidden">{message}</p>}
+    <RefundDialog saleId={id} open={refunding} onClose={() => setRefunding(false)}
+      onDone={text => { setRefunding(false); setMessage(text); setVersion(v => v + 1); }} />
     <article id="receipt" aria-label="Receipt" className="mx-auto space-y-2 rounded border bg-white p-3 font-mono text-xs text-black" style={{ width: width === '58mm' ? '58mm' : '80mm' }}>
       <header className="text-center"><p className="text-sm font-bold">{name}</p><p>Receipt {receipt.number}</p><p>{receipt.date}</p></header>
       <hr className="border-dashed border-black" />
@@ -53,6 +61,7 @@ export default function ReceiptPage() {
       {receipt.change && Number(receipt.change) > 0 && <p className="flex justify-between"><span>Change</span><span>{money(receipt.change)}</span></p>}
       {receipt.status === 'pending_payment' && <p className="text-center font-bold">Transfer awaiting confirmation</p>}
       {receipt.status === 'reversed' && <p className="text-center font-bold">Reversed: transfer not received</p>}
+      {Number(receipt.refunded_total ?? 0) > 0 && <p className="flex justify-between font-bold"><span>Refunded</span><span>−{money(receipt.refunded_total as string)}</span></p>}
       <p className="text-center">Thank you</p>
     </article>
   </div>;

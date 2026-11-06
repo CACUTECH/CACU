@@ -21,6 +21,9 @@ import { format } from 'date-fns';
 const breadcrumbNameMap: { [key: string]: string } = {
   '/': 'Dashboard',
   '/pos': 'POS Checkout',
+  '/pos/sales': 'Sales and refunds',
+  '/pos/shifts': 'Shifts',
+  '/pos/receipt': 'Receipt',
   '/transactions': 'Transactions',
   '/reconciliation': 'Reconciliation',
   '/reconciliation/daily': 'Daily reconciliation',
