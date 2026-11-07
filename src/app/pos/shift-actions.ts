@@ -33,9 +33,10 @@ function refresh() {
   revalidatePath('/pos'); revalidatePath('/pos/shifts'); revalidatePath('/reconciliation/daily'); revalidatePath('/');
 }
 
-export async function openShiftAction(requestKey: string, openingFloat: string): Promise<Result<Shift>> {
+export async function openShiftAction(requestKey: string, openingFloat: string, locationId?: string): Promise<Result<Shift>> {
   try {
-    const data = await accountingRequest<Shift>('shifts', { method: 'POST', body: { request_key: requestKey, opening_float: openingFloat } });
+    const data = await accountingRequest<Shift>('shifts', { method: 'POST', body: { request_key: requestKey, opening_float: openingFloat,
+      ...(locationId ? { location_id: locationId } : {}) } });
     refresh();
     return { success: true, data };
   } catch (error) { return failed(error); }

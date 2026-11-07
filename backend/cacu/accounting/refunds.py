@@ -63,6 +63,9 @@ def return_stock(session,actor,sale_id,key,day,quantities,review,narration):
           WHERE e.business_id=%s AND e.item_id=%s AND e.quantity>0""",(str(sale_id),tenant,str(item_id))).scalar()
         units=min(quantities[item_id],int(issued.quantity or 0)-int(back))
         if units<=0:continue
+        from cacu.accounting import outlets
+        outlets.use(session,raw(session,'SELECT max(location_id::text) FROM accounting.stock_event WHERE business_id=%s AND source_id=%s AND item_id=%s AND quantity<0',
+                                (tenant,str(sale_id),str(item_id))).scalar())
         valuation=inventory.state(session,item_id)
         if valuation:
             origin=raw(session,"SELECT * FROM accounting.inventory_value_event WHERE business_id=%s AND source_id=%s AND item_id=%s AND kind='issue'",

@@ -5,10 +5,10 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { receiveGoodsAction } from '@/app/purchases/actions';
+import { listOutletsAction, receiveGoodsAction } from '@/app/purchases/actions';
 import { useKeyedRequest } from '@/hooks/use-keyed-request';
 import { nairaText } from '@/lib/checkout';
-import type { GoodsReceipt, Supplier } from '@/lib/purchasing';
+import type { GoodsReceipt, Outlets, Supplier } from '@/lib/purchasing';
 
 export type ReceivableLine = { itemId: string; name: string; remaining: number; unitCost: string };
 type Row = { itemId: string; name: string; quantity: string; unitCost: string; remaining?: number };
@@ -25,6 +25,13 @@ export function ReceiveGoodsDialog({ orderId, lines, suppliers, products, onClos
   const [supplierId, setSupplierId] = React.useState(suppliers?.length === 1 ? suppliers[0].id : '');
   const [adding, setAdding] = React.useState('');
   const [note, setNote] = React.useState('');
+  const [places, setPlaces] = React.useState<Outlets>({ outlets: [], own: null }), [outlet, setOutlet] = React.useState('');
+  React.useEffect(() => {
+    let live = true;
+    void listOutletsAction().then(r => { if (live && r.success) { setPlaces(r.data); if (r.data.outlets.length === 1) setOutlet(r.data.outlets[0].id); } });
+    return () => { live = false; };
+  }, []);
+  const choosing = !places.own && places.outlets.length > 1;
   const { attempt, run, reset } = useKeyedRequest();
   const locked = attempt.busy || attempt.uncertain;
   const set = (i: number, patch: Partial<Row>) => setRows(r => r.map((row, j) => j === i ? { ...row, ...patch } : row));
@@ -32,10 +39,12 @@ export function ReceiveGoodsDialog({ orderId, lines, suppliers, products, onClos
   const bad = rows.find(r => r.quantity.trim() && (!QUANTITY.test(r.quantity.trim()) || (r.remaining !== undefined && Number(r.quantity) > r.remaining) || !COST.test(r.unitCost.trim())));
   const totalKobo = chosen.reduce((s, r) => s + (QUANTITY.test(r.quantity) && COST.test(r.unitCost) ? Math.round(Number(r.unitCost) * Number(r.quantity) * 100) : 0), 0);
   const problem = !orderId && !supplierId ? 'Choose the supplier the goods came from.'
+    : choosing && !outlet ? 'Choose the outlet receiving the goods.'
     : bad ? (bad.remaining !== undefined && Number(bad.quantity) > bad.remaining ? `Only ${bad.remaining} ${bad.name} are still to come on this order.` : `Check the quantity and cost for ${bad.name}.`)
     : chosen.length === 0 ? 'Enter what arrived.' : totalKobo <= 0 ? 'The goods must be worth more than zero.' : '';
   const submit = async () => {
-    const receipt = await run(key => receiveGoodsAction({ requestKey: key, orderId, supplierId: orderId ? undefined : supplierId, note: note.trim(),
+    const receipt = await run(key => receiveGoodsAction({ requestKey: key, orderId, supplierId: orderId ? undefined : supplierId,
+      locationId: choosing ? outlet : undefined, note: note.trim(),
       lines: chosen.map(r => ({ itemId: r.itemId, quantity: Number(r.quantity), unitCost: r.unitCost.trim() })) }));
     if (receipt) onDone(receipt);
   };
@@ -54,6 +63,11 @@ export function ReceiveGoodsDialog({ orderId, lines, suppliers, products, onClos
           <select className="h-11 w-full rounded-md border bg-background px-3" value={supplierId} disabled={locked} onChange={e => setSupplierId(e.target.value)}>
             <option value="">Choose a supplier</option>
             {(suppliers ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select></label>}
+        {choosing && <label className="space-y-1"><span>Receiving outlet</span>
+          <select className="h-11 w-full rounded-md border bg-background px-3" value={outlet} disabled={locked} onChange={e => setOutlet(e.target.value)}>
+            <option value="">Choose an outlet</option>
+            {places.outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
           </select></label>}
         {rows.length === 0 && orderId && <p>Everything on this order has been received.</p>}
         {rows.map((row, i) => <div key={row.itemId} className="flex flex-wrap items-end gap-2">

@@ -53,7 +53,7 @@ export default function ReceiptsPage() {
     {receipts && receipts.length > 0 && <ul className="divide-y rounded border" aria-label="Goods receipts">
       {receipts.map(r => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
         <span><Link className="font-semibold underline" href={`/purchases/receipts/${r.id}`}>{r.number}</Link> {r.supplier_name ?? 'Supplier'}
-          <span className="block text-muted-foreground">{r.received_on}{r.order_number ? `, on ${r.order_number}` : ''}{r.note ? `, ${r.note}` : ''}</span></span>
+          <span className="block text-muted-foreground">{r.received_on}{r.outlet ? `, ${r.outlet}` : ''}{r.order_number ? `, on ${r.order_number}` : ''}{r.note ? `, ${r.note}` : ''}</span></span>
         <span className="font-semibold">{naira(r.total)}</span>
       </li>)}
     </ul>}

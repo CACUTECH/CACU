@@ -4,9 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { ReceiveGoodsDialog } from '@/components/receive-goods-dialog';
 import ReceiptPage from '@/app/purchases/receipts/[id]/page';
 import PurchaseOrderPage from '@/app/purchases/[id]/page';
-import { billReceivedAction, getReceiptAction, listReceiptsAction, receiveGoodsAction, returnGoodsAction } from '@/app/purchases/actions';
+import OutletStockPage from '@/app/purchases/stock/page';
+import { billReceivedAction, listOutletsAction, outletStockAction, getReceiptAction, listReceiptsAction, receiveGoodsAction, returnGoodsAction } from '@/app/purchases/actions';
 
-jest.mock('@/app/purchases/actions', () => ({ billReceivedAction: jest.fn(), listReceiptsAction: jest.fn(), getReceiptAction: jest.fn(), receiveGoodsAction: jest.fn(), returnGoodsAction: jest.fn() }));
+jest.mock('@/app/purchases/actions', () => ({ listOutletsAction: jest.fn().mockResolvedValue({ success: true, data: { outlets: [], own: null } }), outletStockAction: jest.fn(), billReceivedAction: jest.fn(), listReceiptsAction: jest.fn(), getReceiptAction: jest.fn(), receiveGoodsAction: jest.fn(), returnGoodsAction: jest.fn() }));
 jest.mock('@/app/business-actions', () => ({ getActiveBusinessIdAction: jest.fn().mockResolvedValue('b1') }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: () => ({ business: { id: 'b1', name: 'Ada Provisions', userRole: 'owner' } }) }));
 jest.mock('next/navigation', () => ({ useParams: () => ({ id: 'gr1' }) }));
@@ -121,3 +122,37 @@ test("the supplier's bill starts at the received value and shows how a different
     dueDate: undefined, notes: '', lines: [{ receiptId: 'gr1', itemId: 'beans', quantity: 20, amount: '27000' }] }));
   expect(await screen.findByText(/Bill INV-101 for ₦27,000.00 recorded/)).toBeInTheDocument();
 });
+
+test('with several outlets, goods are received into a chosen one; a member tied to one outlet is not asked', async () => {
+  const outlets = [{ id: 'ikeja', name: 'Ikeja shop', is_active: true }, { id: 'yaba', name: 'Yaba shop', is_active: true }];
+  (listOutletsAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { outlets, own: null } });
+  (receiveGoodsAction as jest.Mock).mockResolvedValueOnce({ success: true, data: receipt });
+  const onDone = jest.fn();
+  const { unmount } = render(<ReceiveGoodsDialog orderId="po1" lines={[{ itemId: 'beans', name: 'Beans', remaining: 2, unitCost: '1300' }]} onClose={jest.fn()} onDone={onDone} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Choose the outlet receiving the goods.');
+  await userEvent.selectOptions(screen.getByLabelText('Receiving outlet'), 'yaba');
+  await userEvent.click(screen.getByRole('button', { name: 'Receive goods' }));
+  await waitFor(() => expect(onDone).toHaveBeenCalledWith(receipt));
+  expect((receiveGoodsAction as jest.Mock).mock.calls[0][0]).toEqual(expect.objectContaining({ locationId: 'yaba' }));
+  unmount();
+  (listOutletsAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { outlets, own: 'ikeja' } });
+  render(<ReceiveGoodsDialog orderId="po1" lines={[{ itemId: 'beans', name: 'Beans', remaining: 2, unitCost: '1300' }]} onClose={jest.fn()} onDone={jest.fn()} />);
+  await waitFor(() => expect(listOutletsAction).toHaveBeenCalledTimes(2));
+  expect(screen.queryByLabelText('Receiving outlet')).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('stock by outlet shows what each outlet holds, and explains how to add outlets when there are none', async () => {
+  (outletStockAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { outlets: [{ id: 'ikeja', name: 'Ikeja shop', is_active: true },
+    { id: 'yaba', name: 'Yaba shop', is_active: false }], items: [{ id: 'beans', name: 'Beans', total: 13, outlets: { ikeja: 3, yaba: 10 }, in_transit: 0 }] } });
+  const { unmount } = render(<OutletStockPage />);
+  expect(await screen.findByRole('columnheader', { name: 'Yaba shop (closed)' })).toBeInTheDocument();
+  const row = screen.getByRole('row', { name: /Beans/ });
+  expect(row).toHaveTextContent('Beans31013');
+  expect(screen.queryByRole('columnheader', { name: 'In transit' })).not.toBeInTheDocument();
+  unmount();
+  (outletStockAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { outlets: [], items: [] } });
+  render(<OutletStockPage />);
+  expect(await screen.findByText(/The first outlet takes all your current stock/)).toBeInTheDocument();
+});
+

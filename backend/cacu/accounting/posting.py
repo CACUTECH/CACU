@@ -277,14 +277,21 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         cost=Decimal('0')
         from cacu.accounting.inventory import consume, allowance_post
         for item in sorted(command.stock,key=lambda x:str(x.item_id)):
-            row=raw(session,"SELECT stock_quantity,cost_price FROM public.catalog_items WHERE id=%s AND business_id=%s AND item_type='PRODUCT' AND is_active FOR UPDATE",(str(item.item_id),tenant)).first()
+            row=raw(session,"SELECT name,stock_quantity,cost_price FROM public.catalog_items WHERE id=%s AND business_id=%s AND item_type='PRODUCT' AND is_active FOR UPDATE",(str(item.item_id),tenant)).first()
             if not row or row.cost_price is None or row.cost_price<0:raise HTTPException(409,'Stock or authoritative cost unavailable')
             on_hand=max(row.stock_quantity or 0,0);issued=item.quantity
+            # Part 4a: with outlets, only what the selling outlet holds can be sold from it.
+            from cacu.accounting.outlets import short
+            gap=short(session,item.item_id,item.quantity)
+            if gap and gap[0]<on_hand:on_hand=gap[0]
+            else:gap=None
             if on_hand<item.quantity:
                 # BR-022: only when the owner allows overselling, and never for adopted valuations. Stock stops at zero;
                 # only the units on hand are costed; the rest is listed for review before period close (RSK-027).
                 adopted=raw(session,'SELECT 1 FROM accounting.inventory_valuation WHERE business_id=%s AND item_id=%s',(tenant,str(item.item_id))).first()
-                if not allow_shortfall or adopted or command.kind!='pos':raise HTTPException(409,'Stock or authoritative cost unavailable')
+                if not allow_shortfall or adopted or command.kind!='pos':
+                    if gap:raise HTTPException(409,f'Only {gap[0]} x {row.name} at {gap[1]}. Transfer more there, or sell from the outlet that has it.')
+                    raise HTTPException(409,'Stock or authoritative cost unavailable')
                 issued=on_hand
                 raw(session,'INSERT INTO accounting.stock_shortfall(business_id,sale_id,item_id,quantity) VALUES(%s,%s,%s,%s)',
                     (tenant,str(command.source_id),str(item.item_id),item.quantity-on_hand))

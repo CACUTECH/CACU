@@ -66,13 +66,17 @@ def _lines(session, job_id):
 def _issue(session, actor, key, lines, day):
     """Issues tracked materials at cost, as a sale would (PR-06), against the job's request key; returns the cost."""
     from cacu.accounting.inventory import allowance_post, consume
+    from cacu.accounting import outlets
     tenant = str(session.business_id); cost = ZERO
+    outlets.use(session, outlets.selling(session, actor))
     for line in sorted((l for l in lines if l.tracked), key=lambda l: str(l.catalog_item_id)):
         row = raw(session, "SELECT stock_quantity,cost_price FROM public.catalog_items WHERE business_id=%s AND id=%s AND is_active FOR UPDATE",
                   (tenant, str(line.catalog_item_id))).first()
         if not row or row.cost_price is None or row.cost_price < 0: raise HTTPException(409, f'{line.name} has no cost to issue it at')
         if (row.stock_quantity or 0) < line.quantity:
             raise HTTPException(409, f'Only {max(row.stock_quantity or 0, 0)} x {line.name} in stock. Receive more or change the job before completing it.')
+        gap = outlets.short(session, line.catalog_item_id, line.quantity)
+        if gap: raise HTTPException(409, f'Only {gap[0]} x {line.name} at {gap[1]}. Transfer more there before completing the job.')
         valued = consume(session, actor, key, line.catalog_item_id, line.quantity, day)
         cost += valued[0] if valued is not None else row.cost_price * line.quantity
         if valued is not None and valued[1]:

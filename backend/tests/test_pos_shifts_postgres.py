@@ -50,7 +50,7 @@ def on_plan(live, plan):
 def test_a_cashiers_shift_tracks_the_till_and_a_shortage_posts_to_cash_over_and_short(live):
     as_template(live, 'editor', 'cashier')
     assert call(live, 'editor', lambda s, a: current(s, a)) == {'available': True, 'require_shift': False, 'shift': None, 'can_manage': False,
-                                                                 'pay_out_accounts': []}
+                                                                 'pay_out_accounts': [], 'outlets': [], 'own_outlet': None}
     shift, data = opened(live, 'editor')
     choices = [a['code'] for a in call(live, 'editor', lambda s, a: current(s, a))['pay_out_accounts']]
     assert '6300' in choices and '6900' not in choices

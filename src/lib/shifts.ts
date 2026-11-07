@@ -6,11 +6,13 @@ export type Shift = {
   id: string; status: 'open' | 'closed'; opened_by_name: string; mine: boolean; opened_at: string; opened_on: string; overdue: boolean;
   opening_float: string; sales: number; cash_sales: string; cash_refunds: string; pay_ins: string; pay_outs: string; cash_handed_back: string; deposits?: string;
   expected_cash: string; counted_cash: string | null; variance: string | null; close_note: string | null; closed_on: string | null;
-  movements?: ShiftMovement[];
+  movements?: ShiftMovement[]; outlet?: string | null;
 };
 export type ShiftStatus = {
   available: boolean; require_shift: boolean; shift: Shift | null; can_manage: boolean;
   pay_out_accounts?: { id: string; code: string; name: string }[];
+  /** Open outlets, and the one the person is tied to (part 4a): a till sells from its shift's outlet. */
+  outlets?: { id: string; name: string }[]; own_outlet?: string | null;
 };
 export type ShiftsDay = { closed: Shift[]; open: Shift[]; variance_total: string };
 

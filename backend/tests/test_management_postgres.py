@@ -54,6 +54,11 @@ def managed(database,request):
         # Purchasing's goods receipts extend the catalogue guard (weighted-average cost from a receipt in the same transaction).
         receipts = Path('../supabase/migrations/20261109100000_goods_receipts.sql').read_text(encoding='utf-8')
         c.execute(receipts[receipts.index('-- catalog guard begin'):receipts.index('-- catalog guard end')])
+        # Stock per outlet needs the outlets table, which this fixture adds.
+        outlets = Path('../supabase/migrations/20261110090000_outlet_stock.sql').read_text(encoding='utf-8')
+        c.execute(outlets[outlets.index('-- outlet stock begin'):outlets.index('-- outlet stock end')])
+        moves = Path('../supabase/migrations/20261110100000_stock_transfers.sql').read_text(encoding='utf-8')
+        c.execute(moves[moves.index('-- transfer outlets begin'):moves.index('-- transfer outlets end')])
         c.execute(Path('../supabase/migrations/20261101180000_invitation_limits.sql').read_text(encoding='utf-8'))
         c.execute('INSERT INTO auth.users VALUES(%s,%s,now())',(database[2],'owner@example.com'))
     return database

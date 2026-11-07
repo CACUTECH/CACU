@@ -2,12 +2,61 @@
 // Purchasing part 2 (Doc 10 purchase-to-payment, PR-18): goods received post to the books, so they go through the accounting API.
 import { revalidatePath } from 'next/cache';
 import { AccountingRequestError, accountingRequest, usesPythonAccounting } from '@/lib/accounting-client';
-import type { GoodsReceipt, ReceiptSummary } from '@/lib/purchasing';
+import type { GoodsReceipt, OutletStock, Outlets, ReceiptSummary, Transfer } from '@/lib/purchasing';
 
 type Result<T> = { success: true; data: T } | { success: false; error: string; uncertain: boolean };
 function failed(error: unknown, fallback = 'The change was not confirmed. Refresh before trying again.'): { success: false; error: string; uncertain: boolean } {
   const known = error instanceof AccountingRequestError && error.status < 500;
   return { success: false, error: known ? error.message : fallback, uncertain: !known };
+}
+
+/** The business's open outlets (part 4a); none before the books are turned on. */
+export async function listOutletsAction(): Promise<Result<Outlets>> {
+  try {
+    if (!(await usesPythonAccounting())) return { success: true, data: { outlets: [], own: null } };
+    return { success: true, data: await accountingRequest<Outlets>('outlets') };
+  } catch (error) { return failed(error, 'Outlets are unavailable. Refresh to try again.'); }
+}
+
+/** Stock held at each outlet; null before the books are turned on. */
+export async function outletStockAction(): Promise<Result<OutletStock | null>> {
+  try {
+    if (!(await usesPythonAccounting())) return { success: true, data: null };
+    return { success: true, data: await accountingRequest<OutletStock>('outlet-stock') };
+  } catch (error) { return failed(error, 'Stock by outlet is unavailable. Refresh to try again.'); }
+}
+
+/** Transfers between outlets (part 4b); null before the books are turned on. */
+export async function listTransfersAction(): Promise<Result<Transfer[] | null>> {
+  try {
+    if (!(await usesPythonAccounting())) return { success: true, data: null };
+    return { success: true, data: await accountingRequest<Transfer[]>('stock-transfers') };
+  } catch (error) { return failed(error, 'Transfers are unavailable. Refresh to try again.'); }
+}
+
+export async function getTransferAction(id: string): Promise<Result<Transfer>> {
+  try { return { success: true, data: await accountingRequest<Transfer>(`stock-transfers/${encodeURIComponent(id)}`) }; }
+  catch (error) { return failed(error, 'The transfer is unavailable. Refresh to try again.'); }
+}
+
+/** Goods leave the sending outlet and are in transit; the total and the books do not change. */
+export async function sendStockAction(input: { requestKey: string; fromLocation: string; toLocation: string; note: string; lines: { itemId: string; quantity: number }[] }): Promise<Result<Transfer>> {
+  try {
+    const data = await accountingRequest<Transfer>('stock-transfers', { method: 'POST', body: { request_key: input.requestKey, from_location: input.fromLocation,
+      to_location: input.toLocation, note: input.note, lines: input.lines.map(l => ({ item_id: l.itemId, quantity: l.quantity })) } });
+    revalidatePath('/purchases');
+    return { success: true, data };
+  } catch (error) { return failed(error); }
+}
+
+/** What arrived goes into the receiving outlet; anything missing is a loss with a reason. */
+export async function receiveTransferAction(id: string, input: { requestKey: string; note: string; lines: { itemId: string; receivedQuantity: number }[] }): Promise<Result<Transfer>> {
+  try {
+    const data = await accountingRequest<Transfer>(`stock-transfers/${encodeURIComponent(id)}/receive`, { method: 'POST', body: { request_key: input.requestKey,
+      note: input.note, lines: input.lines.map(l => ({ item_id: l.itemId, received_quantity: l.receivedQuantity })) } });
+    revalidatePath('/purchases'); revalidatePath('/catalog');
+    return { success: true, data };
+  } catch (error) { return failed(error); }
 }
 
 /** Receipts for an order, or the latest receipts; null before the books are turned on. */
@@ -24,7 +73,7 @@ export async function getReceiptAction(id: string): Promise<Result<GoodsReceipt>
 }
 
 export type ReceiveInput = {
-  requestKey: string; orderId?: string; supplierId?: string; note: string;
+  requestKey: string; orderId?: string; supplierId?: string; locationId?: string; note: string;
   lines: { itemId: string; quantity: number; unitCost: string }[];
 };
 
@@ -32,7 +81,7 @@ export type ReceiveInput = {
 export async function receiveGoodsAction(input: ReceiveInput): Promise<Result<GoodsReceipt>> {
   try {
     const data = await accountingRequest<GoodsReceipt>('goods-receipts', { method: 'POST', body: {
-      request_key: input.requestKey, order_id: input.orderId || null, supplier_id: input.supplierId || null, note: input.note,
+      request_key: input.requestKey, order_id: input.orderId || null, supplier_id: input.supplierId || null, location_id: input.locationId || null, note: input.note,
       lines: input.lines.map(l => ({ item_id: l.itemId, quantity: l.quantity, unit_cost: l.unitCost })) } });
     revalidatePath('/purchases'); revalidatePath('/catalog');
     return { success: true, data };
