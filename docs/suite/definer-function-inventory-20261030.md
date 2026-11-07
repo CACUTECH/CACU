@@ -17,6 +17,7 @@ Source: Supabase security advisor and `pg_proc` on production (read-only, 29 Oct
 | `management_read`, `management_write` | `management_private.authorize` per section or operation | Keep |
 | `process_sale` | Forwards to `process_sale_safe` with a new request key each call, so a retry can post twice; unused | **Revoke** (20261030120000) |
 | `process_sale_safe`, `record_payment_atomic` | Owner/Admin/Editor | Keep |
+| `purchasing_allowed` (added 20261109090000) | Active membership of the business; returns only whether the plan includes purchasing | Keep |
 | `record_audit` | Any member, including viewers, could write audit rows with any action and record id; unused since the ledger moved to `record_ledger_entry_safe` | **Revoke** (20261030120000) |
 | `request_upload_delete` | Owner/Admin row, then `can_read_upload`, which requires an active membership | Keep |
 | `reserve_upload` | Active membership with a role allowed for the purpose | Keep |

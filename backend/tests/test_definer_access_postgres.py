@@ -40,6 +40,7 @@ REVIEWED = {
     'management_read': 'management_private.authorize per section',
     'management_write': 'management_private.authorize per operation',
     'process_sale_safe': 'has_business_role owner/admin/editor',
+    'purchasing_allowed': 'active membership of the business required; returns only whether the plan includes purchasing',
     'record_ledger_entry_safe': 'has_business_role owner/admin/editor',
     'record_payment_atomic': 'has_business_role owner/admin/editor',
     'request_upload_delete': 'owner/admin membership and can_read_upload (active)',

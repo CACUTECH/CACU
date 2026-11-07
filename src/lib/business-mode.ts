@@ -12,7 +12,7 @@ export function isBusinessMode(value: unknown): value is BusinessType {
 
 export function isRouteAvailableInMode(path: string, mode: unknown) {
   const within = (route: string) => path === route || path.startsWith(`${route}/`);
-  if (within('/pos')) return mode === 'PRODUCT' || mode === 'HYBRID';
+  if (within('/pos') || within('/purchases')) return mode === 'PRODUCT' || mode === 'HYBRID';
   if (within('/appointments') || within('/jobs')) return mode === 'SERVICE' || mode === 'HYBRID';
   return true;
 }
