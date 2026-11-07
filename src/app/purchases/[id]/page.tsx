@@ -13,7 +13,10 @@ import { createClient } from '@/lib/supabase/client';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { useBusiness } from '@/components/business-provider';
 import { nairaText } from '@/lib/checkout';
-import { ORDER_COLUMNS, ORDER_STATUS, orderError, orderText, orderTotalKobo, whatsappNumber, type OrderLine, type PurchaseOrder, type Supplier } from '@/lib/purchasing';
+import { ORDER_COLUMNS, ORDER_STATUS, orderError, orderText, orderTotalKobo, whatsappNumber, type OrderLine, type PurchaseOrder, type ReceiptSummary, type Supplier } from '@/lib/purchasing';
+import { listReceiptsAction } from '../actions';
+import { ReceiveGoodsDialog } from '@/components/receive-goods-dialog';
+import { naira } from '@/lib/transfers';
 
 type Product = { id: string; name: string; cost_price: number | string | null; stock_quantity: number | null; item_type: string; track_stock: boolean | null };
 
@@ -29,6 +32,9 @@ export default function PurchaseOrderPage() {
   const [supplier, setSupplier] = React.useState<Supplier | null>(null);
   const [error, setError] = React.useState(''), [message, setMessage] = React.useState(''), [busy, setBusy] = React.useState(false);
   const [cancelling, setCancelling] = React.useState(false), [version, setVersion] = React.useState(0);
+  // Receipts against this order; null before the books are turned on (receiving posts to the books).
+  const [receipts, setReceipts] = React.useState<ReceiptSummary[] | null>(null);
+  const [receiving, setReceiving] = React.useState(false);
 
   React.useEffect(() => {
     if (!id) return;
@@ -38,10 +44,11 @@ export default function PurchaseOrderPage() {
         const owner = businessId ?? await getActiveBusinessIdAction();
         if (!live) return;
         setBusinessId(owner);
-        const [found, orderLines, catalogue] = await Promise.all([
+        const [found, orderLines, catalogue, received] = await Promise.all([
           supabase.from('purchase_orders').select(ORDER_COLUMNS).eq('business_id', owner).eq('id', id).limit(1),
           supabase.from('purchase_order_lines').select('id, item_id, quantity, unit_cost, received_quantity').eq('business_id', owner).eq('order_id', id).order('created_at'),
           supabase.from('catalog_items').select('id, name, cost_price, stock_quantity, item_type, track_stock').eq('business_id', owner).eq('is_active', true).order('name'),
+          listReceiptsAction(id),
         ]);
         if (!live) return;
         const row = (found.data as PurchaseOrder[] | null)?.[0];
@@ -51,6 +58,7 @@ export default function PurchaseOrderPage() {
         setOrder(row); setLines((orderLines.data as OrderLine[] | null) ?? []);
         setProducts(((catalogue.data as Product[] | null) ?? []).filter(p => p.item_type === 'PRODUCT' && p.track_stock !== false));
         setSupplier((who.data as Supplier[] | null)?.[0] ?? null);
+        setReceipts(received.success ? received.data : null);
       } catch { if (live) setError('The order is unavailable. Refresh to try again.'); }
     })();
     return () => { live = false; };
@@ -113,10 +121,18 @@ export default function PurchaseOrderPage() {
         {supplier?.email && <Button asChild variant="outline"><a href={`mailto:${encodeURIComponent(supplier.email)}?subject=${encodeURIComponent(`Purchase order ${order.number}`)}&body=${encodeURIComponent(text)}`}>Email</a></Button>}
         <Button variant="outline" onClick={() => window.print()}>Print</Button>
       </>}
+      {receipts && (order.status === 'sent' || order.status === 'partly_received') && <Button disabled={busy} onClick={() => { setMessage(''); setReceiving(true); }}>Receive goods</Button>}
       {(order.status === 'draft' || order.status === 'sent') && <Button variant="outline" disabled={busy} onClick={() => { setMessage(''); setCancelling(true); }}>Cancel order</Button>}
     </div>
     {order.status === 'sent' && !phone && !supplier?.email && <p className="text-sm text-muted-foreground print:hidden">Add the supplier&apos;s phone or email in Suppliers to send the order from here.</p>}
 
+    {receipts && receipts.length > 0 && <Card><CardHeader><CardTitle>Received</CardTitle></CardHeader>
+      <CardContent><ul className="space-y-1 text-sm" aria-label="Goods receipts">
+        {receipts.map(r => <li key={r.id}><Link className="underline" href={`/purchases/receipts/${r.id}`}>{r.number}</Link> on {r.received_on}: {naira(r.total)}</li>)}
+      </ul></CardContent></Card>}
+    {receiving && <ReceiveGoodsDialog orderId={order.id} onClose={() => setReceiving(false)}
+      lines={lines.map(l => ({ itemId: l.item_id, name: named.get(l.item_id) ?? 'Item', remaining: l.quantity - l.received_quantity, unitCost: String(Number(l.unit_cost)) }))}
+      onDone={receipt => { setReceiving(false); setMessage(`${receipt.number} received: ${naira(receipt.total)} of stock, owed to ${supplier?.name ?? 'the supplier'} until their bill is entered.`); setError(''); setVersion(v => v + 1); }} />}
     {cancelling && <CancelOrder onClose={() => setCancelling(false)}
       onCancel={async reason => { if (await write(() => supabase.from('purchase_orders').update({ status: 'cancelled', cancel_reason: reason }).eq('id', order.id).select('id'), 'Order cancelled.')) setCancelling(false); }} />}
   </div>;

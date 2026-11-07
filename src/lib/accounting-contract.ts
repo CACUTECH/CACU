@@ -1273,6 +1273,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/goods-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Goods Receipts */
+        get: operations["goods_receipts_api_v1_businesses__business_id__goods_receipts_get"];
+        put?: never;
+        /** Create Goods Receipt */
+        post: operations["create_goods_receipt_api_v1_businesses__business_id__goods_receipts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/goods-receipts/{receipt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Goods Receipt */
+        get: operations["goods_receipt_api_v1_businesses__business_id__goods_receipts__receipt_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/goods-receipts/{receipt_id}/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Return To Supplier */
+        post: operations["return_to_supplier_api_v1_businesses__business_id__goods_receipts__receipt_id__returns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/goods-receipts/bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bill Received Goods */
+        post: operations["bill_received_goods_api_v1_businesses__business_id__goods_receipts_bills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1386,6 +1455,23 @@ export interface components {
              * @default
              */
             description: string;
+        };
+        /** BilledLine */
+        BilledLine: {
+            /**
+             * Receipt Id
+             * Format: uuid
+             */
+            receipt_id: string;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Quantity */
+            quantity: number;
+            /** Amount */
+            amount: string;
         };
         /** BookingClose */
         BookingClose: {
@@ -1678,6 +1764,35 @@ export interface components {
             /** Description */
             description: string;
         };
+        /** GoodsBill */
+        GoodsBill: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /** Bill Number */
+            bill_number: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Due Date */
+            due_date?: string | null;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Lines */
+            lines: components["schemas"]["BilledLine"][];
+        };
         /** GoodsReceipt */
         GoodsReceipt: {
             /**
@@ -1703,6 +1818,25 @@ export interface components {
             tax_account_id?: string | null;
             /** Evidence */
             evidence: string;
+        };
+        /** GoodsReceive */
+        GoodsReceive: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Order Id */
+            order_id?: string | null;
+            /** Supplier Id */
+            supplier_id?: string | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Lines */
+            lines: components["schemas"]["ReceiveLine"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1958,7 +2092,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application";
+            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill";
             /**
              * Source Id
              * Format: uuid
@@ -2070,6 +2204,18 @@ export interface components {
              */
             recoverable_tax: string;
         };
+        /** ReceiveLine */
+        ReceiveLine: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Quantity */
+            quantity: number;
+            /** Unit Cost */
+            unit_cost: string;
+        };
         /** RefundDecision */
         RefundDecision: {
             /**
@@ -2118,6 +2264,16 @@ export interface components {
             bank_account_id?: string | null;
             /** Reason */
             reason: string;
+        };
+        /** ReturnLine */
+        ReturnLine: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Quantity */
+            quantity: number;
         };
         /** ReversalCreate */
         ReversalCreate: {
@@ -2308,6 +2464,18 @@ export interface components {
             method: string;
             /** Bank Account Id */
             bank_account_id?: string | null;
+        };
+        /** SupplierReturn */
+        SupplierReturn: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Reason */
+            reason: string;
+            /** Lines */
+            lines: components["schemas"]["ReturnLine"][];
         };
         /** TransferConfirm */
         TransferConfirm: {
@@ -5221,6 +5389,177 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["JobInvoice"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    goods_receipts_api_v1_businesses__business_id__goods_receipts_get: {
+        parameters: {
+            query?: {
+                order_id?: string | null;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_goods_receipt_api_v1_businesses__business_id__goods_receipts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsReceive"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    goods_receipt_api_v1_businesses__business_id__goods_receipts__receipt_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                receipt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    return_to_supplier_api_v1_businesses__business_id__goods_receipts__receipt_id__returns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                receipt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierReturn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bill_received_goods_api_v1_businesses__business_id__goods_receipts_bills_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsBill"];
             };
         };
         responses: {

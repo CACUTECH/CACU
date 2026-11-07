@@ -62,3 +62,11 @@ export function whatsappNumber(phone: string | null | undefined) {
   if (/^234\d{10}$/.test(digits)) return digits;
   return null;
 }
+
+// Goods received (part 2): stock goes up at the actual cost; the receipt is owed to the supplier until billed.
+export type ReceiptSummary = {
+  id: string; number: string; order_id: string | null; order_number: string | null; supplier_id: string; supplier_name: string | null;
+  received_on: string; total: string; note: string;
+};
+export type ReceiptLine = { item_id: string; name: string; quantity: number; unit_cost: string; amount: string; returned_quantity: number; billed_quantity: number; returnable: number };
+export type GoodsReceipt = ReceiptSummary & { lines: ReceiptLine[]; returns: { id: string; reason: string; returned_on: string; total: string }[] };

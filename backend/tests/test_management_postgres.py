@@ -51,6 +51,9 @@ def managed(database,request):
         c.execute(Path('../supabase/migrations/20261101010624_stock_adjustment_approval.sql').read_text(encoding='utf-8'))
         for migration in Path('../supabase/migrations').glob('*_ifrs_catalog_valuation_guard.sql'):
             c.execute(migration.read_text(encoding='utf-8'))
+        # Purchasing's goods receipts extend the catalogue guard (weighted-average cost from a receipt in the same transaction).
+        receipts = Path('../supabase/migrations/20261109100000_goods_receipts.sql').read_text(encoding='utf-8')
+        c.execute(receipts[receipts.index('-- catalog guard begin'):receipts.index('-- catalog guard end')])
         c.execute(Path('../supabase/migrations/20261101180000_invitation_limits.sql').read_text(encoding='utf-8'))
         c.execute('INSERT INTO auth.users VALUES(%s,%s,now())',(database[2],'owner@example.com'))
     return database
