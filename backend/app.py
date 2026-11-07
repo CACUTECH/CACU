@@ -573,3 +573,36 @@ def finish_job(business_id:UUID,job_id:UUID,data:JobComplete,user_id:UUID=Depend
 def invoice_job(business_id:UUID,job_id:UUID,data:JobInvoice,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True,permission='invoices.post') as session:
         return job_bill_invoice(session,user_id,job_id,data)
+
+# Purchasing part 2 (Doc 10 purchase-to-payment, PR-18): goods received against an order or on their own, and returns.
+from cacu.accounting.purchasing import (GoodsReceive,SupplierReturn,detail as receipt_detail,list_receipts,receive as receive_goods,
+    return_goods)
+
+@app.get('/api/v1/businesses/{business_id}/goods-receipts')
+def goods_receipts(business_id:UUID,order_id:UUID|None=None,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return list_receipts(session,order_id)
+
+@app.post('/api/v1/businesses/{business_id}/goods-receipts')
+def create_goods_receipt(business_id:UUID,data:GoodsReceive,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.post') as session:
+        return receive_goods(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/goods-receipts/{receipt_id}')
+def goods_receipt(business_id:UUID,receipt_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return receipt_detail(session,receipt_id)
+
+@app.post('/api/v1/businesses/{business_id}/goods-receipts/{receipt_id}/returns')
+def return_to_supplier(business_id:UUID,receipt_id:UUID,data:SupplierReturn,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.post') as session:
+        return return_goods(session,user_id,receipt_id,data)
+
+
+# Purchasing part 3: the supplier's bill for received goods (Dr Goods received not invoiced, Cr Payables; IAS 2 differences).
+from cacu.accounting.purchasing import GoodsBill,bill_received
+
+@app.post('/api/v1/businesses/{business_id}/goods-receipts/bills')
+def bill_received_goods(business_id:UUID,data:GoodsBill,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='expenses.post') as session:
+        return bill_received(session,user_id,data)

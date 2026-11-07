@@ -53,6 +53,7 @@ export default function PurchasesPage() {
           <select className="h-10 rounded-md border bg-background px-3" value={filter} onChange={e => setFilter(e.target.value as typeof filter)}>
             {FILTERS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select></label>
+        <Button asChild variant="outline"><Link href="/purchases/receipts">Goods received</Link></Button>
         <Button disabled={!businessId || allowed === false} onClick={() => setCreating(true)}>New order</Button>
       </div>
     </div>

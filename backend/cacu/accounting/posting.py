@@ -32,7 +32,7 @@ class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
-                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application']
+                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -49,10 +49,12 @@ CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'su
          'expense':CashPurchase,'pos':CashSale,'adjustment':JournalEntry,'credit_note':CreditNote,
          'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry,'sale_refund':JournalEntry,
          'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry,
-         'deposit_application':JournalEntry}
+         'deposit_application':JournalEntry,'goods_bill':JournalEntry}
+# Documents filed under another document type: a bill for received goods is a supplier bill to payments and the bills list.
+DOCUMENT_TYPES={'goods_bill':'bill'}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
-INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application'}
+INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
@@ -103,7 +105,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if replay.payload_hash!=digest:raise HTTPException(409,'Idempotency key already used for another request')
         return replay.result
     existing=raw(session,'SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type=%s AND source_id=%s',
-                 (tenant,command.kind,str(command.source_id))).first()
+                 (tenant,DOCUMENT_TYPES.get(command.kind,command.kind),str(command.source_id))).first()
     if existing:raise HTTPException(409,'Source document already posted')
     main=account(session,command.main_account_id)
     lines=[(account(session,l.account_id),Decimal(l.amount),l.credited,l.description or command.narration) for l in command.lines]
@@ -116,7 +118,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         raise HTTPException(409,'Posting predates accounting cutover')
     source=None;target=None
     if command.counterparty_id:
-        table='suppliers' if command.kind in {'bill','supplier_payment'} else 'customers'
+        table='suppliers' if command.kind in {'bill','supplier_payment','goods_bill'} else 'customers'
         party=raw(session,f'SELECT id FROM public.{table} WHERE id=%s AND business_id=%s',(str(command.counterparty_id),tenant)).first()
         if not party:raise HTTPException(422,'Counterparty unavailable for this business')
         mapped=raw(session,'SELECT library_id FROM accounting.party_map WHERE business_id=%s AND party_type=%s AND party_id=%s',
@@ -212,6 +214,12 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 refund=line is not None and command.credited and not line.credited and str(line.account_id)==deposits and (main_id==cash or str(collection_account(session,'Transfer',command.main_account_id))==main_id)
                 forfeit=line is not None and main_id==deposits and not command.credited and line.credited and str(line.account_id) in income
                 if not(refund or forfeit):raise HTTPException(422,'A deposit is either refunded or kept as income')
+        elif command.kind=='goods_bill':
+            # A bill for received goods: debit Goods received not invoiced, credit the supplier's payables (matched by
+            # counterparty); price differences are separate stock adjustments.
+            grni=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='grni'",(tenant,)).all()
+            if len(grni)!=1 or not command.counterparty_id or not command.credited or len(command.lines)!=1 or command.lines[0].credited                or str(command.lines[0].account_id)!=str(grni[0].account_id):
+                raise HTTPException(422,'A bill for received goods clears Goods received not invoiced against the supplier')
         elif command.kind=='shift_variance':
             # PR-22: a shortage debits Cash over and short and credits the till; a surplus the reverse.
             variance=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='cash_variance'",(tenant,)).all()
@@ -297,7 +305,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             secondary_transactions.append(cost_tx.id)
             raw(session,'INSERT INTO accounting.document_map(business_id,source_type,source_id,transaction_id) VALUES(%s,%s,%s,%s)',
                 (tenant,command.kind+'_cogs',str(command.source_id),cost_tx.id))
-    raw(session,'INSERT INTO accounting.document_map(business_id,source_type,source_id,transaction_id) VALUES(%s,%s,%s,%s)',(tenant,command.kind,str(command.source_id),tx.id))
+    raw(session,'INSERT INTO accounting.document_map(business_id,source_type,source_id,transaction_id) VALUES(%s,%s,%s,%s)',(tenant,DOCUMENT_TYPES.get(command.kind,command.kind),str(command.source_id),tx.id))
     result={'source_id':str(command.source_id),'transaction_id':tx.id,'transaction_no':tx.transaction_no,
             'amount':format(amount,'.2f'),'supporting_transaction_ids':secondary_transactions,'outstanding':format(target.amount-target.cleared(session),'.2f') if target else None}
     if command.payment_method:

@@ -6,6 +6,7 @@ import PurchaseOrderPage from '@/app/purchases/[id]/page';
 import { orderError, orderText, orderTotalKobo, whatsappNumber } from '@/lib/purchasing';
 import { isRouteAvailableInMode } from '@/lib/business-mode';
 
+jest.mock('@/app/purchases/actions', () => ({ listReceiptsAction: jest.fn().mockResolvedValue({ success: true, data: null }), receiveGoodsAction: jest.fn() }));
 jest.mock('@/app/business-actions', () => ({ getActiveBusinessIdAction: jest.fn().mockResolvedValue('b1') }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: () => ({ business: { id: 'b1', name: 'Ada Provisions', userRole: 'owner' } }) }));
 jest.mock('next/navigation', () => ({ useParams: () => ({ id: 'po1' }) }));
