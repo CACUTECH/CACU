@@ -213,6 +213,8 @@ def sale_create(session,actor,data:SaleCreate):
         if len({i.item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate sale item')
         from cacu.accounting.shifts import before_sale,tag
         before_sale(session,actor)
+        from cacu.accounting import outlets
+        outlets.use(session,outlets.selling(session,actor))
         if data.customer_id is not None and method!='Credit':raise HTTPException(422,'Only a credit sale names a customer here')
         cap=Decimal(raw(session,'SELECT authz.discount_cap(%s)',(tenant,)).scalar() or 0)
         total=Decimal('0');discounts=Decimal('0');items=[];stock=[]

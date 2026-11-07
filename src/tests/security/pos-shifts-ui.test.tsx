@@ -140,3 +140,17 @@ test("the owner requires shifts, and a manager closes a cashier's forgotten shif
   await waitFor(() => expect(closeShiftAction).toHaveBeenCalledWith('sh-2', expect.any(String), '9300', ''));
   expect(await screen.findByText('Shift closed. No difference.')).toBeInTheDocument();
 });
+
+test('with several outlets the till opens at a chosen outlet, and sells from it', async () => {
+  const outlets = [{ id: 'ikeja', name: 'Ikeja shop' }, { id: 'yaba', name: 'Yaba shop' }];
+  (getShiftAction as jest.Mock).mockResolvedValue({ success: true, data: { available: true, require_shift: false, shift: null, can_manage: false, outlets, own_outlet: null } });
+  (openShiftAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { ...shift, outlet: 'Yaba shop' } });
+  render(<ShiftBar banks={[]} />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Open shift' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('Choose the outlet this till is in.');
+  await userEvent.selectOptions(screen.getByLabelText('Outlet'), 'yaba');
+  await userEvent.click(screen.getAllByRole('button', { name: 'Open shift' }).at(-1)!);
+  expect(await screen.findByText(/Shift opened at Yaba shop with/)).toBeInTheDocument();
+  expect((openShiftAction as jest.Mock).mock.calls.at(-1)).toEqual([expect.any(String), '0', 'yaba']);
+});
+

@@ -34,6 +34,7 @@ class GoodsReceive(BaseModel):
     request_key: UUID
     order_id: UUID | None = None
     supplier_id: UUID | None = None
+    location_id: UUID | None = None
     note: str = Field(default='', max_length=500)
     lines: list[ReceiveLine] = Field(min_length=1, max_length=100)
 
@@ -141,6 +142,9 @@ def receive(session, actor, data: GoodsReceive):
             supplier = data.supplier_id
             if not raw(session, 'SELECT 1 FROM public.suppliers WHERE business_id=%s AND id=%s', (tenant, str(supplier))).first():
                 raise HTTPException(422, 'Choose one of your suppliers')
+        from cacu.accounting import outlets
+        outlet = outlets.choose(session, actor, data.location_id, 'Choose the outlet receiving the goods')
+        outlets.use(session, outlet)
         grni = _ensure_grni(session, actor)
         total = ZERO; lines = []
         for line in sorted(data.lines, key=lambda l: str(l.item_id)):
@@ -159,9 +163,9 @@ def receive(session, actor, data: GoodsReceive):
             entry_date=day, credited=False, narration=f'Goods received {number}' + (f' on {order.number}' if order else ''),
             lines=[{'account_id': grni, 'amount': format(total, '.2f'), 'credited': True}]), managed_stock=True)
         raw(session, 'INSERT INTO accounting.inventory_journal(business_id,source_id) VALUES(%s,%s)', (tenant, str(stock_key)))
-        raw(session, """INSERT INTO accounting.goods_receipt(business_id,id,number,order_id,supplier_id,received_on,received_by,note,total,posting)
-          VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)""", (tenant, str(data.request_key), number, str(order.id) if order else None, str(supplier), day,
-          str(actor), data.note.strip(), total, json.dumps({'transaction_no': posting.get('transaction_no')})))
+        raw(session, """INSERT INTO accounting.goods_receipt(business_id,id,number,order_id,supplier_id,received_on,received_by,note,total,posting,location_id)
+          VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)""", (tenant, str(data.request_key), number, str(order.id) if order else None, str(supplier), day,
+          str(actor), data.note.strip(), total, json.dumps({'transaction_no': posting.get('transaction_no')}), outlet))
         for line, amount, _ in lines:
             raw(session, 'INSERT INTO accounting.goods_receipt_line(business_id,receipt_id,item_id,quantity,unit_cost,amount) VALUES(%s,%s,%s,%s,%s,%s)',
                 (tenant, str(data.request_key), str(line.item_id), line.quantity, _cost(Decimal(line.unit_cost)), amount))
@@ -211,6 +215,8 @@ def return_goods(session, actor, receipt_id: UUID, data: SupplierReturn):
                                                    (tenant, str(key))).all()}
         grni = grni_account(session)
         if grni is None: raise HTTPException(409, 'Goods received not invoiced is archived. Restore it in the chart of accounts.')
+        from cacu.accounting import outlets
+        outlets.use(session, receipt.location_id)
         total = ZERO; lines = []
         for line in sorted(data.lines, key=lambda l: str(l.item_id)):
             got = received.get(str(line.item_id))
@@ -218,6 +224,8 @@ def return_goods(session, actor, receipt_id: UUID, data: SupplierReturn):
             left = got.quantity - got.returned_quantity - got.billed_quantity
             if line.quantity > left: raise HTTPException(409, f'Only {left} can still be returned from this receipt' if left else 'Nothing of that product can still be returned from this receipt')
             amount = (got.unit_cost * line.quantity).quantize(CENT, rounding=ROUND_HALF_UP)
+            gap = outlets.short(session, line.item_id, line.quantity)
+            if gap: raise HTTPException(409, f'Only {gap[0]} of that product left at {gap[1]} to return')
             _stock_out(session, actor, data.request_key, line.item_id, line.quantity, amount, day)
             total += amount; lines.append((line, amount))
         stock_key = uuid5(data.request_key, 'return')
@@ -246,9 +254,11 @@ RECEIPT_SELECT = """SELECT r.*,s.name AS supplier_name,o.number AS order_number 
   LEFT JOIN public.purchase_orders o ON o.business_id=r.business_id AND o.id=r.order_id"""
 
 
-def _summary(r):
+def _summary(r, session=None):
+    from cacu.accounting.outlets import name
     return {'id': str(r.id), 'number': r.number, 'order_id': str(r.order_id) if r.order_id else None, 'order_number': r.order_number,
             'supplier_id': str(r.supplier_id), 'supplier_name': r.supplier_name, 'received_on': r.received_on.isoformat(),
+            'location_id': str(r.location_id) if getattr(r, 'location_id', None) else None, 'outlet': name(session, r.location_id) if session is not None and getattr(r, 'location_id', None) else None,
             'total': _money(r.total), 'note': r.note}
 
 
@@ -260,7 +270,7 @@ def detail(session, receipt_id):
       WHERE l.business_id=%s AND l.receipt_id=%s ORDER BY c.name""", (tenant, str(receipt_id))).all()
     returns = raw(session, 'SELECT id,reason,returned_on,total FROM accounting.supplier_return WHERE business_id=%s AND receipt_id=%s ORDER BY returned_at',
                   (tenant, str(receipt_id))).all()
-    return {**_summary(r), 'lines': [{'item_id': str(l.item_id), 'name': l.name, 'quantity': l.quantity, 'unit_cost': format(l.unit_cost, '.4f'),
+    return {**_summary(r, session), 'lines': [{'item_id': str(l.item_id), 'name': l.name, 'quantity': l.quantity, 'unit_cost': format(l.unit_cost, '.4f'),
                                       'amount': _money(l.amount), 'returned_quantity': l.returned_quantity, 'billed_quantity': l.billed_quantity,
                                       'returnable': l.quantity - l.returned_quantity - l.billed_quantity} for l in lines],
             'returns': [{'id': str(x.id), 'reason': x.reason, 'returned_on': x.returned_on.isoformat(), 'total': _money(x.total)} for x in returns]}
@@ -272,7 +282,7 @@ def list_receipts(session, order_id: UUID | None = None, limit=200):
         rows = raw(session, RECEIPT_SELECT + ' WHERE r.business_id=%s AND r.order_id=%s ORDER BY r.received_at DESC', (tenant, str(order_id))).all()
     else:
         rows = raw(session, RECEIPT_SELECT + ' WHERE r.business_id=%s ORDER BY r.received_at DESC LIMIT %s', (tenant, limit)).all()
-    return [_summary(r) for r in rows]
+    return [_summary(r, session) for r in rows]
 
 
 # Bills for received goods (part 3) ------------------------------------------------------------------------------------

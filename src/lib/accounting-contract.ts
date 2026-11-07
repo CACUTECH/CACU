@@ -1342,6 +1342,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/outlets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Business Outlets */
+        get: operations["business_outlets_api_v1_businesses__business_id__outlets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/outlet-stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stock By Outlet */
+        get: operations["stock_by_outlet_api_v1_businesses__business_id__outlet_stock_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/stock-transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stock Transfers */
+        get: operations["stock_transfers_api_v1_businesses__business_id__stock_transfers_get"];
+        put?: never;
+        /** Create Stock Transfer */
+        post: operations["create_stock_transfer_api_v1_businesses__business_id__stock_transfers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/stock-transfers/{transfer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stock Transfer */
+        get: operations["stock_transfer_api_v1_businesses__business_id__stock_transfers__transfer_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/stock-transfers/{transfer_id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive Stock Transfer */
+        post: operations["receive_stock_transfer_api_v1_businesses__business_id__stock_transfers__transfer_id__receive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1411,6 +1497,16 @@ export interface components {
         Approval: {
             /** Evidence */
             evidence: string;
+        };
+        /** ArrivedLine */
+        ArrivedLine: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Received Quantity */
+            received_quantity: number;
         };
         /** BillCreate */
         BillCreate: {
@@ -1830,6 +1926,8 @@ export interface components {
             order_id?: string | null;
             /** Supplier Id */
             supplier_id?: string | null;
+            /** Location Id */
+            location_id?: string | null;
             /**
              * Note
              * @default
@@ -2399,6 +2497,8 @@ export interface components {
             request_key: string;
             /** Opening Float */
             opening_float: string;
+            /** Location Id */
+            location_id?: string | null;
         };
         /** ShiftPolicy */
         ShiftPolicy: {
@@ -2495,6 +2595,16 @@ export interface components {
              */
             note: string;
         };
+        /** TransferLine */
+        TransferLine: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Quantity */
+            quantity: number;
+        };
         /** TransferNotReceived */
         TransferNotReceived: {
             /**
@@ -2504,6 +2614,46 @@ export interface components {
             request_key: string;
             /** Note */
             note: string;
+        };
+        /** TransferReceive */
+        TransferReceive: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Lines */
+            lines: components["schemas"]["ArrivedLine"][];
+        };
+        /** TransferSend */
+        TransferSend: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * From Location
+             * Format: uuid
+             */
+            from_location: string;
+            /**
+             * To Location
+             * Format: uuid
+             */
+            to_location: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Lines */
+            lines: components["schemas"]["TransferLine"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -5560,6 +5710,204 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["GoodsBill"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    business_outlets_api_v1_businesses__business_id__outlets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stock_by_outlet_api_v1_businesses__business_id__outlet_stock_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stock_transfers_api_v1_businesses__business_id__stock_transfers_get: {
+        parameters: {
+            query?: {
+                status?: ("in_transit" | "received") | null;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_stock_transfer_api_v1_businesses__business_id__stock_transfers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferSend"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stock_transfer_api_v1_businesses__business_id__stock_transfers__transfer_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_stock_transfer_api_v1_businesses__business_id__stock_transfers__transfer_id__receive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferReceive"];
             };
         };
         responses: {

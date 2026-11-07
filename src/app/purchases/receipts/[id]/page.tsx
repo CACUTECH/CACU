@@ -35,7 +35,7 @@ export default function ReceiptPage() {
   return <div className="space-y-6">
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div><h1 className="font-headline text-3xl font-bold">{receipt.number}</h1>
-        <p className="text-muted-foreground">From {receipt.supplier_name ?? 'supplier'} on {receipt.received_on}{receipt.order_number ? `, against ${receipt.order_number}` : ''}</p>
+        <p className="text-muted-foreground">From {receipt.supplier_name ?? 'supplier'} on {receipt.received_on}{receipt.order_number ? `, against ${receipt.order_number}` : ''}{receipt.outlet ? `, into ${receipt.outlet}` : ''}</p>
         {receipt.note && <p className="text-sm">{receipt.note}</p>}</div>
       <div className="flex flex-wrap gap-2">
         {receipt.order_id && <Button asChild variant="outline"><Link href={`/purchases/${receipt.order_id}`}>{receipt.order_number}</Link></Button>}

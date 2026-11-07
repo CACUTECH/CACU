@@ -16,18 +16,27 @@ function Problem({ text }: { text: string }) {
   return text ? <p role="alert" className="text-sm text-destructive">{text}</p> : null;
 }
 
-export function OpenShiftDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (shift: Shift) => void }) {
-  const [float, setFloat] = React.useState('');
+export function OpenShiftDialog({ open, onClose, onDone, outlets = [], own = null }: {
+  open: boolean; onClose: () => void; onDone: (shift: Shift) => void; outlets?: { id: string; name: string }[]; own?: string | null;
+}) {
+  const [float, setFloat] = React.useState(''), [outlet, setOutlet] = React.useState('');
   const { attempt, run, reset } = useKeyedRequest();
-  const problem = float.trim() && !AMOUNT.test(float.trim()) ? 'Enter the cash in naira, for example 5000.' : '';
+  const choosing = !own && outlets.length > 1;
+  const problem = float.trim() && !AMOUNT.test(float.trim()) ? 'Enter the cash in naira, for example 5000.'
+    : choosing && !outlet ? 'Choose the outlet this till is in.' : '';
   const submit = async () => {
-    const shift = await run(key => openShiftAction(key, float.trim() || '0'));
+    const shift = await run(key => openShiftAction(key, float.trim() || '0', choosing ? outlet : undefined));
     if (shift) { setFloat(''); onDone(shift); }
   };
   return <Dialog open={open} onOpenChange={next => { if (!next && !attempt.busy) { reset(); onClose(); } }}>
     <DialogContent className="sm:max-w-sm">
       <DialogHeader><DialogTitle>Open your shift</DialogTitle>
         <DialogDescription>Count the cash in the till before you start. Every sale and cash movement until you close is part of this shift.</DialogDescription></DialogHeader>
+      {choosing && <label className="space-y-1 text-sm"><span>Outlet</span>
+        <select className="h-11 w-full rounded-md border bg-background px-3" value={outlet} disabled={attempt.busy || attempt.uncertain} onChange={e => setOutlet(e.target.value)}>
+          <option value="">Choose the outlet this till is in</option>
+          {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select></label>}
       <label className="space-y-1 text-sm"><span>Cash in the till now (₦)</span>
         <Input inputMode="decimal" value={float} disabled={attempt.busy || attempt.uncertain} placeholder="0" onChange={e => setFloat(e.target.value)} /></label>
       <Problem text={problem || attempt.error} />
@@ -154,7 +163,7 @@ export function ShiftBar({ banks, refreshKey, onStatus }: { banks: Bank[]; refre
 
   return <section aria-label="Your shift" className="rounded-xl border bg-card p-3 text-sm flex flex-wrap items-center justify-between gap-3">
     {shift ? <div>
-      <p className="font-semibold">Shift open since {openedAt(shift)}{shift.overdue ? ` on ${shift.opened_on}` : ''}</p>
+      <p className="font-semibold">Shift open since {openedAt(shift)}{shift.overdue ? ` on ${shift.opened_on}` : ''}{shift.outlet ? ` at ${shift.outlet}` : ''}</p>
       <p className="text-muted-foreground">Expected cash in the till: <span className="font-semibold text-foreground">{naira(shift.expected_cash)}</span></p>
       {shift.overdue && <p className="text-amber-700">This shift has been open since before midnight. Close it and open a new one.</p>}
     </div> : <div>
@@ -170,7 +179,8 @@ export function ShiftBar({ banks, refreshKey, onStatus }: { banks: Bank[]; refre
       </> : <Button size="sm" onClick={() => setDialog('open')}>Open shift</Button>}
       <Button asChild size="sm" variant="ghost"><Link href="/pos/shifts">Shifts</Link></Button>
     </div>
-    <OpenShiftDialog open={dialog === 'open'} onClose={() => setDialog(null)} onDone={s => done(`Shift opened with ${naira(s.opening_float)} in the till.`)} />
+    <OpenShiftDialog open={dialog === 'open'} outlets={status.outlets} own={status.own_outlet} onClose={() => setDialog(null)}
+      onDone={s => done(`Shift opened${s.outlet ? ` at ${s.outlet}` : ''} with ${naira(s.opening_float)} in the till.`)} />
     {shift && <CashMovementDialog shift={shift} accounts={status.pay_out_accounts ?? []} banks={banks} open={dialog === 'move'}
       onClose={() => setDialog(null)} onDone={(_, text) => done(text)} />}
     {shift && <CloseShiftDialog shift={shift} open={dialog === 'close'} onClose={() => setDialog(null)}

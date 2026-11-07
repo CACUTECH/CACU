@@ -606,3 +606,40 @@ from cacu.accounting.purchasing import GoodsBill,bill_received
 def bill_received_goods(business_id:UUID,data:GoodsBill,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True,permission='expenses.post') as session:
         return bill_received(session,user_id,data)
+
+# Purchasing part 4a: stock per outlet.
+from cacu.accounting import outlets as outlet_stock
+
+@app.get('/api/v1/businesses/{business_id}/outlets')
+def business_outlets(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return {'outlets':outlet_stock.listed(session),'own':outlet_stock.assigned(session,user_id)}
+
+@app.get('/api/v1/businesses/{business_id}/outlet-stock')
+def stock_by_outlet(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return outlet_stock.stock(session)
+
+# Purchasing part 4b: transfers between outlets (send, then receive; a shortfall on arrival is a loss).
+from typing import Literal
+from cacu.accounting.stock_transfers import TransferReceive,TransferSend,detail as transfer_detail,list_transfers,receive as receive_transfer,send as send_transfer
+
+@app.get('/api/v1/businesses/{business_id}/stock-transfers')
+def stock_transfers(business_id:UUID,status:Literal['in_transit','received']|None=None,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return list_transfers(session,status)
+
+@app.post('/api/v1/businesses/{business_id}/stock-transfers')
+def create_stock_transfer(business_id:UUID,data:TransferSend,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.post') as session:
+        return send_transfer(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/stock-transfers/{transfer_id}')
+def stock_transfer(business_id:UUID,transfer_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return transfer_detail(session,transfer_id)
+
+@app.post('/api/v1/businesses/{business_id}/stock-transfers/{transfer_id}/receive')
+def receive_stock_transfer(business_id:UUID,transfer_id:UUID,data:TransferReceive,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.post') as session:
+        return receive_transfer(session,user_id,transfer_id,data)

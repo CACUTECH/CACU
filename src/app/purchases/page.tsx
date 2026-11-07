@@ -54,6 +54,7 @@ export default function PurchasesPage() {
             {FILTERS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select></label>
         <Button asChild variant="outline"><Link href="/purchases/receipts">Goods received</Link></Button>
+        <Button asChild variant="outline"><Link href="/purchases/stock">Stock by outlet</Link></Button>
         <Button disabled={!businessId || allowed === false} onClick={() => setCreating(true)}>New order</Button>
       </div>
     </div>

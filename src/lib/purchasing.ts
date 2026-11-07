@@ -66,7 +66,16 @@ export function whatsappNumber(phone: string | null | undefined) {
 // Goods received (part 2): stock goes up at the actual cost; the receipt is owed to the supplier until billed.
 export type ReceiptSummary = {
   id: string; number: string; order_id: string | null; order_number: string | null; supplier_id: string; supplier_name: string | null;
-  received_on: string; total: string; note: string;
+  received_on: string; total: string; note: string; location_id?: string | null; outlet?: string | null;
 };
+export type Outlet = { id: string; name: string; is_active: boolean };
+/** Outlets a person can work at: `own` is set when they are tied to one outlet. */
+export type Outlets = { outlets: Outlet[]; own: string | null };
+export type TransferLine = { item_id: string; name: string; quantity: number; received_quantity: number | null; lost_quantity: number | null };
+export type Transfer = {
+  id: string; number: string; status: 'in_transit' | 'received'; from_location: string; to_location: string; from_name: string | null; to_name: string | null;
+  note: string; sent_on: string; received_on: string | null; receive_note: string | null; loss_value: string | null; items: number | null; lines?: TransferLine[];
+};
+export type OutletStock = { outlets: Outlet[]; items: { id: string; name: string; total: number; outlets: Record<string, number>; in_transit: number }[] };
 export type ReceiptLine = { item_id: string; name: string; quantity: number; unit_cost: string; amount: string; returned_quantity: number; billed_quantity: number; returnable: number };
 export type GoodsReceipt = ReceiptSummary & { lines: ReceiptLine[]; returns: { id: string; reason: string; returned_on: string; total: string }[] };
