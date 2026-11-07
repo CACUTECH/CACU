@@ -25,6 +25,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/pos/shifts': 'Shifts',
   '/appointments/staff': 'Staff and hours',
   '/appointments/settings': 'Deposits and cancellations',
+  '/purchases': 'Purchase orders',
   '/pos/receipt': 'Receipt',
   '/transactions': 'Transactions',
   '/reconciliation': 'Reconciliation',

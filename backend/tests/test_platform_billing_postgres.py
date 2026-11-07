@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import json
 import os
-from datetime import timedelta
+from datetime import timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -571,7 +571,7 @@ def test_monthly_to_yearly_is_paid_now_less_the_unused_month_and_starts_a_year(g
     gateway.pay(invoice)
     assert service.verify_return(ident, owner, Verification(reference=invoice['reference']))['outcome'] == 'activated'
     plan_code, status, start, end, _, interval = subscription(ident)
-    assert (plan_code, status, interval) == (plan, 'active', 'annual') and end.year == start.year + 1 and start.isoformat().startswith('2026-11-02T10:00')
+    assert (plan_code, status, interval) == (plan, 'active', 'annual') and end.year == start.year + 1 and start.astimezone(timezone.utc).isoformat().startswith('2026-11-02T10:00')
 
 
 def test_yearly_to_monthly_waits_for_the_end_of_the_year_and_renews_monthly(gateway):
