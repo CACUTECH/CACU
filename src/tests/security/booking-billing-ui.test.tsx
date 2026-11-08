@@ -10,6 +10,7 @@ import { receiptText } from '@/lib/checkout';
 import { addDays, lagosInstant } from '@/lib/bookings';
 import { lagosToday } from '@/lib/transfers';
 
+jest.mock('@/app/pos/offline-actions', () => ({ syncOfflineSaleAction: jest.fn(), offlineReviewAction: jest.fn(), decideOfflineSaleAction: jest.fn() }));
 jest.mock('@/app/appointments/actions', () => ({ getBookingMoneyAction: jest.fn(), getBookingBillAction: jest.fn(), billByInvoiceAction: jest.fn(),
   takeDepositAction: jest.fn(), closeBookingAction: jest.fn() }));
 jest.mock('@/app/jobs/actions', () => ({ getJobMoneyAction: jest.fn() }));

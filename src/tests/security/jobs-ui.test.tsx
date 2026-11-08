@@ -8,6 +8,7 @@ import { getCheckoutOptionsAction, processCheckoutAction } from '@/app/pos/actio
 import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
 import { jobError, matchesJob } from '@/lib/jobs';
 
+jest.mock('@/app/pos/offline-actions', () => ({ syncOfflineSaleAction: jest.fn(), offlineReviewAction: jest.fn(), decideOfflineSaleAction: jest.fn() }));
 jest.mock('@/app/jobs/actions', () => ({ getJobMoneyAction: jest.fn(), completeJobAction: jest.fn(), billJobByInvoiceAction: jest.fn() }));
 jest.mock('@/app/appointments/actions', () => ({ getBookingBillAction: jest.fn() }));
 jest.mock('@/app/pos/actions', () => ({ getCheckoutOptionsAction: jest.fn(), processCheckoutAction: jest.fn() }));

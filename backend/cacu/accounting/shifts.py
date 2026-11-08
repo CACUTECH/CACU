@@ -119,7 +119,8 @@ def _expected(row):
 def _row(session,r,actor=None,today=None):
     today=today or business_today(session)
     from cacu.accounting.outlets import name
-    return {'id':str(r.id),'status':r.status,'opened_by_name':r.opened_by_name,'outlet':name(session,getattr(r,'location_id',None)),'mine':actor is not None and str(r.opened_by)==str(actor),
+    return {'id':str(r.id),'status':r.status,'opened_by_name':r.opened_by_name,'outlet':name(session,getattr(r,'location_id',None)),
+            'location_id':str(r.location_id) if getattr(r,'location_id',None) else None,'mine':actor is not None and str(r.opened_by)==str(actor),
             'opened_at':r.opened_at.isoformat(),'opened_on':r.opened_on.isoformat(),'overdue':r.status=='open' and r.opened_on<today,
             'opening_float':_money(r.opening_float),'sales':r.sales,'cash_sales':_money(r.cash_sales),'cash_refunds':_money(-r.cash_refunds),
             'pay_ins':_money(r.pay_ins),'pay_outs':_money(-r.pay_outs),'cash_handed_back':_money(-r.handed_back),'deposits':_money(r.deposits),

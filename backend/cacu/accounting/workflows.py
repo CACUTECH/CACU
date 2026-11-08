@@ -2,6 +2,7 @@
 from datetime import date,datetime
 from decimal import Decimal,ROUND_HALF_UP
 import hashlib,json
+from types import SimpleNamespace
 from uuid import UUID,uuid5,NAMESPACE_URL
 from typing import Literal
 from fastapi import HTTPException
@@ -204,22 +205,25 @@ def sales_policy(session):
     row=raw(session,'SELECT allow_oversell FROM accounting.sales_policy WHERE business_id=%s',(str(session.business_id),)).first()
     return {'allow_oversell':bool(row and row.allow_oversell)}
 
-def sale_create(session,actor,data:SaleCreate):
+def sale_create(session,actor,data:SaleCreate,offline=None):
     """Doc 10 checkout: prices from the catalogue; line discounts within the member's cap (sales.edit); cash, transfer
-    (waits for confirmation, BR-010), split cash and transfer, or credit to a named customer (an issued invoice)."""
+    (waits for confirmation, BR-010), split cash and transfer, or credit to a named customer (an issued invoice).
+    offline (E17): {'prices': {item: price}, 'outlet': id} for a sale made offline and checked on sync. It is sold at those
+    prices, from that outlet, any stock shortfall is listed rather than refused, and no open shift is required."""
     def execute():
         tenant=str(session.business_id);method=data.method
         if method=='Card':raise HTTPException(409,'Card payments are not available yet')
         if len({i.item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate sale item')
         from cacu.accounting.shifts import before_sale,tag
-        before_sale(session,actor)
+        if offline is None:before_sale(session,actor)
         from cacu.accounting import outlets
-        outlets.use(session,outlets.selling(session,actor))
+        outlets.use(session,offline['outlet'] if offline and offline.get('outlet') else outlets.selling(session,actor))
         if data.customer_id is not None and method!='Credit':raise HTTPException(422,'Only a credit sale names a customer here')
         cap=Decimal(raw(session,'SELECT authz.discount_cap(%s)',(tenant,)).scalar() or 0)
         total=Decimal('0');discounts=Decimal('0');items=[];stock=[]
         for item in sorted(data.items,key=lambda x:str(x.item_id)):
             row=raw(session,"SELECT name,unit_price,item_type,coalesce((to_jsonb(catalog_items)->>'track_stock')::boolean,true) AS track_stock FROM public.catalog_items WHERE id=%s AND business_id=%s AND is_active FOR UPDATE",(str(item.item_id),tenant)).first()
+            if row and offline:row=SimpleNamespace(**{**row._mapping,'unit_price':Decimal(offline['prices'][str(item.item_id)])})
             if not row or row.unit_price<=0:raise HTTPException(409,'Sale item unavailable')
             percent=Decimal(item.discount_percent)
             if percent>0:
@@ -299,7 +303,7 @@ def sale_create(session,actor,data:SaleCreate):
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='pos',source_id=data.request_key,
             main_account_id=main,entry_date=data.entry_date,narration='POS sale',payment_method=method,
             main_amount=format(cash_part,'.2f') if method=='Split' else None,lines=lines,stock=stock)
-        posting=post_command(session,actor,cmd,allow_shortfall=sales_policy(session)['allow_oversell'],preissued=preissued)
+        posting=post_command(session,actor,cmd,allow_shortfall=offline is not None or sales_policy(session)['allow_oversell'],preissued=preissued)
         if pending:
             waiting=transfer_part if method=='Split' else total-applied
             raw(session,"""INSERT INTO accounting.pending_transfer(business_id,id,source_type,amount,entry_date,expected_bank_account_id,created_by)

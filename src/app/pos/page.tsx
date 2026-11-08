@@ -25,6 +25,8 @@ import { getBookingBillAction } from '@/app/appointments/actions';
 import type { BookingBill } from '@/lib/bookings';
 import { getJobMoneyAction } from '@/app/jobs/actions';
 import { matchesJob, type JobMoney } from '@/lib/jobs';
+import { keepSale, loadSnapshot, online, saveSnapshot } from '@/lib/offline-outbox';
+import { useOfflineSync } from '@/hooks/use-offline-sync';
 
 type CatalogItem = { id: string; name: string; price: number; sku?: string; quantity?: number; type?: string; track_stock?: boolean; status: string; }
 type CartItem = CatalogItem & { cartQuantity: number; discount: string }
@@ -37,6 +39,10 @@ const METHODS: { value: Method; label: string }[] = [
 ];
 
 const tracked = (item: CatalogItem) => item.type === 'PRODUCT' && item.track_stock !== false;
+// Who is signed in on this phone, from the stored session (works offline); null when unknown.
+const signedIn = async (client: ReturnType<typeof createClient>) => {
+    try { return (await client.auth.getSession()).data.session?.user.id ?? null; } catch { return null; }
+};
 
 // useSearchParams needs a Suspense boundary for the production build.
 export default function POSPage() {
@@ -75,6 +81,14 @@ function PointOfSale() {
     const jobId = search?.get('job') ?? null;
     const [job, setJob] = React.useState<JobMoney | null>(null);
     const [bill, setBill] = React.useState<BookingBill | null>(null);
+    // Doc 10 E17: without a connection the till keeps selling for cash or transfer; sales wait on this phone until sent.
+    const [userId, setUserId] = React.useState<string | null>(null);
+    const [savedAt, setSavedAt] = React.useState<string | null>(null);
+    React.useEffect(() => { void signedIn(supabase).then(setUserId); }, [supabase]);
+    // The till opens again without a connection (public/sw.js keeps its last copy).
+    React.useEffect(() => { if ('serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js').catch(() => {}); }, []);
+    const sync = useOfflineSync(businessId, userId);
+    const waiting = sync.entries.filter(e => e.user_id === userId && e.status === 'pending').length;
 
     const native = collectionChoices?.native === true;
     const cap = Number(options?.discount_cap ?? 0);
@@ -95,17 +109,39 @@ function PointOfSale() {
                 .select('*, type:item_type, price:unit_price, quantity:stock_quantity').eq('business_id', businessId)
                 .eq('is_active', true)
                 .order('name');
-            if (!error) setInventory(data || []);
+            if (!error) { setInventory(data || []); setSavedAt(null); }
             if (choices.native) {
                 const { data: people } = await supabase.from('customers').select('id, name').eq('business_id', businessId).order('name').limit(500);
                 setCustomers(people || []);
             }
             setLoading(false);
         } catch {
-            toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            // Offline: sell from the catalogue this phone saved last time, if there is one.
+            let remembered: string | null = null;
+            try { remembered = window.localStorage.getItem('cacu-offline-business'); } catch { /* storage blocked */ }
+            const id = await getActiveBusinessIdAction().catch(() => remembered);
+            const who = await signedIn(supabase);
+            const snapshot = !online() && id && who ? await loadSnapshot(id, who).catch(() => null) : null;
+            if (snapshot) {
+                setBusinessId(id); setUserId(who ?? null);
+                setInventory(snapshot.items as CatalogItem[]); setSavedAt(snapshot.saved_at);
+                setCollectionChoices({ native: true, accounts: snapshot.banks as CollectionAccounts['accounts'] });
+                setOptions({ discount_cap: snapshot.discount_cap, allow_oversell: true }); setTaxRate(0);
+            } else {
+                toast({ variant: "destructive", title: "Business data unavailable", description: "Refresh your session and active business selection, then retry." });
+            }
             setLoading(false);
         }
     }, [supabase, toast]);
+
+    // Keep a copy of the catalogue on this phone for selling offline.
+    React.useEffect(() => {
+        if (!businessId || !userId || savedAt || collectionChoices?.native !== true || inventory.length === 0) return;
+        try { window.localStorage.setItem('cacu-offline-business', businessId); } catch { /* storage blocked */ }
+        void saveSnapshot(businessId, userId, { saved_at: new Date().toISOString(), items: inventory,
+            banks: (collectionChoices?.accounts ?? []).map(a => ({ ...a })), discount_cap: options?.discount_cap ?? '0',
+            location_id: shiftStatus?.shift?.location_id ?? null }).catch(() => {});
+    }, [businessId, userId, savedAt, inventory, collectionChoices, options, shiftStatus]);
 
     React.useEffect(() => { fetchInventory(); }, [fetchInventory]);
 
@@ -193,7 +229,10 @@ function PointOfSale() {
     const cashKobo = /^\d+(\.\d{1,2})?$/.test(cashReceived) ? kobo(cashReceived) : null;
     // Doc 10 shifts: when the owner requires one, nobody sells without an open shift.
     const needsShift = native && shiftStatus?.available === true && shiftStatus.require_shift && !shiftStatus.shift;
-    const problem = !native ? '' : needsShift ? 'Open your shift before selling. The owner requires a shift for every sale.'
+    const offlineNow = native && !sync.connected;
+    const problem = !native ? '' : offlineNow && !['Cash', 'Transfer'].includes(paymentMethod) ? 'Without internet, take cash or a transfer.'
+        : offlineNow && (bill || job) ? 'Bookings and jobs need the internet to take payment.'
+        : !offlineNow && needsShift ? 'Open your shift before selling. The owner requires a shift for every sale.'
         : bill?.deposit?.status === 'awaiting_transfer' ? "This booking's deposit transfer is still awaiting confirmation. Confirm it on Daily reconciliation first."
         : depositKobo > 0 && !['Cash', 'Transfer'].includes(paymentMethod) ? 'A booking with a deposit is paid in cash or by transfer. Bill it by invoice for credit.'
         : depositKobo > totalKobo ? 'The deposit is more than this sale. Add the booked service at its full price.'
@@ -241,8 +280,29 @@ function PointOfSale() {
     };
 
     const checkoutKey = React.useRef(crypto.randomUUID());
+    // Offline: the sale waits on this phone under its request key, at the prices shown, until it is sent.
+    const keepOffline = async () => {
+        if (!businessId || !userId) { toast({ variant: "destructive", title: "Not saved", description: "Sign in again when you are back online." }); return; }
+        try {
+            await keepSale({ key: checkoutKey.current, business_id: businessId, user_id: userId, names: Object.fromEntries(cart.map(i => [i.id, i.name])),
+                payload: { request_key: checkoutKey.current, sold_at: new Date().toISOString(), method: paymentMethod === 'Transfer' ? 'Transfer' : 'Cash',
+                    bank_account_id: paymentMethod === 'Transfer' && bankAccountId ? bankAccountId : null,
+                    cash_received: paymentMethod === 'Cash' && cashReceived ? cashReceived : null,
+                    location_id: shiftStatus?.shift?.location_id ?? null, quoted_total: formatKobo(totalKobo),
+                    items: cart.map(i => ({ item_id: i.id, quantity: i.cartQuantity, unit_price: Number(i.price).toFixed(2), discount_percent: i.discount || '0' })) } });
+        } catch {
+            toast({ variant: "destructive", title: "Not saved", description: "This phone could not keep the sale. Write it down and record it when you are back online." });
+            return;
+        }
+        setInventory(prev => prev.map(i => { const sold = cart.find(c => c.id === i.id); return sold && tracked(i) ? { ...i, quantity: (i.quantity || 0) - sold.cartQuantity } : i; }));
+        setDone({ saleId: checkoutKey.current, status: 'offline', change: change !== null ? formatKobo(change) : null, invoiceNumber: null, shortfalls: [] });
+        checkoutKey.current = crypto.randomUUID();
+        setCart([]); setCashReceived(''); setTransferAmount(''); setIsCheckoutOpen(false);
+        void sync.refresh();
+    };
     const handleCheckout = async () => {
         if (taxRate === null || !collectionChoices || isProcessing || problem) return;
+        if (native && !online()) { setIsProcessing(true); await keepOffline(); setIsProcessing(false); return; }
         setIsProcessing(true);
         const result = await processCheckoutAction({
             requestKey: checkoutKey.current,
@@ -284,7 +344,13 @@ function PointOfSale() {
                 </div>
             </div>
 
-            {native && <ShiftBar banks={collectionChoices?.accounts ?? []} refreshKey={done?.saleId} onStatus={setShiftStatus} />}
+            {native && (!sync.connected || waiting > 0 || savedAt) && <div role="status" className={cn("rounded-xl border p-3 text-sm flex flex-wrap items-center justify-between gap-2",
+                sync.connected ? "bg-card" : "border-amber-300 bg-amber-50 text-amber-950")}>
+                <span>{!sync.connected ? `You are offline. Cash and transfer sales are kept on this phone and sent when you are back online.${savedAt ? ` Prices as saved on ${new Date(savedAt).toLocaleString('en-NG', { timeZone: 'Africa/Lagos', dateStyle: 'medium', timeStyle: 'short' })}.` : ''}`
+                    : sync.syncing ? 'Sending offline sales…' : `${waiting} offline sale${waiting === 1 ? '' : 's'} waiting to send.`}</span>
+                <Button asChild size="sm" variant="outline"><Link href="/settings/offline">Offline sales</Link></Button>
+            </div>}
+            {native && sync.connected && <ShiftBar banks={collectionChoices?.accounts ?? []} refreshKey={done?.saleId} onStatus={setShiftStatus} />}
 
             {job && <div role="status" className="rounded-xl border bg-card p-4 text-sm">
                 <p className="font-semibold">Taking payment for {job.number ?? 'a job'}.</p>
@@ -297,13 +363,14 @@ function PointOfSale() {
 
             {done && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <p className="font-semibold">{done.status === 'credit' ? `Credit sale recorded as invoice ${done.invoiceNumber}.`
+                    <p className="font-semibold">{done.status === 'offline' ? 'Sale saved on this phone. It will be sent when you are back online.'
+                        : done.status === 'credit' ? `Credit sale recorded as invoice ${done.invoiceNumber}.`
                         : done.status === 'pending_payment' ? 'Sale recorded. The transfer is awaiting confirmation on Daily reconciliation.' : 'Sale recorded.'}</p>
                     {done.change && Number(done.change) > 0 && <p className="text-lg font-bold">Give change: ₦{Number(done.change).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</p>}
                     {done.shortfalls.length > 0 && <p>Sold more than recorded stock. The owner reviews this on Daily reconciliation.</p>}
                 </div>
                 <div className="flex gap-2">
-                    {done.status !== 'credit' && <Button asChild size="sm"><Link href={`/pos/receipt/${done.saleId}`}>Receipt</Link></Button>}
+                    {!['credit', 'offline'].includes(done.status) && <Button asChild size="sm"><Link href={`/pos/receipt/${done.saleId}`}>Receipt</Link></Button>}
                     <Button size="sm" variant="outline" onClick={() => setDone(null)}>Next sale</Button>
                 </div>
             </div>}

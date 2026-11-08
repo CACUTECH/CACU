@@ -11,6 +11,7 @@ import { useBusiness } from '@/components/business-provider';
 import { differenceKobo, differenceText } from '@/lib/shifts';
 import { highlights } from '@/lib/billing';
 
+jest.mock('@/app/pos/offline-actions', () => ({ syncOfflineSaleAction: jest.fn(), offlineReviewAction: jest.fn(), decideOfflineSaleAction: jest.fn() }));
 jest.mock('@/app/pos/shift-actions', () => ({ getShiftAction: jest.fn(), listShiftsAction: jest.fn(), openShiftAction: jest.fn(),
   cashMovementAction: jest.fn(), closeShiftAction: jest.fn(), saveShiftPolicyAction: jest.fn() }));
 jest.mock('@/app/appointments/actions', () => ({ getBookingBillAction: jest.fn() }));
