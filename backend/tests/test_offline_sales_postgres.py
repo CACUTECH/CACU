@@ -95,3 +95,39 @@ def test_unusual_offline_sales_wait_for_review_and_an_approver_posts_or_discards
         call(live, 'owner', lambda s, a: decide(s, a, old.request_key, OfflineDecision(decision='post')))
     assert [s['reason'] for s in call(live, 'owner', lambda s, a: review_list(s, a))['sales']] == ['discount']
     books_balance(live)
+
+
+def expense(live, account, amount='2500.00', ago=timedelta(minutes=5), day=None, key=None):
+    from cacu.accounting.offline import OfflineExpense
+    from test_activation_postgres import TODAY
+    return OfflineExpense(request_key=key or uuid4(), recorded_at=NOW() - ago, expense_account_id=account, amount=amount,
+                          entry_date=day or TODAY, method='Cash', description='Diesel for the generator')
+
+
+def test_expenses_recorded_offline_post_once_and_unusual_ones_wait_for_an_owner_or_admin(live):
+    from cacu.accounting.offline import sync_expense
+    from test_activation_postgres import TODAY
+    fuel = live.codes['6300']
+    cash, spent = balance(live, '1000'), balance(live, '6300')
+    data = expense(live, fuel)
+    assert call(live, 'editor', lambda s, a: sync_expense(s, a, data))['status'] == 'posted'
+    assert call(live, 'editor', lambda s, a: sync_expense(s, a, data))['status'] == 'posted'  # a retry posts once
+    assert balance(live, '6300') - spent == Decimal('2500') and balance(live, '1000') - cash == Decimal('-2500')
+    late = expense(live, fuel, ago=timedelta(days=9))
+    assert call(live, 'editor', lambda s, a: sync_expense(s, a, late))['reason'] == 'too_old'
+    early = expense(live, fuel, day=TODAY - timedelta(days=400))
+    assert call(live, 'editor', lambda s, a: sync_expense(s, a, early))['reason'] == 'closed_period'
+    gone = expense(live, uuid4())
+    assert call(live, 'editor', lambda s, a: sync_expense(s, a, gone))['reason'] == 'account_unavailable'
+
+    mine = call(live, 'editor', lambda s, a: review_list(s, a))
+    assert {(e['kind'], e['reason'], e['can_decide']) for e in mine['sales']} == {('expense', 'too_old', False), ('expense', 'closed_period', False),
+                                                                                  ('expense', 'account_unavailable', False)}
+    with pytest.raises(HTTPException, match='Only Owners and Admins'):
+        call(live, 'editor', lambda s, a: decide(s, a, late.request_key, OfflineDecision(decision='post')))
+    assert call(live, 'admin', lambda s, a: decide(s, a, late.request_key, OfflineDecision(decision='post', note='Paid last week')))['status'] == 'posted'
+    assert balance(live, '6300') - spent == Decimal('5000')
+    with pytest.raises(HTTPException, match='no longer in the chart'):
+        call(live, 'owner', lambda s, a: decide(s, a, gone.request_key, OfflineDecision(decision='post')))
+    assert call(live, 'owner', lambda s, a: decide(s, a, gone.request_key, OfflineDecision(decision='discard', note='Recorded again')))['status'] == 'discarded'
+    books_balance(live)

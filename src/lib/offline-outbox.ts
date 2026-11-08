@@ -7,8 +7,16 @@ export type OfflinePayload = {
   location_id: string | null; quoted_total: string;
   items: { item_id: string; quantity: number; unit_price: string; discount_percent: string }[];
 };
+export type OfflineExpensePayload = {
+  request_key: string; recorded_at: string; expense_account_id: string; amount: string; entry_date: string;
+  method: 'Cash' | 'Transfer'; bank_account_id: string | null; description: string;
+};
 export type OutboxStatus = 'pending' | 'posted' | 'review' | 'failed';
-export type OutboxEntry = {
+type Common = { key: string; business_id: string; user_id: string; names: Record<string, string>;
+  status: OutboxStatus; detail: string | null; attempts: number; created_at: string; updated_at: string };
+/** A sale (the default, for entries kept before expenses could be) or an expense. */
+export type OutboxEntry = Common & ({ kind?: 'sale'; payload: OfflinePayload } | { kind: 'expense'; payload: OfflineExpensePayload });
+type LegacyEntry = {
   key: string; business_id: string; user_id: string; payload: OfflinePayload; names: Record<string, string>;
   status: OutboxStatus; detail: string | null; attempts: number; created_at: string; updated_at: string;
 };
@@ -47,9 +55,15 @@ async function run<T>(store: string, mode: IDBTransactionMode, work: (s: IDBObje
 }
 
 /** Keeps a sale on this device. A sale already kept under the same key is not replaced. */
-export async function keepSale(entry: Omit<OutboxEntry, 'status' | 'detail' | 'attempts' | 'created_at' | 'updated_at'>) {
+export async function keepSale(entry: Omit<LegacyEntry, 'status' | 'detail' | 'attempts' | 'created_at' | 'updated_at'>) {
   const now = new Date().toISOString();
-  await run(SALES, 'readwrite', s => s.add({ ...entry, status: 'pending', detail: null, attempts: 0, created_at: now, updated_at: now }));
+  await run(SALES, 'readwrite', s => s.add({ ...entry, kind: 'sale', status: 'pending', detail: null, attempts: 0, created_at: now, updated_at: now }));
+}
+
+/** Keeps an expense on this device, like a sale. */
+export async function keepExpense(entry: { key: string; business_id: string; user_id: string; payload: OfflineExpensePayload; names: Record<string, string> }) {
+  const now = new Date().toISOString();
+  await run(SALES, 'readwrite', s => s.add({ ...entry, kind: 'expense', status: 'pending', detail: null, attempts: 0, created_at: now, updated_at: now }));
 }
 
 export async function salesOnDevice(businessId: string): Promise<OutboxEntry[]> {

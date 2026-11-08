@@ -645,19 +645,25 @@ def receive_stock_transfer(business_id:UUID,transfer_id:UUID,data:TransferReceiv
         return receive_transfer(session,user_id,transfer_id,data)
 
 # Offline selling (E17): sales made offline are checked and posted on sync; anything unusual waits for review.
-from cacu.accounting.offline import OfflineDecision,OfflineSale,decide as decide_offline,review_list as offline_review,sync as sync_offline
+from cacu.accounting.offline import OfflineDecision,OfflineExpense,OfflineSale,decide as decide_offline,review_list as offline_review,sync as sync_offline,sync_expense
 
 @app.post('/api/v1/businesses/{business_id}/sales/offline')
 def sync_offline_sale(business_id:UUID,data:OfflineSale,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True,permission='sales.post') as session:
         return sync_offline(session,user_id,data)
 
-@app.get('/api/v1/businesses/{business_id}/sales/offline-review')
-def offline_sales_for_review(business_id:UUID,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,permission='sales.view') as session:
+@app.post('/api/v1/businesses/{business_id}/expenses/offline')
+def sync_offline_expense(business_id:UUID,data:OfflineExpense,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='expenses.post') as session:
+        return sync_expense(session,user_id,data)
+
+# Who may see and decide each entry is checked per entry: sales by sales approvers, expenses by Owners and Admins.
+@app.get('/api/v1/businesses/{business_id}/offline-review')
+def offline_entries_for_review(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
         return offline_review(session,user_id)
 
-@app.post('/api/v1/businesses/{business_id}/sales/offline-review/{sale_id}')
-def decide_offline_sale(business_id:UUID,sale_id:UUID,data:OfflineDecision,user_id:UUID=Depends(current_user)):
-    with library_transaction(user_id,business_id,write=True,permission='sales.approve') as session:
-        return decide_offline(session,user_id,sale_id,data)
+@app.post('/api/v1/businesses/{business_id}/offline-review/{entry_id}')
+def decide_offline_entry(business_id:UUID,entry_id:UUID,data:OfflineDecision,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True) as session:
+        return decide_offline(session,user_id,entry_id,data)

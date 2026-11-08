@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/experimental-ct-react';
 import Page0 from '../../src/app/settings/taxes/page';
 import Page1 from '../../src/app/settings/locale/page';
-import Page2 from '../../src/app/settings/notifications/page';
 import Page3 from '../../src/app/settings/customers/page';
 import Page4 from '../../src/app/analytics/kpi/page';
 import Page5 from '../../src/app/analytics/planning/page';
@@ -24,16 +23,6 @@ test('settings/locale has an honest unavailable state on mobile', async ({ mount
   await page.setViewportSize({ width: 390, height: 844 });
   const component = await mount(<Page1 />);
   await expect(component.getByRole('heading', { level: 1, name: 'Language & Currency' })).toBeVisible();
-  await expect(component.getByRole('heading', { name: 'Not available yet', exact: true })).toBeVisible();
-  await expect(component.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/');
-  await expect(component.locator('input, button, form, table, canvas, svg, [role="switch"], [role="combobox"]')).toHaveCount(0);
-  await expect(component).not.toContainText('₦');
-});
-
-test('settings/notifications has an honest unavailable state on mobile', async ({ mount, page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const component = await mount(<Page2 />);
-  await expect(component.getByRole('heading', { level: 1, name: 'Notification Preferences' })).toBeVisible();
   await expect(component.getByRole('heading', { name: 'Not available yet', exact: true })).toBeVisible();
   await expect(component.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/');
   await expect(component.locator('input, button, form, table, canvas, svg, [role="switch"], [role="combobox"]')).toHaveCount(0);

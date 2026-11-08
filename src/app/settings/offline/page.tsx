@@ -15,22 +15,25 @@ const STATUS: Record<string, string> = { pending: 'Waiting to send', review: 'Se
 const when = (iso: string) => new Date(iso).toLocaleString('en-NG', { timeZone: 'Africa/Lagos', dateStyle: 'medium', timeStyle: 'short' });
 const naira = (value: string) => `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
 
-function ReviewItem({ sale, canDecide, onDone }: { sale: ReviewSale; canDecide: boolean; onDone: (text: string) => void }) {
+function ReviewItem({ sale, onDone }: { sale: ReviewSale; onDone: (text: string) => void }) {
+  const canDecide = sale.can_decide;
   const [note, setNote] = React.useState(''), [busy, setBusy] = React.useState(false), [error, setError] = React.useState('');
   const decide = async (decision: 'post' | 'discard') => {
     setBusy(true); setError('');
     const result = await decideOfflineSaleAction(sale.id, decision, note.trim());
     setBusy(false);
-    if (result.success) onDone(decision === 'post' ? 'Sale posted as sold.' : 'Sale discarded.'); else setError(result.error);
+    if (result.success) onDone(decision === 'post' ? (sale.kind === 'expense' ? 'Expense posted.' : 'Sale posted as sold.') : (sale.kind === 'expense' ? 'Expense discarded.' : 'Sale discarded.'));
+    else setError(result.error);
   };
   return <li className="space-y-2 p-3 text-sm">
-    <p className="font-medium">{naira(sale.total)} by {sale.method === 'Transfer' ? 'transfer' : 'cash'}, {when(sale.sold_at)}, sold by {sale.seller}</p>
-    <p>{sale.items.map(i => `${i.quantity} x ${i.name} at ${naira(i.unit_price)}${Number(i.discount_percent) > 0 ? ` less ${i.discount_percent}%` : ''}`).join('; ')}</p>
+    <p className="font-medium">{sale.kind === 'expense' ? 'Expense' : 'Sale'}: {naira(sale.total)} by {sale.method === 'Transfer' ? 'transfer' : 'cash'}, {when(sale.sold_at)}, {sale.kind === 'expense' ? 'recorded' : 'sold'} by {sale.seller}</p>
+    {sale.kind === 'expense' ? <p>{sale.description} ({sale.account}), dated {sale.entry_date}</p>
+      : <p>{sale.items.map(i => `${i.quantity} x ${i.name} at ${naira(i.unit_price)}${Number(i.discount_percent) > 0 ? ` less ${i.discount_percent}%` : ''}`).join('; ')}</p>}
     <p className="text-amber-700">{sale.reason_text}{sale.detail ? `: ${sale.detail}` : ''}.</p>
     {canDecide && <div className="flex flex-wrap items-end gap-2">
       <label className="space-y-1"><span>Note</span><Input className="h-9 w-64" maxLength={500} value={note} disabled={busy} onChange={e => setNote(e.target.value)} /></label>
-      <Button size="sm" disabled={busy} onClick={() => void decide('post')}>Post as sold</Button>
-      <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (note.trim().length < 3) { setError('Say why this sale is discarded.'); return; } void decide('discard'); }}>Discard</Button>
+      <Button size="sm" disabled={busy} onClick={() => void decide('post')}>{sale.kind === 'expense' ? 'Post expense' : 'Post as sold'}</Button>
+      <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (note.trim().length < 3) { setError(`Say why this ${sale.kind === 'expense' ? 'expense' : 'sale'} is discarded.`); return; } void decide('discard'); }}>Discard</Button>
     </div>}
     {error && <p role="alert" className="text-destructive">{error}</p>}
   </li>;
@@ -61,13 +64,16 @@ export default function OfflinePage() {
     if (!window.confirm('Discard this sale from this phone? It has not been recorded in CACU. Record it another way first.')) return;
     await forgetSale(entry.key); await sync.refresh(); setMessage('Removed from this phone.');
   };
-  const total = (entry: OutboxEntry) => naira(entry.payload.quoted_total);
+  const total = (entry: OutboxEntry) => naira(entry.kind === 'expense' ? entry.payload.amount : entry.payload.quoted_total);
+  const what = (entry: OutboxEntry) => entry.kind === 'expense' ? `Expense: ${entry.payload.description}`
+    : entry.payload.items.map(i => `${i.quantity} x ${entry.names[i.item_id] ?? 'item'}`).join(', ');
+  const at = (entry: OutboxEntry) => entry.kind === 'expense' ? entry.payload.recorded_at : entry.payload.sold_at;
 
   return <div className="max-w-3xl space-y-6">
-    <div><h1 className="font-headline text-3xl font-bold">Offline sales</h1>
-      <p className="text-muted-foreground">When the internet drops, the till keeps selling for cash or transfer. Sales wait on the phone that made them and are sent when it is back online. CACU checks each one before it counts.</p></div>
+    <div><h1 className="font-headline text-3xl font-bold">Offline sales and expenses</h1>
+      <p className="text-muted-foreground">When the internet drops, the till keeps selling for cash or transfer and expenses can still be recorded. They wait on the phone that made them and are sent when it is back online. CACU checks each one before it counts.</p></div>
     <p role="status" className={sync.connected ? 'text-emerald-700' : 'font-medium text-amber-700'}>
-      {sync.connected ? (sync.syncing ? 'Online. Sending sales…' : 'Online.') : 'Offline. Sales are kept on this phone until the connection returns.'}</p>
+      {sync.connected ? (sync.syncing ? 'Online. Sending…' : 'Online.') : 'Offline. Sales and expenses are kept on this phone until the connection returns.'}</p>
     {message && <p role="status" className="text-emerald-700">{message}</p>}
     {error && <p role="alert" className="text-destructive">{error}</p>}
 
@@ -79,8 +85,8 @@ export default function OfflinePage() {
         </div></div>
       {sync.entries.length === 0 ? <p className="text-sm text-muted-foreground">Nothing waiting on this phone.</p>
         : <ul className="divide-y rounded-xl border text-sm">{sync.entries.map(e => <li key={e.key} className="flex flex-wrap items-center justify-between gap-2 p-3">
-          <span><span className="font-medium">{total(e)}</span> by {e.payload.method === 'Transfer' ? 'transfer' : 'cash'}, {when(e.payload.sold_at)}
-            <span className="block text-muted-foreground">{e.payload.items.map(i => `${i.quantity} x ${e.names[i.item_id] ?? 'item'}`).join(', ')}</span>
+          <span><span className="font-medium">{total(e)}</span> by {e.payload.method === 'Transfer' ? 'transfer' : 'cash'}, {when(at(e))}
+            <span className="block text-muted-foreground">{what(e)}</span>
             {e.user_id !== userId && <span className="block text-amber-700">Made by someone else on this phone; it is sent when they sign in.</span>}
             {e.detail && <span className="block text-amber-700">{e.detail}</span>}</span>
           <span className="flex items-center gap-2"><span>{STATUS[e.status] ?? e.status}</span>
@@ -90,9 +96,9 @@ export default function OfflinePage() {
 
     {review && <section className="space-y-2">
       <h2 className="font-semibold">Waiting for review ({review.sales.length})</h2>
-      <p className="text-sm text-muted-foreground">{review.can_decide ? 'Post each as sold, or discard it with a reason.' : 'Someone who approves sales will post these or discard them.'}</p>
+      <p className="text-sm text-muted-foreground">{review.can_decide ? 'Post each one, or discard it with a reason.' : 'Someone who approves these will post them or discard them.'}</p>
       {review.sales.length === 0 ? <p className="text-sm text-muted-foreground">Nothing to review.</p>
-        : <ul className="divide-y rounded-xl border">{review.sales.map(s => <ReviewItem key={s.id} sale={s} canDecide={review.can_decide}
+        : <ul className="divide-y rounded-xl border">{review.sales.map(s => <ReviewItem key={s.id} sale={s}
           onDone={text => { setMessage(text); setVersion(v => v + 1); }} />)}</ul>}
     </section>}
   </div>;

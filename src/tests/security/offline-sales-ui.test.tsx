@@ -5,13 +5,14 @@ import POSPage from '@/app/pos/page';
 import OfflinePage from '@/app/settings/offline/page';
 import { getCheckoutOptionsAction, processCheckoutAction } from '@/app/pos/actions';
 import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
-import { decideOfflineSaleAction, offlineReviewAction, syncOfflineSaleAction } from '@/app/pos/offline-actions';
-import { forgetSale, keepSale, markSale, salesOnDevice, type OutboxEntry } from '@/lib/offline-outbox';
+import { decideOfflineSaleAction, offlineReviewAction, syncOfflineExpenseAction, syncOfflineSaleAction } from '@/app/pos/offline-actions';
+import { forgetSale, keepExpense, keepSale, markSale, salesOnDevice, type OfflinePayload, type OutboxEntry } from '@/lib/offline-outbox';
 
-jest.mock('@/app/pos/offline-actions', () => ({ syncOfflineSaleAction: jest.fn(), offlineReviewAction: jest.fn(), decideOfflineSaleAction: jest.fn() }));
-jest.mock('@/lib/offline-outbox', () => ({ keepSale: jest.fn().mockResolvedValue(undefined), salesOnDevice: jest.fn().mockResolvedValue([]),
+jest.mock('@/app/pos/offline-actions', () => ({ syncOfflineExpenseAction: jest.fn(), syncOfflineSaleAction: jest.fn(), offlineReviewAction: jest.fn(), decideOfflineSaleAction: jest.fn() }));
+jest.mock('@/lib/offline-outbox', () => ({ keepSale: jest.fn().mockResolvedValue(undefined), keepExpense: jest.fn().mockResolvedValue(undefined), salesOnDevice: jest.fn().mockResolvedValue([]),
   markSale: jest.fn(), forgetSale: jest.fn(), saveSnapshot: jest.fn().mockResolvedValue(undefined), loadSnapshot: jest.fn().mockResolvedValue(null),
   online: () => navigator.onLine !== false }));
+jest.mock('@/app/accounting/expenses/actions', () => ({ getExpensesAction: jest.fn(), recordExpenseAction: jest.fn(), reverseExpenseAction: jest.fn() }));
 jest.mock('@/app/pos/actions', () => ({ getCheckoutOptionsAction: jest.fn(), processCheckoutAction: jest.fn() }));
 jest.mock('@/app/accounting/collection-actions', () => ({ getCollectionAccountsAction: jest.fn() }));
 jest.mock('@/app/pos/shift-actions', () => ({ getShiftAction: jest.fn().mockResolvedValue({ success: true, data: null }) }));
@@ -38,10 +39,10 @@ jest.setTimeout(20000);
 let keys = 0;
 Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () => `key-${++keys}` });
 const setOnline = (value: boolean) => Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => value });
-const entry = (over: Partial<OutboxEntry> = {}): OutboxEntry => ({ key: 'k1', business_id: 'b1', user_id: 'u1', names: { beans: 'Beans' }, status: 'pending', detail: null,
-  attempts: 0, created_at: '2026-11-08T09:00:00Z', updated_at: '2026-11-08T09:00:00Z',
-  payload: { request_key: 'k1', sold_at: '2026-11-08T09:00:00Z', method: 'Cash', bank_account_id: null, cash_received: null, location_id: null, quoted_total: '3000.00',
-    items: [{ item_id: 'beans', quantity: 2, unit_price: '1500.00', discount_percent: '0' }] }, ...over });
+const salePayload: OfflinePayload = { request_key: 'k1', sold_at: '2026-11-08T09:00:00Z', method: 'Cash', bank_account_id: null, cash_received: null, location_id: null,
+  quoted_total: '3000.00', items: [{ item_id: 'beans', quantity: 2, unit_price: '1500.00', discount_percent: '0' }] };
+const entry = (over: Record<string, unknown> = {}) => ({ key: 'k1', business_id: 'b1', user_id: 'u1', names: { beans: 'Beans' }, status: 'pending', detail: null,
+  attempts: 0, created_at: '2026-11-08T09:00:00Z', updated_at: '2026-11-08T09:00:00Z', kind: 'sale', payload: salePayload, ...over }) as OutboxEntry;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -71,10 +72,10 @@ test('offline, the till keeps a cash sale on the phone at the prices shown and d
 });
 
 test('back online, sales are sent: posted ones leave the phone, review ones stay marked, approvers decide', async () => {
-  (salesOnDevice as jest.Mock).mockResolvedValue([entry(), entry({ key: 'k2', payload: { ...entry().payload, request_key: 'k2' } })]);
+  (salesOnDevice as jest.Mock).mockResolvedValue([entry(), entry({ key: 'k2', payload: { ...salePayload, request_key: 'k2' } })]);
   (syncOfflineSaleAction as jest.Mock).mockResolvedValueOnce({ success: true, data: { status: 'posted', sale_id: 'k1' } })
     .mockResolvedValueOnce({ success: true, data: { status: 'review', sale_id: 'k2', reason: 'price', detail: 'Beans: sold at ₦1,500.00, catalogue price then ₦1,800.00' } });
-  (offlineReviewAction as jest.Mock).mockResolvedValue({ success: true, data: { can_decide: true, sales: [{ id: 'k2', seller: 'Bisi', sold_at: '2026-11-08T09:00:00Z',
+  (offlineReviewAction as jest.Mock).mockResolvedValue({ success: true, data: { can_decide: true, sales: [{ id: 'k2', kind: 'sale', can_decide: true, seller: 'Bisi', sold_at: '2026-11-08T09:00:00Z',
     method: 'Cash', total: '3000.00', reason: 'price', reason_text: 'A price differs from the catalogue price at the time of the sale', detail: 'Beans: sold at ₦1,500.00, catalogue price then ₦1,800.00',
     items: [{ name: 'Beans', quantity: 2, unit_price: '1500.00', discount_percent: '0' }] }] } });
   (decideOfflineSaleAction as jest.Mock).mockResolvedValue({ success: true, data: { status: 'discarded', sale_id: 'k2' } });
@@ -99,4 +100,31 @@ test('a lost answer keeps the sale waiting and stops for now; a sale made by som
   await waitFor(() => expect(markSale).toHaveBeenCalledWith('k1', { attempts: 1, detail: 'Not sent yet. It will be tried again.' }));
   expect(syncOfflineSaleAction).toHaveBeenCalledTimes(1);
   expect(await screen.findByText(/Made by someone else on this phone/)).toBeInTheDocument();
+});
+
+test('offline, an expense waits on the phone and is sent with its own request', async () => {
+  const { default: ExpensesPage } = await import('@/app/accounting/expenses/page');
+  const { getExpensesAction } = await import('@/app/accounting/expenses/actions');
+  (getExpensesAction as jest.Mock).mockResolvedValue({ success: true, data: { native: true, accounts: [{ id: 'fuel', code: '6300', name: 'Fuel and power' }],
+    banks: [], expenses: [] } });
+  render(<ExpensesPage />);
+  await userEvent.selectOptions(await screen.findByLabelText('Expense account'), 'fuel');
+  await userEvent.type(screen.getByLabelText('Amount (NGN)'), '2500');
+  await userEvent.type(screen.getByLabelText('Description'), 'Diesel for the generator');
+  setOnline(false);
+  act(() => { window.dispatchEvent(new Event('offline')); });
+  await userEvent.click(screen.getByRole('button', { name: 'Record expense' }));
+  expect(await screen.findByText('Expense saved on this phone. It will be sent when you are back online.')).toBeInTheDocument();
+  expect(keepExpense).toHaveBeenCalledWith(expect.objectContaining({ business_id: 'b1', user_id: 'u1', payload: expect.objectContaining({
+    expense_account_id: 'fuel', amount: '2500', method: 'Cash', description: 'Diesel for the generator' }) }));
+  const { recordExpenseAction } = await import('@/app/accounting/expenses/actions');
+  expect(recordExpenseAction).not.toHaveBeenCalled();
+
+  (salesOnDevice as jest.Mock).mockResolvedValue([entry({ key: 'e1', kind: 'expense', payload: { request_key: 'e1', recorded_at: '2026-11-08T09:00:00Z',
+    expense_account_id: 'fuel', amount: '2500', entry_date: '2026-11-08', method: 'Cash', bank_account_id: null, description: 'Diesel' } })]);
+  (syncOfflineExpenseAction as jest.Mock).mockResolvedValue({ success: true, data: { status: 'posted', sale_id: 'e1' } });
+  setOnline(true);
+  act(() => { window.dispatchEvent(new Event('online')); });
+  await waitFor(() => expect(syncOfflineExpenseAction).toHaveBeenCalledWith(expect.objectContaining({ request_key: 'e1', amount: '2500' })));
+  await waitFor(() => expect(forgetSale).toHaveBeenCalledWith('e1'));
 });

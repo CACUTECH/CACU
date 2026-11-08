@@ -4,7 +4,7 @@
 // the page sends them through the normal, checked API when it is back online.
 const PAGES = 'cacu-pages-v1';
 const STATIC = 'cacu-static-v1';
-const OFFLINE_PAGES = ['/pos', '/settings/offline'];
+const OFFLINE_PAGES = ['/pos', '/accounting/expenses', '/settings/offline'];
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => {

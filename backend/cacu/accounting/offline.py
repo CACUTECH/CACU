@@ -1,12 +1,14 @@
-"""Offline selling, part 1 (Doc 10 E17, Doc 13; owner decisions of 7 November 2026).
+"""Offline selling and expenses (Doc 10 E17, Doc 13; owner decisions of 7 November 2026).
 
 A till that loses its connection keeps selling for cash or transfer; the device keeps each sale under its request key
 and sends it here when it is back online. A sale posts as sold, dated the day it was made, from its outlet, when its
 prices were the catalogue prices at that moment and its discounts are within the seller's limit; stock that ran short
 meanwhile is listed as a shortfall rather than refused, since the money was taken. Anything else waits for someone who
 approves sales: they post it as sold or discard it with a reason. A sale already posted under its key (an online attempt
-whose answer was lost) is reported as posted, so nothing is sold twice and nothing captured offline is lost."""
-from datetime import datetime, time, timedelta, timezone
+whose answer was lost) is reported as posted, so nothing is sold twice and nothing captured offline is lost. Expenses
+recorded offline post the same way; one dated in a closed period, more than 7 days late, or to an expense account no
+longer in the chart waits for an Owner or Admin."""
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 import json
 from typing import Literal
@@ -14,11 +16,12 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field
+from python_accounting.exceptions import MissingReportingPeriodError
 from python_accounting.models import ReportingPeriod
 from cacu.accounting import outlets
 from cacu.accounting.posting import raw
 from cacu.accounting.session import allowed
-from cacu.accounting.workflows import SaleCreate, business_today, sale_create
+from cacu.accounting.workflows import ExpenseCreate, SaleCreate, business_today, expense_accounts, expense_create, role, sale_create
 
 AMOUNT = r'^[0-9]{1,13}(\.[0-9]{1,2})?$'
 CENT = Decimal('0.01')
@@ -28,7 +31,8 @@ REASONS = {'price': 'A price differs from the catalogue price at the time of the
            'valuation_stock': 'A product on the adopted valuation did not have the stock',
            'closed_period': 'The sale is dated in a closed period or before the books started',
            'too_old': 'The sale reached CACU more than 7 days after it was made, or the device clock was wrong',
-           'item_unavailable': 'A product is no longer active in the catalogue'}
+           'item_unavailable': 'A product is no longer active in the catalogue',
+           'account_unavailable': 'The expense account is no longer in the chart of accounts'}
 
 
 class OfflineLine(BaseModel):
@@ -49,6 +53,18 @@ class OfflineSale(BaseModel):
     location_id: UUID | None = None
     quoted_total: str = Field(pattern=AMOUNT)
     items: list[OfflineLine] = Field(min_length=1, max_length=100)
+
+
+class OfflineExpense(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_key: UUID
+    recorded_at: datetime
+    expense_account_id: UUID
+    amount: str = Field(pattern=AMOUNT)
+    entry_date: date
+    method: Literal['Cash', 'Transfer']
+    bank_account_id: UUID | None = None
+    description: str = Field(min_length=1, max_length=500)
 
 
 class OfflineDecision(BaseModel):
@@ -74,18 +90,28 @@ def _naira(value):
     return f'₦{Decimal(value):,.2f}'
 
 
+def _dates(session, made: datetime, day: date):
+    """('too_old' | 'closed_period', detail) when an entry made at made and dated day cannot post as it is."""
+    now = datetime.now(timezone.utc)
+    made = made if made.tzinfo else made.replace(tzinfo=timezone.utc)
+    if made > now + timedelta(minutes=10) or made < now - timedelta(days=7):
+        return 'too_old', f'Made {made.astimezone(LAGOS):%d %b %Y %H:%M}'
+    cutover = raw(session, 'SELECT cutover_date FROM accounting.business_map WHERE business_id=%s', (str(session.business_id),)).scalar()
+    if day < cutover or day > business_today(session):
+        return 'closed_period', f'Dated {day:%d %b %Y}'
+    try:
+        closed = ReportingPeriod.get_period(session, datetime.combine(day, time(12))).status == ReportingPeriod.Status.CLOSED
+    except MissingReportingPeriodError:
+        closed = True
+    return ('closed_period', f'Dated {day:%d %b %Y}') if closed else None
+
+
 def _problem(session, data: OfflineSale, outlet):
     """(reason, detail) when the sale needs review, else None."""
     tenant = str(session.business_id)
-    now = datetime.now(timezone.utc)
+    dated = _dates(session, data.sold_at, _day(data))
+    if dated: return dated
     sold = data.sold_at if data.sold_at.tzinfo else data.sold_at.replace(tzinfo=timezone.utc)
-    if sold > now + timedelta(minutes=10) or sold < now - timedelta(days=7):
-        return 'too_old', f'Made {sold.astimezone(LAGOS):%d %b %Y %H:%M}'
-    day = _day(data)
-    cutover = raw(session, 'SELECT cutover_date FROM accounting.business_map WHERE business_id=%s', (tenant,)).scalar()
-    period = ReportingPeriod.get_period(session, datetime.combine(day, time(12)))
-    if day < cutover or day > business_today(session) or period.status == ReportingPeriod.Status.CLOSED:
-        return 'closed_period', f'Dated {day:%d %b %Y}'
     cap = Decimal(raw(session, 'SELECT authz.discount_cap(%s)', (tenant,)).scalar() or 0)
     for line in data.items:
         row = raw(session, """SELECT name,unit_price,item_type,coalesce((to_jsonb(catalog_items)->>'track_stock')::boolean,true) AS track_stock
@@ -125,60 +151,115 @@ def sync(session, actor, data: OfflineSale):
     if _total(data) != Decimal(data.quoted_total): raise HTTPException(422, 'The offline sale does not add up')
     if raw(session, "SELECT 1 FROM accounting.document_map WHERE business_id=%s AND source_type='pos' AND source_id=%s", (tenant, key)).first():
         return {'status': 'posted', 'sale_id': key, 'shortfalls': []}
-    seen = raw(session, 'SELECT status,reason,detail FROM accounting.offline_sale WHERE business_id=%s AND id=%s', (tenant, key)).first()
+    seen = raw(session, 'SELECT status,reason,detail FROM accounting.offline_entry WHERE business_id=%s AND id=%s', (tenant, key)).first()
     if seen: return {'status': seen.status, 'sale_id': key, 'reason': seen.reason, 'detail': seen.detail}
     outlet = _outlet(session, data)
     problem = _problem(session, data, outlet)
     payload = data.model_dump(mode='json')
     if problem:
-        raw(session, """INSERT INTO accounting.offline_sale(business_id,id,sold_by,sold_at,payload,status,reason,detail)
-          VALUES(%s,%s,%s,%s,%s::jsonb,'review',%s,%s)""", (tenant, key, str(actor), data.sold_at, json.dumps(payload), problem[0], problem[1][:500]))
+        raw(session, """INSERT INTO accounting.offline_entry(business_id,id,kind,made_by,made_at,payload,status,reason,detail)
+          VALUES(%s,%s,'sale',%s,%s,%s::jsonb,'review',%s,%s)""", (tenant, key, str(actor), data.sold_at, json.dumps(payload), problem[0], problem[1][:500]))
         return {'status': 'review', 'sale_id': key, 'reason': problem[0], 'detail': problem[1]}
     result = _post(session, actor, data, outlet)
-    raw(session, """INSERT INTO accounting.offline_sale(business_id,id,sold_by,sold_at,payload,status) VALUES(%s,%s,%s,%s,%s::jsonb,'posted')""",
+    raw(session, """INSERT INTO accounting.offline_entry(business_id,id,kind,made_by,made_at,payload,status) VALUES(%s,%s,'sale',%s,%s,%s::jsonb,'posted')""",
         (tenant, key, str(actor), data.sold_at, json.dumps(payload)))
     return {'status': 'posted', 'sale_id': key, 'shortfalls': result.get('shortfalls', [])}
 
 
+def _expense_problem(session, data: OfflineExpense):
+    dated = _dates(session, data.recorded_at, data.entry_date)
+    if dated: return dated
+    if str(data.expense_account_id) not in {a['id'] for a in expense_accounts(session)}:
+        return 'account_unavailable', 'The account it was recorded against is archived or removed'
+    return None
+
+
+def _post_expense(session, actor, data: OfflineExpense):
+    return expense_create(session, actor, ExpenseCreate(request_key=data.request_key, expense_account_id=data.expense_account_id, amount=data.amount,
+                                                        entry_date=data.entry_date, method=data.method, bank_account_id=data.bank_account_id,
+                                                        description=data.description))
+
+
+def sync_expense(session, actor, data: OfflineExpense):
+    """An expense recorded offline: posted as recorded, or held for an Owner or Admin."""
+    tenant = str(session.business_id); key = str(data.request_key)
+    if Decimal(data.amount) <= 0: raise HTTPException(422, 'Enter an amount above zero')
+    if raw(session, "SELECT 1 FROM accounting.document_map WHERE business_id=%s AND source_type='expense' AND source_id=%s", (tenant, key)).first():
+        return {'status': 'posted', 'id': key}
+    seen = raw(session, 'SELECT status,reason,detail FROM accounting.offline_entry WHERE business_id=%s AND id=%s', (tenant, key)).first()
+    if seen: return {'status': seen.status, 'id': key, 'reason': seen.reason, 'detail': seen.detail}
+    payload = data.model_dump(mode='json')
+    problem = _expense_problem(session, data)
+    if problem:
+        raw(session, """INSERT INTO accounting.offline_entry(business_id,id,kind,made_by,made_at,payload,status,reason,detail)
+          VALUES(%s,%s,'expense',%s,%s,%s::jsonb,'review',%s,%s)""", (tenant, key, str(actor), data.recorded_at, json.dumps(payload), problem[0], problem[1][:500]))
+        return {'status': 'review', 'id': key, 'reason': problem[0], 'detail': problem[1]}
+    _post_expense(session, actor, data)
+    raw(session, """INSERT INTO accounting.offline_entry(business_id,id,kind,made_by,made_at,payload,status) VALUES(%s,%s,'expense',%s,%s,%s::jsonb,'posted')""",
+        (tenant, key, str(actor), data.recorded_at, json.dumps(payload)))
+    return {'status': 'posted', 'id': key}
+
+
+def _decider(session, actor, kind):
+    """Who decides an entry under review: people who approve sales; for expenses, Owners and Admins."""
+    return bool(allowed(session, 'sales.approve')) if kind == 'sale' else role(session, actor) in {'owner', 'admin'}
+
+
 def review_list(session, actor):
-    """Sales waiting for review: all of them for people who approve sales, else the person's own."""
-    everyone = bool(allowed(session, 'sales.approve'))
-    rows = raw(session, f"""SELECT o.*,coalesce((SELECT nullif(to_jsonb(m)->>'display_name','') FROM public.memberships m
-        WHERE m.business_id=o.business_id AND m.user_id=o.sold_by),'A team member') AS seller
-      FROM accounting.offline_sale o WHERE o.business_id=%s AND o.status='review'{'' if everyone else ' AND o.sold_by=%s'}
-      ORDER BY o.received_at LIMIT 200""", (str(session.business_id),) if everyone else (str(session.business_id), str(actor))).all()
+    """Entries waiting for review: those the person may decide, and their own."""
+    rows = raw(session, """SELECT o.*,coalesce((SELECT nullif(to_jsonb(m)->>'display_name','') FROM public.memberships m
+        WHERE m.business_id=o.business_id AND m.user_id=o.made_by),'A team member') AS seller
+      FROM accounting.offline_entry o WHERE o.business_id=%s AND o.status='review' ORDER BY o.received_at LIMIT 200""", (str(session.business_id),)).all()
+    can = {kind: _decider(session, actor, kind) for kind in ('sale', 'expense')}
     names = {}
     out = []
+    accounts = None
     for r in rows:
+        if not can[r.kind] and str(r.made_by) != str(actor): continue
+        if r.kind == 'expense':
+            if accounts is None: accounts = {a['id']: f"{a['code']} {a['name']}" for a in expense_accounts(session)}
+            out.append({'id': str(r.id), 'kind': 'expense', 'seller': r.seller, 'sold_at': r.made_at.isoformat(), 'method': r.payload['method'],
+                        'total': r.payload['amount'], 'description': r.payload['description'], 'entry_date': r.payload['entry_date'],
+                        'account': accounts.get(r.payload['expense_account_id'], 'An archived account'), 'can_decide': can['expense'],
+                        'reason': r.reason, 'reason_text': REASONS.get(r.reason, r.reason), 'detail': r.detail, 'items': []})
+            continue
         items = []
         for line in r.payload['items']:
             if line['item_id'] not in names:
                 names[line['item_id']] = raw(session, 'SELECT name FROM public.catalog_items WHERE business_id=%s AND id=%s',
                                              (str(session.business_id), line['item_id'])).scalar() or 'Product'
             items.append({'name': names[line['item_id']], 'quantity': line['quantity'], 'unit_price': line['unit_price'], 'discount_percent': line['discount_percent']})
-        out.append({'id': str(r.id), 'seller': r.seller, 'sold_at': r.sold_at.isoformat(), 'method': r.payload['method'], 'total': r.payload['quoted_total'],
-                    'reason': r.reason, 'reason_text': REASONS.get(r.reason, r.reason), 'detail': r.detail, 'items': items})
-    return {'can_decide': everyone, 'sales': out}
+        out.append({'id': str(r.id), 'kind': 'sale', 'seller': r.seller, 'sold_at': r.made_at.isoformat(), 'method': r.payload['method'], 'total': r.payload['quoted_total'],
+                    'can_decide': can['sale'], 'reason': r.reason, 'reason_text': REASONS.get(r.reason, r.reason), 'detail': r.detail, 'items': items})
+    return {'can_decide': can['sale'] or can['expense'], 'sales': out}
 
 
 def decide(session, actor, sale_id: UUID, data: OfflineDecision):
-    if not allowed(session, 'sales.approve'): raise HTTPException(403, 'Only people who approve sales can post or discard an offline sale')
     tenant = str(session.business_id)
-    row = raw(session, 'SELECT * FROM accounting.offline_sale WHERE business_id=%s AND id=%s FOR UPDATE', (tenant, str(sale_id))).first()
-    if not row: raise HTTPException(404, 'Offline sale not found')
-    if row.status != 'review': raise HTTPException(409, 'This offline sale has already been decided')
+    row = raw(session, 'SELECT * FROM accounting.offline_entry WHERE business_id=%s AND id=%s FOR UPDATE', (tenant, str(sale_id))).first()
+    if not row: raise HTTPException(404, 'Offline entry not found')
+    if not _decider(session, actor, row.kind):
+        raise HTTPException(403, 'Only people who approve sales can post or discard an offline sale' if row.kind == 'sale'
+                            else 'Only Owners and Admins can post or discard an offline expense')
+    if row.status != 'review': raise HTTPException(409, 'This offline entry has already been decided')
     note = data.note.strip()
     if data.decision == 'discard':
-        if len(note) < 3: raise HTTPException(422, 'Say why this sale is discarded')
+        if len(note) < 3: raise HTTPException(422, 'Say why this is discarded')
         result = {'status': 'discarded', 'sale_id': str(sale_id)}
+    elif row.kind == 'expense':
+        expense = OfflineExpense.model_validate(row.payload)
+        if str(expense.expense_account_id) not in {a['id'] for a in expense_accounts(session)}:
+            raise HTTPException(409, 'Its expense account is no longer in the chart. Discard it and record the expense again.')
+        _post_expense(session, actor, expense)
+        result = {'status': 'posted', 'sale_id': str(sale_id), 'shortfalls': []}
     else:
         sale = OfflineSale.model_validate(row.payload)
         if _day(sale) < raw(session, 'SELECT cutover_date FROM accounting.business_map WHERE business_id=%s', (tenant,)).scalar():
             raise HTTPException(409, 'This sale is dated before the books started. Discard it and record it another way.')
         posted = _post(session, actor, sale, _outlet(session, sale))
         result = {'status': 'posted', 'sale_id': str(sale_id), 'shortfalls': posted.get('shortfalls', [])}
-    raw(session, 'UPDATE accounting.offline_sale SET status=%s,decided_by=%s,decided_at=now(),note=%s WHERE business_id=%s AND id=%s',
+    raw(session, 'UPDATE accounting.offline_entry SET status=%s,decided_by=%s,decided_at=now(),note=%s WHERE business_id=%s AND id=%s',
         (result['status'], str(actor), note or None, tenant, str(sale_id)))
     raw(session, "INSERT INTO accounting.audit_event(business_id,actor_id,request_key,event,details) VALUES(%s,%s,%s,'offline_sale_decided',%s::jsonb)",
-        (tenant, str(actor), str(sale_id), json.dumps({'decision': data.decision, 'reason': row.reason})))
+        (tenant, str(actor), str(sale_id), json.dumps({'kind': row.kind, 'decision': data.decision, 'reason': row.reason})))
     return result

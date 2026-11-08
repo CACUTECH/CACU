@@ -1,23 +1,26 @@
--- Offline selling, part 1 (Doc 10 E17, Doc 13; owner decisions of 7 November 2026).
---  * a till that loses its connection keeps selling for cash or transfer; each sale waits on the device under its request
---    key and is sent when the device is back online. Nothing is final until the server accepts it;
---  * on sync the sale posts as sold when its prices were the catalogue prices at the time of the sale, dated the day it was
---    made, from the outlet it was made at. Stock that ran short meanwhile is posted and listed as a shortfall, since the
---    money was taken;
+-- Offline selling and expenses (Doc 10 E17, Doc 13; owner decisions of 7 November 2026).
+--  * a till that loses its connection keeps selling for cash or transfer, and expenses can still be recorded; each
+--    waits on the device under its request key and is sent when the device is back online. Nothing is final until the
+--    server accepts it;
+--  * on sync a sale posts as sold when its prices were the catalogue prices at the time of the sale, dated the day it was
+--    made, from the outlet it was made at; stock that ran short meanwhile is posted and listed as a shortfall, since the
+--    money was taken. An expense posts as recorded;
 --  * anything else waits in a review list (an edited price, a discount above the seller's limit, a product on the adopted
---    valuation without the stock, a closed period, a sale more than 7 days old) until someone who approves sales posts it
---    as sold or discards it with a reason. Nothing captured offline is lost.
+--    valuation without the stock, a closed period, an entry more than 7 days old, an expense account no longer in the
+--    chart) until someone who approves it posts it as recorded or discards it with a reason. Nothing captured offline is
+--    lost.
 SET LOCAL search_path = accounting, public, pg_catalog;
 
--- Every offline sale the server has seen; id is the sale's request key.
-CREATE TABLE accounting.offline_sale (
+-- Every offline entry the server has seen; id is its request key.
+CREATE TABLE accounting.offline_entry (
  business_id uuid NOT NULL REFERENCES public.businesses(id),
  id uuid NOT NULL,
- sold_by uuid NOT NULL,
- sold_at timestamptz NOT NULL,
+ kind text NOT NULL CHECK (kind IN ('sale', 'expense')),
+ made_by uuid NOT NULL,
+ made_at timestamptz NOT NULL,
  payload jsonb NOT NULL,
  status text NOT NULL CHECK (status IN ('posted', 'review', 'discarded')),
- reason text CHECK (reason IN ('price', 'discount', 'valuation_stock', 'closed_period', 'too_old', 'item_unavailable')),
+ reason text CHECK (reason IN ('price', 'discount', 'valuation_stock', 'closed_period', 'too_old', 'item_unavailable', 'account_unavailable')),
  detail text CHECK (length(detail) <= 500),
  received_at timestamptz NOT NULL DEFAULT now(),
  decided_by uuid, decided_at timestamptz,
@@ -26,13 +29,13 @@ CREATE TABLE accounting.offline_sale (
  CHECK (status <> 'review' OR (reason IS NOT NULL AND decided_by IS NULL)),
  CHECK (status <> 'discarded' OR (decided_by IS NOT NULL AND note IS NOT NULL))
 );
-CREATE INDEX offline_sale_review ON accounting.offline_sale (business_id, status, received_at);
-ALTER TABLE accounting.offline_sale ENABLE ROW LEVEL SECURITY;
-ALTER TABLE accounting.offline_sale FORCE ROW LEVEL SECURITY;
-CREATE POLICY tenant_access ON accounting.offline_sale TO cacu_runtime
+CREATE INDEX offline_entry_review ON accounting.offline_entry (business_id, status, received_at);
+ALTER TABLE accounting.offline_entry ENABLE ROW LEVEL SECURITY;
+ALTER TABLE accounting.offline_entry FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_access ON accounting.offline_entry TO cacu_runtime
  USING (accounting.authorized(business_id)) WITH CHECK (accounting.authorized(business_id));
-GRANT SELECT, INSERT ON accounting.offline_sale TO cacu_runtime;
-GRANT UPDATE (status, decided_by, decided_at, note) ON accounting.offline_sale TO cacu_runtime;
+GRANT SELECT, INSERT ON accounting.offline_entry TO cacu_runtime;
+GRANT UPDATE (status, decided_by, decided_at, note) ON accounting.offline_entry TO cacu_runtime;
 
 -- A product's selling price at a moment: the price before the first price change after it, else today's price. Read from
 -- the catalogue's change history, which records every change with its before and after.

@@ -2,7 +2,7 @@
 // A sale the server has posted leaves the device; one waiting for review is marked and kept; a refusal is kept with its
 // reason so nothing captured offline is lost.
 import * as React from 'react';
-import { syncOfflineSaleAction } from '@/app/pos/offline-actions';
+import { syncOfflineExpenseAction, syncOfflineSaleAction } from '@/app/pos/offline-actions';
 import { forgetSale, markSale, online, salesOnDevice, type OutboxEntry } from '@/lib/offline-outbox';
 
 export function useOfflineSync(businessId: string | null, userId: string | null) {
@@ -22,7 +22,7 @@ export function useOfflineSync(businessId: string | null, userId: string | null)
     try {
       for (const entry of await salesOnDevice(businessId)) {
         if (entry.user_id !== userId || entry.status !== 'pending') continue;
-        const result = await syncOfflineSaleAction(entry.payload);
+        const result = entry.kind === 'expense' ? await syncOfflineExpenseAction(entry.payload) : await syncOfflineSaleAction(entry.payload);
         if (result.success && result.data.status === 'posted') await forgetSale(entry.key);
         else if (result.success) await markSale(entry.key, { status: 'review', detail: result.data.detail ?? null });
         else if (result.uncertain) { await markSale(entry.key, { attempts: entry.attempts + 1, detail: result.error }); break; }

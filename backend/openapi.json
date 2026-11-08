@@ -5310,10 +5310,63 @@
         }
       }
     },
-    "/api/v1/businesses/{business_id}/sales/offline-review": {
+    "/api/v1/businesses/{business_id}/expenses/offline": {
+      "post": {
+        "summary": "Sync Offline Expense",
+        "operationId": "sync_offline_expense_api_v1_businesses__business_id__expenses_offline_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfflineExpense"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/offline-review": {
       "get": {
-        "summary": "Offline Sales For Review",
-        "operationId": "offline_sales_for_review_api_v1_businesses__business_id__sales_offline_review_get",
+        "summary": "Offline Entries For Review",
+        "operationId": "offline_entries_for_review_api_v1_businesses__business_id__offline_review_get",
         "security": [
           {
             "HTTPBearer": []
@@ -5353,10 +5406,10 @@
         }
       }
     },
-    "/api/v1/businesses/{business_id}/sales/offline-review/{sale_id}": {
+    "/api/v1/businesses/{business_id}/offline-review/{entry_id}": {
       "post": {
-        "summary": "Decide Offline Sale",
-        "operationId": "decide_offline_sale_api_v1_businesses__business_id__sales_offline_review__sale_id__post",
+        "summary": "Decide Offline Entry",
+        "operationId": "decide_offline_entry_api_v1_businesses__business_id__offline_review__entry_id__post",
         "security": [
           {
             "HTTPBearer": []
@@ -5374,13 +5427,13 @@
             }
           },
           {
-            "name": "sale_id",
+            "name": "entry_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Sale Id"
+              "title": "Entry Id"
             }
           }
         ],
@@ -7017,6 +7070,73 @@
           "decision"
         ],
         "title": "OfflineDecision"
+      },
+      "OfflineExpense": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "expense_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Expense Account Id"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Amount"
+          },
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "Cash",
+              "Transfer"
+            ],
+            "title": "Method"
+          },
+          "bank_account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Account Id"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "recorded_at",
+          "expense_account_id",
+          "amount",
+          "entry_date",
+          "method",
+          "description"
+        ],
+        "title": "OfflineExpense"
       },
       "OfflineLine": {
         "properties": {
