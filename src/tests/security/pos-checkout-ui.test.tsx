@@ -5,6 +5,7 @@ import POSPage from '@/app/pos/page';
 import { getCheckoutOptionsAction, processCheckoutAction } from '@/app/pos/actions';
 import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
 
+jest.mock('@/app/pos/offline-actions', () => ({ syncOfflineSaleAction: jest.fn(), offlineReviewAction: jest.fn(), decideOfflineSaleAction: jest.fn() }));
 jest.mock('@/app/pos/actions', () => ({ getCheckoutOptionsAction: jest.fn(), processCheckoutAction: jest.fn() }));
 jest.mock('@/app/accounting/collection-actions', () => ({ getCollectionAccountsAction: jest.fn() }));
 jest.mock('@/app/pos/shift-actions', () => ({ getShiftAction: jest.fn().mockResolvedValue({ success: true, data: null }) }));

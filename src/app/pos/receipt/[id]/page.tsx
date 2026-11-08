@@ -7,6 +7,7 @@ import { useBusiness } from '@/components/business-provider';
 import { getReceiptAction } from '@/app/pos/actions';
 import { receiptText, type SaleReceipt } from '@/lib/checkout';
 import { RefundDialog } from '@/components/refund-dialog';
+import { ShareReceiptDialog } from '@/components/share-receipt-dialog';
 
 const METHOD: Record<string, string> = { cash: 'Cash', transfer: 'Transfer', split: 'Cash and transfer' };
 const money = (value: string) => `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -17,7 +18,7 @@ export default function ReceiptPage() {
   const { business } = useBusiness();
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null), [error, setError] = useState('');
   const [width, setWidth] = useState<'58mm' | '80mm'>('80mm');
-  const [refunding, setRefunding] = useState(false), [message, setMessage] = useState(''), [version, setVersion] = useState(0);
+  const [sharing, setSharing] = useState(false), [refunding, setRefunding] = useState(false), [message, setMessage] = useState(''), [version, setVersion] = useState(0);
   useEffect(() => {
     let live = true;
     void getReceiptAction(id).then(result => { if (!live) return; if (result.success) setReceipt(result.data); else setError(result.error); });
@@ -37,10 +38,12 @@ export default function ReceiptPage() {
       </div>
       <Button onClick={() => window.print()}>Print</Button>
       <Button asChild variant="outline"><a href={share} target="_blank" rel="noopener noreferrer">Share on WhatsApp</a></Button>
+      {business?.id && <Button variant="outline" onClick={() => setSharing(true)}>Send to customer</Button>}
       {['completed', 'refunded'].includes(receipt.status) && Number(receipt.refunded_total ?? 0) < Number(receipt.total) &&
         <Button variant="outline" onClick={() => { setMessage(''); setRefunding(true); }}>Refund</Button>}
     </div>
     {message && <p role="status" className="print:hidden">{message}</p>}
+    {business?.id && <ShareReceiptDialog businessId={business.id} saleId={id} open={sharing} onClose={() => setSharing(false)} />}
     <RefundDialog saleId={id} open={refunding} onClose={() => setRefunding(false)}
       onDone={text => { setRefunding(false); setMessage(text); setVersion(v => v + 1); }} />
     <article id="receipt" aria-label="Receipt" className="mx-auto space-y-2 rounded border bg-white p-3 font-mono text-xs text-black" style={{ width: width === '58mm' ? '58mm' : '80mm' }}>

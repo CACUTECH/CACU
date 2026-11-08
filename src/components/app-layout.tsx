@@ -143,7 +143,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname)) {
+    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname) && !pathname.startsWith('/r/')) {
         router.push('/login');
     }
   }, [user, userLoading, pathname, router]);
@@ -216,7 +216,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   // Auth page check must happen before loader check
-  if (['/setup', '/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/join'].includes(pathname)) {
+  // Public receipt links (/r/<token>) open without an account (Doc 10 E20).
+  if (['/setup', '/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/join'].includes(pathname) || pathname.startsWith('/r/')) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 

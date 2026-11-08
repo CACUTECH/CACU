@@ -643,3 +643,21 @@ def stock_transfer(business_id:UUID,transfer_id:UUID,user_id:UUID=Depends(curren
 def receive_stock_transfer(business_id:UUID,transfer_id:UUID,data:TransferReceive,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True,permission='inventory.post') as session:
         return receive_transfer(session,user_id,transfer_id,data)
+
+# Offline selling (E17): sales made offline are checked and posted on sync; anything unusual waits for review.
+from cacu.accounting.offline import OfflineDecision,OfflineSale,decide as decide_offline,review_list as offline_review,sync as sync_offline
+
+@app.post('/api/v1/businesses/{business_id}/sales/offline')
+def sync_offline_sale(business_id:UUID,data:OfflineSale,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='sales.post') as session:
+        return sync_offline(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/sales/offline-review')
+def offline_sales_for_review(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='sales.view') as session:
+        return offline_review(session,user_id)
+
+@app.post('/api/v1/businesses/{business_id}/sales/offline-review/{sale_id}')
+def decide_offline_sale(business_id:UUID,sale_id:UUID,data:OfflineDecision,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='sales.approve') as session:
+        return decide_offline(session,user_id,sale_id,data)

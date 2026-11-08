@@ -79,10 +79,11 @@ def _post(url: str, **kwargs) -> dict:
     return body if isinstance(body, dict) else {}
 
 
-def send_email(to: list[str], subject: str, text: str, idempotency_key: str) -> str:
+def send_email(to: list[str], subject: str, text: str, idempotency_key: str, reply_to: str | None = None) -> str:
+    message = {'from': os.environ['CACU_EMAIL_FROM'], 'to': to, 'subject': subject, 'text': text}
+    if reply_to: message['reply_to'] = reply_to
     body = _post('https://api.resend.com/emails', headers={'Authorization': f"Bearer {os.environ['RESEND_API_KEY']}",
-                                                            'Idempotency-Key': idempotency_key},
-                 json={'from': os.environ['CACU_EMAIL_FROM'], 'to': to, 'subject': subject, 'text': text})
+                                                            'Idempotency-Key': idempotency_key}, json=message)
     return str(body.get('id') or '')
 
 
@@ -134,4 +135,71 @@ def send_due(limit: int = 50) -> dict:
         report['sent' if sent else 'skipped' if error == 'no_recipient' else 'failed'] += 1
         with platform_transaction() as cursor:
             cursor.execute('SELECT platform.finish_notification(%s,%s,%s,%s)', (item['id'], sent, provider_id, error))
+    return report
+
+
+# Customer messages (Doc 10 E20): receipts, invoice reminders and booking messages a business sends its own customers.
+
+def receipt_url(token: str) -> str | None:
+    base = os.environ.get('CACU_APP_URL', '').rstrip('/')
+    return f'{base}/r/{token}' if base.startswith('https://') and re.fullmatch(r'[0-9a-f]{64}', token or '') else None
+
+
+def _when(value) -> str:
+    moment = datetime.fromisoformat(str(value).replace('Z', '+00:00')).astimezone(LAGOS)
+    return f"{moment:%a} {moment.day} {moment:%b} at {moment:%H:%M}"
+
+
+def render_customer(kind: str, channel: str, details: dict, business: str) -> tuple[str, str]:
+    """(subject, text) for a business's customer. Texts use NGN, as for billing reminders."""
+    money = lambda naira: (lambda kobo: _naira(kobo, '₦' if channel == 'email' else 'NGN '))(round(float(naira) * 100))
+    if kind == 'receipt':
+        link = receipt_url(details.get('token', ''))
+        subject = f'Your receipt from {business}'
+        body = f"Thank you for your purchase. Receipt {details['number']}, total {money(details['total'])}." + (f' View it: {link}' if link else '')
+    elif kind == 'invoice_reminder':
+        subject = f"Invoice {details['number']} from {business}"
+        due = _date(details['due_date'])
+        lead = {'before': f'is due on {due}', 'due': 'is due today', 'after': f'was due on {due}'}[details['stage']]
+        body = f"Invoice {details['number']} for {money(details['outstanding'])} {lead}. Please contact {business} to pay."
+    elif kind == 'booking_confirmation':
+        subject = f'Your booking with {business}'
+        body = f"Your booking for {details['service']} is confirmed for {_when(details['at'])}."
+    elif kind == 'booking_reminder':
+        subject = f'Reminder: your booking with {business}'
+        body = f"Reminder: your booking for {details['service']} is {_when(details['at'])}."
+    else:
+        raise ValueError('Unknown customer message')
+    if channel == 'sms':
+        return subject, f'{business}: {body}'[:480]
+    return subject, '\n\n'.join(['Hello,', body, business, f'Sent for {business} by CACU.'])
+
+
+def send_customer_due(limit: int = 50) -> dict:
+    """Claim and send queued customer messages for each configured channel; as send_due, counts only."""
+    channels = configured_channels()
+    report = {'channels': channels, 'claimed': 0, 'sent': 0, 'failed': 0, 'skipped': 0}
+    if not channels:
+        return report
+    with platform_transaction() as cursor:
+        batch = call(cursor, 'SELECT platform.claim_customer_messages(%s,%s)', (channels, limit))
+    report['claimed'] = len(batch)
+    for item in batch:
+        sent, provider_id, error = False, None, None
+        try:
+            subject, text = render_customer(item['kind'], item['channel'], item['details'], item['business'] or 'Your shop')
+            if not item.get('to'):
+                raise SendFailed('no_recipient')
+            if item['channel'] == 'email':
+                provider_id = send_email([item['to']], subject, text, f"cacu-customer-message-{item['id']}", reply_to=item.get('business_email') or None)
+            else:
+                provider_id = send_sms(item['to'], text)
+            sent = True
+        except SendFailed as exc:
+            error = str(exc)
+        except (KeyError, ValueError):
+            error = 'unreadable_message'
+        report['sent' if sent else 'skipped' if error == 'no_recipient' else 'failed'] += 1
+        with platform_transaction() as cursor:
+            cursor.execute('SELECT platform.finish_customer_message(%s,%s,%s,%s)', (item['id'], sent, provider_id, error))
     return report

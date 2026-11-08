@@ -7,6 +7,7 @@ import { getCheckoutOptionsAction, getRefundableAction, requestRefundAction } fr
 import { getCollectionAccountsAction } from '@/app/accounting/collection-actions';
 import { refundKobo, refundWaits } from '@/lib/checkout';
 
+jest.mock('@/app/pos/offline-actions', () => ({ syncOfflineSaleAction: jest.fn(), offlineReviewAction: jest.fn(), decideOfflineSaleAction: jest.fn() }));
 jest.mock('@/app/pos/actions', () => ({ getRefundableAction: jest.fn(), requestRefundAction: jest.fn(), getCheckoutOptionsAction: jest.fn(), processCheckoutAction: jest.fn() }));
 jest.mock('@/app/accounting/collection-actions', () => ({ getCollectionAccountsAction: jest.fn() }));
 jest.mock('@/app/pos/shift-actions', () => ({ getShiftAction: jest.fn().mockResolvedValue({ success: true, data: null }) }));

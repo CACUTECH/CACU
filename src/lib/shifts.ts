@@ -6,7 +6,7 @@ export type Shift = {
   id: string; status: 'open' | 'closed'; opened_by_name: string; mine: boolean; opened_at: string; opened_on: string; overdue: boolean;
   opening_float: string; sales: number; cash_sales: string; cash_refunds: string; pay_ins: string; pay_outs: string; cash_handed_back: string; deposits?: string;
   expected_cash: string; counted_cash: string | null; variance: string | null; close_note: string | null; closed_on: string | null;
-  movements?: ShiftMovement[]; outlet?: string | null;
+  movements?: ShiftMovement[]; outlet?: string | null; location_id?: string | null;
 };
 export type ShiftStatus = {
   available: boolean; require_shift: boolean; shift: Shift | null; can_manage: boolean;

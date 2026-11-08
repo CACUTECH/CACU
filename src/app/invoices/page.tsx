@@ -2,6 +2,7 @@
 "use client"
 
 import { InvoicePaymentDialog } from '@/components/invoice-payment-dialog';
+import { rpc } from '@/lib/customer-messages';
 import { FileAttachments } from "@/components/file-attachments";
 import * as React from "react"
 import {
@@ -117,6 +118,17 @@ const downloadPdf = async (invoice: Invoice) => {
 export default function InvoicesPage() {
   const [supabase] = React.useState(() => createClient());
   const { toast } = useToast();
+  // Doc 10 E20: a reminder to the customer now, by text (from the plan's allowance) or else email.
+  const sendReminder = async (invoiceId: string) => {
+    const result = await rpc<{ result: string; texts: { used: number; limit: number } }>('send_invoice_reminder',
+      { p_business_id: await getActiveBusinessIdAction(), p_invoice_id: invoiceId, p_request_key: crypto.randomUUID() });
+    if (!result.success) { toast({ variant: 'destructive', title: 'Reminder not sent', description: result.error }); return; }
+    const said: Record<string, string> = { sms: 'Reminder sent by text.', email: 'Reminder sent by email.',
+      no_contact: 'This customer has no phone number or email, or the texts for this month are used and there is no email.',
+      paid: 'Nothing is owed on this invoice.', not_due: 'Only issued, unpaid invoices get reminders.', limit: 'This invoice has had too many reminders already.',
+      already_queued: 'Reminder already on its way.' };
+    toast({ title: said[result.data.result] ?? 'Reminder not sent.', description: `Texts this month: ${result.data.texts.used} of ${result.data.texts.limit}.` });
+  };
   const [paymentInvoice, setPaymentInvoice] = React.useState<Invoice | null>(null);
   const [attachmentDocument, setAttachmentDocument] = React.useState<Invoice | null>(null);
   const [docs, setDocs] = React.useState<Invoice[]>([]);
@@ -259,6 +271,9 @@ export default function InvoicesPage() {
                                                 )}
                                                 {inv.type === 'Invoice' && inv.status !== 'Paid' && (
                                                     <DropdownMenuItem onClick={() => handleAction('pay', inv)}>Mark as Paid</DropdownMenuItem>
+                                                )}
+                                                {inv.type === 'Invoice' && inv.status !== 'Paid' && inv.status !== 'Draft' && inv.status !== 'Cancelled' && (
+                                                    <DropdownMenuItem onClick={() => void sendReminder(inv.id)}>Send reminder</DropdownMenuItem>
                                                 )}
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem className="text-destructive">Cancel Document</DropdownMenuItem>
