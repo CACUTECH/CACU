@@ -352,14 +352,18 @@ def statement(session,customer_id:UUID,start:date,end:date):
           FROM accounting.assignment a JOIN accounting."transaction" t ON t.id=a.transaction_id
           WHERE a.business_id=%s AND a.assigned_id = ANY(%s)""",(tenant,list(numbers))).all()
         labels={'CLIENT_RECEIPT':'Payment','CREDIT_NOTE':'Credit note','JOURNAL_ENTRY':'Deposit applied'}
+        # Credit notes (E12) carry the business's own CN number.
+        credit_numbers={r.transaction_id:r.number for r in raw(session,"""SELECT d.transaction_id,c.number FROM accounting.document_map d
+          JOIN accounting.invoice_credit c ON c.business_id=d.business_id AND c.id=d.source_id WHERE d.business_id=%s AND d.source_type='credit_note'""",(tenant,)).all()}
         for c in clearing:
             if c.transaction_id in applied:continue
             kind=getattr(c.transaction_type,'name',str(c.transaction_type))
-            events.append((c.assignment_date.date(),1,labels.get(kind,'Payment'),f'{c.transaction_no} for {numbers[c.assigned_id]}',ZERO,Decimal(c.amount)))
-    for a in raw(session,'SELECT kind,amount,entry_date,note,posting FROM accounting.customer_advance WHERE business_id=%s AND customer_id=%s AND kind<>%s',
-                 (tenant,str(customer_id),'applied')).all():
-        reference=(a.posting or {}).get('transaction_no') or ''
-        if a.kind=='received':events.append((a.entry_date,1,'Advance received',reference,ZERO,Decimal(a.amount)))
+            events.append((c.assignment_date.date(),1,labels.get(kind,'Payment'),f'{credit_numbers.get(c.transaction_id,c.transaction_no)} for {numbers[c.assigned_id]}',ZERO,Decimal(c.amount)))
+    for a in raw(session,"""SELECT a.kind,a.amount,a.entry_date,a.note,a.posting,c.number AS credit_number FROM accounting.customer_advance a
+          LEFT JOIN accounting.invoice_credit c ON c.business_id=a.business_id AND c.id=a.credit_id
+          WHERE a.business_id=%s AND a.customer_id=%s AND a.kind<>%s""",(tenant,str(customer_id),'applied')).all():
+        reference=a.credit_number or (a.posting or {}).get('transaction_no') or ''
+        if a.kind=='received':events.append((a.entry_date,1,'Credit kept as advance' if a.credit_number else 'Advance received',reference,ZERO,Decimal(a.amount)))
         else:events.append((a.entry_date,2,'Advance handed back',reference,Decimal(a.amount),ZERO))
     events.sort(key=lambda e:(e[0],e[1],e[3]))
     opening=sum((e[4]-e[5] for e in events if e[0]<start),ZERO);balance=opening;lines=[]

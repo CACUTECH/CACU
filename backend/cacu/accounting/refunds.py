@@ -50,17 +50,20 @@ class RefundPolicy(BaseModel):
     refund_threshold:str|None=Field(default=None,pattern=AMOUNT)
 
 
-def return_stock(session,actor,sale_id,key,day,quantities,review,narration):
+def return_stock(session,actor,sale_id,key,day,quantities,review,narration,returns='sale'):
     """Returns sold goods to stock at the cost they left at (PR-05, PR-16); quantities maps item to units. Units beyond
     what the sale took from recorded stock, less earlier refunds (an oversold shortfall), are not returned, since they
-    never left the records. Returns the cost restored."""
+    never left the records. Returns the cost restored. returns names what earlier returns of this document were:
+    till refunds ('sale') or invoice credit notes ('invoice')."""
     tenant=str(session.business_id);total=ZERO
+    earlier_returns=("JOIN accounting.sale_refund r ON r.business_id=e.business_id AND r.id=e.source_id AND r.status='posted' AND r.sale_id=%s"
+                     if returns=='sale' else
+                     "JOIN accounting.invoice_credit r ON r.business_id=e.business_id AND r.id=e.source_id AND r.status='posted' AND r.invoice_id=%s")
     for item_id in sorted(quantities,key=str):
         issued=raw(session,"""SELECT -sum(quantity) AS quantity,max(unit_cost) AS unit_cost FROM accounting.stock_event
           WHERE business_id=%s AND source_id=%s AND item_id=%s AND quantity<0""",(tenant,str(sale_id),str(item_id))).one()
-        back=raw(session,"""SELECT coalesce(sum(e.quantity),0) FROM accounting.stock_event e JOIN accounting.sale_refund r
-          ON r.business_id=e.business_id AND r.id=e.source_id AND r.status='posted' AND r.sale_id=%s
-          WHERE e.business_id=%s AND e.item_id=%s AND e.quantity>0""",(str(sale_id),tenant,str(item_id))).scalar()
+        back=raw(session,"SELECT coalesce(sum(e.quantity),0) FROM accounting.stock_event e "+earlier_returns+
+          " WHERE e.business_id=%s AND e.item_id=%s AND e.quantity>0",(str(sale_id),tenant,str(item_id))).scalar()
         units=min(quantities[item_id],int(issued.quantity or 0)-int(back))
         if units<=0:continue
         from cacu.accounting import outlets
