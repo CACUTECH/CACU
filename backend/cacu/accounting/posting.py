@@ -32,7 +32,7 @@ class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
-                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement']
+                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement','credit_advance']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -50,13 +50,13 @@ CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'su
          'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry,'sale_refund':JournalEntry,
          'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry,
          'deposit_application':JournalEntry,'goods_bill':JournalEntry,'customer_advance':JournalEntry,
-         'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry}
+         'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry,'credit_advance':JournalEntry}
 # Documents filed under another document type: a bill for received goods is a supplier bill to payments and the bills list.
 DOCUMENT_TYPES={'goods_bill':'bill'}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
 INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance',
-                'gateway_receipt','gateway_settlement'}
+                'gateway_receipt','gateway_settlement','credit_advance'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
@@ -238,6 +238,13 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 banks=[l for l in command.lines if str(l.account_id) not in fees]
                 if str(command.main_account_id)!=online or not command.credited or any(l.credited for l in command.lines) or len(banks)!=1                    or len(command.lines)-len(banks)>1 or str(collection_account(session,'Transfer',banks[0].account_id))!=str(banks[0].account_id):
                     raise HTTPException(422,'A settlement moves money from Card and online payments clearing to the bank, less the fee')
+        elif command.kind=='credit_advance':
+            # PR-16 on a paid invoice: the part of a credit note beyond what the invoice still owed debits revenue and
+            # credits Customer deposits and advances, kept for the customer (E11).
+            deposits=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='customer_deposits'",(tenant,)).all()
+            income={str(r.account_id) for r in raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose IN ('revenue','service_revenue')",(tenant,)).all()}
+            if len(deposits)!=1 or str(command.main_account_id)!=str(deposits[0].account_id) or not command.credited or len(command.lines)!=1                or command.lines[0].credited or str(command.lines[0].account_id) not in income or command.counterparty_id is not None:
+                raise HTTPException(422,'A credit kept as advance takes back revenue into Customer deposits and advances')
         elif command.kind=='goods_bill':
             # A bill for received goods: debit Goods received not invoiced, credit the supplier's payables (matched by
             # counterparty); price differences are separate stock adjustments.

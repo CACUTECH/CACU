@@ -705,6 +705,37 @@ def ageing(business_id:UUID,type:str,as_of:date,user_id:UUID=Depends(current_use
     with library_transaction(user_id,business_id,permission=permission) as session:
         return ageing_report(session,type,as_of)
 
+# Credit notes on invoices (Doc 10 E12, Doc 09 PR-16, Doc 11 POST /credit-notes): asked for by anyone who posts
+# invoices; posted by an Owner or Admin (checked inside), at once up to the owner's refund limit.
+from cacu.accounting.credit_notes import (CreditDecision,CreditRequest,creditable,decide as decide_credit,list_credits,
+    request as request_credit)
+
+@app.get('/api/v1/businesses/{business_id}/invoices/{invoice_id}/creditable')
+def invoice_creditable(business_id:UUID,invoice_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='invoices.view') as session:
+        return creditable(session,invoice_id,user_id)
+
+@app.post('/api/v1/businesses/{business_id}/credit-notes')
+def create_credit_note(business_id:UUID,data:CreditRequest,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='invoices.post') as session:
+        return request_credit(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/credit-notes')
+def credit_notes(business_id:UUID,status:str='pending',invoice_id:UUID|None=None,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='invoices.view') as session:
+        return list_credits(session,status,user_id,invoice_id)
+
+@app.post('/api/v1/businesses/{business_id}/credit-notes/{credit_id}/approve')
+def approve_credit_note(business_id:UUID,credit_id:UUID,data:CreditDecision,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='invoices.post') as session:
+        return decide_credit(session,user_id,credit_id,True,data)
+
+@app.post('/api/v1/businesses/{business_id}/credit-notes/{credit_id}/reject')
+def reject_credit_note(business_id:UUID,credit_id:UUID,data:CreditDecision,user_id:UUID=Depends(current_user)):
+    # The requester may withdraw their own request; rejecting anyone else's needs an Owner or Admin, checked inside.
+    with library_transaction(user_id,business_id,write=True,permission='invoices.post') as session:
+        return decide_credit(session,user_id,credit_id,False,data)
+
 # Online invoice payments through the business's own Paystack account (Doc 10 E23; Doc 09 PR-14, PR-15).
 from fastapi import Header, Request
 from starlette.concurrency import run_in_threadpool

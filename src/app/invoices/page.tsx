@@ -5,6 +5,7 @@ import { InvoicePaymentDialog } from '@/components/invoice-payment-dialog';
 import { CustomerPaymentDialog } from '@/components/customer-payment-dialog';
 import { ApplyAdvanceDialog } from '@/components/apply-advance-dialog';
 import { PayLinkDialog } from '@/components/pay-link-dialog';
+import { CreditNoteDialog } from '@/components/credit-note-dialog';
 import Link from 'next/link';
 import { rpc } from '@/lib/customer-messages';
 import { FileAttachments } from "@/components/file-attachments";
@@ -138,6 +139,7 @@ export default function InvoicesPage() {
   const [receiving, setReceiving] = React.useState<{ customerId: string | null } | null>(null);
   const [advanceInvoice, setAdvanceInvoice] = React.useState<Invoice | null>(null);
   const [payLinkInvoice, setPayLinkInvoice] = React.useState<Invoice | null>(null);
+  const [creditInvoice, setCreditInvoice] = React.useState<Invoice | null>(null);
   const [attachmentDocument, setAttachmentDocument] = React.useState<Invoice | null>(null);
   const [docs, setDocs] = React.useState<Invoice[]>([]);
   const [customers, setCustomers] = React.useState<Customer[]>([]);
@@ -214,7 +216,8 @@ export default function InvoicesPage() {
                 {activeTab === 'receipts' ? (
                     <p className="text-sm text-muted-foreground">Receipts are issued when you record a payment on an invoice.</p>
                 ) : activeTab === 'refunds' ? (
-                    <p className="text-sm text-muted-foreground">Credit memos are not available yet.</p>
+                    <><p className="text-sm text-muted-foreground">Credit notes are made from an invoice&apos;s menu.</p>
+                    <Button variant="outline" asChild><Link href="/invoices/credit-notes">Credit notes</Link></Button></>
                 ) : (
                     <>{activeTab === 'invoices' && <Button variant="outline" onClick={() => setReceiving({ customerId: null })}>Receive payment</Button>}
                     <CreateDocumentDialog 
@@ -233,6 +236,8 @@ export default function InvoicesPage() {
         <ApplyAdvanceDialog invoice={advanceInvoice} onClose={() => setAdvanceInvoice(null)}
             onSaved={message => { toast({ title: "Advance applied", description: message }); void fetchData(); }} />
         <PayLinkDialog invoice={payLinkInvoice} onClose={() => setPayLinkInvoice(null)} />
+        <CreditNoteDialog invoice={creditInvoice} onClose={() => setCreditInvoice(null)}
+            onSaved={message => { toast({ title: "Credit note", description: message }); void fetchData(); }} />
         <Dialog open={!!attachmentDocument} onOpenChange={open=>{if(!open)setAttachmentDocument(null);}}><DialogContent><DialogHeader><DialogTitle>Document attachments</DialogTitle><DialogDescription>{attachmentDocument?.invoice_number}</DialogDescription></DialogHeader>{attachmentDocument && <FileAttachments key={attachmentDocument.id} purpose="invoice_attachment" resourceId={attachmentDocument.id} />}</DialogContent></Dialog>
         <Tabs defaultValue="invoices" onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full lg:w-max h-auto p-1 bg-primary/5 border border-primary/10 rounded-xl">
@@ -294,6 +299,9 @@ export default function InvoicesPage() {
                                                     <DropdownMenuItem onClick={() => setAdvanceInvoice(inv)}>Use customer advance</DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => setPayLinkInvoice(inv)}>Share pay link</DropdownMenuItem>
                                                 </>}
+                                                {inv.type === 'Invoice' && inv.status !== 'Draft' && inv.status !== 'Cancelled' && inv.customer_id && (
+                                                    <DropdownMenuItem onClick={() => setCreditInvoice(inv)}>Credit note</DropdownMenuItem>
+                                                )}
                                                 {inv.type === 'Invoice' && inv.customer_id && (
                                                     <DropdownMenuItem asChild><Link href={`/invoices/statement?customer=${inv.customer_id}`}>Customer statement</Link></DropdownMenuItem>
                                                 )}
