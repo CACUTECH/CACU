@@ -217,7 +217,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Auth page check must happen before loader check
   // Public receipt links (/r/<token>) open without an account (Doc 10 E20).
-  if (['/setup', '/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/join'].includes(pathname) || pathname.startsWith('/r/')) {
+  if (['/setup', '/login', '/login/verify', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/join'].includes(pathname) || pathname.startsWith('/r/')) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 

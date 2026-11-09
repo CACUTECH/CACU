@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { getBusinessSelectionAction, selectBusinessAction } from '@/app/business-actions';
 import { Button } from '@/components/ui/button';
 import type { BusinessType } from '@/lib/data';
+import Link from 'next/link';
+import { gateFor } from '@/lib/two-step';
 
 /** The selected business row plus the signed-in member's role. */
 export type ActiveBusiness = {
@@ -21,14 +23,14 @@ type Selection = Awaited<ReturnType<typeof getBusinessSelectionAction>>;
 
 export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [selection, setSelection] = useState<Selection>({ memberships: [], active: null });
+  const [selection, setSelection] = useState<Selection>({ memberships: [], active: null, twoStep: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const requestVersion = useRef(0);
   const refresh = useCallback(async () => {
     const version = ++requestVersion.current;
     setLoading(true);
-    setSelection({ memberships: [], active: null });
+    setSelection({ memberships: [], active: null, twoStep: null });
     try {
       const next = await getBusinessSelectionAction();
       if (version !== requestVersion.current) return;
@@ -45,7 +47,10 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const member = selection.active;
   const record = member && (Array.isArray(member.businesses) ? member.businesses[0] : member.businesses);
   const business = record ? { ...record, userRole: member?.role } as ActiveBusiness : null;
-  const publicRoute = ['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname);
+  const publicRoute = ['/login', '/login/verify', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname);
+  // Two-step sign-in (SEC-014): until the session has passed it, the database answers nothing for the business, so say
+  // what to do instead of showing empty screens. The setup page stays reachable.
+  const gate = !publicRoute && pathname !== '/settings/security' ? gateFor(selection.twoStep) : null;
   const choose = async (id: string) => {
     requestVersion.current++;
     setLoading(true);
@@ -56,6 +61,8 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     <BusinessContext.Provider value={{ business, loading, refresh }}>
       {!publicRoute && loading ? <p role="status" className="p-6">Loading business…</p> :
        !publicRoute && error ? <div className="p-6"><p role="alert">{error}</p><Button onClick={() => void refresh()}>Retry</Button></div> :
+       gate ? <div className="mx-auto max-w-md space-y-3 p-6"><h1 className="text-xl font-bold">{gate.title}</h1><p>{gate.text}</p>
+         <Button asChild><Link href={gate.href}>{gate.action}</Link></Button></div> :
        !publicRoute && selection.memberships.length > 0 && !member ?
        <div className="p-6 space-y-4"><h1 className="text-xl font-bold">Select your business</h1>
          {selection.memberships.map(m => {

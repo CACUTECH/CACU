@@ -39,6 +39,12 @@ def _client(session) -> Paystack:
     return Paystack(op.secret(session))
 
 
+# Pay links, webhooks and the check job act for a staff member without a browser session (Doc 16 SEC-014): their
+# requests are verified by the link token, the Paystack signature or the job itself, so two-step sign-in does not apply.
+# "Check Paystack now" checks the signed-in person first, at their own session level.
+SYSTEM = 'system'
+
+
 def callback_url(token: str) -> str | None:
     base = os.environ.get('CACU_APP_URL', '').rstrip('/')
     return f'{base}/pay/{token}' if base.startswith('https://') else None
@@ -46,7 +52,7 @@ def callback_url(token: str) -> str | None:
 
 def public_summary(token: str) -> dict:
     target = link_target(token)
-    with library_transaction(target['actor'], target['business_id']) as session:
+    with library_transaction(target['actor'], target['business_id'], level=SYSTEM) as session:
         return op.link_summary(session, target['invoice_id'], target['business'])
 
 
@@ -54,7 +60,7 @@ def public_summary(token: str) -> dict:
 # a link could use up the business's own allowance; each link instead allows a few checkouts an hour.
 def public_start(token: str, data: op.PayStart) -> dict:
     target = link_target(token)
-    with library_transaction(target['actor'], target['business_id']) as session:
+    with library_transaction(target['actor'], target['business_id'], level=SYSTEM) as session:
         started = op.start_payment(session, target['actor'], token, target['invoice_id'], data)
         client = _client(session)
     url = client.initialize(reference=started['reference'], amount_kobo=started['amount_kobo'], email=started['email'],
@@ -64,19 +70,19 @@ def public_start(token: str, data: op.PayStart) -> dict:
 
 def _verify_and_apply(business_id: UUID, actor: UUID, reference: str, client: Paystack, public: bool = False) -> dict:
     verified = client.verify(reference)
-    with library_transaction(actor, business_id, write=not public, while_read_only=True) as session:
+    with library_transaction(actor, business_id, write=not public, while_read_only=True, level=SYSTEM) as session:
         return op.apply_verified(session, actor, reference, verified)
 
 
 def public_verify(token: str, data: op.PayReturn) -> dict:
     """The customer came back from Paystack. The redirect proves nothing; only the verified payment does (TEST-201)."""
     target = link_target(token)
-    with library_transaction(target['actor'], target['business_id']) as session:
+    with library_transaction(target['actor'], target['business_id'], level=SYSTEM) as session:
         status = op.payment_status(session, token, data.reference)
         client = _client(session)
     if status['status'] in {'pending', 'failed'}:
         _verify_and_apply(target['business_id'], target['actor'], data.reference, client, public=True)
-        with library_transaction(target['actor'], target['business_id']) as session:
+        with library_transaction(target['actor'], target['business_id'], level=SYSTEM) as session:
             status = op.payment_status(session, token, data.reference)
             status['summary'] = op.link_summary(session, target['invoice_id'], target['business'])
     return status
@@ -100,7 +106,7 @@ def webhook(webhook_token: str, raw: bytes, signature: str | None) -> dict:
         key = f"{kind}:{data['id']}"
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         raise HTTPException(400, 'Unreadable event') from exc
-    with library_transaction(actor, business_id, write=True, while_read_only=True) as session:
+    with library_transaction(actor, business_id, write=True, while_read_only=True, level=SYSTEM) as session:
         new = op.record_event(session, key[:200], kind, reference if isinstance(reference, str) else None, event)
     if not new:
         return {'received': True, 'outcome': 'duplicate'}
@@ -119,7 +125,7 @@ def webhook(webhook_token: str, raw: bytes, signature: str | None) -> dict:
 
 def check_business(business_id: UUID, actor: UUID, days: int = 14, min_age_minutes: int = 2) -> dict:
     """Verifies checkouts still waiting, then matches Paystack payouts of the last days (PR-15)."""
-    with library_transaction(actor, business_id) as session:
+    with library_transaction(actor, business_id, level=SYSTEM) as session:
         client = _client(session)
         references = op.pending_references(session, min_age_minutes)
         known = op.known_settlements(session)
@@ -134,7 +140,7 @@ def check_business(business_id: UUID, actor: UUID, days: int = 14, min_age_minut
         if not provider_id or provider_id in known:
             continue
         transactions = client.settlement_transactions(provider_id)
-        with library_transaction(actor, business_id, write=True, while_read_only=True) as session:
+        with library_transaction(actor, business_id, write=True, while_read_only=True, level=SYSTEM) as session:
             outcome = op.settle(session, actor, settlement, transactions)['outcome']
         if outcome == 'posted':
             report['payouts'] += 1

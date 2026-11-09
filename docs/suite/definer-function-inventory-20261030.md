@@ -33,3 +33,11 @@ Added with POS part 2 (20261107100000): `discount_caps` (needs `settings.view` t
 Added with online payments (20261114090000), callable only by the accounting API's runtime role, never by signed-in users or anonymous visitors: `accounting.payment_link_target` (finds one business and invoice from an unguessable 64-hex pay-link token; live links of connected businesses only), `accounting.payment_webhook_target` (finds one business and its sealed Paystack key from the 64-hex token in its webhook address; the key stays AES-GCM ciphertext) and `accounting.payment_businesses` (the check job's list of connected businesses). Each also names who the API acts as, through `accounting.payments_actor` (not callable by any client role): the person who shared the link or connected Paystack while they may still record payments, otherwise the owner.
 
 `backend/tests/test_definer_access_postgres.py` keeps this list honest: it fails when a callable SECURITY DEFINER function is not in its reviewed list or has no fixed `search_path`, and it calls every listed function as a member of another business and requires a refusal or an empty answer with nothing written. Re-run the advisor after each migration and update this table.
+
+Added with two-step sign-in (20261116090000, E22 part 1):
+- **Callable from the browser (`authenticated`), each answering only for the caller:**
+  - `public.mfa_status`.
+  - `public.new_recovery_codes`, only right after the second step.
+  - `public.use_recovery_code`, five failed tries an hour. It deletes only the caller's own `auth.mfa_factors` rows.
+- **Internal:** `authz.mfa_enrolled`, `authz.mfa_required` and `authz.session_level`, with no grants. `authz.mfa_ok` is granted to `authenticated` and `cacu_runtime`.
+- **Changed:** `authz.has_permission`, `public.is_business_member`, `public.has_business_role` and `management_private.authorize` now also require `authz.mfa_ok`.
