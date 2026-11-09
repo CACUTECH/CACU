@@ -41,3 +41,8 @@ Added with two-step sign-in (20261116090000, E22 part 1):
   - `public.use_recovery_code`, five failed tries an hour. It deletes only the caller's own `auth.mfa_factors` rows.
 - **Internal:** `authz.mfa_enrolled`, `authz.mfa_required` and `authz.session_level`, with no grants. `authz.mfa_ok` is granted to `authenticated` and `cacu_runtime`.
 - **Changed:** `authz.has_permission`, `public.is_business_member`, `public.has_business_role` and `management_private.authorize` now also require `authz.mfa_ok`.
+
+Added with the full data export (20261117090000, E22 part 2). All are callable only by the accounting API's runtime role:
+- `accounting.exporting`: the export read policy. It is true only for the business and export in the API's own transaction, while that export is running and its requester is still an active member.
+- `accounting.export_queue`: the job's list of waiting exports, stopped runs and expired files.
+- `accounting.export_settle`: marks an export failed, or deletes a file past its seven days, and nothing else.

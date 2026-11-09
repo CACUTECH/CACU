@@ -1,0 +1,45 @@
+name: Data exports
+# Builds the full data exports owners ask for, and deletes them after seven days (Doc 10 E22 part 2, FR-192, NFR-035).
+# Off until the repository variable CACU_EXPORTS_ENABLED is 'true'; a manual run is a dry run unless "apply" is ticked.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Build waiting exports and delete old files (approved production operation)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: data-exports
+  cancel-in-progress: false
+jobs:
+  export:
+    if: github.event_name == 'workflow_dispatch' || vars.CACU_EXPORTS_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: billing-operations
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.11'
+      - run: uv sync --frozen --no-editable
+      - name: Build exports or dry run
+        env:
+          CACU_DATABASE_URL: ${{ secrets.CACU_DATABASE_URL }}
+          APPLY_EXPORTS: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          if [ "$APPLY_EXPORTS" = "true" ]; then
+            uv run --frozen python -m tools.run_data_exports --apply --json
+          else
+            uv run --frozen python -m tools.run_data_exports --json
+          fi

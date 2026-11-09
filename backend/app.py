@@ -736,6 +736,32 @@ def reject_credit_note(business_id:UUID,credit_id:UUID,data:CreditDecision,user_
     with library_transaction(user_id,business_id,write=True,permission='invoices.post') as session:
         return decide_credit(session,user_id,credit_id,False,data)
 
+# Full data export (Doc 10 E22 part 2, Doc 03 FR-192, Doc 11 /exports): settings.export; allowed while read-only (SUB-10).
+from fastapi import Response as FileResponse
+from cacu.accounting.exports import ExportRequest,download as export_download,list_exports,read_export,request_export
+
+@app.post('/api/v1/businesses/{business_id}/exports')
+def create_export(business_id:UUID,data:ExportRequest,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='settings.export') as session:
+        return request_export(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/exports')
+def data_exports(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='settings.export') as session:
+        return list_exports(session)
+
+@app.get('/api/v1/businesses/{business_id}/exports/{export_id}')
+def data_export(business_id:UUID,export_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='settings.export') as session:
+        return read_export(session,export_id)
+
+@app.get('/api/v1/businesses/{business_id}/exports/{export_id}/download')
+def download_data_export(business_id:UUID,export_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='settings.export') as session:
+        name,content=export_download(session,user_id,export_id)
+    return FileResponse(content=content,media_type='application/zip',
+                        headers={'Content-Disposition':f'attachment; filename="{name}"','Cache-Control':'no-store'})
+
 # Online invoice payments through the business's own Paystack account (Doc 10 E23; Doc 09 PR-14, PR-15).
 from fastapi import Header, Request
 from starlette.concurrency import run_in_threadpool

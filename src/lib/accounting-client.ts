@@ -35,6 +35,28 @@ export async function accountingRequest<T>(path: string, options?: { method: 'PO
   }
   return response.json() as Promise<T>;
 }
+// A file from the accounting API (the full data export, E22): the raw response for a route handler to pass on.
+export async function accountingDownload(path: string): Promise<Response> {
+  const base = process.env.CACU_ACCOUNTING_API_URL;
+  if (!base) throw new Error('Accounting API is not configured');
+  const url = new URL(base);
+  if (url.protocol !== 'https:' && !(process.env.NODE_ENV !== 'production' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw new Error('Accounting API requires HTTPS');
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new AccountingRequestError('Sign in to download', 401);
+  const businessId = await getActiveBusinessIdAction();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new AccountingRequestError('Sign in to download', 401);
+  const { segments, query } = routeParts(path);
+  const response = await fetch(serviceUrl(url, ['api', 'v1', 'businesses', businessId, ...segments], query), {
+    headers: { Authorization: `Bearer ${session.access_token}` }, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(60000),
+  });
+  if (!response.ok) {
+    const failure: { detail?: unknown } = await response.json().catch(() => ({}));
+    throw new AccountingRequestError(typeof failure.detail === 'string' && failure.detail.length <= 500 && response.status < 500 ? failure.detail : 'The file is unavailable. Try again.', response.status);
+  }
+  return response;
+}
 // A customer paying from a pay link (Doc 10 E23): no CACU account and no user token. The link token alone names the
 // invoice; the API checks it, and answers only for that one invoice.
 export async function publicPayRequest<T>(token: string, action: '' | 'verify', body?: unknown): Promise<T> {
