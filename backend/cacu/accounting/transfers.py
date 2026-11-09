@@ -59,6 +59,10 @@ def confirm(session,actor,transfer_id:UUID,data:TransferConfirm):
         elif row.source_type=='deposit':
             from cacu.accounting.bookings import deposit_confirmed
             posting=deposit_confirmed(session,transfer_id,bank,actor,day)
+        elif row.source_type=='customer_receipt':
+            # E11: a payment for several invoices posts each part, and any advance, into the chosen bank.
+            from cacu.accounting.receivables import confirm_receipt
+            posting=confirm_receipt(session,actor,transfer_id,bank,day)
         else:
             # The held receipt posts now, into the chosen bank, and clears the invoice by that amount.
             posting=receipt_posting(session,actor,transfer_id,row.invoice_id,amount,'Transfer',bank,day)
@@ -97,6 +101,9 @@ def not_received(session,actor,transfer_id:UUID,data:TransferNotReceived):
         elif row.source_type=='deposit':
             from cacu.accounting.bookings import deposit_not_received
             posting=deposit_not_received(session,transfer_id,actor,day,data.note)
+        elif row.source_type=='customer_receipt':
+            from cacu.accounting.receivables import receipt_not_received
+            receipt_not_received(session,transfer_id)
         _decide(session,actor,transfer_id,'not_received',day,None,data.note)
         return {'id':str(transfer_id),'status':'not_received','posting':posting,'stock_cost_restored':format(restored,'.2f'),
                 'cash_to_refund':format(sale.total-row.amount,'.2f') if row.source_type=='pos' and sale.payment_method=='split' else None}
@@ -110,7 +117,7 @@ def list_transfers(session,status='pending',limit=200):
       LEFT JOIN public.invoices i ON i.business_id=p.business_id AND i.id=p.invoice_id
       LEFT JOIN public.customers c ON c.business_id=p.business_id AND c.id=p.customer_id
       WHERE p.business_id=%s AND p.status=%s ORDER BY p.entry_date,p.created_at LIMIT %s""",(str(session.business_id),status,limit)).all()
-    kinds={'pos':'sale','receipt':'invoice payment','deposit':'booking deposit'}
+    kinds={'pos':'sale','receipt':'invoice payment','deposit':'booking deposit','customer_receipt':'customer payment'}
     return [{'id':str(r.id),'kind':kinds[r.source_type],'amount':format(r.amount,'.2f'),
              'entry_date':r.entry_date.isoformat(),'age_days':(today-r.entry_date).days,'invoice_number':r.invoice_number,
              'customer':r.customer_name,'expected_bank_account_id':str(r.expected_bank_account_id) if r.expected_bank_account_id else None,

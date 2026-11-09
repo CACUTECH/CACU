@@ -667,3 +667,40 @@ def offline_entries_for_review(business_id:UUID,user_id:UUID=Depends(current_use
 def decide_offline_entry(business_id:UUID,entry_id:UUID,data:OfflineDecision,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True) as session:
         return decide_offline(session,user_id,entry_id,data)
+
+# Receivables (Doc 10 E11, Doc 11 R2): payments for several invoices, customer advances, ageing and statements.
+from cacu.accounting.receivables import (AdvanceApply,AdvanceRefund,CustomerReceipt,ageing as ageing_report,apply_advance,
+    open_items as customer_open_items,receipt_create as customer_receipt_create,refund_advance,statement as customer_statement)
+
+@app.get('/api/v1/businesses/{business_id}/customers/{customer_id}/open-items')
+def customer_open_invoices(business_id:UUID,customer_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='invoices.view') as session:
+        return customer_open_items(session,customer_id)
+
+# Recording money that arrived is allowed while the workspace is read-only, like single-invoice receipts.
+@app.post('/api/v1/businesses/{business_id}/customer-receipts')
+def create_customer_receipt(business_id:UUID,data:CustomerReceipt,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='invoices.post') as session:
+        return customer_receipt_create(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/invoices/{invoice_id}/apply-advance')
+def apply_customer_advance(business_id:UUID,invoice_id:UUID,data:AdvanceApply,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='invoices.post') as session:
+        return apply_advance(session,user_id,invoice_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/customers/{customer_id}/advance-refund')
+def refund_customer_advance(business_id:UUID,customer_id:UUID,data:AdvanceRefund,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='invoices.post') as session:
+        return refund_advance(session,user_id,customer_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/customers/{customer_id}/statement')
+def customer_account_statement(business_id:UUID,customer_id:UUID,start_date:date,end_date:date,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='invoices.view') as session:
+        return customer_statement(session,customer_id,start_date,end_date)
+
+@app.get('/api/v1/businesses/{business_id}/reports/ageing')
+def ageing(business_id:UUID,type:str,as_of:date,user_id:UUID=Depends(current_user)):
+    permission={'receivables':'invoices.view','payables':'expenses.view'}.get(type)
+    if permission is None:raise HTTPException(422,'Choose receivables or payables')
+    with library_transaction(user_id,business_id,permission=permission) as session:
+        return ageing_report(session,type,as_of)

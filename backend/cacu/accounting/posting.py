@@ -32,7 +32,7 @@ class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
-                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill']
+                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -49,12 +49,12 @@ CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'su
          'expense':CashPurchase,'pos':CashSale,'adjustment':JournalEntry,'credit_note':CreditNote,
          'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry,'sale_refund':JournalEntry,
          'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry,
-         'deposit_application':JournalEntry,'goods_bill':JournalEntry}
+         'deposit_application':JournalEntry,'goods_bill':JournalEntry,'customer_advance':JournalEntry}
 # Documents filed under another document type: a bill for received goods is a supplier bill to payments and the bills list.
 DOCUMENT_TYPES={'goods_bill':'bill'}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
-INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill'}
+INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
@@ -193,7 +193,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 raise HTTPException(422,'A refund is paid from the till or a bank account')
             if not command.credited or len(command.lines)!=1 or command.lines[0].credited or str(command.lines[0].account_id)!=str(purpose(session,'revenue')):
                 raise HTTPException(422,'A refund takes back revenue only')
-        elif command.kind in {'booking_deposit','deposit_settlement','deposit_application'}:
+        elif command.kind in {'booking_deposit','deposit_settlement','deposit_application','customer_advance'}:
             deposits=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='customer_deposits'",(tenant,)).all()
             if len(deposits)!=1:raise HTTPException(409,'Set up deposits before taking one')
             deposits=str(deposits[0].account_id);main_id=str(command.main_account_id);line=command.lines[0] if len(command.lines)==1 else None
@@ -202,6 +202,12 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 # PR-12: debit the till (or Transfers awaiting confirmation), credit Customer deposits and advances.
                 if line is None or command.credited or not line.credited or str(line.account_id)!=deposits or main_id not in {cash,clearing}:
                     raise HTTPException(422,'A deposit moves money into the till or Transfers awaiting confirmation and holds it as a customer deposit')
+            elif command.kind=='customer_advance':
+                # PR-10: money paid beyond a customer's invoices, debit the till or the bank it arrived in, credit
+                # Customer deposits and advances.
+                into_bank=main_id!=cash and str(collection_account(session,'Transfer',command.main_account_id))==main_id
+                if line is None or command.credited or not line.credited or str(line.account_id)!=deposits or not(main_id==cash or into_bank):
+                    raise HTTPException(422,'An advance moves money into the till or a bank account and holds it for the customer')
             elif command.kind=='deposit_application':
                 # PR-13 at the till: debit the deposit, credit the till or Transfers awaiting confirmation the sale went
                 # into. PR-11 on an invoice: debit the deposit, credit the customer's receivable, allocated to the invoice.
