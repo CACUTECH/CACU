@@ -26,8 +26,8 @@ def charted(boundary):
         c.execute("INSERT INTO memberships(business_id,user_id,role,is_active) VALUES(%s,%s,'owner',true)", (service, people['owner']))
         c.execute(Path('../supabase/migrations/20261031100000_default_chart_of_accounts.sql').read_text(encoding='utf-8'))
         c.execute(Path('../supabase/migrations/20261101150000_chart_edits.sql').read_text(encoding='utf-8'))
-        # Later migrations add account kinds to the chart rebuilt here (booking deposits: customer_deposits).
-        for later in ('20261108100000_booking_deposits.sql', '20261109100000_goods_receipts.sql'):
+        # Later migrations add account kinds to the chart rebuilt here (booking deposits: customer_deposits; online payments: gateway_clearing).
+        for later in ('20261108100000_booking_deposits.sql', '20261109100000_goods_receipts.sql', '20261114090000_online_payments.sql'):
             text = Path(f'../supabase/migrations/{later}').read_text(encoding='utf-8')
             c.execute(text[text.index('INSERT INTO onboarding_private.account_kinds'):text.index('ON CONFLICT (kind) DO NOTHING;') + len('ON CONFLICT (kind) DO NOTHING;')])
     return d, legacy, other, service, people

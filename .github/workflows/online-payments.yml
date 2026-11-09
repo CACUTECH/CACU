@@ -1,0 +1,48 @@
+name: Online payments
+# Verifies waiting Paystack checkouts and matches Paystack payouts for every business that connected its own Paystack
+# account (Doc 10 E23; Doc 09 PR-14, PR-15). Off until the repository variable CACU_ONLINE_PAYMENTS_ENABLED is 'true';
+# a manual run is a dry run unless "apply" is ticked. Each business's key is read sealed from the database and opened
+# with CACU_PAYMENT_KEY_ENCRYPTION_KEY.
+on:
+  schedule:
+    - cron: '10,40 * * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Verify, post and match payouts (approved production operation)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: online-payments
+  cancel-in-progress: false
+jobs:
+  check:
+    if: github.event_name == 'workflow_dispatch' || vars.CACU_ONLINE_PAYMENTS_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: billing-operations
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.11'
+      - run: uv sync --frozen --no-editable
+      - name: Check online payments or dry run
+        env:
+          CACU_DATABASE_URL: ${{ secrets.CACU_DATABASE_URL }}
+          CACU_PAYMENT_KEY_ENCRYPTION_KEY: ${{ secrets.CACU_PAYMENT_KEY_ENCRYPTION_KEY }}
+          APPLY_CHECK: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          if [ "$APPLY_CHECK" = "true" ]; then
+            uv run --frozen python -m tools.check_online_payments --apply --json
+          else
+            uv run --frozen python -m tools.check_online_payments --json
+          fi

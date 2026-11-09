@@ -704,3 +704,66 @@ def ageing(business_id:UUID,type:str,as_of:date,user_id:UUID=Depends(current_use
     if permission is None:raise HTTPException(422,'Choose receivables or payables')
     with library_transaction(user_id,business_id,permission=permission) as session:
         return ageing_report(session,type,as_of)
+
+# Online invoice payments through the business's own Paystack account (Doc 10 E23; Doc 09 PR-14, PR-15).
+from fastapi import Header, Request
+from starlette.concurrency import run_in_threadpool
+from cacu.accounting import online_payments as online
+from cacu.payments import service as online_service
+from cacu.payments.paystack import Paystack
+
+@app.get('/api/v1/businesses/{business_id}/online-payments')
+def online_payments_overview(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='invoices.view') as session:
+        return online.overview(session,user_id)
+
+@app.put('/api/v1/businesses/{business_id}/online-payments/paystack')
+def connect_paystack(business_id:UUID,data:online.PaystackConnect,user_id:UUID=Depends(current_user)):
+    client=Paystack(data.secret_key.strip())
+    with library_transaction(user_id,business_id) as session:
+        online._owner_or_admin(session,user_id)
+    # The key is tried against Paystack before it is saved, outside any database transaction.
+    client.check_key()
+    with library_transaction(user_id,business_id,write=True) as session:
+        return online.connect(session,user_id,data.model_copy(update={'secret_key':client.secret}),client.mode)
+
+@app.delete('/api/v1/businesses/{business_id}/online-payments/paystack')
+def disconnect_paystack(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True) as session:
+        return online.disconnect(session,user_id)
+
+@app.post('/api/v1/businesses/{business_id}/online-payments/check')
+def check_online_payments(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id) as session:
+        online._owner_or_admin(session,user_id,'Only an Owner or Admin can check Paystack now')
+    return online_service.check_business(business_id,user_id)
+
+@app.post('/api/v1/businesses/{business_id}/invoices/{invoice_id}/payment-link')
+def share_payment_link(business_id:UUID,invoice_id:UUID,data:online.LinkCreate,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='invoices.post') as session:
+        return online.share_link(session,user_id,invoice_id)
+
+@app.post('/api/v1/businesses/{business_id}/invoices/{invoice_id}/payment-link/revoke')
+def revoke_payment_link(business_id:UUID,invoice_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='invoices.post') as session:
+        return online.revoke_link(session,user_id,invoice_id)
+
+# Public: anyone holding a pay link may see that one invoice's amount due and pay it. No user token.
+@app.get('/api/v1/pay/{token}')
+def pay_link_summary(token:str):
+    return online_service.public_summary(token)
+
+@app.post('/api/v1/pay/{token}')
+def pay_link_start(token:str,data:online.PayStart):
+    return online_service.public_start(token,data)
+
+@app.post('/api/v1/pay/{token}/verify')
+def pay_link_verify(token:str,data:online.PayReturn):
+    return online_service.public_verify(token,data)
+
+# Signed by the business's own Paystack key, not by a user: the HMAC over the raw body is the authentication.
+@app.post('/api/v1/webhooks/paystack/{webhook_token}')
+async def tenant_paystack_webhook(webhook_token:str,request:Request,signature:str|None=Header(default=None,alias='x-paystack-signature')):
+    raw=await request.body()
+    if len(raw)>256_000:raise HTTPException(413,'Event too large')
+    return await run_in_threadpool(online_service.webhook,webhook_token,raw,signature)
