@@ -32,7 +32,7 @@ class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
-                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance']
+                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -49,12 +49,14 @@ CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'su
          'expense':CashPurchase,'pos':CashSale,'adjustment':JournalEntry,'credit_note':CreditNote,
          'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry,'sale_refund':JournalEntry,
          'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry,
-         'deposit_application':JournalEntry,'goods_bill':JournalEntry,'customer_advance':JournalEntry}
+         'deposit_application':JournalEntry,'goods_bill':JournalEntry,'customer_advance':JournalEntry,
+         'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry}
 # Documents filed under another document type: a bill for received goods is a supplier bill to payments and the bills list.
 DOCUMENT_TYPES={'goods_bill':'bill'}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
-INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance'}
+INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance',
+                'gateway_receipt','gateway_settlement'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
@@ -129,7 +131,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if not source or source.status!='draft' or source.total!=amount or (source.tax or 0)!=0:
             raise HTTPException(409,'Invoice must be a reconciled tax-free draft matching its authoritative total')
         if str(source.customer_id)!=str(command.counterparty_id):raise HTTPException(422,'Invoice customer mismatch')
-    if command.kind in {'receipt','supplier_payment','credit_note'} or (command.kind=='deposit_application' and command.target_id):
+    if command.kind in {'receipt','supplier_payment','credit_note'} or (command.kind in {'deposit_application','gateway_receipt'} and command.target_id):
         if not command.target_id:raise HTTPException(422,'Allocation target required')
         kind='bill' if command.kind=='supplier_payment' else 'invoice'
         mapped=raw(session,'SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type=%s AND source_id=%s',
@@ -205,7 +207,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             elif command.kind=='customer_advance':
                 # PR-10: money paid beyond a customer's invoices, debit the till or the bank it arrived in, credit
                 # Customer deposits and advances.
-                into_bank=main_id!=cash and str(collection_account(session,'Transfer',command.main_account_id))==main_id
+                # An online payment beyond the invoice (E23) arrives in Card and online payments clearing.
+                online=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='gateway_clearing'",(tenant,)).scalar()
+                into_bank=main_id!=cash and (main_id==str(online) or str(collection_account(session,'Transfer',command.main_account_id))==main_id)
                 if line is None or command.credited or not line.credited or str(line.account_id)!=deposits or not(main_id==cash or into_bank):
                     raise HTTPException(422,'An advance moves money into the till or a bank account and holds it for the customer')
             elif command.kind=='deposit_application':
@@ -220,6 +224,20 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 refund=line is not None and command.credited and not line.credited and str(line.account_id)==deposits and (main_id==cash or str(collection_account(session,'Transfer',command.main_account_id))==main_id)
                 forfeit=line is not None and main_id==deposits and not command.credited and line.credited and str(line.account_id) in income
                 if not(refund or forfeit):raise HTTPException(422,'A deposit is either refunded or kept as income')
+        elif command.kind in {'gateway_receipt','gateway_settlement'}:
+            online=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='gateway_clearing'",(tenant,)).all()
+            if len(online)!=1:raise HTTPException(409,'Connect Paystack first: it adds Card and online payments clearing to your chart')
+            online=str(online[0].account_id)
+            if command.kind=='gateway_receipt':
+                # PR-14: debit Card and online payments clearing, credit the customer's receivable, allocated to the invoice.
+                if not command.target_id or not command.credited or len(command.lines)!=1 or command.lines[0].credited or str(command.lines[0].account_id)!=online:
+                    raise HTTPException(422,'A verified online payment moves the invoice into Card and online payments clearing')
+            else:
+                # PR-15: debit the bank (net) and Bank and payment charges (fee), credit clearing (gross).
+                fees={str(r.account_id) for r in raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='gateway_fees'",(tenant,)).all()}
+                banks=[l for l in command.lines if str(l.account_id) not in fees]
+                if str(command.main_account_id)!=online or not command.credited or any(l.credited for l in command.lines) or len(banks)!=1                    or len(command.lines)-len(banks)>1 or str(collection_account(session,'Transfer',banks[0].account_id))!=str(banks[0].account_id):
+                    raise HTTPException(422,'A settlement moves money from Card and online payments clearing to the bank, less the fee')
         elif command.kind=='goods_bill':
             # A bill for received goods: debit Goods received not invoiced, credit the supplier's payables (matched by
             # counterparty); price differences are separate stock adjustments.
