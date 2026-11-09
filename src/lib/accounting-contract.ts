@@ -1496,6 +1496,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/customers/{customer_id}/open-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Open Invoices */
+        get: operations["customer_open_invoices_api_v1_businesses__business_id__customers__customer_id__open_items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/customer-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Customer Receipt */
+        post: operations["create_customer_receipt_api_v1_businesses__business_id__customer_receipts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/invoices/{invoice_id}/apply-advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Customer Advance */
+        post: operations["apply_customer_advance_api_v1_businesses__business_id__invoices__invoice_id__apply_advance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/customers/{customer_id}/advance-refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refund Customer Advance */
+        post: operations["refund_customer_advance_api_v1_businesses__business_id__customers__customer_id__advance_refund_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/customers/{customer_id}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Account Statement */
+        get: operations["customer_account_statement_api_v1_businesses__business_id__customers__customer_id__statement_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/reports/ageing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ageing */
+        get: operations["ageing_api_v1_businesses__business_id__reports_ageing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1560,6 +1662,45 @@ export interface components {
             entry_date: string;
             /** Evidence */
             evidence: string;
+        };
+        /** AdvanceApply */
+        AdvanceApply: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Amount */
+            amount: string;
+        };
+        /** AdvanceRefund */
+        AdvanceRefund: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "Cash" | "Transfer";
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+            /** Note */
+            note: string;
+        };
+        /** Allocation */
+        Allocation: {
+            /**
+             * Invoice Id
+             * Format: uuid
+             */
+            invoice_id: string;
+            /** Amount */
+            amount: string;
         };
         /** Approval */
         Approval: {
@@ -1846,6 +1987,35 @@ export interface components {
         CostRates: {
             /** Rates */
             rates: components["schemas"]["CostRate"][];
+        };
+        /** CustomerReceipt */
+        CustomerReceipt: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Customer Id
+             * Format: uuid
+             */
+            customer_id: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "Cash" | "Transfer";
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+            /** Allocations */
+            allocations?: components["schemas"]["Allocation"][];
         };
         /** Decision */
         Decision: {
@@ -2350,7 +2520,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill";
+            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill" | "customer_advance";
             /**
              * Source Id
              * Format: uuid
@@ -6207,6 +6377,214 @@ export interface operations {
                 "application/json": components["schemas"]["OfflineDecision"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_open_invoices_api_v1_businesses__business_id__customers__customer_id__open_items_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_customer_receipt_api_v1_businesses__business_id__customer_receipts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerReceipt"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_customer_advance_api_v1_businesses__business_id__invoices__invoice_id__apply_advance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdvanceApply"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refund_customer_advance_api_v1_businesses__business_id__customers__customer_id__advance_refund_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdvanceRefund"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_account_statement_api_v1_businesses__business_id__customers__customer_id__statement_get: {
+        parameters: {
+            query: {
+                start_date: string;
+                end_date: string;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ageing_api_v1_businesses__business_id__reports_ageing_get: {
+        parameters: {
+            query: {
+                type: string;
+                as_of: string;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

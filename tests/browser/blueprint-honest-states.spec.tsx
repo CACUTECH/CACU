@@ -5,7 +5,6 @@ import Page3 from '../../src/app/settings/customers/page';
 import Page4 from '../../src/app/analytics/kpi/page';
 import Page5 from '../../src/app/analytics/planning/page';
 import Page6 from '../../src/app/analytics/budget-vs-actual/page';
-import Page7 from '../../src/app/analytics/aging-reports/page';
 import Page8 from '../../src/app/analytics/reconciliation/page';
 import Page12 from '../../src/app/settings/profile/page';
 
@@ -63,16 +62,6 @@ test('analytics/budget-vs-actual has an honest unavailable state on mobile', asy
   await page.setViewportSize({ width: 390, height: 844 });
   const component = await mount(<Page6 />);
   await expect(component.getByRole('heading', { level: 1, name: 'Budget vs. Actual' })).toBeVisible();
-  await expect(component.getByRole('heading', { name: 'Not available yet', exact: true })).toBeVisible();
-  await expect(component.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/');
-  await expect(component.locator('input, button, form, table, canvas, svg, [role="switch"], [role="combobox"]')).toHaveCount(0);
-  await expect(component).not.toContainText('₦');
-});
-
-test('analytics/aging-reports has an honest unavailable state on mobile', async ({ mount, page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const component = await mount(<Page7 />);
-  await expect(component.getByRole('heading', { level: 1, name: 'Receivables & Payables Aging' })).toBeVisible();
   await expect(component.getByRole('heading', { name: 'Not available yet', exact: true })).toBeVisible();
   await expect(component.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/');
   await expect(component.locator('input, button, form, table, canvas, svg, [role="switch"], [role="combobox"]')).toHaveCount(0);

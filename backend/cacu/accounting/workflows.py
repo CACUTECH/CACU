@@ -179,7 +179,10 @@ def invoice_outstanding(session,invoice_id):
     raw(session,'SELECT 1 FROM public.invoices WHERE business_id=%s AND id=%s FOR UPDATE',(tenant,str(invoice_id)))
     target=session.get(Transaction,mapped)
     waiting=raw(session,"SELECT coalesce(sum(amount),0) FROM accounting.pending_transfer WHERE business_id=%s AND invoice_id=%s AND status='pending'",(tenant,str(invoice_id))).scalar()
-    return target.amount-target.cleared(session),Decimal(waiting)
+    # Parts of a customer payment by transfer that is still waiting (E11) count too.
+    parts=raw(session,"""SELECT coalesce(sum((a->>'amount')::numeric),0) FROM accounting.customer_receipt r,jsonb_array_elements(r.allocations) a
+      WHERE r.business_id=%s AND r.status='awaiting_transfer' AND a->>'invoice_id'=%s""",(tenant,str(invoice_id))).scalar()
+    return target.amount-target.cleared(session),Decimal(waiting)+Decimal(parts)
 
 def receipt_create(session,actor,data:ReceiptCreate):
     def execute():
@@ -196,6 +199,9 @@ def receipt_create(session,actor,data:ReceiptCreate):
             return {'source_id':str(data.request_key),'status':'awaiting_confirmation','amount':format(Decimal(data.amount),'.2f'),
                     'outstanding':format(outstanding,'.2f'),'payment_method':'Transfer'}
         collection=collection_account(session,data.method,data.bank_account_id)
+        outstanding,waiting=invoice_outstanding(session,data.invoice_id)
+        if waiting and Decimal(data.amount)>outstanding-waiting:
+            raise HTTPException(409,'Amount exceeds outstanding balance, including transfers waiting for confirmation')
         return receipt_posting(session,actor,data.request_key,data.invoice_id,data.amount,data.method,collection,data.entry_date)
     return durable(session,actor,'receipt',data,execute)
 
