@@ -1,0 +1,46 @@
+name: Closed businesses
+# 90 days after a business closed, removes its customers' and suppliers' contact details and operational data; the
+# books stay, read-only (Doc 10 E22 part 3, FR-210). Off until the repository variable CACU_CLOSURE_PURGE_ENABLED is
+# 'true'; a manual run is a dry run unless "apply" is ticked.
+on:
+  schedule:
+    - cron: '20 2 * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Remove what is due (approved production operation)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: closed-businesses
+  cancel-in-progress: false
+jobs:
+  purge:
+    if: github.event_name == 'workflow_dispatch' || vars.CACU_CLOSURE_PURGE_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: billing-operations
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.11'
+      - run: uv sync --frozen --no-editable
+      - name: Remove what is due or dry run
+        env:
+          CACU_DATABASE_URL: ${{ secrets.CACU_DATABASE_URL }}
+          APPLY_PURGE: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          if [ "$APPLY_PURGE" = "true" ]; then
+            uv run --frozen python -m tools.purge_closed_businesses --apply --json
+          else
+            uv run --frozen python -m tools.purge_closed_businesses --json
+          fi

@@ -48,6 +48,7 @@ def claims(user_id: UUID, level: str | None = None) -> str:
 def allowed(session, permission: str) -> bool:
     """Whether the signed-in member holds the permission in the session's business (Doc 08 §6)."""
     return bool(session.connection().exec_driver_sql('SELECT authz.has_permission(%s, %s)', (str(session.business_id), permission)).scalar())
+CLOSED_MESSAGE = 'This business is closed, so its records are read-only. The owner can export them, or reopen the business within 90 days.'
 READ_ONLY_MESSAGE = 'Your workspace is read-only until the subscription is paid. You can still record payments received and export.'
 
 @contextmanager
@@ -88,7 +89,8 @@ def library_transaction(user_id: UUID, business_id: UUID, write=False, while_rea
             if permission and not connection.exec_driver_sql('SELECT authz.has_permission(%s, %s)', (str(business_id), permission)).scalar():
                 raise HTTPException(403, PERMISSION_MESSAGE)
             if write and not while_read_only and not connection.exec_driver_sql('SELECT platform.writes_allowed(%s)', (str(business_id),)).scalar():
-                raise HTTPException(403, READ_ONLY_MESSAGE)
+                closed = connection.exec_driver_sql('SELECT platform.is_closed(%s)', (str(business_id),)).scalar()
+                raise HTTPException(403, CLOSED_MESSAGE if closed else READ_ONLY_MESSAGE)
             mapping = connection.exec_driver_sql("SELECT entity_id, timezone FROM accounting.business_map WHERE business_id=%s AND state='active'", (str(business_id),)).first()
             if not mapping:
                 raise HTTPException(409, 'Accounting cutover has not been reconciled for this business')

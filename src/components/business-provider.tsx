@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import type { BusinessType } from '@/lib/data';
 import Link from 'next/link';
 import { gateFor } from '@/lib/two-step';
+import { longDate } from '@/lib/closure';
 
 /** The selected business row plus the signed-in member's role. */
 export type ActiveBusiness = {
@@ -23,14 +24,14 @@ type Selection = Awaited<ReturnType<typeof getBusinessSelectionAction>>;
 
 export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [selection, setSelection] = useState<Selection>({ memberships: [], active: null, twoStep: null });
+  const [selection, setSelection] = useState<Selection>({ memberships: [], active: null, twoStep: null, closure: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const requestVersion = useRef(0);
   const refresh = useCallback(async () => {
     const version = ++requestVersion.current;
     setLoading(true);
-    setSelection({ memberships: [], active: null, twoStep: null });
+    setSelection({ memberships: [], active: null, twoStep: null, closure: null });
     try {
       const next = await getBusinessSelectionAction();
       if (version !== requestVersion.current) return;
@@ -79,6 +80,9 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
                return <option key={m.business_id} value={m.business_id}>{b?.name ?? m.business_id}</option>;
              })}
            </select>
+         </div>}
+         {!publicRoute && selection.closure?.closed && <div role="status" className="border-b bg-amber-50 p-2 text-sm text-amber-900">
+           This business is closed, so everything is read-only.{selection.closure.can_reopen && <> <Link className="underline" href="/settings/export">Export your data</Link> or <Link className="underline" href="/settings/close">reopen it</Link> before {longDate(selection.closure.purge_after)}.</>}
          </div>}
          <div key={`${member?.business_id ?? 'public'}:${member?.role ?? 'none'}`}>{children}</div>
        </>}

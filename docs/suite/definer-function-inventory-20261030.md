@@ -46,3 +46,13 @@ Added with the full data export (20261117090000, E22 part 2). All are callable o
 - `accounting.exporting`: the export read policy. It is true only for the business and export in the API's own transaction, while that export is running and its requester is still an active member.
 - `accounting.export_queue`: the job's list of waiting exports, stopped runs and expired files.
 - `accounting.export_settle`: marks an export failed, or deletes a file past its seven days, and nothing else.
+
+Added with closing a business (20261118090000, E22 part 3):
+- **Callable from the browser (`authenticated`):**
+  - `public.business_closure_status`: active members only.
+  - `public.close_business`: through `management_private.authorize`, Owner only. It needs the business name typed and a reason.
+  - `public.reopen_business`: Owner only, within 90 days.
+- **Runtime only:** `platform.purge_closed_businesses`, `platform.closures_due` and `platform.is_closed`.
+- **Changed:**
+  - `platform.writes_allowed` also refuses a closed business.
+  - `platform.read_only_guard` names a closed business, and lets only the removal job's own transaction clear contact details.

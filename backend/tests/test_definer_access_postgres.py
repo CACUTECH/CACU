@@ -55,6 +55,9 @@ REVIEWED = {
     'mfa_status': "the caller's own two-step status only; for a business they are not in it says nothing is required",
     'new_recovery_codes': "the caller's own codes, only right after the second step",
     'use_recovery_code': "the caller's own codes and authenticators only; five failed tries an hour",
+    'business_closure_status': 'active membership of the business; nothing for anyone else',
+    'close_business': 'management_private.authorize owner, with the business name typed and a reason',
+    'reopen_business': 'management_private.authorize owner, within 90 days of closing',
 }
 NO_TENANT_INPUT = {'hr_payroll_defaults', 'billing_plans'}
 # Answer only about the caller themselves, never about the business named.

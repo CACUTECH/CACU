@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Briefcase, Users, Globe, Power, Banknote, FileText, Truck, Heart, ArrowRight, Palette, Bell, BookText, CreditCard, ShieldCheck, Download } from 'lucide-react';
+import { User, Briefcase, Users, Globe, Power, Banknote, FileText, Truck, Heart, ArrowRight, Palette, Bell, BookText, CreditCard, ShieldCheck, Download, Archive } from 'lucide-react';
 import Link from 'next/link';
 
 function SettingCard({ icon: Icon, title, description, href }: { icon: React.ElementType, title: string, description: string, href: string }) {
@@ -47,6 +47,7 @@ export default function SettingsPage() {
                 <SettingCard icon={Globe} title="Language & Currency" description="Set your preferred language and default currency for reports." href="/settings/locale" />
                 <SettingCard icon={Palette} title="Appearance" description="Customize the look and feel of the application." href="/settings/appearance" />
                 <SettingCard icon={Bell} title="Notifications" description="Configure how you receive alerts and updates." href="/settings/notifications" />
+                <SettingCard icon={Archive} title="Close business" description="Stop trading on CACU: read-only at once, reopen within 90 days." href="/settings/close" />
                 <SettingCard icon={Download} title="Export your data" description="Download everything CACU keeps for your business as spreadsheet files." href="/settings/export" />
                 <SettingCard icon={ShieldCheck} title="Two-step sign-in" description="Protect your account with a code from an authenticator app." href="/settings/security" />
                 <SettingCard icon={CreditCard} title="Online payments" description="Let customers pay invoices through your own Paystack account." href="/settings/online-payments" />
