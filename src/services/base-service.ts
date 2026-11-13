@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/logger';
 import { cookies } from 'next/headers';
 import { ACTIVE_BUSINESS_COOKIE, selectMembership } from '@/lib/business-selection';
+import { openedSupportCases } from '@/lib/support-access';
 
 /**
  * @fileOverview Base class for all backend services.
@@ -29,8 +30,11 @@ export abstract class BaseService {
     if (selected) {
       const { data, error } = await supabase.from('memberships').select('business_id, role')
         .eq('user_id', user.id).eq('is_active', true).eq('business_id', selected).single();
-      if (error || !data) throw new Error('Selected business membership is no longer valid');
-      membership = data;
+      // No membership (PGRST116 only; any other lookup error fails closed): CACU support with an opened,
+      // owner-granted case reads as a viewer, and the database refuses its writes.
+      const supported = !data && error?.code === 'PGRST116' && (await openedSupportCases(supabase)).some(c => c.business_id === selected);
+      if (!data && !supported) throw new Error('Selected business membership is no longer valid');
+      membership = data ?? { business_id: selected, role: 'viewer' };
     } else {
       const { data, error } = await supabase.from('memberships').select('business_id, role')
         .eq('user_id', user.id).eq('is_active', true).limit(2);

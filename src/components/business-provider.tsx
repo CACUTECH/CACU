@@ -8,6 +8,7 @@ import type { BusinessType } from '@/lib/data';
 import Link from 'next/link';
 import { gateFor } from '@/lib/two-step';
 import { longDate } from '@/lib/closure';
+import { dateTime } from '@/lib/support-access';
 
 /** The selected business row plus the signed-in member's role. */
 export type ActiveBusiness = {
@@ -80,6 +81,9 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
                return <option key={m.business_id} value={m.business_id}>{b?.name ?? m.business_id}</option>;
              })}
            </select>
+         </div>}
+         {!publicRoute && member?.support && <div role="status" className="border-b bg-sky-50 p-2 text-sm text-sky-900">
+           You are viewing this business as CACU support, read-only, until {dateTime(member.support.expires_at)}. <Link className="underline" href="/support">Support cases</Link>
          </div>}
          {!publicRoute && selection.closure?.closed && <div role="status" className="border-b bg-amber-50 p-2 text-sm text-amber-900">
            This business is closed, so everything is read-only.{selection.closure.can_reopen && <> <Link className="underline" href="/settings/export">Export your data</Link> or <Link className="underline" href="/settings/close">reopen it</Link> before {longDate(selection.closure.purge_after)}.</>}
