@@ -38,9 +38,9 @@ def plan(live, code):
                      ON CONFLICT (business_id) DO UPDATE SET plan_code=EXCLUDED.plan_code''', (live.business, code))
 
 
-def as_user(live, who, sql, args=(), level='aal1', user=None):
+def as_user(live, who, sql, args=(), level='aal1', login=None):
     """Run sql as a signed-in browser session (role authenticated) with the given assurance level."""
-    with psycopg.connect(URL, **({'user': user} if user else {})) as c:
+    with psycopg.connect(URL, **(login or {})) as c:
         c.execute('SET LOCAL ROLE authenticated')
         c.execute("SELECT set_config('request.jwt.claims',%s,true)", (json.dumps({'sub': str(live.people[who]), 'role': 'authenticated', 'aal': level}),))
         return c.execute(sql, args).fetchone()[0]
@@ -85,11 +85,12 @@ def test_only_the_runtime_can_act_as_a_server_job(factors):
         c.execute('SET LOCAL ROLE cacu_runtime')
         c.execute("SELECT set_config('request.jwt.claims',%s,true)", (claims(live.people['owner'], 'system'),))
         assert c.execute('SELECT authz.mfa_ok(%s)', (live.business,)).fetchone()[0]
-    probe = f'cacu_browser_probe_{uuid4().hex[:8]}'
+    probe, secret = f'cacu_browser_probe_{uuid4().hex[:8]}', uuid4().hex  # CI's server requires a password
     with psycopg.connect(URL) as c:
-        c.execute(f'CREATE ROLE {probe} LOGIN; GRANT authenticated TO {probe}')
+        c.execute(f"CREATE ROLE {probe} LOGIN PASSWORD '{secret}'; GRANT authenticated TO {probe}")
     try:  # a browser session cannot claim to be a server job
-        assert not as_user(live, 'owner', 'SELECT authz.mfa_ok(%s)', (live.business,), level='system', user=probe)
+        assert not as_user(live, 'owner', 'SELECT authz.mfa_ok(%s)', (live.business,), level='system',
+                           login={'user': probe, 'password': secret})
     finally:
         with psycopg.connect(URL) as c:
             c.execute(f'DROP OWNED BY {probe}; DROP ROLE {probe}')
