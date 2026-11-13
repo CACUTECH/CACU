@@ -26,7 +26,7 @@ def database():
     assert DSN and urlparse(DSN).hostname in {'127.0.0.1','localhost','postgres'}, 'Refuse non-local disposable test database'
     assert DSN and DSN.rsplit('/',1)[-1].split('?')[0].endswith('_test'), 'Refuse non-test database'
     with psycopg.connect(DSN) as c:
-        c.execute('DROP SCHEMA IF EXISTS authz CASCADE; DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+        c.execute('DROP SCHEMA IF EXISTS security_private CASCADE; DROP SCHEMA IF EXISTS authz CASCADE; DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
         c.execute("""CREATE TABLE public.businesses(id uuid primary key,name text,business_type text NOT NULL DEFAULT 'PRODUCT');
           CREATE TABLE public.memberships(business_id uuid,user_id uuid,role text,is_active boolean NOT NULL DEFAULT true);
           CREATE TABLE public.accounts(id uuid primary key,business_id uuid,name text,is_active boolean default true);
@@ -74,7 +74,7 @@ def database():
                      '20261106110000_permissions_sales_invoices_expenses.sql','20261106120000_permissions_ledger_hr_settings_billing.sql',
                      '20261107090000_transfer_clearing.sql','20261107100000_pos_checkout.sql','20261107110000_pos_parked_sales_and_refunds.sql','20261107120000_pos_cashier_shifts.sql',
                      '20261108090000_bookings_and_service_staff.sql','20261108100000_booking_deposits.sql','20261108110000_booking_billing.sql','20261108120000_jobs.sql','20261109090000_purchase_orders.sql',
-                     '20261109100000_goods_receipts.sql','20261109110000_goods_bills.sql','20261110090000_outlet_stock.sql','20261110100000_stock_transfers.sql','20261111090000_customer_messages.sql','20261111100000_customer_reminders.sql','20261112090000_offline_sales.sql','20261113090000_customer_receipts.sql','20261114090000_online_payments.sql','20261115090000_invoice_credit_notes.sql']:
+                     '20261109100000_goods_receipts.sql','20261109110000_goods_bills.sql','20261110090000_outlet_stock.sql','20261110100000_stock_transfers.sql','20261111090000_customer_messages.sql','20261111100000_customer_reminders.sql','20261112090000_offline_sales.sql','20261113090000_customer_receipts.sql','20261114090000_online_payments.sql','20261115090000_invoice_credit_notes.sql','20261116090000_two_step_sign_in.sql','20261117090000_data_export.sql','20261118090000_business_closure.sql']:
             c.execute(Path(f'../supabase/migrations/{name}').read_text(encoding='utf-8'))
         for tab in ['memberships','accounts','customers','suppliers','catalog_items','invoices','invoice_items','payments','transactions','transaction_items']:
             c.execute(f'ALTER TABLE public.{tab} ENABLE ROW LEVEL SECURITY')

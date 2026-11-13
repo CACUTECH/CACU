@@ -24,29 +24,39 @@ class AtomicAccountingSession(AccountingSession):
         # may commit; otherwise document/stock/audit failures would leave postings.
         self.flush()
 
-def take_write_slot(engine, user_id: UUID, business_id: UUID):
+def take_write_slot(engine, user_id: UUID, business_id: UUID, level: str | None = None):
     """API-012: count this write against the user's and the business's per-minute allowance. It commits on its own,
     before the write's transaction, so refused and failed writes count too."""
     with engine.begin() as connection:
         connection.exec_driver_sql("SELECT set_config('request.jwt.claims', %s, true), set_config('cacu.business_id', %s, true)",
-                                   (json.dumps({'sub': str(user_id), 'role': 'authenticated'}), str(business_id)))
+                                   (claims(user_id, level), str(business_id)))
         wait = connection.exec_driver_sql('SELECT accounting.take_write_slot(%s)', (str(business_id),)).scalar()
     if wait:
         raise HTTPException(429, f'Too many changes in a short time. Try again in {wait} seconds.', headers={'Retry-After': str(wait)})
 
 PERMISSION_MESSAGE = 'You do not have permission to do this in this business. Ask the business owner.'
+MFA_MESSAGE = 'Finish two-step sign-in first: enter the code from your authenticator app, or set one up if your plan requires it.'
+
+
+def claims(user_id: UUID, level: str | None = None) -> str:
+    """The request claims the database reads: who is acting, and the session's assurance level (SEC-014). level is
+    'system' only for the API's own server jobs acting for a staff member without a browser session."""
+    from cacu.auth.session import session_level
+    return json.dumps({'sub': str(user_id), 'role': 'authenticated', 'aal': level or session_level.get()})
 
 
 def allowed(session, permission: str) -> bool:
     """Whether the signed-in member holds the permission in the session's business (Doc 08 §6)."""
     return bool(session.connection().exec_driver_sql('SELECT authz.has_permission(%s, %s)', (str(session.business_id), permission)).scalar())
+CLOSED_MESSAGE = 'This business is closed, so its records are read-only. The owner can export them, or reopen the business within 90 days.'
 READ_ONLY_MESSAGE = 'Your workspace is read-only until the subscription is paid. You can still record payments received and export.'
 
 @contextmanager
-def library_transaction(user_id: UUID, business_id: UUID, write=False, while_read_only=False, permission: str | None = None):
+def library_transaction(user_id: UUID, business_id: UUID, write=False, while_read_only=False, permission: str | None = None, level: str | None = None):
     """while_read_only: the write is one a suspended business may still make (Doc 14 SUB-10), such as a receipt.
     permission: the Doc 08 permission the action needs (module.action), checked by authz.has_permission in this
-    transaction, alongside the role check above, until every module has switched (M-08)."""
+    transaction, alongside the role check above, until every module has switched (M-08).
+    level: 'system' for the API's server jobs (see claims); otherwise the request's own session level."""
     dsn = os.environ.get('CACU_DATABASE_URL')
     if not dsn:
         raise HTTPException(503, 'Accounting database unavailable')
@@ -58,7 +68,7 @@ def library_transaction(user_id: UUID, business_id: UUID, write=False, while_rea
                           connect_args=database_connect_options())
     try:
         if write:
-            take_write_slot(engine, user_id, business_id)
+            take_write_slot(engine, user_id, business_id, level)
         with engine.begin() as connection:
             role = connection.exec_driver_sql('SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user').one()
             if role != ('cacu_runtime', False, False):
@@ -67,17 +77,20 @@ def library_transaction(user_id: UUID, business_id: UUID, write=False, while_rea
             if owns:
                 raise HTTPException(503, 'Runtime must not own accounting or source tables')
             connection.exec_driver_sql("SELECT set_config('request.jwt.claims', %s, true), set_config('cacu.business_id', %s, true), set_config('search_path', 'accounting,public,pg_catalog', true), set_config('statement_timeout', '15000', true)",
-                                       (json.dumps({'sub': str(user_id), 'role': 'authenticated'}), str(business_id)))
+                                       (claims(user_id, level), str(business_id)))
             # Locks the tenant for numbering, durable replay, and payment allocation.
             # All accounting writes use this same lock, even with different request keys.
             connection.exec_driver_sql('SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))', (str(business_id),))
             member = connection.exec_driver_sql('SELECT accounting.lock_membership(%s, %s)', (str(business_id), str(user_id))).scalar()
             if member not in {'owner', 'admin', 'editor', 'viewer'} or (write and member == 'viewer'):
                 raise HTTPException(403, 'Business permission required')
+            if not connection.exec_driver_sql('SELECT authz.mfa_ok(%s)', (str(business_id),)).scalar():
+                raise HTTPException(403, MFA_MESSAGE)
             if permission and not connection.exec_driver_sql('SELECT authz.has_permission(%s, %s)', (str(business_id), permission)).scalar():
                 raise HTTPException(403, PERMISSION_MESSAGE)
             if write and not while_read_only and not connection.exec_driver_sql('SELECT platform.writes_allowed(%s)', (str(business_id),)).scalar():
-                raise HTTPException(403, READ_ONLY_MESSAGE)
+                closed = connection.exec_driver_sql('SELECT platform.is_closed(%s)', (str(business_id),)).scalar()
+                raise HTTPException(403, CLOSED_MESSAGE if closed else READ_ONLY_MESSAGE)
             mapping = connection.exec_driver_sql("SELECT entity_id, timezone FROM accounting.business_map WHERE business_id=%s AND state='active'", (str(business_id),)).first()
             if not mapping:
                 raise HTTPException(409, 'Accounting cutover has not been reconciled for this business')

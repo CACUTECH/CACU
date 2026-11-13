@@ -52,8 +52,16 @@ REVIEWED = {
     'request_upload_delete': 'owner/admin membership and can_read_upload (active)',
     'reserve_upload': 'active membership with purpose role',
     'update_invoice_status_safe': 'has_business_role owner/admin/editor',
+    'mfa_status': "the caller's own two-step status only; for a business they are not in it says nothing is required",
+    'new_recovery_codes': "the caller's own codes, only right after the second step",
+    'use_recovery_code': "the caller's own codes and authenticators only; five failed tries an hour",
+    'business_closure_status': 'active membership of the business; nothing for anyone else',
+    'close_business': 'management_private.authorize owner, with the business name typed and a reason',
+    'reopen_business': 'management_private.authorize owner, within 90 days of closing',
 }
 NO_TENANT_INPUT = {'hr_payroll_defaults', 'billing_plans'}
+# Answer only about the caller themselves, never about the business named.
+CALLER_ONLY = {'mfa_status'}
 SAMPLE = {'uuid': None, 'text': "'x'", 'jsonb': "'{}'::jsonb", 'date': 'CURRENT_DATE', 'numeric': '1', 'integer': '1',
           'bigint': '1', 'boolean': 'false', 'membership_role[]': "ARRAY['owner']::public.membership_role[]"}
 
@@ -88,7 +96,7 @@ def test_every_callable_definer_is_reviewed_pinned_and_refuses_other_tenants(inv
     for signature, name, config, types in functions:
         assert name in REVIEWED, f'{signature} is callable by signed-in users but has not been reviewed'
         assert any(setting.startswith('search_path=') for setting in config or []), f'{signature} has no fixed search_path'
-        if name in NO_TENANT_INPUT:
+        if name in NO_TENANT_INPUT or name in CALLER_ONLY:
             continue
         first_uuid = True
         args = []

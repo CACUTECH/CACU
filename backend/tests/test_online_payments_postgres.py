@@ -66,7 +66,8 @@ def paystack(live, monkeypatch):
     FakePaystack.verified, FakePaystack.started, FakePaystack.payouts, FakePaystack.payout_items = {}, [], [], {}
 
     @contextmanager
-    def tenant(actor, business, write=False, while_read_only=False, permission=None):
+    def tenant(actor, business, write=False, while_read_only=False, permission=None, level=None):
+        assert level == 'system'  # pay links, webhooks and the job never depend on a staff member's sign-in step
         with live.engine.begin() as c:
             s = session_for(c, (live.engine, business, actor, live.entity, None, None, TODAY.year))
             try:
