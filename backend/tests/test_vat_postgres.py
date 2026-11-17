@@ -129,3 +129,79 @@ def test_output_vat_cannot_be_posted_by_other_documents(registered):
                              narration='Moving VAT by hand', credited=False, lines=[{'account_id': output, 'amount': '50.00', 'credited': True}])
     with pytest.raises(HTTPException, match='charged only by sales and invoices'):
         call(live, 'owner', lambda s, a: post_command(s, a, journal))
+
+
+# Part 2b: input VAT on bills, bills for received goods and expenses.
+
+def paid_out(live, amount, vat='0.00', **kw):
+    from cacu.accounting.workflows import ExpenseCreate
+    return ExpenseCreate(request_key=uuid4(), expense_account_id=live.codes['6200'], amount=amount, entry_date=TODAY, method='Cash',
+                         description='Diesel for the generator', vat=vat, **kw)
+
+
+def test_vat_on_purchases_needs_registration_and_stays_within_the_rate(live):
+    from cacu.accounting.workflows import expense_create
+    with pytest.raises(HTTPException, match='not registered for VAT on that date'):
+        call(live, 'owner', lambda s, a: expense_create(s, a, paid_out(live, '10750.00', '750.00')))
+    call(live, 'owner', lambda s, a: expense_create(s, a, paid_out(live, '10750.00')))  # unregistered: all of it is the cost
+    assert balance(live, '6200') == Decimal('10750.00')
+    call(live, 'owner', lambda s, a: save_settings(s, a, REGISTERED))
+    with pytest.raises(HTTPException, match='more than 7.5% allows'):
+        call(live, 'owner', lambda s, a: expense_create(s, a, paid_out(live, '1075.00', '100.00')))
+
+
+def test_expenses_and_bills_claim_input_vat_and_the_return_nets_it_off(registered):
+    from cacu.accounting.bills import BillCreate, SupplierPaymentCreate, bill_create, list_bills, payment_create
+    from cacu.accounting.workflows import ExpenseCreate, ReversalCreate, expense_create, reversal_create
+    live = registered
+    cash, payables = balance(live, '1000'), balance(live, '2000')
+    receipt = paid_out(live, '10750.00', '750.00')  # ₦10,750 paid; ₦750 of it VAT on the receipt
+    call(live, 'owner', lambda s, a: expense_create(s, a, receipt))
+    assert balance(live, '6200') == Decimal('10000.00') and balance(live, '1310') == Decimal('750.00')
+    assert balance(live, '1000') - cash == Decimal('-10750.00')
+
+    supplier_bill = BillCreate(request_key=uuid4(), supplier_id=live.ids['supplier'], bill_number='MILLS-77', entry_date=TODAY,
+                               lines=[{'account_id': live.codes['6100'], 'amount': '20000.00'}], vat='1500.00')
+    made = call(live, 'owner', lambda s, a: bill_create(s, a, supplier_bill))
+    assert balance(live, '6100') == Decimal('20000.00') and balance(live, '1310') == Decimal('2250.00')
+    assert balance(live, '2000') - payables == Decimal('-21500.00')  # the supplier is owed the VAT too
+    listed = next(b for b in call(live, 'owner', lambda s, a: list_bills(s)) if b['id'] == made['id'])
+    assert listed['total'] == '21500.00'
+    call(live, 'owner', lambda s, a: payment_create(s, a, made['id'], SupplierPaymentCreate(request_key=uuid4(), amount='21500.00', entry_date=TODAY, method='Cash')))
+    assert next(b for b in call(live, 'owner', lambda s, a: list_bills(s)) if b['id'] == made['id'])['status'] == 'paid'
+
+    call(live, 'owner', lambda s, a: sale_create(s, a, sale(live, lines=(('Beans', 1, '0'),))))  # ₦104.65 output VAT
+    month = call(live, 'viewer', lambda s, a: vat_return(s, month_start(TODAY)))
+    assert month['purchases'] == {'standard_net': '30000.00', 'zero_rated_net': '0.00', 'exempt_net': '0.00', 'vat': '2250.00', 'documents': 2}
+    assert month['payable'] == '-2145.35' and month['exceptions'] == []  # more paid than charged: reclaimable
+    tb = call(live, 'viewer', lambda s, a: trial_balance(s, TODAY))
+    assert tb['difference'] == '0.00' and [e for e in tb['exceptions'] if e['check'] != 'stock'] == []
+
+    with pytest.raises(HTTPException, match='not available yet'):  # taking VAT back comes in part 2c
+        call(live, 'owner', lambda s, a: reversal_create(s, a, receipt.request_key, ReversalCreate(request_key=uuid4(), entry_date=TODAY, reason='Entered twice')))
+    with pytest.raises(ValueError, match='pattern'):  # a negative VAT never reaches the books
+        BillCreate(request_key=uuid4(), supplier_id=live.ids['supplier'], bill_number='X', entry_date=TODAY,
+                   lines=[{'account_id': live.codes['6100'], 'amount': '1.00'}], vat='-1')
+
+
+def test_a_bill_for_received_goods_claims_its_vat(registered):
+    from test_goods_receipts_postgres import got
+    from test_goods_bills_postgres import bill
+    live = registered
+    receipt, _ = got(live, supplier_id=live.ids['supplier'], lines=[('Beans', 10, '1300')])
+    payables, grni = balance(live, '2000'), balance(live, '2010')
+    billed, _ = bill(live, receipt, 10, '13000.00', vat='975.00')
+    assert billed['total'] == '13000.00' and balance(live, '1310') == Decimal('975.00')
+    assert balance(live, '2000') - payables == Decimal('-13975.00') and balance(live, '2010') - grni == Decimal('13000.00')  # the bill clears what was received
+    assert call(live, 'viewer', lambda s, a: vat_return(s, month_start(TODAY)))['purchases']['vat'] == '975.00'
+
+
+def test_input_vat_is_claimed_only_on_bills_and_expenses(registered):
+    from cacu.accounting.posting import PostingCommand, post_command
+    live = registered
+    with psycopg.connect(URL) as c:
+        claim = c.execute("SELECT id FROM accounts WHERE business_id=%s AND code='1310'", (live.business,)).fetchone()[0]
+    journal = PostingCommand(request_key=uuid4(), kind='adjustment', source_id=uuid4(), main_account_id=live.codes['1000'], entry_date=TODAY,
+                             narration='Claiming VAT by hand', credited=True, lines=[{'account_id': claim, 'amount': '50.00', 'credited': False}])
+    with pytest.raises(HTTPException, match='claimed only on bills and expenses'):
+        call(live, 'owner', lambda s, a: post_command(s, a, journal))

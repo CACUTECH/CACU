@@ -31,6 +31,8 @@ class BillCreate(BaseModel):
     due_date:date|None=None
     notes:str=Field(default='',max_length=1000)
     lines:list[BillLine]=Field(min_length=1,max_length=50)
+    # VAT (E14 R3 2b): the VAT shown on the supplier's bill; the lines are before VAT, so the supplier is owed both.
+    vat:str=Field(default='0.00',pattern=AMOUNT)
 
 class SupplierPaymentCreate(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -61,10 +63,15 @@ def bill_create(session,actor,data:BillCreate):
         payables=party_account(session,'suppliers',data.supplier_id)
         raw(session,'INSERT INTO accounting.supplier_bill(business_id,id,supplier_id,bill_number,bill_date,due_date,notes,created_by) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
             (tenant,str(data.request_key),str(data.supplier_id),number,data.entry_date,data.due_date,data.notes,str(actor)))
+        from cacu.accounting import vat
+        net=sum((Decimal(l.amount) for l in data.lines),Decimal('0'));figures=vat.input_vat(session,data.entry_date,net,Decimal(data.vat),False)
+        lines=[{'account_id':l.account_id,'amount':l.amount,'description':l.description or f'Bill {number}'} for l in data.lines]
+        if figures.vat>0:lines.append(vat.input_line(session,figures.vat,f'Bill {number}: VAT'))
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='bill',source_id=data.request_key,main_account_id=payables,
-            entry_date=data.entry_date,narration=f'Bill {number}',counterparty_id=data.supplier_id,
-            lines=[{'account_id':l.account_id,'amount':l.amount,'description':l.description or f'Bill {number}'} for l in data.lines])
-        return {'id':str(data.request_key),'posting':post_command(session,actor,cmd)}
+            entry_date=data.entry_date,narration=f'Bill {number}',counterparty_id=data.supplier_id,lines=lines)
+        posting=post_command(session,actor,cmd)
+        vat.record(session,'bill',data.request_key,'input',data.entry_date,figures)
+        return {'id':str(data.request_key),'posting':posting}
     return durable(session,actor,'bill',data,execute)
 
 def _bill(session,bill_id):

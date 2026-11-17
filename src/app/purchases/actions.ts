@@ -102,12 +102,12 @@ export type BilledGoods = { id: string; bill_number: string; total: string; rece
 
 /** PR-18: the supplier's bill for received goods; any difference from the received cost adjusts stock cost (IAS 2). */
 export async function billReceivedAction(input: { requestKey: string; supplierId: string; billNumber: string; entryDate: string; dueDate?: string; notes: string;
-  lines: { receiptId: string; itemId: string; quantity: number; amount: string }[] }): Promise<Result<BilledGoods>> {
+  lines: { receiptId: string; itemId: string; quantity: number; amount: string }[]; vat?: string }): Promise<Result<BilledGoods>> {
   try {
     const data = await accountingRequest<BilledGoods>('goods-receipts/bills', { method: 'POST', body: {
       request_key: input.requestKey, supplier_id: input.supplierId, bill_number: input.billNumber, entry_date: input.entryDate,
       due_date: input.dueDate || null, notes: input.notes,
-      lines: input.lines.map(l => ({ receipt_id: l.receiptId, item_id: l.itemId, quantity: l.quantity, amount: l.amount })) } });
+      lines: input.lines.map(l => ({ receipt_id: l.receiptId, item_id: l.itemId, quantity: l.quantity, amount: l.amount })), ...(input.vat ? { vat: input.vat } : {}) } });
     revalidatePath('/purchases'); revalidatePath('/accounting/bills'); revalidatePath('/catalog');
     return { success: true, data };
   } catch (error) { return failed(error); }

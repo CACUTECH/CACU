@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { VatField, useVatStatus } from '@/components/vat-field';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { billReceivedAction, getReceiptAction, returnGoodsAction } from '../../actions';
@@ -106,6 +107,7 @@ function BillDialog({ receipt, onClose, onDone }: { receipt: GoodsReceipt; onClo
   const [rows, setRows] = React.useState(() => lines.map(l => ({ itemId: l.item_id, name: l.name, max: l.returnable, quantity: String(l.returnable),
     amount: (valueKobo(l, l.returnable) / 100).toFixed(2) })));
   const [number, setNumber] = React.useState(''), [date, setDate] = React.useState(lagosToday()), [due, setDue] = React.useState(''), [notes, setNotes] = React.useState('');
+  const vatStatus = useVatStatus(), [vat, setVat] = React.useState('');
   const { attempt, run, reset } = useKeyedRequest();
   const locked = attempt.busy || attempt.uncertain;
   const chosen = rows.filter(r => r.quantity.trim() && r.quantity.trim() !== '0');
@@ -114,10 +116,11 @@ function BillDialog({ receipt, onClose, onDone }: { receipt: GoodsReceipt; onClo
   const billed = chosen.reduce((s, r) => s + (/^\d{1,13}(\.\d{1,2})?$/.test(r.amount.trim()) ? kobo(r.amount) : 0), 0);
   const problem = !number.trim() ? "Enter the supplier's bill number." : bad ? `Check the quantity (up to ${bad.max}) and amount for ${bad.name}.`
     : chosen.length === 0 ? 'Choose what this bill is for.' : billed <= 0 ? 'A bill must be for more than zero.'
-    : due && due < date ? 'The due date cannot be before the bill date.' : '';
+    : due && due < date ? 'The due date cannot be before the bill date.' : vat && !/^\d{1,13}(\.\d{1,2})?$/.test(vat.trim()) ? 'Enter the VAT with at most two decimal places, or leave it empty.' : '';
   const submit = async () => {
     const done = await run(key => billReceivedAction({ requestKey: key, supplierId: receipt.supplier_id, billNumber: number.trim(), entryDate: date, dueDate: due || undefined,
-      notes: notes.trim(), lines: chosen.map(r => ({ receiptId: receipt.id, itemId: r.itemId, quantity: Number(r.quantity), amount: r.amount.trim() })) }));
+      notes: notes.trim(), lines: chosen.map(r => ({ receiptId: receipt.id, itemId: r.itemId, quantity: Number(r.quantity), amount: r.amount.trim() })),
+      ...(Number(vat) > 0 ? { vat: vat.trim() } : {}) }));
     if (done) onDone(`Bill ${done.bill_number} for ${naira(done.total)} recorded. You owe ${receipt.supplier_name ?? 'the supplier'}; pay it from Bills.`);
   };
   return <Dialog open onOpenChange={o => { if (!o && !attempt.busy) { reset(); onClose(); } }}>
@@ -137,6 +140,7 @@ function BillDialog({ receipt, onClose, onDone }: { receipt: GoodsReceipt; onClo
           <label className="space-y-1"><span>Amount (₦)</span><Input aria-label={`Amount billed for ${r.name}`} className="h-9 w-32" inputMode="decimal" value={r.amount} disabled={locked}
             onChange={e => setRows(rs => rs.map((x, j) => j === i ? { ...x, amount: e.target.value } : x))} /></label>
         </div>)}
+        <VatField status={vatStatus} value={vat} onChange={setVat} base={(billed / 100).toFixed(2)} inclusive={false} label="VAT on the bill (amounts above are before VAT)" disabled={locked} />
         <label className="space-y-1"><span>Notes (optional)</span><Input maxLength={1000} value={notes} disabled={locked} onChange={e => setNotes(e.target.value)} /></label>
         <p>Received at {nairaText(received)}; billed {nairaText(billed)}.{billed !== received ? ` The ${nairaText(Math.abs(billed - received))} difference ${billed > received ? 'adds to' : 'comes off'} the cost of these goods.` : ''}</p>
         {(attempt.error || problem) && <p role="alert" className="text-destructive">{attempt.error || problem}</p>}

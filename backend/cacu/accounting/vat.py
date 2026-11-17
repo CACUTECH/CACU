@@ -235,3 +235,45 @@ def vat_return(session, month: date):
     return {'month': month.isoformat(), 'vat_number': row.vat_number if row else None, 'sales': output, 'purchases': purchases,
             'payable': format(payable, '.2f'), 'exceptions': exceptions,
             'note': 'Prepared from CACU records for you to check before filing. CACU does not file VAT returns.'}
+
+
+# Input VAT (part 2b): the VAT on a supplier's bill or receipt, as printed on it. Reclaimable only while the business
+# is registered; otherwise VAT is part of the cost and the document is entered without it.
+NOT_REGISTERED = 'Your business is not registered for VAT on that date, so VAT is part of the cost. Enter the full amount with no VAT.'
+
+
+def input_vat(session, day: date, base: Decimal, vat: Decimal, inclusive: bool) -> Split:
+    """base is the amount before VAT (bills) or the total paid including VAT (expenses). Checks the VAT is no more
+    than the standard rate allows (to the kobo) and returns the purchase as the return records it."""
+    figures = Split()
+    if vat < 0:
+        raise HTTPException(422, 'VAT cannot be below zero.')
+    if vat > 0 and not charging(session, day):
+        raise HTTPException(409, NOT_REGISTERED)
+    if not charging(session, day):
+        return figures
+    figures.rate = rate(session, 'standard', day)
+    most = (base * figures.rate / (100 + figures.rate) if inclusive else base * figures.rate / 100).quantize(CENT, rounding=ROUND_HALF_UP)
+    if vat > most:
+        raise HTTPException(422, f"VAT of {vat:.2f} is more than {figures.rate.normalize()}% allows on this amount ({most:.2f}). Check the supplier's bill.")
+    net = base - vat if inclusive else base
+    if vat > 0:
+        figures.standard_net, figures.vat = net, vat
+    else:
+        figures.exempt_net = net  # bought with no VAT charged (zero-rated, exempt, or from a supplier not registered)
+    return figures
+
+
+def input_line(session, vat: Decimal, description: str):
+    account_id = account(session, 'vat_input')
+    if account_id is None:
+        raise HTTPException(409, 'Turn VAT on again in Settings › Taxes to add the VAT accounts.')
+    return {'account_id': account_id, 'amount': format(vat, '.2f'), 'credited': False, 'description': description}
+
+
+def status(session):
+    """For any member's forms (expenses, bills): whether VAT applies today, and at what rate."""
+    from cacu.accounting.workflows import business_today
+    today = business_today(session)
+    on = charging(session, today)
+    return {'charging': on, 'standard_rate': format(rate(session, 'standard', today), 'f') if on else None}

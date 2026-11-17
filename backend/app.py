@@ -395,6 +395,12 @@ def vat_settings(business_id:UUID,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,permission='settings.view') as session:
         return vat_overview(session)
 
+@app.get('/api/v1/businesses/{business_id}/vat/status')
+def vat_status(business_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.vat import status
+    with library_transaction(user_id,business_id) as session:
+        return status(session)
+
 @app.post('/api/v1/businesses/{business_id}/vat')
 def update_vat_settings(business_id:UUID,data:VatSettings,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True,permission='settings.edit') as session:

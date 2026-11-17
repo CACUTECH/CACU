@@ -2742,6 +2742,49 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/vat/status": {
+      "get": {
+        "summary": "Vat Status",
+        "operationId": "vat_status_api_v1_businesses__business_id__vat_status_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/vat/items": {
       "post": {
         "summary": "Update Vat Classes",
@@ -7504,6 +7547,12 @@
             "maxItems": 50,
             "minItems": 1,
             "title": "Lines"
+          },
+          "vat": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Vat",
+            "default": "0.00"
           }
         },
         "additionalProperties": false,
@@ -8370,6 +8419,12 @@
             "maxLength": 500,
             "minLength": 1,
             "title": "Description"
+          },
+          "vat": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Vat",
+            "default": "0.00"
           }
         },
         "additionalProperties": false,
@@ -8448,6 +8503,12 @@
             "maxItems": 100,
             "minItems": 1,
             "title": "Lines"
+          },
+          "vat": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Vat",
+            "default": "0.00"
           }
         },
         "additionalProperties": false,

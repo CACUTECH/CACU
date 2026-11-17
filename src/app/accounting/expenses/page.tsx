@@ -6,6 +6,7 @@ import { PostedEntries } from '@/components/posted-entries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { VatField, useVatStatus } from '@/components/vat-field';
 import type { CollectionAccount } from '@/lib/collection-accounts';
 import type { ExpenseAccount, PostedEntry } from '@/lib/corrections';
 import { getExpensesAction, recordExpenseAction, reverseExpenseAction } from './actions';
@@ -14,9 +15,10 @@ import { keepExpense, loadSnapshot, online, saveSnapshot } from '@/lib/offline-o
 import { useOfflineSync } from '@/hooks/use-offline-sync';
 
 const today = () => new Date().toLocaleDateString('en-CA');
-const blank = () => ({ expense_account_id: '', amount: '', entry_date: today(), method: 'Cash' as 'Cash' | 'Transfer', bank_account_id: '', description: '' });
+const blank = () => ({ expense_account_id: '', amount: '', entry_date: today(), method: 'Cash' as 'Cash' | 'Transfer', bank_account_id: '', description: '', vat: '' });
 
 export default function ExpensesPage() {
+  const vat = useVatStatus();
   const { business } = useBusiness();
   const writer = ['owner', 'admin', 'editor'].includes(business?.userRole ?? ''), manager = ['owner', 'admin'].includes(business?.userRole ?? '');
   const [state, setState] = useState<{ native: boolean; accounts: ExpenseAccount[]; banks: CollectionAccount[]; expenses: PostedEntry[] } | null>(null);
@@ -48,6 +50,8 @@ export default function ExpensesPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!/^[0-9]{1,13}(\.[0-9]{1,2})?$/.test(form.amount) || Number(form.amount) <= 0) { setError('Enter an amount above zero with at most two decimal places.'); return; }
+    if (form.vat && !/^[0-9]{1,13}(\.[0-9]{1,2})?$/.test(form.vat)) { setError('Enter the VAT with at most two decimal places, or leave it empty.'); return; }
+    if (Number(form.vat) > 0 && !online()) { setError('Expenses with VAT are recorded online. Record this one when you are back online.'); return; }
     const requestKey = key ?? crypto.randomUUID(); setKey(requestKey); setBusy(true); setError(''); setSaved('');
     if (!online()) {
       if (!business?.id || !userId) { setBusy(false); setKey(null); setError('Sign in again when you are back online.'); return; }
@@ -61,7 +65,8 @@ export default function ExpensesPage() {
       return;
     }
     const result = await recordExpenseAction({ request_key: requestKey, expense_account_id: form.expense_account_id, amount: form.amount, entry_date: form.entry_date,
-      method: form.method, description: form.description.trim(), ...(form.method === 'Transfer' ? { bank_account_id: form.bank_account_id } : {}) });
+      method: form.method, description: form.description.trim(), ...(form.method === 'Transfer' ? { bank_account_id: form.bank_account_id } : {}),
+      ...(Number(form.vat) > 0 ? { vat: form.vat } : {}) });
     setBusy(false);
     if (result.success) { setKey(null); setForm(blank()); setSaved('Expense recorded.'); await load(); return; }
     if (!result.uncertain) setKey(null);
@@ -84,6 +89,7 @@ export default function ExpensesPage() {
             <label className="space-y-1 text-sm"><span>What was it for?</span><select aria-label="Expense account" required className="w-full rounded-md border bg-background p-2" value={form.expense_account_id} disabled={locked} onChange={set('expense_account_id')}>
               <option value="">Choose an account</option>{state.accounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}</select></label>
             <label className="space-y-1 text-sm"><span>Amount (NGN)</span><Input inputMode="decimal" required value={form.amount} disabled={locked} onChange={set('amount')}/></label>
+            <VatField status={vat} value={form.vat} onChange={v => setForm(f => ({ ...f, vat: v }))} base={form.amount} inclusive label="VAT inside the amount" disabled={locked}/>
             <label className="space-y-1 text-sm"><span>Date paid</span><Input type="date" required max={today()} value={form.entry_date} disabled={locked} onChange={set('entry_date')}/></label>
             <label className="space-y-1 text-sm"><span>Paid with</span><select aria-label="Paid with" className="w-full rounded-md border bg-background p-2" value={form.method} disabled={locked} onChange={set('method')}>
               <option value="Cash">Cash</option><option value="Transfer" disabled={!state.banks.length}>Bank transfer</option></select></label>

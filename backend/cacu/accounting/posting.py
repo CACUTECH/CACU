@@ -61,6 +61,9 @@ INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','s
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
 
+def vat_account_id(session,purpose_name):
+    return raw(session,'SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose=%s',(str(session.business_id),purpose_name)).scalar()
+
 def account(session,source_id):
     row=raw(session,'SELECT m.library_id FROM accounting.account_map m JOIN public.accounts a ON a.id=m.account_id AND a.business_id=m.business_id WHERE m.business_id=%s AND m.account_id=%s AND a.is_active',
             (str(session.business_id),str(source_id))).first()
@@ -121,6 +124,11 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     charged_vat=sum((l[1] for l in vat_legs),Decimal('0'))
     if charged and (command.kind not in {'invoice','pos'} or len(charged)!=1):
         raise HTTPException(422,'Output VAT is charged only by sales and invoices')
+    # Input VAT (2b): only a bill or an expense claims it, with one VAT line; a reclaim or settlement credits it.
+    vat_input=raw(session,"SELECT library_id FROM accounting.account_map WHERE business_id=%s AND purpose='vat_input'",(tenant,)).scalar()
+    claimed=[l for l in lines if vat_input is not None and l[0].id==vat_input and not l[2]] if command.kind!='reversal' else []
+    if claimed and (command.kind not in {'bill','goods_bill','expense'} or len(claimed)!=1):
+        raise HTTPException(422,'Input VAT is claimed only on bills and expenses')
     if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
     if split_sale and command.main_amount is None:raise HTTPException(422,'A split sale names its cash part')
     if command.main_amount is not None and amount<=0:raise HTTPException(422,'Compound main amount must be positive')
@@ -257,7 +265,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             # A bill for received goods: debit Goods received not invoiced, credit the supplier's payables (matched by
             # counterparty); price differences are separate stock adjustments.
             grni=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='grni'",(tenant,)).all()
-            if len(grni)!=1 or not command.counterparty_id or not command.credited or len(command.lines)!=1 or command.lines[0].credited                or str(command.lines[0].account_id)!=str(grni[0].account_id):
+            # With VAT (E14 R3 2b), the second line is the input VAT on the bill, checked above.
+            goods=[l for l in command.lines if not (claimed and str(l.account_id)==str(vat_account_id(session,'vat_input')))]
+            if len(grni)!=1 or not command.counterparty_id or not command.credited or len(goods)!=1 or goods[0].credited                or str(goods[0].account_id)!=str(grni[0].account_id):
                 raise HTTPException(422,'A bill for received goods clears Goods received not invoiced against the supplier')
         elif command.kind=='shift_variance':
             # PR-22: a shortage debits Cash over and short and credits the till; a surplus the reverse.
@@ -279,8 +289,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if main.id in protected or any(line[0].id in protected for line in lines):
             raise HTTPException(409,'Adopted inventory and NRV control accounts require the inventory valuation workflows')
     transfer_sale=command.kind=='pos' and command.payment_method in {'Transfer','Split'}
-    cls=JournalEntry if transfer_sale or vat_legs else CLASSES[command.kind]
-    side=False if transfer_sale or vat_legs else command.credited if command.kind in {'adjustment','reversal'}|INTERNAL_KINDS else None
+    cls=JournalEntry if transfer_sale or vat_legs or claimed else CLASSES[command.kind]
+    # A taxed bill or expense credits payables or the bank; a taxed sale or invoice debits the till, bank or receivable.
+    side=True if claimed else False if transfer_sale or vat_legs else command.credited if command.kind in {'adjustment','reversal'}|INTERNAL_KINDS else None
     tx=native_post(session,cls,main,lines,command.entry_date,command.narration,side,compound)
     if target:
         assignment=Assignment(transaction_id=tx.id,assigned_id=target.id,assigned_type=target.__class__.__name__,

@@ -727,6 +727,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/vat/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vat Status */
+        get: operations["vat_status_api_v1_businesses__business_id__vat_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/vat/items": {
         parameters: {
             query?: never;
@@ -2120,6 +2137,11 @@ export interface components {
             notes: string;
             /** Lines */
             lines: components["schemas"]["BillLine"][];
+            /**
+             * Vat
+             * @default 0.00
+             */
+            vat: string;
         };
         /** BillLine */
         BillLine: {
@@ -2524,6 +2546,11 @@ export interface components {
             bank_account_id?: string | null;
             /** Description */
             description: string;
+            /**
+             * Vat
+             * @default 0.00
+             */
+            vat: string;
         };
         /** ExportRequest */
         ExportRequest: {
@@ -2561,6 +2588,11 @@ export interface components {
             notes: string;
             /** Lines */
             lines: components["schemas"]["BilledLine"][];
+            /**
+             * Vat
+             * @default 0.00
+             */
+            vat: string;
         };
         /** GoodsReceipt */
         GoodsReceipt: {
@@ -5221,6 +5253,37 @@ export interface operations {
                 "application/json": components["schemas"]["VatSettings"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vat_status_api_v1_businesses__business_id__vat_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

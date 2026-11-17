@@ -304,6 +304,8 @@ class GoodsBill(BaseModel):
     due_date: date | None = None
     notes: str = Field(default='', max_length=1000)
     lines: list[BilledLine] = Field(min_length=1, max_length=100)
+    # VAT (E14 R3 2b): the VAT on the supplier's bill; the line amounts are before VAT.
+    vat: str = Field(default='0.00', pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
 
 
 def _difference(session, actor, key, item_id, quantity, difference, day):
@@ -360,9 +362,14 @@ def bill_received(session, actor, data: GoodsBill):
         payables = party_account(session, 'suppliers', data.supplier_id)
         raw(session, 'INSERT INTO accounting.supplier_bill(business_id,id,supplier_id,bill_number,bill_date,due_date,notes,created_by) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
             (tenant, str(data.request_key), str(data.supplier_id), number, day, data.due_date, data.notes, str(actor)))
+        from cacu.accounting import vat
+        figures = vat.input_vat(session, day, billed, Decimal(data.vat), False)
+        bill_lines = [{'account_id': grni, 'amount': format(billed, '.2f'), 'credited': False}]
+        if figures.vat > 0: bill_lines.append(vat.input_line(session, figures.vat, f'Bill {number}: VAT'))
         posting = post_command(session, actor, PostingCommand(request_key=uuid5(data.request_key, 'posting'), kind='goods_bill', source_id=data.request_key,
             main_account_id=payables, counterparty_id=data.supplier_id, entry_date=day, credited=True, narration=f'Bill {number}',
-            lines=[{'account_id': grni, 'amount': format(billed, '.2f'), 'credited': False}]), internal=True)
+            lines=bill_lines), internal=True)
+        vat.record(session, 'bill', data.request_key, 'input', day, figures)
         to_stock = to_sales = ZERO
         for line, got, value, amount in matched:
             difference = amount - value

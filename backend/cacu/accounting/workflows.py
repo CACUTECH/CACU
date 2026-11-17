@@ -357,6 +357,8 @@ class ExpenseCreate(BaseModel):
     method:str=Field(pattern=r'^(Cash|Transfer)$')
     bank_account_id:UUID|None=None
     description:str=Field(min_length=1,max_length=500)
+    # VAT (E14 R3 2b): the VAT inside the amount paid, as shown on the receipt.
+    vat:str=Field(default='0.00',pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
 
 class ReversalCreate(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -389,10 +391,15 @@ def expense_create(session,actor,data:ExpenseCreate):
         if str(data.expense_account_id) not in {a['id'] for a in expense_accounts(session)}:
             raise HTTPException(422,'Choose an expense account from your chart')
         paid_from=collection_account(session,data.method,data.bank_account_id)
+        from cacu.accounting import vat
+        figures=vat.input_vat(session,data.entry_date,Decimal(data.amount),Decimal(data.vat),True)
+        lines=[{'account_id':data.expense_account_id,'amount':format(Decimal(data.amount)-figures.vat,'.2f')}]
+        if figures.vat>0:lines.append(vat.input_line(session,figures.vat,data.description+': VAT'))
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='expense',source_id=data.request_key,
-            main_account_id=paid_from,entry_date=data.entry_date,narration=data.description,
-            lines=[{'account_id':data.expense_account_id,'amount':data.amount}])
-        return {'id':str(data.request_key),'posting':post_command(session,actor,cmd)}
+            main_account_id=paid_from,entry_date=data.entry_date,narration=data.description,lines=lines)
+        posting=post_command(session,actor,cmd)
+        vat.record(session,'expense',data.request_key,'input',data.entry_date,figures)
+        return {'id':str(data.request_key),'posting':posting}
     return durable(session,actor,'expense',data,execute)
 
 def recent_documents(session,kind,limit=50):
@@ -412,6 +419,8 @@ def reversal_create(session,actor,target_id:UUID,data:ReversalCreate):
     """PR-26: post the mirror of a manual journal or expense; the original is never edited (ACC-010)."""
     def execute():
         if role(session,actor) not in {'owner','admin'}:raise HTTPException(403,'Only an Owner or Admin can reverse an entry')
+        from cacu.accounting.vat import refuse_if_taxed
+        refuse_if_taxed(session,'expense',target_id)  # taking VAT back comes in E14 R3 part 2c
         if data.entry_date>business_today(session):raise HTTPException(422,'A reversal cannot be dated in the future')
         original=raw(session,"""SELECT t.transaction_no,m.account_id FROM accounting.document_map d
             JOIN accounting."transaction" t ON t.id=d.transaction_id AND t.business_id=d.business_id

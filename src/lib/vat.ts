@@ -11,3 +11,11 @@ export const naira = (value: string) => `₦${Number(value).toLocaleString('en-N
 export const percent = (rate: string) => `${Number(rate)}%`;
 /** Nigerian VAT numbers (TIN) are 6 to 20 letters, digits and dashes; checked again by the API. */
 export const validVatNumber = (value: string) => /^[0-9A-Za-z-]{6,20}$/.test(value.trim());
+export type VatStatus = { charging: boolean; standard_rate: string | null };
+
+/** The most VAT the standard rate allows, in naira: on an amount before VAT, or inside a total that includes it. */
+export function mostVat(amount: string, rate: string, inclusive: boolean): string {
+  const kobo = Math.round(Number(amount) * 100), r = Number(rate);
+  if (!Number.isFinite(kobo) || kobo <= 0 || !r) return '0.00';
+  return (Math.round(inclusive ? kobo * r / (100 + r) : kobo * r / 100) / 100).toFixed(2);
+}
