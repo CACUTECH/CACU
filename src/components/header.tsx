@@ -53,6 +53,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/accounting/journal-entries': 'Journal Adjustments',
   '/accounting/trial-balance': 'Trial Balance',
   '/accounting/general-ledger': 'General Ledger',
+  '/accounting/periods': 'Month Close',
 };
 
 function NotificationBell() {

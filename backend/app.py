@@ -367,6 +367,26 @@ def approve_reporting_close(business_id:UUID,close_id:UUID,data:Approval,user_id
     with library_transaction(user_id,business_id,write=True,permission='ledger.approve') as session:
         return approve_close(session,user_id,close_id,data)
 
+# Month close and reopen (Doc 11 R3, FR-135): closing needs ledger.post and ledger.approve; reopening is Owner only.
+from cacu.accounting.periods import CloseMonth,ReopenMonth,overview as period_overview,close_month,reopen_month
+
+@app.get('/api/v1/businesses/{business_id}/periods')
+def accounting_periods(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return period_overview(session)
+
+@app.post('/api/v1/businesses/{business_id}/periods/{month}/close')
+def close_accounting_month(business_id:UUID,month:str,data:CloseMonth,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.session import allowed
+    with library_transaction(user_id,business_id,write=True,permission='ledger.post') as session:
+        if not allowed(session,'ledger.approve'):raise HTTPException(403,'Closing a month needs permission to post and approve ledger entries.')
+        return close_month(session,user_id,month,data)
+
+@app.post('/api/v1/businesses/{business_id}/periods/{month}/reopen')
+def reopen_accounting_month(business_id:UUID,month:str,data:ReopenMonth,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='ledger.approve') as session:
+        return reopen_month(session,user_id,month,data)
+
 from cacu.billing.routes import billing_router
 app.include_router(billing_router(current_user))
 

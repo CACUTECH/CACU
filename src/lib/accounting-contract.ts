@@ -658,6 +658,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accounting Periods */
+        get: operations["accounting_periods_api_v1_businesses__business_id__periods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/periods/{month}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close Accounting Month */
+        post: operations["close_accounting_month_api_v1_businesses__business_id__periods__month__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/periods/{month}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen Accounting Month */
+        post: operations["reopen_accounting_month_api_v1_businesses__business_id__periods__month__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/billing/checkout": {
         parameters: {
             query?: never;
@@ -1876,6 +1927,19 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** Acknowledgement */
+        Acknowledgement: {
+            /**
+             * Done
+             * @default false
+             */
+            done: boolean;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
         /** AdjustmentRequest */
         AdjustmentRequest: {
             /**
@@ -2231,6 +2295,13 @@ export interface components {
             maturities?: components["schemas"]["Maturity"][];
             /** Equity Classifications */
             equity_classifications?: components["schemas"]["EquityClassification"][];
+        };
+        /** CloseMonth */
+        CloseMonth: {
+            /** Acknowledgements */
+            acknowledgements?: {
+                [key: string]: components["schemas"]["Acknowledgement"];
+            };
         };
         /** CostRate */
         CostRate: {
@@ -3037,6 +3108,11 @@ export interface components {
             method: "Cash" | "Transfer";
             /** Bank Account Id */
             bank_account_id?: string | null;
+            /** Reason */
+            reason: string;
+        };
+        /** ReopenMonth */
+        ReopenMonth: {
             /** Reason */
             reason: string;
         };
@@ -4888,6 +4964,109 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Approval"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accounting_periods_api_v1_businesses__business_id__periods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_accounting_month_api_v1_businesses__business_id__periods__month__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseMonth"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reopen_accounting_month_api_v1_businesses__business_id__periods__month__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenMonth"];
             };
         };
         responses: {
