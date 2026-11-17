@@ -30,6 +30,8 @@ class InvoiceCreate(BaseModel):
     performance_status:Literal['satisfied','not_satisfied','over_time']='satisfied'
     performance_evidence:str=Field(default='',max_length=2000)
     performance_date:date|None=None
+    # VAT (E14 R3 2a): whether the prices include VAT; None takes the business's setting. Till credit sales include it.
+    vat_included:bool|None=None
 
 class ReceiptCreate(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -133,7 +135,7 @@ def invoice_create(session,actor,data:InvoiceCreate,preissued=frozenset()):
         if data.issue and (data.performance_status!='satisfied' or (data.performance_date and data.performance_date>data.entry_date)):
             raise HTTPException(409,'Issue invoices only for delivered goods or completed services; advances and over-time contracts require a reviewed recognition workflow')
         if data.entry_date>business_today(session):raise HTTPException(422,'An issued sale cannot be dated in the future')
-        if Decimal(data.tax)!=0:raise HTTPException(409,'Taxed invoices require reviewed tax mappings before cutover')
+        if Decimal(data.tax)!=0:raise HTTPException(409,'CACU works out VAT from your tax settings; leave the tax amount at zero')
         if len({i.catalog_item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate invoice item')
         customer=raw(session,'SELECT id FROM public.customers WHERE business_id=%s AND id=%s',(tenant,str(data.customer_id))).first()
         if not customer:raise HTTPException(422,'Customer unavailable')
@@ -144,8 +146,12 @@ def invoice_create(session,actor,data:InvoiceCreate,preissued=frozenset()):
             if not row or row.unit_price!=Decimal(item.unit_price) or row.unit_price<=0:raise HTTPException(409,'Invoice price differs from authoritative catalog')
             line_total=row.unit_price*item.quantity;total+=line_total;items.append((item,row.name,line_total))
             if row.item_type=='PRODUCT' and row.track_stock and str(item.catalog_item_id) not in {str(i) for i in preissued}:stock.append({'item_id':item.catalog_item_id,'quantity':item.quantity})
-        raw(session,"INSERT INTO public.invoices(id,business_id,customer_id,invoice_number,status,issue_date,due_date,subtotal,total,tax,notes,type,vat_included) VALUES(%s,%s,%s,%s,'draft',%s,%s,%s,%s,0,%s,'Invoice',false)",
-            (str(data.request_key),tenant,str(data.customer_id),data.invoice_number,data.entry_date,data.due_date,total,total,data.notes))
+        from cacu.accounting import vat
+        settings=vat.setting(session)
+        inclusive=data.vat_included if data.vat_included is not None else bool(settings and settings.invoices_include_vat)
+        figures=vat.split(session,data.entry_date,[(item.catalog_item_id,value) for item,_,value in items],inclusive)
+        raw(session,"INSERT INTO public.invoices(id,business_id,customer_id,invoice_number,status,issue_date,due_date,subtotal,total,tax,notes,type,vat_included) VALUES(%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,'Invoice',%s)",
+            (str(data.request_key),tenant,str(data.customer_id),data.invoice_number,data.entry_date,data.due_date,figures.net,figures.gross,figures.vat,data.notes,inclusive and figures.vat>0))
         for item,name,value in items:
             raw(session,'INSERT INTO public.invoice_items(id,business_id,invoice_id,catalog_item_id,description,quantity,unit_price,line_total) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
                 (str(uuid5(data.request_key,str(item.catalog_item_id))),tenant,str(data.request_key),str(item.catalog_item_id),name,item.quantity,Decimal(item.unit_price),value))
@@ -154,8 +160,9 @@ def invoice_create(session,actor,data:InvoiceCreate,preissued=frozenset()):
             (tenant,str(actor),str(data.request_key),'revenue_performance_confirmed',json.dumps({'scope':'completed_sale','performance_date':str(data.performance_date or data.entry_date),'evidence':data.performance_evidence,'legacy_contract':not bool(data.performance_evidence)})))
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='invoice',source_id=data.request_key,
             main_account_id=ar,entry_date=data.entry_date,narration=data.invoice_number,counterparty_id=data.customer_id,
-            lines=[{'account_id':purpose(session,'revenue'),'amount':format(total,'.2f')}],stock=stock)
+            lines=vat.output_lines(session,purpose(session,'revenue'),figures,True),stock=stock)
         result=post_command(session,actor,cmd,preissued=preissued)
+        vat.record(session,'invoice',data.request_key,'output',data.entry_date,figures)
         return {'id':str(data.request_key),'posting':result}
     return durable(session,actor,'invoice',data,execute)
 
@@ -266,7 +273,7 @@ def sale_create(session,actor,data:SaleCreate,offline=None):
             if data.customer_id is None:raise HTTPException(422,'Choose the customer who owes for this sale')
             if data.cash_received or data.transfer_amount or data.bank_account_id:raise HTTPException(422,'A credit sale takes no payment now')
             invoice=InvoiceCreate(request_key=uuid5(data.request_key,'credit'),customer_id=data.customer_id,invoice_number='POS-'+str(data.request_key)[:8].upper(),
-                entry_date=data.entry_date,items=[{'catalog_item_id':item.item_id,'quantity':item.quantity,'unit_price':format(row.unit_price,'.2f')} for item,row,_,_ in items])
+                entry_date=data.entry_date,vat_included=True,items=[{'catalog_item_id':item.item_id,'quantity':item.quantity,'unit_price':format(row.unit_price,'.2f')} for item,row,_,_ in items])
             created=invoice_create(session,actor,invoice,preissued=preissued)
             tag(session,[actor],'sale',created['id'],Decimal('0'))
             if booking is not None:
@@ -304,12 +311,16 @@ def sale_create(session,actor,data:SaleCreate,offline=None):
         for item,row,value,discount in items:
             raw(session,'INSERT INTO public.transaction_items(id,business_id,transaction_id,catalog_item_id,description,quantity,unit_price,line_total,discount) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                 (str(uuid5(data.request_key,str(item.item_id))),tenant,str(data.request_key),str(item.item_id),row.name,item.quantity,row.unit_price,value,discount))
-        lines=[{'account_id':purpose(session,'revenue'),'amount':format(total,'.2f'),'credited':pending}]
+        # VAT (E14 R3 2a): till prices include VAT. A taxed sale posts as one entry with revenue and Output VAT credited.
+        from cacu.accounting import vat
+        figures=vat.split(session,data.entry_date,[(item.item_id,value) for item,_,value,_ in items],True)
+        lines=vat.output_lines(session,purpose(session,'revenue'),figures,pending or figures.vat>0)
         if method=='Split':lines.append({'account_id':clearing_account(session),'amount':format(transfer_part,'.2f'),'credited':False})
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='pos',source_id=data.request_key,
             main_account_id=main,entry_date=data.entry_date,narration='POS sale',payment_method=method,
             main_amount=format(cash_part,'.2f') if method=='Split' else None,lines=lines,stock=stock)
         posting=post_command(session,actor,cmd,allow_shortfall=offline is not None or sales_policy(session)['allow_oversell'],preissued=preissued)
+        vat.record(session,'pos',data.request_key,'output',data.entry_date,figures)
         if pending:
             waiting=transfer_part if method=='Split' else total-applied
             raw(session,"""INSERT INTO accounting.pending_transfer(business_id,id,source_type,amount,entry_date,expected_bank_account_id,created_by)

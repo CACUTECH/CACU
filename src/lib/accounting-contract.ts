@@ -709,6 +709,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/vat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vat Settings */
+        get: operations["vat_settings_api_v1_businesses__business_id__vat_get"];
+        put?: never;
+        /** Update Vat Settings */
+        post: operations["update_vat_settings_api_v1_businesses__business_id__vat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/vat/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update Vat Classes */
+        post: operations["update_vat_classes_api_v1_businesses__business_id__vat_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/reports/vat-return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vat Return Report */
+        get: operations["vat_return_report_api_v1_businesses__business_id__reports_vat_return_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/billing/checkout": {
         parameters: {
             query?: never;
@@ -2633,6 +2685,8 @@ export interface components {
             performance_evidence: string;
             /** Performance Date */
             performance_date?: string | null;
+            /** Vat Included */
+            vat_included?: boolean | null;
         };
         /** InvoiceItem */
         InvoiceItem: {
@@ -2645,6 +2699,24 @@ export interface components {
             quantity: number;
             /** Unit Price */
             unit_price: string;
+        };
+        /** ItemClass */
+        ItemClass: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /**
+             * Vat Class
+             * @enum {string}
+             */
+            vat_class: "standard" | "zero_rated" | "exempt";
+        };
+        /** ItemClasses */
+        ItemClasses: {
+            /** Items */
+            items: components["schemas"]["ItemClass"][];
         };
         /** JobComplete */
         JobComplete: {
@@ -3420,6 +3492,20 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VatSettings */
+        VatSettings: {
+            /** Registered */
+            registered: boolean;
+            /** Vat Number */
+            vat_number?: string | null;
+            /** Effective From */
+            effective_from?: string | null;
+            /**
+             * Invoices Include Vat
+             * @default false
+             */
+            invoices_include_vat: boolean;
         };
         /** Verification */
         Verification: {
@@ -5069,6 +5155,140 @@ export interface operations {
                 "application/json": components["schemas"]["ReopenMonth"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vat_settings_api_v1_businesses__business_id__vat_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_vat_settings_api_v1_businesses__business_id__vat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VatSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_vat_classes_api_v1_businesses__business_id__vat_items_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemClasses"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vat_return_report_api_v1_businesses__business_id__reports_vat_return_get: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

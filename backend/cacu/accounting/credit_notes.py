@@ -180,6 +180,8 @@ def request(session,actor,data:CreditRequest):
         tenant=str(session.business_id)
         if not allowed(session,'invoices.post'):raise HTTPException(403,'Only someone who can post invoices can ask for a credit note')
         invoice=_invoice(session,data.invoice_id,lock=True)
+        from cacu.accounting.vat import refuse_if_taxed
+        refuse_if_taxed(session,'invoice',data.invoice_id)  # VAT on credit notes comes in E14 R3 part 2c
         reason=data.reason.strip()
         if len(reason)<3:raise HTTPException(422,'Say why the invoice is credited')
         if len({l.line_id for l in data.lines})!=len(data.lines):raise HTTPException(422,'Each invoice line appears once in a credit note')

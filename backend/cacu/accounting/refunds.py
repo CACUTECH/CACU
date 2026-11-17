@@ -187,6 +187,8 @@ def request(session,actor,sale_id:UUID,data:RefundRequest):
     def execute():
         tenant=str(session.business_id)
         sale=_sale(session,sale_id,lock=True);_refundable_sale(sale)
+        from cacu.accounting.vat import refuse_if_taxed
+        refuse_if_taxed(session,'pos',sale_id)  # VAT on refunds comes in E14 R3 part 2c
         if not data.reason.strip():raise HTTPException(422,'Say why the sale is refunded')
         if len({l.line_id for l in data.lines})!=len(data.lines):raise HTTPException(422,'Each item appears once in a refund')
         lines={str(r.id):r for r in _lines(session,sale_id)}

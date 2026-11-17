@@ -113,6 +113,14 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     lines=[(account(session,l.account_id),Decimal(l.amount),l.credited,l.description or command.narration) for l in command.lines]
     amount=Decimal(command.main_amount) if command.main_amount is not None else sum((l[1] for l in lines),Decimal('0'))
     split_sale=command.kind=='pos' and command.payment_method=='Split'
+    # VAT (E14 R3 2a): only sales and invoices charge output VAT here; such a document posts as one balanced entry.
+    vat_output=raw(session,"SELECT library_id FROM accounting.account_map WHERE business_id=%s AND purpose='vat_output'",(tenant,)).scalar()
+    # Paying VAT to the tax office debits it; only a sale or an invoice credits it, with exactly one VAT line.
+    charged=[l for l in lines if vat_output is not None and l[0].id==vat_output and l[2]]
+    vat_legs=charged if command.kind in {'invoice','pos'} else []
+    charged_vat=sum((l[1] for l in vat_legs),Decimal('0'))
+    if charged and (command.kind not in {'invoice','pos'} or len(charged)!=1):
+        raise HTTPException(422,'Output VAT is charged only by sales and invoices')
     if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
     if split_sale and command.main_amount is None:raise HTTPException(422,'A split sale names its cash part')
     if command.main_amount is not None and amount<=0:raise HTTPException(422,'Compound main amount must be positive')
@@ -128,8 +136,8 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if mapped!=main.id:raise HTTPException(422,'Counterparty account mapping required')
     if command.kind=='invoice':
         source=raw(session,'SELECT total,tax,status,customer_id FROM public.invoices WHERE id=%s AND business_id=%s FOR UPDATE',(str(command.source_id),tenant)).first()
-        if not source or source.status!='draft' or source.total!=amount or (source.tax or 0)!=0:
-            raise HTTPException(409,'Invoice must be a reconciled tax-free draft matching its authoritative total')
+        if not source or source.status!='draft' or source.total!=amount or (source.tax or 0)!=charged_vat:
+            raise HTTPException(409,'Invoice must be a reconciled draft matching its authoritative total and VAT')
         if str(source.customer_id)!=str(command.counterparty_id):raise HTTPException(422,'Invoice customer mismatch')
     if command.kind in {'receipt','supplier_payment','credit_note'} or (command.kind in {'deposit_application','gateway_receipt'} and command.target_id):
         if not command.target_id:raise HTTPException(422,'Allocation target required')
@@ -271,8 +279,8 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if main.id in protected or any(line[0].id in protected for line in lines):
             raise HTTPException(409,'Adopted inventory and NRV control accounts require the inventory valuation workflows')
     transfer_sale=command.kind=='pos' and command.payment_method in {'Transfer','Split'}
-    cls=JournalEntry if transfer_sale else CLASSES[command.kind]
-    side=False if transfer_sale else command.credited if command.kind in {'adjustment','reversal'}|INTERNAL_KINDS else None
+    cls=JournalEntry if transfer_sale or vat_legs else CLASSES[command.kind]
+    side=False if transfer_sale or vat_legs else command.credited if command.kind in {'adjustment','reversal'}|INTERNAL_KINDS else None
     tx=native_post(session,cls,main,lines,command.entry_date,command.narration,side,compound)
     if target:
         assignment=Assignment(transaction_id=tx.id,assigned_id=target.id,assigned_type=target.__class__.__name__,
