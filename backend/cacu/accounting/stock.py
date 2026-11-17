@@ -70,6 +70,8 @@ def _check(session,item,delta,entry_date):
     if entry_date<cutover or entry_date>business_today(session):raise HTTPException(409,'Stock date must be between the books start date and today')
     period=ReportingPeriod.get_period(session,datetime.combine(entry_date,time(12)))
     if period.status==ReportingPeriod.Status.CLOSED:raise HTTPException(409,'Stock changes cannot use a closed accounting period')
+    from cacu.accounting.periods import refuse_closed_month
+    refuse_closed_month(session,entry_date)
     cost=item.cost_price or Decimal('0')
     value=abs(delta)*cost
     from cacu.accounting.inventory import state, proportion, cents

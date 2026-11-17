@@ -112,6 +112,8 @@ def dated(session,entry_date,valuation=None):
     from python_accounting.models import ReportingPeriod
     period=ReportingPeriod.get_period(session,datetime.combine(entry_date,time(12)))
     if period.status==ReportingPeriod.Status.CLOSED: raise HTTPException(409,'Valuation cannot use a closed period')
+    from cacu.accounting.periods import refuse_closed_month
+    refuse_closed_month(session,entry_date)
 
 
 def item(session,item_id):

@@ -103,6 +103,8 @@ def _dates(session, made: datetime, day: date):
         closed = ReportingPeriod.get_period(session, datetime.combine(day, time(12))).status == ReportingPeriod.Status.CLOSED
     except MissingReportingPeriodError:
         closed = True
+    from cacu.accounting.periods import month_closed
+    closed = closed or month_closed(session, day)  # a month closed while the till was offline
     return ('closed_period', f'Dated {day:%d %b %Y}') if closed else None
 
 

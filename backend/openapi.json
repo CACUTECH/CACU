@@ -2481,6 +2481,173 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/periods": {
+      "get": {
+        "summary": "Accounting Periods",
+        "operationId": "accounting_periods_api_v1_businesses__business_id__periods_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/periods/{month}/close": {
+      "post": {
+        "summary": "Close Accounting Month",
+        "operationId": "close_accounting_month_api_v1_businesses__business_id__periods__month__close_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Month"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseMonth"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/periods/{month}/reopen": {
+      "post": {
+        "summary": "Reopen Accounting Month",
+        "operationId": "reopen_accounting_month_api_v1_businesses__business_id__periods__month__reopen_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Month"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReopenMonth"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/billing/checkout": {
       "post": {
         "tags": [
@@ -6856,6 +7023,23 @@
         ],
         "title": "AccountCreate"
       },
+      "Acknowledgement": {
+        "properties": {
+          "done": {
+            "type": "boolean",
+            "title": "Done",
+            "default": false
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "Acknowledgement"
+      },
       "AdjustmentRequest": {
         "properties": {
           "request_key": {
@@ -7617,6 +7801,19 @@
           "notes"
         ],
         "title": "CloseDraft"
+      },
+      "CloseMonth": {
+        "properties": {
+          "acknowledgements": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Acknowledgement"
+            },
+            "type": "object",
+            "title": "Acknowledgements"
+          }
+        },
+        "type": "object",
+        "title": "CloseMonth"
       },
       "CostRate": {
         "properties": {
@@ -9430,6 +9627,21 @@
           "reason"
         ],
         "title": "RefundRequest"
+      },
+      "ReopenMonth": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "ReopenMonth"
       },
       "ReturnLine": {
         "properties": {

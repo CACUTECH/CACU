@@ -5,6 +5,7 @@ import os
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import create_engine
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.pool import NullPool
 from cacu.database_tls import database_connect_options
 from python_accounting.database.session import AccountingSession
@@ -105,8 +106,15 @@ def library_transaction(user_id: UUID, business_id: UUID, write=False, while_rea
                     raise HTTPException(409, 'This reporting policy supports single-currency NGN entities')
                 session.business_id = business_id
                 session.business_timezone = mapping.timezone
-                yield session
-                session.flush()
+                try:
+                    yield session
+                    session.flush()
+                except DBAPIError as exc:
+                    # The ledger refuses any line dated in a closed month (accounting.ledger_month_open).
+                    if 'ACCOUNTING_MONTH_CLOSED' in str(exc.orig):
+                        from cacu.accounting.periods import CLOSED_MONTH_MESSAGE
+                        raise HTTPException(409, CLOSED_MONTH_MESSAGE) from None
+                    raise
             finally:
                 session.close()
     finally:
