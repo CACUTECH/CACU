@@ -58,10 +58,15 @@ REVIEWED = {
     'business_closure_status': 'active membership of the business; nothing for anyone else',
     'close_business': 'management_private.authorize owner, with the business name typed and a reason',
     'reopen_business': 'management_private.authorize owner, within 90 days of closing',
+    'support_access_status': 'management_private.authorize owner',
+    'grant_support_access': 'management_private.authorize owner; 1 hour to 7 days, with a reason',
+    'end_support_access': 'management_private.authorize owner',
+    'support_cases': "CACU support staff only, after the second step: businesses with a live grant; '[]' for anyone else",
+    'open_support_case': 'CACU support staff only, after the second step, and only a business with a live grant; recorded',
 }
 NO_TENANT_INPUT = {'hr_payroll_defaults', 'billing_plans'}
 # Answer only about the caller themselves, never about the business named.
-CALLER_ONLY = {'mfa_status'}
+CALLER_ONLY = {'mfa_status', 'support_cases'}
 SAMPLE = {'uuid': None, 'text': "'x'", 'jsonb': "'{}'::jsonb", 'date': 'CURRENT_DATE', 'numeric': '1', 'integer': '1',
           'bigint': '1', 'boolean': 'false', 'membership_role[]': "ARRAY['owner']::public.membership_role[]"}
 

@@ -56,3 +56,16 @@ Added with closing a business (20261118090000, E22 part 3):
 - **Changed:**
   - `platform.writes_allowed` also refuses a closed business.
   - `platform.read_only_guard` names a closed business, and lets only the removal job's own transaction clear contact details.
+
+Added with support access (20261119090000, E22 part 4):
+- **Callable from the browser (`authenticated`):**
+  - `public.support_access_status`, `public.grant_support_access` and `public.end_support_access`: through `management_private.authorize`, Owner only. A grant lasts 1 hour, 24 hours, 3 days or 7 days and needs a reason.
+  - `public.support_cases`: answers only for the caller. A listed CACU support person, after the second step, sees the businesses with a live grant; anyone else gets an empty list.
+  - `public.open_support_case`: listed CACU support staff only, after the second step, and only for a business with a live grant. Every opening is recorded.
+- **Runtime only:** `ops.set_support_staff` (runbook RB-09) and `authz.supporting`.
+- **Internal (no grants):** `authz.caller`, `authz.support_case`, `authz.support_permits` and the `authz.support_read_only` trigger.
+- **Changed:**
+  - `authz.has_permission` also accepts an opened support case, for `*.view` permissions only, and for `hr.view` only when the Owner ticked staff and pay records.
+  - `public.is_business_member` accepts an opened case; `public.has_business_role` accepts one only where viewers are admitted.
+  - `accounting.authorized` shows an opened case the business's rows; `accounting.lock_membership` names it `support`, which the API refuses on every write.
+  - Every public table with a `business_id` gets the `support_read_only` trigger: a CACU support account cannot change a row in a business it is not a member of.

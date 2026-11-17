@@ -48,6 +48,7 @@ def claims(user_id: UUID, level: str | None = None) -> str:
 def allowed(session, permission: str) -> bool:
     """Whether the signed-in member holds the permission in the session's business (Doc 08 §6)."""
     return bool(session.connection().exec_driver_sql('SELECT authz.has_permission(%s, %s)', (str(session.business_id), permission)).scalar())
+SUPPORT_MESSAGE = 'CACU support access is read-only.'
 CLOSED_MESSAGE = 'This business is closed, so its records are read-only. The owner can export them, or reopen the business within 90 days.'
 READ_ONLY_MESSAGE = 'Your workspace is read-only until the subscription is paid. You can still record payments received and export.'
 
@@ -82,8 +83,9 @@ def library_transaction(user_id: UUID, business_id: UUID, write=False, while_rea
             # All accounting writes use this same lock, even with different request keys.
             connection.exec_driver_sql('SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))', (str(business_id),))
             member = connection.exec_driver_sql('SELECT accounting.lock_membership(%s, %s)', (str(business_id), str(user_id))).scalar()
-            if member not in {'owner', 'admin', 'editor', 'viewer'} or (write and member == 'viewer'):
-                raise HTTPException(403, 'Business permission required')
+            # 'support': CACU support with an opened, owner-granted case (E22 part 4); read-only, like a viewer.
+            if member not in {'owner', 'admin', 'editor', 'viewer', 'support'} or (write and member in {'viewer', 'support'}):
+                raise HTTPException(403, SUPPORT_MESSAGE if write and member == 'support' else 'Business permission required')
             if not connection.exec_driver_sql('SELECT authz.mfa_ok(%s)', (str(business_id),)).scalar():
                 raise HTTPException(403, MFA_MESSAGE)
             if permission and not connection.exec_driver_sql('SELECT authz.has_permission(%s, %s)', (str(business_id), permission)).scalar():

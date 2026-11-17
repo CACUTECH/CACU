@@ -28,8 +28,10 @@ def authorized_transaction(user_id: UUID, business_id: UUID, write: bool = False
                                (claims(user_id), str(business_id)))
                 cursor.execute("SELECT accounting.lock_membership(%s, %s)", (business_id, user_id))
                 membership = cursor.fetchone()
-                if not membership or membership[0] not in {"owner", "admin", "editor", "viewer"}:
+                if not membership or membership[0] not in {"owner", "admin", "editor", "viewer", "support"}:
                     raise HTTPException(403, "Business membership required")
+                if write and membership[0] == "support":  # CACU support access is read-only (E22 part 4)
+                    raise HTTPException(403, "CACU support access is read-only.")
                 cursor.execute("SELECT authz.mfa_ok(%s)", (business_id,))
                 if not cursor.fetchone()[0]:
                     raise HTTPException(403, MFA_MESSAGE)

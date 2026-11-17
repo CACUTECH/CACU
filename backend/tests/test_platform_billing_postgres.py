@@ -674,7 +674,7 @@ def test_reminders_go_to_owners_by_email_and_the_business_phone_by_sms(monkeypat
     with psycopg.connect(URL) as c:
         c.execute("UPDATE businesses SET phone_number='+234 803 123 4567' WHERE id=%s", (ident,))
         c.execute("SELECT set_config('platform.reason','test: trial nearly over',true)")
-        c.execute("UPDATE platform.subscriptions SET current_period_end='2026-11-16T10:00:00Z' WHERE business_id=%s", (ident,))
+        c.execute("UPDATE platform.subscriptions SET current_period_start='2026-11-02T10:00:00Z', current_period_end='2026-11-16T10:00:00Z' WHERE business_id=%s", (ident,))
     queue("'2026-11-13T10:00:00Z'::timestamptz")
     with psycopg.connect(URL) as c:
         c.execute("UPDATE platform.notifications SET created_at=now()")
