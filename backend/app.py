@@ -579,6 +579,20 @@ def customer_tags(business_id:UUID,customer_id:UUID,data:Tags,user_id:UUID=Depen
     with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='customers.edit') as session:
         return crm.set_tags(session,user_id,customer_id,data)
 
+# Management profitability by product, service, outlet and job (Doc 09 statement set, E15 R3).
+@app.get('/api/v1/businesses/{business_id}/reports/profitability')
+def profitability_report(business_id:UUID,start_date:date,end_date:date,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.profitability import report
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return report(session,start_date,end_date)
+
+# Key performance indicators (E16 R3): this period against the one before, from the posted books.
+@app.get('/api/v1/businesses/{business_id}/reports/kpis')
+def kpi_report(business_id:UUID,start_date:date,end_date:date,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.kpis import kpis
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return kpis(session,start_date,end_date)
+
 from cacu.billing.routes import billing_router
 app.include_router(billing_router(current_user))
 

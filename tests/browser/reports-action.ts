@@ -22,5 +22,8 @@ export async function getStatementsAction(start: string, end: string, compare: '
     financial_position: { sections: [section('current_assets', 'Current assets', [['1000', 'Cash on hand', v('10000.00', '5000.00')]]),
       section('non_current_assets', 'Non-current assets', []), section('current_liabilities', 'Current liabilities', []),
       section('non_current_liabilities', 'Non-current liabilities', []), section('equity', 'Equity', [['3000', 'Capital', v('10000.00', '4000.00')]])],
-      total_assets: v('10000.00', '5000.00'), total_liabilities: v('0.00', '0.00'), total_equity: v('10000.00', '4000.00'), difference: v('0.00', '1000.00') } } };
+      total_assets: v('10000.00', '5000.00'), total_liabilities: v('0.00', '0.00'), total_equity: v('10000.00', '4000.00'), difference: v('0.00', '1000.00') },
+    changes_in_equity: { lines: [{ account_id: 'c', code: '3000', name: 'Capital', opening: '4000.00', movement: '6000.00', closing: '10000.00' },
+      { account_id: null, code: null, name: 'Profit not yet closed to retained earnings', opening: '0.00', movement: '0.00', closing: '0.00' }],
+      total: { opening: '4000.00', movement: '6000.00', closing: '10000.00' }, profit_for_period: '0.00' } } };
 }
