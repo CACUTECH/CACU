@@ -185,6 +185,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     },
     { href: '/reports', label: 'Reports', icon: FileText },
     { href: '/customers', label: 'Customers', icon: Users },
+    { href: '/customers/segments', label: 'Customer segments', icon: Users },
     { 
       href: '/analytics', 
       label: 'Analytics', 

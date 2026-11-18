@@ -538,6 +538,47 @@ def batch_write_off(business_id:UUID,batch_id:UUID,data:BatchWriteOff,user_id:UU
     with library_transaction(user_id,business_id,write=True,permission='inventory.create') as session:
         return stock_batches.write_off(session,user_id,batch_id,data)
 
+# Customer tags, segments and lifetime value (E06 R3).
+from cacu.accounting.crm import Rules,SegmentSave,Tags
+from cacu.accounting import crm
+
+@app.get('/api/v1/businesses/{business_id}/segments')
+def list_segments(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='customers.view') as session:
+        return crm.overview(session)
+
+@app.post('/api/v1/businesses/{business_id}/segments/preview')
+def preview_segment(business_id:UUID,rules:Rules,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='customers.view') as session:
+        return crm.members(session,rules)
+
+@app.post('/api/v1/businesses/{business_id}/segments')
+def save_segment(business_id:UUID,data:SegmentSave,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='customers.edit') as session:
+        return crm.save_segment(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/segments/{segment_id}')
+def read_segment(business_id:UUID,segment_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='customers.view') as session:
+        return crm.segment(session,segment_id)
+
+@app.get('/api/v1/businesses/{business_id}/segments/{segment_id}/export')
+def export_segment(business_id:UUID,segment_id:UUID,user_id:UUID=Depends(current_user)):
+    from fastapi.responses import Response
+    with library_transaction(user_id,business_id,permission='customers.export') as session:
+        text=crm.export(session,segment_id)
+    return Response(text,media_type='text/csv',headers={'Content-Disposition':'attachment; filename="segment.csv"'})
+
+@app.post('/api/v1/businesses/{business_id}/segments/{segment_id}/delete')
+def delete_segment(business_id:UUID,segment_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='customers.edit') as session:
+        return crm.delete_segment(session,segment_id)
+
+@app.post('/api/v1/businesses/{business_id}/customers/{customer_id}/tags')
+def customer_tags(business_id:UUID,customer_id:UUID,data:Tags,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='customers.edit') as session:
+        return crm.set_tags(session,user_id,customer_id,data)
+
 from cacu.billing.routes import billing_router
 app.include_router(billing_router(current_user))
 
