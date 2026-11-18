@@ -109,6 +109,11 @@ def checklist(session, month: date):
     steps['gateway'] = (line is None, f"{line['debit'] if line['debit'] != '0.00' else line['credit']} not yet settled" if line else None)
     for manual in MANUAL:
         steps[manual] = (manual == 'stock_count' and not _tracks_stock(session), None)
+    # An approved stock count in the month answers step 4 (E09 R3 counts).
+    if _tracks_stock(session):
+        from cacu.accounting.counts import counted_in
+        counted = counted_in(session, month, end)
+        steps['stock_count'] = (counted is not None, f'Stock count approved on {counted:%d %b %Y}' if counted else None)
     # Bank reconciliation (FR-134) tells the closer which bank accounts already agree with their statements.
     from cacu.accounting import bank
     from cacu.accounting.workflows import bank_accounts
