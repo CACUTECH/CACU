@@ -4,8 +4,9 @@
 import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { vatReturnAction } from '@/app/settings/taxes/actions';
-import { naira, type VatReturn, type VatSide } from '@/lib/vat';
+import { Button } from '@/components/ui/button';
+import { saveWhtCertificateAction, vatReturnAction } from '@/app/settings/taxes/actions';
+import { naira, type VatReturn, type VatSide, type WhtDeduction } from '@/lib/vat';
 
 const lastMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); };
 
@@ -19,6 +20,20 @@ function Side({ title, side }: { title: string; side: VatSide }) {
       <dt className="font-medium">VAT</dt><dd className="text-right font-medium">{naira(side.vat)}</dd>
     </dl>
   </section>;
+}
+
+function Certificate({ deduction }: { deduction: WhtDeduction }) {
+  const [value, setValue] = React.useState(deduction.certificate ?? ''), [saved, setSaved] = React.useState(deduction.certificate ?? '');
+  const [busy, setBusy] = React.useState(false), [error, setError] = React.useState('');
+  if (saved) return <span>{saved}</span>;
+  return <span className="flex items-center gap-2">
+    <Input aria-label={`Certificate for ${deduction.invoice_number ?? 'this deduction'}`} className="h-8 w-40" maxLength={60} value={value} disabled={busy} onChange={e => setValue(e.target.value)} />
+    <Button type="button" size="sm" variant="outline" disabled={busy || !value.trim()} onClick={async () => {
+      setBusy(true); setError('');
+      const r = await saveWhtCertificateAction(deduction.id, value.trim());
+      setBusy(false);
+      if (r.success) setSaved(r.data.certificate); else setError(r.error);
+    }}>Save</Button>{error && <span role="alert" className="text-destructive">{error}</span>}</span>;
 }
 
 export default function VatReturnPage() {
@@ -45,7 +60,13 @@ export default function VatReturnPage() {
       {report.vat_number && <p className="text-sm">VAT number: {report.vat_number}</p>}
       <Side title="Sales" side={report.sales} />
       <Side title="Purchases" side={report.purchases} />
-      <p className="text-lg font-semibold">VAT payable for the month: {naira(report.payable)}</p>
+      <p className="text-lg font-semibold">{Number(report.payable) < 0 ? `VAT reclaimable for the month: ${naira(String(-Number(report.payable)))}` : `VAT payable for the month: ${naira(report.payable)}`}</p>
+      {report.wht && report.wht.deductions.length > 0 && <section aria-label="WHT credits" className="space-y-2 rounded-xl border p-4">
+        <h2 className="font-semibold">WHT deducted by customers: {naira(report.wht.total)}</h2>
+        {!report.wht.reviewed && <p className="text-sm text-amber-900">How WHT credits are treated is still to be confirmed by our accountant reviewer.</p>}
+        <ul className="divide-y text-sm">{report.wht.deductions.map(d => <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+          <span>{d.date} · {d.customer ?? 'Customer'} · {d.invoice_number ?? ''} · {naira(d.amount)}</span><Certificate deduction={d} /></li>)}</ul>
+      </section>}
       {report.exceptions.length > 0 && <div role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
         <p className="font-medium">These figures do not agree with the books. Check them before filing:</p>
         <ul className="list-disc pl-5">{report.exceptions.map(e => <li key={e}>{e}</li>)}</ul></div>}

@@ -41,6 +41,9 @@ class ReceiptCreate(BaseModel):
     entry_date:date
     method:str=Field(pattern=r'^(Cash|Transfer|Card)$')
     bank_account_id:UUID|None=None
+    # WHT (E14 R3 2c): what the customer deducted and paid to the tax office instead; settles the invoice with the cash.
+    wht:str=Field(default='0.00',pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
+    wht_certificate:str|None=Field(default=None,max_length=60)
 
 class SaleLine(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -162,7 +165,7 @@ def invoice_create(session,actor,data:InvoiceCreate,preissued=frozenset()):
             main_account_id=ar,entry_date=data.entry_date,narration=data.invoice_number,counterparty_id=data.customer_id,
             lines=vat.output_lines(session,purpose(session,'revenue'),figures,True),stock=stock)
         result=post_command(session,actor,cmd,preissued=preissued)
-        vat.record(session,'invoice',data.request_key,'output',data.entry_date,figures)
+        vat.record(session,'invoice',data.request_key,'output',data.entry_date,figures,total,inclusive)
         return {'id':str(data.request_key),'posting':result}
     return durable(session,actor,'invoice',data,execute)
 
@@ -193,6 +196,17 @@ def invoice_outstanding(session,invoice_id):
 
 def receipt_create(session,actor,data:ReceiptCreate):
     def execute():
+        wht=Decimal(data.wht)
+        if wht>0:
+            # The WHT settles part of the invoice now; the cash, whichever way it is paid, settles the rest.
+            outstanding,waiting=invoice_outstanding(session,data.invoice_id)
+            if Decimal(data.amount)+wht>outstanding-waiting:raise HTTPException(409,'Amount and WHT together exceed what is still owed')
+            from cacu.accounting.vat import deduct_wht
+            deducted=deduct_wht(session,actor,data.request_key,data.invoice_id,wht,Decimal(data.amount),data.entry_date,data.wht_certificate)
+            result=_receipt(data)
+            return {**result,'wht':format(wht,'.2f'),'wht_posting':deducted} if isinstance(result,dict) else result
+        return _receipt(data)
+    def _receipt(data):
         if data.method=='Transfer':
             # BR-010: a transfer receipt is held until the owner confirms the money arrived; the invoice stays outstanding.
             if data.bank_account_id is not None:collection_account(session,'Transfer',data.bank_account_id)
@@ -320,7 +334,7 @@ def sale_create(session,actor,data:SaleCreate,offline=None):
             main_account_id=main,entry_date=data.entry_date,narration='POS sale',payment_method=method,
             main_amount=format(cash_part,'.2f') if method=='Split' else None,lines=lines,stock=stock)
         posting=post_command(session,actor,cmd,allow_shortfall=offline is not None or sales_policy(session)['allow_oversell'],preissued=preissued)
-        vat.record(session,'pos',data.request_key,'output',data.entry_date,figures)
+        vat.record(session,'pos',data.request_key,'output',data.entry_date,figures,total,True)
         if pending:
             waiting=transfer_part if method=='Split' else total-applied
             raw(session,"""INSERT INTO accounting.pending_transfer(business_id,id,source_type,amount,entry_date,expected_bank_account_id,created_by)
@@ -398,7 +412,7 @@ def expense_create(session,actor,data:ExpenseCreate):
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='expense',source_id=data.request_key,
             main_account_id=paid_from,entry_date=data.entry_date,narration=data.description,lines=lines)
         posting=post_command(session,actor,cmd)
-        vat.record(session,'expense',data.request_key,'input',data.entry_date,figures)
+        vat.record(session,'expense',data.request_key,'input',data.entry_date,figures,Decimal(data.amount),True)
         return {'id':str(data.request_key),'posting':posting}
     return durable(session,actor,'expense',data,execute)
 
@@ -419,8 +433,6 @@ def reversal_create(session,actor,target_id:UUID,data:ReversalCreate):
     """PR-26: post the mirror of a manual journal or expense; the original is never edited (ACC-010)."""
     def execute():
         if role(session,actor) not in {'owner','admin'}:raise HTTPException(403,'Only an Owner or Admin can reverse an entry')
-        from cacu.accounting.vat import refuse_if_taxed
-        refuse_if_taxed(session,'expense',target_id)  # taking VAT back comes in E14 R3 part 2c
         if data.entry_date>business_today(session):raise HTTPException(422,'A reversal cannot be dated in the future')
         original=raw(session,"""SELECT t.transaction_no,m.account_id FROM accounting.document_map d
             JOIN accounting."transaction" t ON t.id=d.transaction_id AND t.business_id=d.business_id
@@ -432,5 +444,10 @@ def reversal_create(session,actor,target_id:UUID,data:ReversalCreate):
             main_account_id=original.account_id,entry_date=data.entry_date,narration=f'Reversal of {original.transaction_no}: {data.reason}',
             lines=[{'account_id':original.account_id,'amount':'0.01'}])
         # post_command audits the reversal in accounting.audit_event; the reason is in its narration.
-        return {'id':str(data.request_key),'reversed':str(target_id),'posting':post_command(session,actor,cmd)}
+        posting=post_command(session,actor,cmd)
+        # An expense that claimed input VAT gives the claim back with it (E14 R3 2c).
+        from cacu.accounting import vat
+        claimed=vat._original(session,'expense',target_id)
+        if claimed:vat.record_back(session,'expense_reversal',data.request_key,data.entry_date,vat.take_back(session,'expense',target_id,claimed.base))
+        return {'id':str(data.request_key),'reversed':str(target_id),'posting':posting}
     return durable(session,actor,'reversal:'+str(target_id),data,execute)

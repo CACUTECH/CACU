@@ -13,13 +13,13 @@ export default function TaxSettingsPage() {
   const [view, setView] = React.useState<VatOverview | null | undefined>(undefined);
   const [loadError, setLoadError] = React.useState('');
   const [registered, setRegistered] = React.useState(false), [number, setNumber] = React.useState('');
-  const [from, setFrom] = React.useState(''), [inclusive, setInclusive] = React.useState(false);
+  const [from, setFrom] = React.useState(''), [inclusive, setInclusive] = React.useState(false), [wht, setWht] = React.useState(false);
   const [classes, setClasses] = React.useState<Record<string, VatClass>>({});
   const [busy, setBusy] = React.useState(false), [error, setError] = React.useState(''), [message, setMessage] = React.useState('');
 
   const show = (data: VatOverview) => {
     setView(data); setRegistered(data.registered); setNumber(data.vat_number ?? ''); setFrom(data.effective_from ?? '');
-    setInclusive(data.invoices_include_vat); setClasses(Object.fromEntries(data.items.map(i => [i.id, i.vat_class])));
+    setInclusive(data.invoices_include_vat); setWht(data.wht_enabled); setClasses(Object.fromEntries(data.items.map(i => [i.id, i.vat_class])));
   };
   React.useEffect(() => { void vatAction().then(r => { if (r.success) show(r.data); else { setView(null); setLoadError(r.error); } }); }, []);
 
@@ -28,7 +28,7 @@ export default function TaxSettingsPage() {
     if (registered && !validVatNumber(number)) { setError('Enter your VAT number (6 to 20 letters, digits or dashes).'); return; }
     if (registered && !from) { setError('Enter the date you started charging VAT.'); return; }
     setBusy(true); setError(''); setMessage('');
-    const r = await saveVatAction({ registered, vat_number: registered ? number.trim() : null, effective_from: registered ? from : null, invoices_include_vat: inclusive });
+    const r = await saveVatAction({ registered, vat_number: registered ? number.trim() : null, effective_from: registered ? from : null, invoices_include_vat: inclusive, wht_enabled: wht });
     setBusy(false);
     if (!r.success) { setError(r.error); return; }
     show(r.data); setMessage(r.data.registered ? 'VAT is on. New sales and invoices from that date include VAT.' : 'VAT is off. New sales and invoices carry no VAT.');
@@ -69,6 +69,12 @@ export default function TaxSettingsPage() {
           <li>Sales and invoices already recorded are not changed.</li>
         </ul>
       </>}
+      <div className="space-y-1 border-t pt-4">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={wht} disabled={busy} onChange={e => setWht(e.target.checked)} />
+          Some customers deduct withholding tax (WHT) before paying</label>
+        <p className="text-sm text-muted-foreground">Record the WHT with their payment; CACU keeps it as a tax credit (account 1320) and lists it for their certificates.
+          How WHT credits are treated is still to be confirmed by our accountant reviewer.</p>
+      </div>
       <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
     </form>
 

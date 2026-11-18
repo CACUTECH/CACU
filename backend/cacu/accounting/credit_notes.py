@@ -11,7 +11,7 @@ Posting debits revenue and credits the customer's receivable, allocated to the i
 rest, when the invoice was already paid, is kept as the customer's advance (debit revenue, credit Customer deposits and
 advances), to apply to another invoice or hand back (E11). A credit note is replay-safe under its request key, numbered
 CN-0001 onwards, and decided once."""
-from decimal import Decimal
+from decimal import ROUND_HALF_UP,Decimal
 import json
 from uuid import UUID,uuid5
 from fastapi import HTTPException
@@ -21,6 +21,7 @@ from cacu.accounting.posting import PostingCommand,post_command,raw
 from cacu.accounting.session import allowed
 from cacu.accounting.workflows import business_today,durable,purpose,role
 from cacu.accounting import inventory
+CENT=Decimal('0.01')
 from cacu.accounting.refunds import refund_policy,return_stock
 
 ZERO=Decimal('0')
@@ -135,18 +136,30 @@ def _post(session,actor,credit_id,note):
     against=min(credit.amount,max(owed,ZERO));excess=credit.amount-against
     revenue=_revenue(session,target);narration=f'{credit.number} for invoice {invoice.invoice_number}: {credit.reason}'
     detail={'credit_note':None,'advance':None}
+    # VAT (E14 R3 2c): the VAT the credit gives back, shared between the part against the invoice and any advance.
+    from cacu.accounting import vat
+    base=raw(session,'SELECT coalesce(sum(amount),0) FROM accounting.invoice_credit_line WHERE business_id=%s AND credit_id=%s',(tenant,str(credit_id))).scalar()
+    original=vat._original(session,'invoice',credit.invoice_id)
+    vat_back=vat.take_back(session,'invoice',credit.invoice_id,base,None if original is None or original.inclusive else credit.amount-base)
+    if vat_back and vat_back.amount!=credit.amount:raise HTTPException(409,'The VAT on this invoice has changed since the credit note was asked for. Ask again.')
+    given=vat_back.vat if vat_back else ZERO
+    on_invoice=(given*against/credit.amount).quantize(CENT,rounding=ROUND_HALF_UP) if credit.amount else ZERO
+    def taken(amount,vat_part,label):
+        lines=[{'account_id':revenue,'amount':_money(amount-vat_part),'credited':False}]
+        if vat_part>0:lines.append(vat.output_back_line(session,vat_part,label))
+        return lines
     if against>0:
         # PR-16: debit revenue, credit the customer's receivable, allocated to the invoice.
         posted=post_command(session,actor,PostingCommand(request_key=uuid5(credit_id,'posting'),kind='credit_note',source_id=credit_id,target_id=credit.invoice_id,
             main_account_id=_account_of(session,target.account_id),counterparty_id=invoice.customer_id,entry_date=day,narration=narration,
-            lines=[{'account_id':revenue,'amount':_money(against)}]))
+            lines=taken(against,on_invoice,'VAT given back')))
         detail['credit_note']=posted['transaction_no']
     if excess>0:
         # The invoice was already paid (or partly): the rest is the customer's to use or have back (E11).
         from cacu.accounting.receivables import advances_account
         key=uuid5(credit_id,'advance')
         kept=post_command(session,actor,PostingCommand(request_key=key,kind='credit_advance',source_id=key,main_account_id=advances_account(session,actor,True),
-            entry_date=day,credited=True,narration=narration+' (kept as advance)',lines=[{'account_id':revenue,'amount':_money(excess),'credited':False}]),internal=True)
+            entry_date=day,credited=True,narration=narration+' (kept as advance)',lines=taken(excess,given-on_invoice,'VAT given back')),internal=True)
         detail['advance']=kept['transaction_no']
         raw(session,"""INSERT INTO accounting.customer_advance(business_id,id,customer_id,kind,amount,entry_date,credit_id,note,posting,created_by)
           VALUES(%s,%s,%s,'received',%s,%s,%s,%s,%s::jsonb,%s)""",(tenant,str(key),str(invoice.customer_id),excess,day,str(credit_id),
@@ -157,6 +170,7 @@ def _post(session,actor,credit_id,note):
     restored=return_stock(session,actor,credit.invoice_id,credit_id,day,back,f'Credit note {credit.number}: {credit.reason}',
                           'Stock returned: credit note '+credit.number,returns='invoice') if back else ZERO
     detail['stock_cost_restored']=_money(restored)
+    if vat_back:vat.record_back(session,'invoice_credit',credit_id,day,vat_back);detail['vat']=_money(given)
     raw(session,"""UPDATE accounting.invoice_credit SET status='posted',decided_by=%s,decided_at=now(),decided_on=%s,decision_note=%s,
       against_invoice=%s,to_advance=%s,posting=%s::jsonb WHERE business_id=%s AND id=%s""",
         (str(actor),day,note or None,against,excess,json.dumps(detail),tenant,str(credit_id)))
@@ -180,8 +194,6 @@ def request(session,actor,data:CreditRequest):
         tenant=str(session.business_id)
         if not allowed(session,'invoices.post'):raise HTTPException(403,'Only someone who can post invoices can ask for a credit note')
         invoice=_invoice(session,data.invoice_id,lock=True)
-        from cacu.accounting.vat import refuse_if_taxed
-        refuse_if_taxed(session,'invoice',data.invoice_id)  # VAT on credit notes comes in E14 R3 part 2c
         reason=data.reason.strip()
         if len(reason)<3:raise HTTPException(422,'Say why the invoice is credited')
         if len({l.line_id for l in data.lines})!=len(data.lines):raise HTTPException(422,'Each invoice line appears once in a credit note')
@@ -204,6 +216,10 @@ def request(session,actor,data:CreditRequest):
                 restock=False
             chosen.append((line,row,value,restock));amount+=value
         if amount<=0:raise HTTPException(422,'A credit note must be for more than zero')
+        # VAT (E14 R3 2c): an invoice priced before VAT credits its VAT on top, so the credit note's amount includes it.
+        from cacu.accounting import vat
+        back=vat.take_back(session,'invoice',data.invoice_id,amount)
+        if back and not back.original.inclusive:amount=back.amount
         number=_next_number(session)
         raw(session,"""INSERT INTO accounting.invoice_credit(business_id,id,number,invoice_id,customer_id,amount,reason,requested_by)
           VALUES(%s,%s,%s,%s,%s,%s,%s,%s)""",(tenant,str(data.request_key),number,str(data.invoice_id),str(invoice.customer_id),amount,reason,str(actor)))

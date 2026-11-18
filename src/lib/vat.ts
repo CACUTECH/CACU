@@ -1,9 +1,11 @@
 // VAT (Doc 09 PR-32; E14 R3 part 2a): what the accounting API returns for Settings › Taxes and the VAT return.
 export type VatClass = 'standard' | 'zero_rated' | 'exempt';
-export type VatOverview = { registered: boolean; vat_number: string | null; effective_from: string | null; invoices_include_vat: boolean;
+export type VatOverview = { registered: boolean; vat_number: string | null; effective_from: string | null; invoices_include_vat: boolean; wht_enabled: boolean;
   standard_rate: string; items: { id: string; name: string; vat_class: VatClass }[] };
 export type VatSide = { standard_net: string; zero_rated_net: string; exempt_net: string; vat: string; documents: number };
-export type VatReturn = { month: string; vat_number: string | null; sales: VatSide; purchases: VatSide; payable: string; exceptions: string[]; note: string };
+export type WhtDeduction = { id: string; date: string; amount: string; certificate: string | null; invoice_number: string | null; customer: string | null };
+export type VatReturn = { month: string; vat_number: string | null; sales: VatSide; purchases: VatSide; payable: string; exceptions: string[]; note: string;
+  wht?: { total: string; reviewed: boolean; deductions: WhtDeduction[] } };
 
 export const VAT_CLASS_LABELS: Record<VatClass, string> = { standard: 'Standard rate', zero_rated: 'Zero-rated', exempt: 'Exempt' };
 export const naira = (value: string) => `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -11,7 +13,7 @@ export const naira = (value: string) => `₦${Number(value).toLocaleString('en-N
 export const percent = (rate: string) => `${Number(rate)}%`;
 /** Nigerian VAT numbers (TIN) are 6 to 20 letters, digits and dashes; checked again by the API. */
 export const validVatNumber = (value: string) => /^[0-9A-Za-z-]{6,20}$/.test(value.trim());
-export type VatStatus = { charging: boolean; standard_rate: string | null };
+export type VatStatus = { charging: boolean; standard_rate: string | null; wht_enabled?: boolean };
 
 /** The most VAT the standard rate allows, in naira: on an amount before VAT, or inside a total that includes it. */
 export function mostVat(amount: string, rate: string, inclusive: boolean): string {

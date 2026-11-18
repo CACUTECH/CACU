@@ -369,7 +369,7 @@ def bill_received(session, actor, data: GoodsBill):
         posting = post_command(session, actor, PostingCommand(request_key=uuid5(data.request_key, 'posting'), kind='goods_bill', source_id=data.request_key,
             main_account_id=payables, counterparty_id=data.supplier_id, entry_date=day, credited=True, narration=f'Bill {number}',
             lines=bill_lines), internal=True)
-        vat.record(session, 'bill', data.request_key, 'input', day, figures)
+        vat.record(session, 'bill', data.request_key, 'input', day, figures, billed, False)
         to_stock = to_sales = ZERO
         for line, got, value, amount in matched:
             difference = amount - value

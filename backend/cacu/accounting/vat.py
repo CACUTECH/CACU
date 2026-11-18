@@ -21,7 +21,6 @@ CENT = Decimal('0.01')
 ZERO = Decimal('0')
 CLASSES = ('standard', 'zero_rated', 'exempt')
 ACCOUNTS = {'vat_output': 'Output VAT payable', 'vat_input': 'Input VAT recoverable', 'wht_receivable': 'Withholding tax credits'}
-TAXED_LATER = 'Refunds and credit notes for documents with VAT are not available yet. Record a new adjusting document instead.'
 
 
 class VatSettings(BaseModel):
@@ -29,6 +28,7 @@ class VatSettings(BaseModel):
     vat_number: str | None = Field(default=None, pattern=r'^[0-9A-Za-z-]{6,20}$')
     effective_from: date | None = None
     invoices_include_vat: bool = False
+    wht_enabled: bool = False  # customers deduct withholding tax (2c)
 
 
 class ItemClass(BaseModel):
@@ -124,22 +124,90 @@ def output_lines(session, revenue, figures: Split, credited: bool):
     return lines
 
 
-def record(session, source_type: str, source_id, direction: str, day: date, figures: Split):
+def record(session, source_type: str, source_id, direction: str, day: date, figures: Split, base: Decimal, inclusive: bool):
     """What the document charged, for the VAT return. Only documents with VAT, zero-rated or exempt supplies while
-    registered are recorded; a business that is not registered leaves nothing."""
+    registered are recorded; a business that is not registered leaves nothing. base is the value its lines were priced
+    at (gross where prices include VAT, net where VAT is added on top)."""
     if not charging(session, day):
         return
-    raw(session, """INSERT INTO accounting.document_vat(business_id,source_type,source_id,direction,entry_date,standard_net,zero_rated_net,exempt_net,vat,rate)
-        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (str(session.business_id), source_type, str(source_id), direction, day,
-                                                  figures.standard_net, figures.zero_rated_net, figures.exempt_net, figures.vat, figures.rate))
+    raw(session, """INSERT INTO accounting.document_vat(business_id,source_type,source_id,direction,entry_date,standard_net,zero_rated_net,exempt_net,vat,rate,base,inclusive)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (str(session.business_id), source_type, str(source_id), direction, day,
+              figures.standard_net, figures.zero_rated_net, figures.exempt_net, figures.vat, figures.rate, base, inclusive))
 
 
-def refuse_if_taxed(session, source_type: str, source_id):
-    """Refunds and credit notes take VAT back only from part 2c; until then a document that carried VAT is refused."""
-    vat = raw(session, 'SELECT vat FROM accounting.document_vat WHERE business_id=%s AND source_type=%s AND source_id=%s',
-              (str(session.business_id), source_type, str(source_id))).scalar()
-    if vat and Decimal(vat) > 0:
-        raise HTTPException(409, TAXED_LATER)
+@dataclass
+class TakenBack:
+    """What a refund, credit note or reversal takes back from a document that was recorded for VAT."""
+    original: object
+    base: Decimal          # the value taken back, on the document's own basis
+    figures: Split         # the amounts taken back (positive here; recorded negative)
+
+    @property
+    def vat(self):
+        return self.figures.vat
+
+    @property
+    def amount(self):
+        """What changes hands: the value itself where prices included VAT, the value plus VAT where it was added on top."""
+        return self.base if self.original.inclusive else self.base + self.figures.vat
+
+    @property
+    def net(self):
+        return self.figures.net
+
+
+def _original(session, source_type: str, source_id):
+    return raw(session, 'SELECT * FROM accounting.document_vat WHERE business_id=%s AND source_type=%s AND source_id=%s AND original_id IS NULL',
+               (str(session.business_id), source_type, str(source_id))).first()
+
+
+def take_back(session, source_type: str, source_id, value: Decimal, vat: Decimal | None = None) -> TakenBack | None:
+    """The share of a recorded document's VAT that goes with value (on the document's own basis). The same share of
+    its VAT, rounded to the kobo; the last credit takes exactly what is left, so nothing is left over. vat, when given,
+    is a figure worked out earlier (a credit note asked for before it was approved) and is checked, not recomputed.
+    None when the document was not recorded for VAT (the business was not registered then)."""
+    row = _original(session, source_type, source_id)
+    if row is None:
+        return None
+    taken = raw(session, """SELECT coalesce(-sum(base),0) base, coalesce(-sum(vat),0) vat, coalesce(-sum(standard_net),0) standard_net,
+        coalesce(-sum(zero_rated_net),0) zero_rated_net, coalesce(-sum(exempt_net),0) exempt_net FROM accounting.document_vat
+        WHERE business_id=%s AND original_type=%s AND original_id=%s""", (str(session.business_id), source_type, str(source_id))).one()
+    left_base, left_vat = row.base - taken.base, row.vat - taken.vat
+    if value <= 0 or value > left_base:
+        raise HTTPException(409, 'That is more than is left to take back on this document.')
+    whole = value == left_base
+    if vat is None:
+        vat = left_vat if whole else min(left_vat, (row.vat * value / row.base).quantize(CENT, rounding=ROUND_HALF_UP) if row.base else ZERO)
+    elif vat < 0 or vat > left_vat or (whole and vat != left_vat):
+        raise HTTPException(409, 'The VAT on this document has changed since this was asked for. Ask again.')
+    net = value - vat if row.inclusive else value
+    # The net taken back by VAT class, in the document's proportions; the last credit takes what is left of each.
+    lefts = {k: getattr(row, k) - getattr(taken, k) for k in ('standard_net', 'zero_rated_net', 'exempt_net')}
+    figures = Split(rate=row.rate, vat=vat)
+    if whole:
+        figures.standard_net, figures.zero_rated_net, figures.exempt_net = lefts['standard_net'], lefts['zero_rated_net'], lefts['exempt_net']
+    else:
+        total_net = row.standard_net + row.zero_rated_net + row.exempt_net
+        share = lambda k: (getattr(row, k) * net / total_net).quantize(CENT, rounding=ROUND_HALF_UP) if total_net else ZERO
+        figures.zero_rated_net, figures.exempt_net = min(share('zero_rated_net'), lefts['zero_rated_net']), min(share('exempt_net'), lefts['exempt_net'])
+        figures.standard_net = net - figures.zero_rated_net - figures.exempt_net
+    return TakenBack(original=row, base=value, figures=figures)
+
+
+def record_back(session, source_type: str, source_id, day: date, back: TakenBack):
+    """The refund, credit note or reversal's own row: the same amounts, negative, on the original's side of the return."""
+    o, f = back.original, back.figures
+    raw(session, """INSERT INTO accounting.document_vat(business_id,source_type,source_id,direction,entry_date,standard_net,zero_rated_net,exempt_net,vat,rate,base,inclusive,original_type,original_id)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (str(session.business_id), source_type, str(source_id), o.direction, day,
+              -f.standard_net, -f.zero_rated_net, -f.exempt_net, -f.vat, o.rate, -back.base, o.inclusive, o.source_type, str(o.source_id)))
+
+
+def output_back_line(session, vat: Decimal, description: str):
+    """A refund or credit note debits Output VAT payable with the VAT it gives back."""
+    vat_account = account(session, 'vat_output')
+    if vat_account is None:
+        raise HTTPException(409, 'Turn VAT on again in Settings › Taxes to add the VAT accounts.')
+    return {'account_id': vat_account, 'amount': format(vat, '.2f'), 'credited': False, 'description': description}
 
 
 def ensure_accounts(session, actor):
@@ -157,7 +225,7 @@ def overview(session):
         WHERE c.business_id=%s AND c.is_active ORDER BY c.name LIMIT 500""", (str(session.business_id),)).mappings().all()
     return {'registered': bool(row and row.registered), 'vat_number': row.vat_number if row else None,
             'effective_from': row.effective_from.isoformat() if row and row.effective_from else None,
-            'invoices_include_vat': bool(row and row.invoices_include_vat),
+            'invoices_include_vat': bool(row and row.invoices_include_vat), 'wht_enabled': bool(row and row.wht_enabled),
             'standard_rate': format(rate(session, 'standard', date.today()), 'f'),
             'items': [dict(i) for i in items]}
 
@@ -176,12 +244,14 @@ def save_settings(session, actor, data: VatSettings):
         if month_closed(session, data.effective_from):
             raise HTTPException(409, 'That date is in a closed month. Choose a date in an open month.')
         ensure_accounts(session, actor)
-    raw(session, """INSERT INTO accounting.vat_setting(business_id,registered,vat_number,effective_from,invoices_include_vat,updated_by)
-        VALUES(%s,%s,%s,%s,%s,%s) ON CONFLICT (business_id) DO UPDATE SET registered=EXCLUDED.registered,
+    if data.wht_enabled:
+        ensure_accounts(session, actor)
+    raw(session, """INSERT INTO accounting.vat_setting(business_id,registered,vat_number,effective_from,invoices_include_vat,wht_enabled,updated_by)
+        VALUES(%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (business_id) DO UPDATE SET registered=EXCLUDED.registered,wht_enabled=EXCLUDED.wht_enabled,
          vat_number=coalesce(EXCLUDED.vat_number,accounting.vat_setting.vat_number),
          effective_from=coalesce(EXCLUDED.effective_from,accounting.vat_setting.effective_from),
          invoices_include_vat=EXCLUDED.invoices_include_vat,updated_by=EXCLUDED.updated_by,updated_at=now()""",
-        (str(session.business_id), data.registered, data.vat_number, data.effective_from, data.invoices_include_vat, str(actor)))
+        (str(session.business_id), data.registered, data.vat_number, data.effective_from, data.invoices_include_vat, data.wht_enabled, str(actor)))
     raw(session, 'INSERT INTO accounting.audit_event(business_id,actor_id,request_key,event,details) VALUES(%s,%s,%s,%s,%s::jsonb)',
         (str(session.business_id), str(actor), str(uuid4()), 'vat_settings', json.dumps(data.model_dump(mode='json'))))
     return overview(session)
@@ -232,7 +302,14 @@ def vat_return(session, month: date):
     if ledger_input != Decimal(purchases['vat']):
         exceptions.append(f"Input VAT in the ledger ({ledger_input:.2f}) differs from the documents ({purchases['vat']}).")
     row = setting(session)
+    wht = raw(session, """SELECT w.id::text, w.entry_date, w.amount, w.certificate, i.invoice_number, c.name AS customer
+        FROM accounting.wht_deduction w LEFT JOIN public.invoices i ON i.business_id=w.business_id AND i.id=w.invoice_id
+        LEFT JOIN public.customers c ON c.business_id=w.business_id AND c.id=w.customer_id
+        WHERE w.business_id=%s AND w.entry_date BETWEEN %s AND %s ORDER BY w.entry_date, w.created_at""", (str(session.business_id), month, end)).all()
     return {'month': month.isoformat(), 'vat_number': row.vat_number if row else None, 'sales': output, 'purchases': purchases,
+            'wht': {'total': format(sum((w.amount for w in wht), ZERO), '.2f'), 'reviewed': False,
+                    'deductions': [{'id': w.id, 'date': w.entry_date.isoformat(), 'amount': format(w.amount, '.2f'), 'certificate': w.certificate,
+                                    'invoice_number': w.invoice_number, 'customer': w.customer} for w in wht]},
             'payable': format(payable, '.2f'), 'exceptions': exceptions,
             'note': 'Prepared from CACU records for you to check before filing. CACU does not file VAT returns.'}
 
@@ -275,5 +352,50 @@ def status(session):
     """For any member's forms (expenses, bills): whether VAT applies today, and at what rate."""
     from cacu.accounting.workflows import business_today
     today = business_today(session)
-    on = charging(session, today)
-    return {'charging': on, 'standard_rate': format(rate(session, 'standard', today), 'f') if on else None}
+    on, row = charging(session, today), setting(session)
+    return {'charging': on, 'standard_rate': format(rate(session, 'standard', today), 'f') if on else None,
+            'wht_enabled': bool(row and row.wht_enabled)}
+
+
+# WHT deducted by customers (part 2c; Doc 09 PR-33, treatment to be confirmed by the accountant reviewer).
+WHT_MOST = Decimal('10')  # % of the invoice amount it settles: Nigerian WHT on goods and services is 2% to 10%
+
+
+class WhtCertificate(BaseModel):
+    certificate: str = Field(min_length=1, max_length=60)
+
+
+def deduct_wht(session, actor, request_key, invoice_id, amount: Decimal, paid: Decimal, day: date, certificate: str | None):
+    """The WHT a customer kept back from paying an invoice: posted as its own entry against the invoice, so the
+    invoice is settled by the cash and the WHT together."""
+    from uuid import uuid5 as _uuid5
+    from cacu.accounting.posting import PostingCommand, post_command
+    row = setting(session)
+    if not (row and row.wht_enabled):
+        raise HTTPException(409, 'Turn on "Customers deduct withholding tax" in Settings › Taxes first.')
+    if amount <= 0:
+        raise HTTPException(422, 'Enter the WHT deducted, above zero.')
+    if amount > ((paid + amount) * WHT_MOST / 100).quantize(CENT, rounding=ROUND_HALF_UP):
+        raise HTTPException(422, f'WHT is at most {WHT_MOST:f}% of the amount it settles. Check the figure.')
+    invoice = raw(session, """SELECT i.customer_id, m.account_id FROM public.invoices i JOIN accounting.document_map d ON d.business_id=i.business_id AND d.source_id=i.id AND d.source_type='invoice'
+        JOIN accounting."transaction" t ON t.id=d.transaction_id AND t.business_id=d.business_id JOIN accounting.account_map m ON m.business_id=t.business_id AND m.library_id=t.account_id
+        WHERE i.business_id=%s AND i.id=%s""", (str(session.business_id), str(invoice_id))).first()
+    if invoice is None:
+        raise HTTPException(409, 'Invoice must be issued before payment')
+    key = _uuid5(request_key, 'wht')
+    posting = post_command(session, actor, PostingCommand(request_key=key, kind='wht_deduction', source_id=key, target_id=invoice_id,
+        main_account_id=invoice.account_id, counterparty_id=invoice.customer_id, entry_date=day, credited=True,
+        narration='WHT deducted by the customer', lines=[{'account_id': account(session, 'wht_receivable'), 'amount': format(amount, '.2f'), 'credited': False}]),
+        internal=True)
+    raw(session, """INSERT INTO accounting.wht_deduction(business_id,id,invoice_id,customer_id,amount,entry_date,certificate,created_by)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s)""", (str(session.business_id), str(key), str(invoice_id), str(invoice.customer_id), amount, day,
+                                             certificate.strip() if certificate else None, str(actor)))
+    return posting
+
+
+def save_certificate(session, deduction_id, data: WhtCertificate):
+    done = raw(session, 'UPDATE accounting.wht_deduction SET certificate=%s WHERE business_id=%s AND id=%s RETURNING id',
+               (data.certificate.strip(), str(session.business_id), str(deduction_id))).first()
+    if done is None:
+        raise HTTPException(404, 'That WHT deduction is not in this business.')
+    return {'id': str(deduction_id), 'certificate': data.certificate.strip()}

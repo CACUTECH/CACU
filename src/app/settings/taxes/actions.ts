@@ -10,7 +10,7 @@ export async function vatAction(): Promise<Result<VatOverview>> {
   try { return { success: true, data: await accountingRequest<VatOverview>('vat') }; } catch (error) { return failed(error); }
 }
 
-export async function saveVatAction(settings: { registered: boolean; vat_number: string | null; effective_from: string | null; invoices_include_vat: boolean }): Promise<Result<VatOverview>> {
+export async function saveVatAction(settings: { registered: boolean; vat_number: string | null; effective_from: string | null; invoices_include_vat: boolean; wht_enabled: boolean }): Promise<Result<VatOverview>> {
   try { return { success: true, data: await accountingRequest<VatOverview>('vat', { method: 'POST', body: settings }) }; } catch (error) { return failed(error); }
 }
 
@@ -25,4 +25,10 @@ export async function vatReturnAction(month: string): Promise<Result<VatReturn>>
 /** For any member's purchase forms: whether VAT applies today, and the rate. */
 export async function vatStatusAction(): Promise<Result<VatStatus>> {
   try { return { success: true, data: await accountingRequest<VatStatus>('vat/status') }; } catch (error) { return failed(error); }
+}
+
+/** The customer's WHT certificate number, once it arrives (E14 R3 2c). */
+export async function saveWhtCertificateAction(id: string, certificate: string): Promise<Result<{ id: string; certificate: string }>> {
+  try { return { success: true, data: await accountingRequest<{ id: string; certificate: string }>(`wht/${encodeURIComponent(id)}/certificate`, { method: 'POST', body: { certificate } }) }; }
+  catch (error) { return failed(error); }
 }

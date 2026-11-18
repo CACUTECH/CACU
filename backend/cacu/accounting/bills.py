@@ -70,7 +70,7 @@ def bill_create(session,actor,data:BillCreate):
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='bill',source_id=data.request_key,main_account_id=payables,
             entry_date=data.entry_date,narration=f'Bill {number}',counterparty_id=data.supplier_id,lines=lines)
         posting=post_command(session,actor,cmd)
-        vat.record(session,'bill',data.request_key,'input',data.entry_date,figures)
+        vat.record(session,'bill',data.request_key,'input',data.entry_date,figures,net,False)
         return {'id':str(data.request_key),'posting':posting}
     return durable(session,actor,'bill',data,execute)
 

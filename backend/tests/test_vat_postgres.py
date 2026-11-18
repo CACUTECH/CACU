@@ -1,7 +1,7 @@
 """VAT part 2a (Doc 09 PR-32; Doc 10 E14 R3 part 2): off unless the business is VAT-registered; then 7.5% on
 standard-rated items, worked out per document to the kobo; till prices include VAT, invoices say whether theirs do;
 the sale or invoice posts revenue net and Output VAT payable (2200); payments, the trial balance and the month's VAT
-return all agree. Refunds and credit notes of taxed documents wait for part 2c."""
+return all agree. Refunds, credit notes and reversals take back their share of the VAT; customers' WHT settles invoices."""
 from decimal import Decimal
 from uuid import uuid4
 import psycopg
@@ -104,20 +104,47 @@ def test_invoices_say_whether_prices_include_vat_and_are_paid_in_full(registered
     assert call(live, 'viewer', lambda s, a: vat_return(s, month_start(TODAY)))['sales']['vat'] == '329.65'
 
 
-def test_refunds_and_credit_notes_of_taxed_documents_wait_for_part_2c(registered):
+def test_refunds_give_back_their_share_of_the_vat_and_the_last_takes_what_is_left(registered):
     live = registered
-    made = call(live, 'owner', lambda s, a: sale_create(s, a, sale(live, lines=(('Beans', 1, '0'),))))
+    made = call(live, 'owner', lambda s, a: sale_create(s, a, sale(live, lines=(('Beans', 2, '0'),))))  # ₦3,000, VAT ₦209.30
     with psycopg.connect(URL) as c:
         line = c.execute('SELECT id FROM transaction_items WHERE transaction_id=%s', (made['saleId'],)).fetchone()[0]
-    with pytest.raises(HTTPException, match='not available yet'):
-        call(live, 'owner', lambda s, a: refund_request(s, a, made['saleId'], RefundRequest(request_key=uuid4(), lines=[{'line_id': line, 'quantity': 1}], method='Cash', reason='Wrong item')))
-    invoice = InvoiceCreate(request_key=uuid4(), customer_id=live.ids['ada'], invoice_number='INV-VAT-2', entry_date=TODAY,
-                            items=[{'catalog_item_id': live.items['Beans'], 'quantity': 1, 'unit_price': '1500.00'}])
-    call(live, 'owner', lambda s, a: invoice_create(s, a, invoice))
+    for _ in range(2):  # one tin back, then the other
+        refunded = call(live, 'owner', lambda s, a: refund_request(s, a, made['saleId'], RefundRequest(request_key=uuid4(), lines=[{'line_id': line, 'quantity': 1}], method='Cash', reason='Dented tin')))
+        assert refunded['status'] == 'posted'
+        if _ == 0:
+            assert balance(live, '2200') == Decimal('-104.65') and balance(live, '4000') == Decimal('-1395.35')
+    assert balance(live, '2200') == 0 and balance(live, '4000') == 0  # everything taken back, to the kobo
+    month = call(live, 'viewer', lambda s, a: vat_return(s, month_start(TODAY)))
+    assert (month['sales']['standard_net'], month['sales']['vat'], month['exceptions']) == ('0.00', '0.00', [])
+
+
+def test_credit_notes_give_vat_back_on_top_or_from_inside_as_the_invoice_was_priced(registered):
+    live = registered
+    owed = balance(live, '1100')
+    plus = InvoiceCreate(request_key=uuid4(), customer_id=live.ids['ada'], invoice_number='INV-VAT-3', entry_date=TODAY,
+                         items=[{'catalog_item_id': live.items['Beans'], 'quantity': 1, 'unit_price': '1500.00'}], vat_included=False)
+    call(live, 'owner', lambda s, a: invoice_create(s, a, plus))  # ₦1,500 + ₦112.50 VAT
     with psycopg.connect(URL) as c:
-        item = c.execute('SELECT id FROM invoice_items WHERE invoice_id=%s', (invoice.request_key,)).fetchone()[0]
-    with pytest.raises(HTTPException, match='not available yet'):
-        call(live, 'owner', lambda s, a: credit_request(s, a, CreditRequest(request_key=uuid4(), invoice_id=invoice.request_key, lines=[{'line_id': item, 'quantity': 1}], reason='Returned')))
+        item = c.execute('SELECT id FROM invoice_items WHERE invoice_id=%s', (plus.request_key,)).fetchone()[0]
+    credited = call(live, 'owner', lambda s, a: credit_request(s, a, CreditRequest(request_key=uuid4(), invoice_id=plus.request_key,
+                                                                                   lines=[{'line_id': item, 'quantity': 1}], reason='Returned unopened')))
+    assert credited['amount'] == '1612.50' and credited['status'] == 'posted'  # the VAT added on top comes back too
+    assert balance(live, '1100') == owed and balance(live, '2200') == 0
+    with psycopg.connect(URL) as c:
+        assert c.execute('SELECT status FROM invoices WHERE id=%s', (plus.request_key,)).fetchone()[0] == 'paid'
+
+    inside = InvoiceCreate(request_key=uuid4(), customer_id=live.ids['ada'], invoice_number='INV-VAT-4', entry_date=TODAY,
+                           items=[{'catalog_item_id': live.items['Beans'], 'quantity': 1, 'unit_price': '1500.00'}], vat_included=True)
+    call(live, 'owner', lambda s, a: invoice_create(s, a, inside))  # ₦1,500 including ₦104.65 VAT
+    with psycopg.connect(URL) as c:
+        item = c.execute('SELECT id FROM invoice_items WHERE invoice_id=%s', (inside.request_key,)).fetchone()[0]
+    allowance = call(live, 'owner', lambda s, a: credit_request(s, a, CreditRequest(request_key=uuid4(), invoice_id=inside.request_key,
+                                                                                    lines=[{'line_id': item, 'amount': '500.00'}], reason='Late delivery')))
+    assert allowance['amount'] == '500.00'  # ₦34.88 of it VAT
+    assert balance(live, '2200') == Decimal('-69.77') and balance(live, '1100') - owed == Decimal('1000.00')
+    month = call(live, 'viewer', lambda s, a: vat_return(s, month_start(TODAY)))
+    assert month['sales']['vat'] == '69.77' and month['exceptions'] == []
 
 
 def test_output_vat_cannot_be_posted_by_other_documents(registered):
@@ -177,8 +204,10 @@ def test_expenses_and_bills_claim_input_vat_and_the_return_nets_it_off(registere
     tb = call(live, 'viewer', lambda s, a: trial_balance(s, TODAY))
     assert tb['difference'] == '0.00' and [e for e in tb['exceptions'] if e['check'] != 'stock'] == []
 
-    with pytest.raises(HTTPException, match='not available yet'):  # taking VAT back comes in part 2c
-        call(live, 'owner', lambda s, a: reversal_create(s, a, receipt.request_key, ReversalCreate(request_key=uuid4(), entry_date=TODAY, reason='Entered twice')))
+    call(live, 'owner', lambda s, a: reversal_create(s, a, receipt.request_key, ReversalCreate(request_key=uuid4(), entry_date=TODAY, reason='Entered twice')))
+    assert balance(live, '6200') == 0 and balance(live, '1310') == Decimal('1500.00')  # the expense's VAT claim goes back with it
+    month = call(live, 'viewer', lambda s, a: vat_return(s, month_start(TODAY)))
+    assert month['purchases']['vat'] == '1500.00' and month['purchases']['standard_net'] == '20000.00' and month['exceptions'] == []
     with pytest.raises(ValueError, match='pattern'):  # a negative VAT never reaches the books
         BillCreate(request_key=uuid4(), supplier_id=live.ids['supplier'], bill_number='X', entry_date=TODAY,
                    lines=[{'account_id': live.codes['6100'], 'amount': '1.00'}], vat='-1')
@@ -205,3 +234,34 @@ def test_input_vat_is_claimed_only_on_bills_and_expenses(registered):
                              narration='Claiming VAT by hand', credited=True, lines=[{'account_id': claim, 'amount': '50.00', 'credited': False}])
     with pytest.raises(HTTPException, match='claimed only on bills and expenses'):
         call(live, 'owner', lambda s, a: post_command(s, a, journal))
+
+
+# Part 2c: WHT deducted by customers.
+
+def test_wht_a_customer_deducts_settles_the_invoice_with_the_cash_and_is_listed_for_its_certificate(live):
+    from cacu.accounting.vat import WhtCertificate, save_certificate
+    invoice = InvoiceCreate(request_key=uuid4(), customer_id=live.ids['ada'], invoice_number='INV-WHT-1', entry_date=TODAY,
+                            items=[{'catalog_item_id': live.items['Beans'], 'quantity': 1, 'unit_price': '1500.00'}])
+    call(live, 'owner', lambda s, a: invoice_create(s, a, invoice))  # not VAT-registered: ₦1,500 owed
+    pay = ReceiptCreate(request_key=uuid4(), invoice_id=invoice.request_key, amount='1425.00', entry_date=TODAY, method='Cash', wht='75.00')
+    with pytest.raises(HTTPException, match='Customers deduct withholding tax'):
+        call(live, 'owner', lambda s, a: receipt_create(s, a, pay))
+    call(live, 'owner', lambda s, a: save_settings(s, a, VatSettings(registered=False, wht_enabled=True)))  # WHT needs no VAT registration
+    with pytest.raises(HTTPException, match='at most 10%'):
+        call(live, 'owner', lambda s, a: receipt_create(s, a, pay.model_copy(update={'request_key': uuid4(), 'amount': '1200.00', 'wht': '300.00'})))
+    with pytest.raises(HTTPException, match='exceed what is still owed'):
+        call(live, 'owner', lambda s, a: receipt_create(s, a, pay.model_copy(update={'request_key': uuid4(), 'amount': '1500.00'})))
+    owed, cash = balance(live, '1100'), balance(live, '1000')
+    paid = call(live, 'owner', lambda s, a: receipt_create(s, a, pay))
+    assert paid['wht'] == '75.00'
+    assert balance(live, '1320') == Decimal('75.00') and balance(live, '1000') - cash == Decimal('1425.00') and balance(live, '1100') - owed == Decimal('-1500.00')
+    with psycopg.connect(URL) as c:
+        assert c.execute('SELECT status FROM invoices WHERE id=%s', (invoice.request_key,)).fetchone()[0] == 'paid'
+    month = call(live, 'viewer', lambda s, a: vat_return(s, month_start(TODAY)))
+    assert month['wht']['total'] == '75.00' and month['wht']['reviewed'] is False
+    deduction = month['wht']['deductions'][0]
+    assert (deduction['invoice_number'], deduction['amount'], deduction['certificate']) == ('INV-WHT-1', '75.00', None)
+    call(live, 'owner', lambda s, a: save_certificate(s, deduction['id'], WhtCertificate(certificate='WHT/2026/0042')))
+    assert call(live, 'viewer', lambda s, a: vat_return(s, month_start(TODAY)))['wht']['deductions'][0]['certificate'] == 'WHT/2026/0042'
+    tb = call(live, 'viewer', lambda s, a: trial_balance(s, TODAY))
+    assert tb['difference'] == '0.00' and [e for e in tb['exceptions'] if e['check'] != 'stock'] == []

@@ -2838,6 +2838,71 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/wht/{deduction_id}/certificate": {
+      "post": {
+        "summary": "Wht Certificate",
+        "operationId": "wht_certificate_api_v1_businesses__business_id__wht__deduction_id__certificate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "deduction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deduction Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/reports/vat-return": {
       "get": {
         "summary": "Vat Return Report",
@@ -9541,7 +9606,8 @@
               "customer_advance",
               "gateway_receipt",
               "gateway_settlement",
-              "credit_advance"
+              "credit_advance",
+              "wht_deduction"
             ],
             "title": "Kind"
           },
@@ -9724,6 +9790,24 @@
               }
             ],
             "title": "Bank Account Id"
+          },
+          "wht": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Wht",
+            "default": "0.00"
+          },
+          "wht_certificate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wht Certificate"
           }
         },
         "additionalProperties": false,
@@ -10726,6 +10810,11 @@
           "invoices_include_vat": {
             "type": "boolean",
             "title": "Invoices Include Vat",
+            "default": false
+          },
+          "wht_enabled": {
+            "type": "boolean",
+            "title": "Wht Enabled",
             "default": false
           }
         },

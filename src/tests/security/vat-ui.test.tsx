@@ -3,12 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TaxSettingsPage from '@/app/settings/taxes/page';
 import VatReturnPage from '@/app/reports/vat-return/page';
-import { saveVatAction, saveVatClassesAction, vatAction, vatReturnAction } from '@/app/settings/taxes/actions';
+import { saveVatAction, saveVatClassesAction, saveWhtCertificateAction, vatAction, vatReturnAction } from '@/app/settings/taxes/actions';
 import { percent, validVatNumber, type VatOverview, type VatReturn } from '@/lib/vat';
 
-jest.mock('@/app/settings/taxes/actions', () => ({ vatAction: jest.fn(), saveVatAction: jest.fn(), saveVatClassesAction: jest.fn(), vatReturnAction: jest.fn() }));
+jest.mock('@/app/settings/taxes/actions', () => ({ vatAction: jest.fn(), saveVatAction: jest.fn(), saveVatClassesAction: jest.fn(), vatReturnAction: jest.fn(), saveWhtCertificateAction: jest.fn() }));
 
-const off: VatOverview = { registered: false, vat_number: null, effective_from: null, invoices_include_vat: false, standard_rate: '7.5000',
+const off: VatOverview = { registered: false, vat_number: null, effective_from: null, invoices_include_vat: false, wht_enabled: false, standard_rate: '7.5000',
   items: [{ id: 'i1', name: 'Beans', vat_class: 'standard' }, { id: 'i2', name: 'Rice', vat_class: 'standard' }] };
 const on: VatOverview = { ...off, registered: true, vat_number: '12345678-0001', effective_from: '2026-11-01' };
 const side = (vat: string, documents: number) => ({ standard_net: '2790.70', zero_rated_net: '1500.00', exempt_net: '0.00', vat, documents });
@@ -36,7 +36,7 @@ test('a registered business turns VAT on with its number and start date, then ma
   await userEvent.type(screen.getByLabelText('VAT number (TIN)'), '12345678-0001');
   await userEvent.type(screen.getByLabelText('Charging VAT from'), '2026-11-01');
   await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-  await waitFor(() => expect(saveVatAction).toHaveBeenCalledWith({ registered: true, vat_number: '12345678-0001', effective_from: '2026-11-01', invoices_include_vat: false }));
+  await waitFor(() => expect(saveVatAction).toHaveBeenCalledWith({ registered: true, vat_number: '12345678-0001', effective_from: '2026-11-01', invoices_include_vat: false, wht_enabled: false }));
   expect(await screen.findByText(/VAT is on/)).toBeInTheDocument();
   await userEvent.selectOptions(screen.getByLabelText('VAT on Rice'), 'zero_rated');
   await userEvent.click(screen.getByRole('button', { name: 'Save item VAT' }));
@@ -55,4 +55,27 @@ test('the VAT return shows sales, purchases, what is payable, and any disagreeme
   (vatReturnAction as jest.Mock).mockResolvedValue({ success: true, data: { ...november, exceptions: ['Output VAT in the ledger (100.00) differs from the documents (209.30).'] } });
   render(<VatReturnPage />);
   expect(await screen.findByRole('alert')).toHaveTextContent('differs from the documents');
+});
+
+test('a business that is not VAT-registered can still record the WHT its customers deduct', async () => {
+  (vatAction as jest.Mock).mockResolvedValue({ success: true, data: off });
+  (saveVatAction as jest.Mock).mockResolvedValue({ success: true, data: { ...off, wht_enabled: true } });
+  render(<TaxSettingsPage />);
+  await userEvent.click(await screen.findByLabelText(/customers deduct withholding tax/));
+  expect(screen.getByText(/still to be confirmed by our accountant reviewer/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(saveVatAction).toHaveBeenCalledWith({ registered: false, vat_number: null, effective_from: null, invoices_include_vat: false, wht_enabled: true }));
+});
+
+test('the return lists WHT deducted by customers, and takes the certificate number when it arrives', async () => {
+  (vatReturnAction as jest.Mock).mockResolvedValue({ success: true, data: { ...november, payable: '-2145.35',
+    wht: { total: '75.00', reviewed: false, deductions: [{ id: 'w1', date: '2026-11-18', amount: '75.00', certificate: null, invoice_number: 'INV-WHT-1', customer: 'Ada' }] } } });
+  (saveWhtCertificateAction as jest.Mock).mockResolvedValue({ success: true, data: { id: 'w1', certificate: 'WHT/2026/0042' } });
+  render(<VatReturnPage />);
+  expect(await screen.findByText(/VAT reclaimable for the month: ₦2,145.35/)).toBeInTheDocument();
+  expect(screen.getByText(/WHT deducted by customers: ₦75.00/)).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText('Certificate for INV-WHT-1'), 'WHT/2026/0042');
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(saveWhtCertificateAction).toHaveBeenCalledWith('w1', 'WHT/2026/0042'));
+  expect(await screen.findByText('WHT/2026/0042')).toBeInTheDocument();
 });

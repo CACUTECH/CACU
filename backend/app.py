@@ -411,6 +411,12 @@ def update_vat_classes(business_id:UUID,data:ItemClasses,user_id:UUID=Depends(cu
     with library_transaction(user_id,business_id,write=True,permission='settings.edit') as session:
         return save_vat_classes(session,user_id,data)
 
+@app.post('/api/v1/businesses/{business_id}/wht/{deduction_id}/certificate')
+def wht_certificate(business_id:UUID,deduction_id:UUID,data:dict,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.vat import WhtCertificate,save_certificate
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='invoices.post') as session:
+        return save_certificate(session,deduction_id,WhtCertificate(**data))
+
 @app.get('/api/v1/businesses/{business_id}/reports/vat-return')
 def vat_return_report(business_id:UUID,month:str,user_id:UUID=Depends(current_user)):
     from cacu.accounting.periods import _month
