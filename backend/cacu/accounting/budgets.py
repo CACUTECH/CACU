@@ -127,6 +127,7 @@ def against_actual(session, month_value: str):
     for r in raw(session, 'SELECT account_id::text, month, amount FROM accounting.budget_line WHERE business_id=%s AND fiscal_year=%s',
                  (str(session.business_id), year)).all():
         budgeted[r.account_id][r.month] = r.amount
+    has_budget = bool(budgeted)  # before the lookups below, which add empty entries to the defaultdict
     in_month, to_date = _actuals(session, month, month_end(month)), _actuals(session, months[0], month_end(month))
     upto = [m for m in months if m <= month]
 
@@ -153,6 +154,6 @@ def against_actual(session, month_value: str):
         act = totals['income'][span][1] - totals['expense'][span][1]
         return figures('income', b, act)
     return {'month': month.isoformat(), 'fiscal_year': year, 'year_from': months[0].isoformat(),
-            'has_budget': bool(budgeted), 'lines': lines,
+            'has_budget': has_budget, 'lines': lines,
             'totals': {kind: {'month': figures(kind, *totals[kind]['month']), 'year_to_date': figures(kind, *totals[kind]['year'])} for kind in ('income', 'expense')}
                       | {'profit': {'month': profit('month'), 'year_to_date': profit('year')}}}
