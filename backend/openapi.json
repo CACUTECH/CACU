@@ -3922,6 +3922,165 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/batches": {
+      "get": {
+        "summary": "List Batches",
+        "operationId": "list_batches_api_v1_businesses__business_id__batches_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/batches/tracking": {
+      "post": {
+        "summary": "Batch Tracking",
+        "operationId": "batch_tracking_api_v1_businesses__business_id__batches_tracking_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchTracking"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/batches/{batch_id}/write-off": {
+      "post": {
+        "summary": "Batch Write Off",
+        "operationId": "batch_write_off_api_v1_businesses__business_id__batches__batch_id__write_off_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchWriteOff"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/billing/checkout": {
       "post": {
         "tags": [
@@ -8530,6 +8689,53 @@
         ],
         "title": "ArrivedLine"
       },
+      "BatchTracking": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "track": {
+            "type": "boolean",
+            "title": "Track"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "track"
+        ],
+        "title": "BatchTracking"
+      },
+      "BatchWriteOff": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 10000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_key",
+          "quantity",
+          "reason"
+        ],
+        "title": "BatchWriteOff"
+      },
       "BillCreate": {
         "properties": {
           "request_key": {
@@ -11132,6 +11338,30 @@
             "type": "string",
             "pattern": "^[0-9]{1,13}(\\.[0-9]{1,4})?$",
             "title": "Unit Cost"
+          },
+          "batch_no": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch No"
+          },
+          "expiry": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry"
           }
         },
         "additionalProperties": false,

@@ -1052,6 +1052,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Batches */
+        get: operations["list_batches_api_v1_businesses__business_id__batches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/batches/tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Batch Tracking */
+        post: operations["batch_tracking_api_v1_businesses__business_id__batches_tracking_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/batches/{batch_id}/write-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Batch Write Off */
+        post: operations["batch_write_off_api_v1_businesses__business_id__batches__batch_id__write_off_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/billing/checkout": {
         parameters: {
             query?: never;
@@ -2383,6 +2434,28 @@ export interface components {
             /** Received Quantity */
             received_quantity: number;
         };
+        /** BatchTracking */
+        BatchTracking: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Track */
+            track: boolean;
+        };
+        /** BatchWriteOff */
+        BatchWriteOff: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Quantity */
+            quantity: number;
+            /** Reason */
+            reason: string;
+        };
         /** BillCreate */
         BillCreate: {
             /**
@@ -3540,6 +3613,10 @@ export interface components {
             quantity: number;
             /** Unit Cost */
             unit_cost: string;
+            /** Batch No */
+            batch_no?: string | null;
+            /** Expiry */
+            expiry?: string | null;
         };
         /** Record */
         Record: {
@@ -6393,6 +6470,108 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CountDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_batches_api_v1_businesses__business_id__batches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_tracking_api_v1_businesses__business_id__batches_tracking_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchTracking"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_write_off_api_v1_businesses__business_id__batches__batch_id__write_off_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchWriteOff"];
             };
         };
         responses: {

@@ -166,7 +166,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { href: '/reconciliation/daily', label: 'Daily reconciliation', icon: ClipboardCheck },
     { href: '/invoices', label: 'Invoices & Receipts', icon: Receipt },
     { href: '/catalog', label: 'Inventory', icon: Package },
-    ...(businessType !== 'SERVICE' ? [{ href: '/purchases', label: 'Purchase orders', icon: ClipboardList }, { href: '/inventory/counts', label: 'Stock counts', icon: ClipboardCheck }] : []),
+    ...(businessType !== 'SERVICE' ? [{ href: '/purchases', label: 'Purchase orders', icon: ClipboardList }, { href: '/inventory/counts', label: 'Stock counts', icon: ClipboardCheck }, { href: '/inventory/batches', label: 'Batches & expiry', icon: CalendarClock }] : []),
     { href: '/storefront', label: 'Storefront', icon: Store },
     {
       href: '/accounting',

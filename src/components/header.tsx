@@ -36,6 +36,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/invoices': 'Invoices',
   '/inventory': 'Inventory',
   '/inventory/counts': 'Stock counts',
+  '/inventory/batches': 'Batches & expiry',
   '/storefront': 'Storefront',
   '/reports': 'Reports',
   '/customers': 'Customers',

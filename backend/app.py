@@ -519,6 +519,25 @@ def reject_stock_count(business_id:UUID,count_id:UUID,data:CountDecision,user_id
     with library_transaction(user_id,business_id,write=True,permission='inventory.approve') as session:
         return stock_counts.reject(session,user_id,count_id,data)
 
+# Batches and expiry dates (E09 R3): which products track batches, what is expiring, and writing a batch off.
+from cacu.accounting.batches import BatchTracking,BatchWriteOff
+from cacu.accounting import batches as stock_batches
+
+@app.get('/api/v1/businesses/{business_id}/batches')
+def list_batches(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return stock_batches.overview(session)
+
+@app.post('/api/v1/businesses/{business_id}/batches/tracking')
+def batch_tracking(business_id:UUID,data:BatchTracking,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='inventory.edit') as session:
+        return stock_batches.set_tracking(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/batches/{batch_id}/write-off')
+def batch_write_off(business_id:UUID,batch_id:UUID,data:BatchWriteOff,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.create') as session:
+        return stock_batches.write_off(session,user_id,batch_id,data)
+
 from cacu.billing.routes import billing_router
 app.include_router(billing_router(current_user))
 
