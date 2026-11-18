@@ -423,6 +423,24 @@ def vat_return_report(business_id:UUID,month:str,user_id:UUID=Depends(current_us
     with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return vat_return(session,_month(month))
 
+# Budgets (E14 R3 part 3, FR-137, FR-145).
+from cacu.accounting.budgets import BudgetSave,budget as budget_view,save as save_budget,against_actual
+
+@app.get('/api/v1/businesses/{business_id}/budgets/{fiscal_year}')
+def get_budget(business_id:UUID,fiscal_year:int,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return budget_view(session,fiscal_year)
+
+@app.post('/api/v1/businesses/{business_id}/budgets/{fiscal_year}')
+def put_budget(business_id:UUID,fiscal_year:int,data:BudgetSave,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='ledger.edit') as session:
+        return save_budget(session,user_id,fiscal_year,data)
+
+@app.get('/api/v1/businesses/{business_id}/reports/budget-vs-actual')
+def budget_vs_actual(business_id:UUID,month:str,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return against_actual(session,month)
+
 from cacu.billing.routes import billing_router
 app.include_router(billing_router(current_user))
 

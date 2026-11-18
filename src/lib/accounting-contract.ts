@@ -795,6 +795,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/budgets/{fiscal_year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Budget */
+        get: operations["get_budget_api_v1_businesses__business_id__budgets__fiscal_year__get"];
+        put?: never;
+        /** Put Budget */
+        post: operations["put_budget_api_v1_businesses__business_id__budgets__fiscal_year__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/reports/budget-vs-actual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Budget Vs Actual */
+        get: operations["budget_vs_actual_api_v1_businesses__business_id__reports_budget_vs_actual_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/billing/checkout": {
         parameters: {
             query?: never;
@@ -2230,6 +2265,21 @@ export interface components {
             late_deposit: "keep" | "refund";
             /** Rules */
             rules?: components["schemas"]["DepositRule"][];
+        };
+        /** BudgetLine */
+        BudgetLine: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Months */
+            months: string[];
+        };
+        /** BudgetSave */
+        BudgetSave: {
+            /** Lines */
+            lines: components["schemas"]["BudgetLine"][];
         };
         /** CashClassification */
         CashClassification: {
@@ -5408,6 +5458,107 @@ export interface operations {
         };
     };
     vat_return_report_api_v1_businesses__business_id__reports_vat_return_get: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_budget_api_v1_businesses__business_id__budgets__fiscal_year__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                fiscal_year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_budget_api_v1_businesses__business_id__budgets__fiscal_year__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                fiscal_year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    budget_vs_actual_api_v1_businesses__business_id__reports_budget_vs_actual_get: {
         parameters: {
             query: {
                 month: string;
