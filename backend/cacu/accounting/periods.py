@@ -109,6 +109,13 @@ def checklist(session, month: date):
     steps['gateway'] = (line is None, f"{line['debit'] if line['debit'] != '0.00' else line['credit']} not yet settled" if line else None)
     for manual in MANUAL:
         steps[manual] = (manual == 'stock_count' and not _tracks_stock(session), None)
+    # Bank reconciliation (FR-134) tells the closer which bank accounts already agree with their statements.
+    from cacu.accounting import bank
+    from cacu.accounting.workflows import bank_accounts
+    accounts = bank_accounts(session)
+    if accounts:
+        done = sum(1 for a in accounts if bank.overview(session, a['id'], month.strftime('%Y-%m'))['summary']['reconciled'])
+        steps['bank_cash'] = (False, f'{done} of {len(accounts)} bank account{"s" if len(accounts) != 1 else ""} reconciled in CACU for the month; count the cash too')
     return [{'key': key, 'label': STEPS[key][0], 'blocking': STEPS[key][1], 'passed': passed, 'detail': detail,
              'needs_answer': not passed and not STEPS[key][1]} for key, (passed, detail) in steps.items()]
 
