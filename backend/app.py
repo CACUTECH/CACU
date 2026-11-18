@@ -480,6 +480,45 @@ def bank_record(business_id:UUID,line_id:UUID,data:Record,user_id:UUID=Depends(c
     with library_transaction(user_id,business_id,write=True,permission='banking.post') as session:
         return reconciliation.record(session,user_id,line_id,data)
 
+# Stock counts (E09 R3): count, submit, and one approval by an Owner or Admin posts the differences.
+from cacu.accounting.counts import CountStart,CountSave,CountDecision
+from cacu.accounting import counts as stock_counts
+
+@app.get('/api/v1/businesses/{business_id}/stock-counts')
+def list_stock_counts(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return stock_counts.listing(session)
+
+@app.post('/api/v1/businesses/{business_id}/stock-counts')
+def start_stock_count(business_id:UUID,data:CountStart,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.create') as session:
+        return stock_counts.start(session,user_id,data)
+
+@app.get('/api/v1/businesses/{business_id}/stock-counts/{count_id}')
+def read_stock_count(business_id:UUID,count_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='inventory.view') as session:
+        return stock_counts.read(session,count_id)
+
+@app.post('/api/v1/businesses/{business_id}/stock-counts/{count_id}/lines')
+def save_stock_count(business_id:UUID,count_id:UUID,data:CountSave,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.create') as session:
+        return stock_counts.save(session,user_id,count_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/stock-counts/{count_id}/submit')
+def submit_stock_count(business_id:UUID,count_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.create') as session:
+        return stock_counts.submit(session,user_id,count_id)
+
+@app.post('/api/v1/businesses/{business_id}/stock-counts/{count_id}/approve')
+def approve_stock_count(business_id:UUID,count_id:UUID,data:CountDecision,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.approve') as session:
+        return stock_counts.approve(session,user_id,count_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/stock-counts/{count_id}/reject')
+def reject_stock_count(business_id:UUID,count_id:UUID,data:CountDecision,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='inventory.approve') as session:
+        return stock_counts.reject(session,user_id,count_id,data)
+
 from cacu.billing.routes import billing_router
 app.include_router(billing_router(current_user))
 
