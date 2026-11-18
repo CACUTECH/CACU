@@ -106,3 +106,21 @@ def test_statements_show_profit_by_section_and_a_balanced_position_with_comparat
     assert last_year['periods'][1]['start_date'][:4] == str(TODAY.year - 1)
     with pytest.raises(HTTPException, match='prior or last_year'):
         call(live, 'viewer', lambda s, a: statements(s, TODAY, TODAY, 'quarter'))
+
+
+def test_changes_in_equity_run_from_opening_to_closing_and_agree_with_the_position(live):
+    from decimal import Decimal
+    from cacu.accounting.reports import statements
+    from cacu.accounting.workflows import InvoiceCreate, invoice_create
+    call(live, 'owner', lambda s, a: invoice_create(s, a, InvoiceCreate(request_key=uuid4(), customer_id=live.ids['ada'], invoice_number='INV-EQ-1',
+         entry_date=TODAY, items=[{'catalog_item_id': live.items['Rice'], 'quantity': 1, 'unit_price': '65000'}])))  # ₦15,000 gross profit
+    report = call(live, 'viewer', lambda s, a: statements(s, TODAY, TODAY))
+    changes = report['changes_in_equity']
+    for line in changes['lines']:  # every line runs from its opening to its closing balance
+        assert Decimal(line['opening']) + Decimal(line['movement']) == Decimal(line['closing']), line
+    profit = changes['lines'][-1]
+    assert profit['name'] == 'Profit not yet closed to retained earnings' and (profit['opening'], profit['movement'], profit['closing']) == ('0.00', '15000.00', '15000.00')
+    assert changes['profit_for_period'] == report['income_statement']['net_profit'][0] == '15000.00'
+    assert changes['total']['opening'] == '0.00'  # the books started today: everything in equity arrived in the period
+    assert changes['total']['closing'] == report['financial_position']['total_equity'][0]
+    assert Decimal(changes['total']['opening']) + Decimal(changes['total']['movement']) == Decimal(changes['total']['closing'])

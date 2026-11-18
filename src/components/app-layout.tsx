@@ -196,6 +196,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           { href: '/analytics/budget-vs-actual', label: 'Budget vs. Actual' },
           { href: '/analytics/reconciliation', label: 'Reconciliation' },
           { href: '/analytics/top-selling', label: 'Top-Selling' },
+          { href: '/analytics/profitability', label: 'Profitability' },
           { href: '/analytics/aging-reports', label: 'Aging Reports' },
       ]
     },

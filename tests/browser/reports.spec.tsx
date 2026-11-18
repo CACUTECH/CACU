@@ -4,10 +4,10 @@ import * as XLSX from 'xlsx';
 import { test, expect } from '@playwright/experimental-ct-react';
 import ReportsPage from '../../src/app/reports/page';
 
-test('three report tabs stay accessible, statements run by period with labels and an optional comparison, on mobile', async ({ mount, page }) => {
+test('four report tabs stay accessible, statements run by period with labels and an optional comparison, on mobile', async ({ mount, page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const component = await mount(<ReportsPage />);
-  await expect(component.getByRole('tab')).toHaveCount(3);
+  await expect(component.getByRole('tab')).toHaveCount(4);
   await component.getByLabel('From').fill('2026-10-01');
   await component.getByLabel('To').fill('2026-10-31');
   await component.getByRole('button', { name: 'Run report' }).click();
@@ -25,12 +25,18 @@ test('three report tabs stay accessible, statements run by period with labels an
   await expect(component.getByRole('alert')).toContainText('Assets do not equal liabilities and equity at the end of the comparison period');
   await expect(component.getByRole('row', { name: /^Total assets/ })).toContainText('5,000.00');
 
+  await component.getByRole('tab', { name: 'Changes in Equity', exact: true }).click();
+  await expect(component.getByLabel('Compare with')).toHaveCount(0);  // it already runs from opening to closing
+  await component.getByRole('button', { name: 'Run report' }).click();
+  await expect(component.getByRole('columnheader')).toHaveText(['', /^At \d{4}-\d{2}-01$/, 'Movements in the period', /^At \d{4}-\d{2}-\d{2}$/]);  // this month, as the form starts
+  await expect(component.getByRole('row', { name: /^Total equity/ })).toContainText('10,000.00');
+
   await component.getByRole('tab', { name: 'Cash Flow Statement', exact: true }).click();
   await expect(component.getByRole('link', { name: 'Reports', exact: true })).toHaveCount(0);
   await component.getByRole('button', { name: 'Run report' }).click();
   await expect(component.getByText('Reconciled', { exact: true })).toBeVisible();
   const calls = await page.evaluate(() => (window as unknown as { statementCalls: unknown[][] }).statementCalls);
-  expect(calls).toEqual([['2026-10-01', '2026-10-31', ''], ['2026-10-01', '2026-10-31', 'prior']]);
+  expect(calls.slice(0, 2)).toEqual([['2026-10-01', '2026-10-31', ''], ['2026-10-01', '2026-10-31', 'prior']]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

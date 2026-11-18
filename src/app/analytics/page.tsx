@@ -47,6 +47,12 @@ export default function AnalyticsPage() {
                     href="/analytics/planning"
                 />
                 <FeatureCard
+                    icon={Coins}
+                    title="Profitability"
+                    description="Profit and margin on each product, service, outlet and job, from your books."
+                    href="/analytics/profitability"
+                />
+                <FeatureCard
                     icon={Scale}
                     title="Budget vs. Actual Analysis"
                     description="Compare your actual financial performance against your budget to identify variances."
