@@ -16,6 +16,8 @@ export class PaymentService extends BaseService {
     reference?: string;
     requestKey?: string;
     bankAccountId?: string;
+    wht?: string;
+    whtCertificate?: string;
   }) {
     const { supabase, businessId } = await this.getContext();
     if (!businessId) throw new Error('Business context missing');
@@ -25,11 +27,13 @@ export class PaymentService extends BaseService {
         request_key: paymentData.requestKey || randomUUID(), invoice_id: paymentData.invoiceId,
         amount: decimalInput(paymentData.amount), method: paymentData.method,
         bank_account_id: paymentData.bankAccountId || null,
+        ...(paymentData.wht ? { wht: paymentData.wht, wht_certificate: paymentData.whtCertificate || null } : {}),
         entry_date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()),
       } });
       return { paymentId: result.source_id, outstanding: result.outstanding };
     }
     if (paymentData.bankAccountId) throw new Error('Selected bank accounts require native accounting');
+    if (paymentData.wht) throw new Error('WHT is recorded once your books are live');
     const { data: paymentId, error } = await supabase.rpc('record_payment_atomic', {
       p_business_id: businessId,
       p_invoice_id: paymentData.invoiceId,

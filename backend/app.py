@@ -387,6 +387,42 @@ def reopen_accounting_month(business_id:UUID,month:str,data:ReopenMonth,user_id:
     with library_transaction(user_id,business_id,write=True,permission='ledger.approve') as session:
         return reopen_month(session,user_id,month,data)
 
+# VAT (E14 R3 2a): Settings › Taxes and the VAT return.
+from cacu.accounting.vat import VatSettings,ItemClasses,overview as vat_overview,save_settings as save_vat_settings,save_classes as save_vat_classes,vat_return
+
+@app.get('/api/v1/businesses/{business_id}/vat')
+def vat_settings(business_id:UUID,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,permission='settings.view') as session:
+        return vat_overview(session)
+
+@app.get('/api/v1/businesses/{business_id}/vat/status')
+def vat_status(business_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.vat import status
+    with library_transaction(user_id,business_id) as session:
+        return status(session)
+
+@app.post('/api/v1/businesses/{business_id}/vat')
+def update_vat_settings(business_id:UUID,data:VatSettings,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='settings.edit') as session:
+        return save_vat_settings(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/vat/items')
+def update_vat_classes(business_id:UUID,data:ItemClasses,user_id:UUID=Depends(current_user)):
+    with library_transaction(user_id,business_id,write=True,permission='settings.edit') as session:
+        return save_vat_classes(session,user_id,data)
+
+@app.post('/api/v1/businesses/{business_id}/wht/{deduction_id}/certificate')
+def wht_certificate(business_id:UUID,deduction_id:UUID,data:dict,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.vat import WhtCertificate,save_certificate
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='invoices.post') as session:
+        return save_certificate(session,deduction_id,WhtCertificate(**data))
+
+@app.get('/api/v1/businesses/{business_id}/reports/vat-return')
+def vat_return_report(business_id:UUID,month:str,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.periods import _month
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return vat_return(session,_month(month))
+
 from cacu.billing.routes import billing_router
 app.include_router(billing_router(current_user))
 

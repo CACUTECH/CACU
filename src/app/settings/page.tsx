@@ -54,7 +54,7 @@ export default function SettingsPage() {
                 <SettingCard icon={CreditCard} title="Online payments" description="Let customers pay invoices through your own Paystack account." href="/settings/online-payments" />
                 <SettingCard icon={Power} title="Offline Settings" description="Check current connectivity requirements and offline availability." href="/settings/offline" />
                 <SettingCard icon={Banknote} title="Bank Linking" description="Connect and manage your bank accounts securely." href="/settings/banks" />
-                <SettingCard icon={FileText} title="Tax Settings" description="Configure tax rates and settings for accurate calculations." href="/settings/taxes" />
+                <SettingCard icon={FileText} title="Tax Settings" description="Turn VAT on if you are registered, and set the VAT on each item." href="/settings/taxes" />
                 <SettingCard icon={Truck} title="Suppliers" description="Manage supplier details and set up low-stock alerts." href="/settings/suppliers" />
                 <SettingCard icon={Heart} title="Customers" description="Tools for loyalty programs and customer management." href="/settings/customers" />
                  <SettingCard icon={FileText} title="Business Registration" description="Tools and guides for registering your business." href="/settings/registration" />

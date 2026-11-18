@@ -2648,6 +2648,313 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/vat": {
+      "get": {
+        "summary": "Vat Settings",
+        "operationId": "vat_settings_api_v1_businesses__business_id__vat_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Update Vat Settings",
+        "operationId": "update_vat_settings_api_v1_businesses__business_id__vat_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VatSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/vat/status": {
+      "get": {
+        "summary": "Vat Status",
+        "operationId": "vat_status_api_v1_businesses__business_id__vat_status_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/vat/items": {
+      "post": {
+        "summary": "Update Vat Classes",
+        "operationId": "update_vat_classes_api_v1_businesses__business_id__vat_items_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemClasses"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/wht/{deduction_id}/certificate": {
+      "post": {
+        "summary": "Wht Certificate",
+        "operationId": "wht_certificate_api_v1_businesses__business_id__wht__deduction_id__certificate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "deduction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deduction Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/reports/vat-return": {
+      "get": {
+        "summary": "Vat Return Report",
+        "operationId": "vat_return_report_api_v1_businesses__business_id__reports_vat_return_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/billing/checkout": {
       "post": {
         "tags": [
@@ -7305,6 +7612,12 @@
             "maxItems": 50,
             "minItems": 1,
             "title": "Lines"
+          },
+          "vat": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Vat",
+            "default": "0.00"
           }
         },
         "additionalProperties": false,
@@ -8171,6 +8484,12 @@
             "maxLength": 500,
             "minLength": 1,
             "title": "Description"
+          },
+          "vat": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Vat",
+            "default": "0.00"
           }
         },
         "additionalProperties": false,
@@ -8249,6 +8568,12 @@
             "maxItems": 100,
             "minItems": 1,
             "title": "Lines"
+          },
+          "vat": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Vat",
+            "default": "0.00"
           }
         },
         "additionalProperties": false,
@@ -8527,6 +8852,17 @@
               }
             ],
             "title": "Performance Date"
+          },
+          "vat_included": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vat Included"
           }
         },
         "additionalProperties": false,
@@ -8567,6 +8903,48 @@
           "unit_price"
         ],
         "title": "InvoiceItem"
+      },
+      "ItemClass": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "vat_class": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "zero_rated",
+              "exempt"
+            ],
+            "title": "Vat Class"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "vat_class"
+        ],
+        "title": "ItemClass"
+      },
+      "ItemClasses": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemClass"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ItemClasses"
       },
       "JobComplete": {
         "properties": {
@@ -9228,7 +9606,8 @@
               "customer_advance",
               "gateway_receipt",
               "gateway_settlement",
-              "credit_advance"
+              "credit_advance",
+              "wht_deduction"
             ],
             "title": "Kind"
           },
@@ -9411,6 +9790,24 @@
               }
             ],
             "title": "Bank Account Id"
+          },
+          "wht": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Wht",
+            "default": "0.00"
+          },
+          "wht_certificate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wht Certificate"
           }
         },
         "additionalProperties": false,
@@ -10379,6 +10776,53 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VatSettings": {
+        "properties": {
+          "registered": {
+            "type": "boolean",
+            "title": "Registered"
+          },
+          "vat_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z-]{6,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vat Number"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "invoices_include_vat": {
+            "type": "boolean",
+            "title": "Invoices Include Vat",
+            "default": false
+          },
+          "wht_enabled": {
+            "type": "boolean",
+            "title": "Wht Enabled",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "registered"
+        ],
+        "title": "VatSettings"
       },
       "Verification": {
         "properties": {

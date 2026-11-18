@@ -161,10 +161,15 @@ def _post(session,actor,refund_id,bank,note):
     if refund.method=='transfer' and bank is None:raise HTTPException(422,'Choose the bank account the refund is paid from')
     day=business_today(session)
     paid_from=collection_account(session,'Cash',None) if refund.method=='cash' else collection_account(session,'Transfer',bank)
-    # PR-16: debit revenue, credit the till or the bank.
+    # PR-16: debit revenue, credit the till or the bank. A sale that carried VAT gives back its share (E14 R3 2c).
+    from cacu.accounting import vat
+    back=vat.take_back(session,'pos',refund.sale_id,refund.amount)
+    lines=[{'account_id':purpose(session,'revenue'),'amount':format(refund.amount-(back.vat if back else ZERO),'.2f'),'credited':False}]
+    if back and back.vat>0:lines.append(vat.output_back_line(session,back.vat,'VAT given back'))
     posting=post_command(session,actor,PostingCommand(request_key=uuid5(refund_id,'posting'),kind='sale_refund',source_id=refund_id,
         main_account_id=paid_from,entry_date=day,credited=True,narration='Refund for sale '+str(refund.sale_id)[:8]+': '+refund.reason,
-        lines=[{'account_id':purpose(session,'revenue'),'amount':format(refund.amount,'.2f'),'credited':False}]),internal=True)
+        lines=lines),internal=True)
+    if back:vat.record_back(session,'sale_refund',refund_id,day,back)
     back={}
     for line in raw(session,'SELECT item_id,quantity FROM accounting.sale_refund_line WHERE business_id=%s AND refund_id=%s AND restock',(tenant,str(refund_id))).all():
         back[line.item_id]=back.get(line.item_id,0)+line.quantity

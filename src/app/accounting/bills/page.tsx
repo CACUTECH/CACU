@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { VatField, useVatStatus } from '@/components/vat-field';
 import type { CollectionAccount } from '@/lib/collection-accounts';
 import type { ExpenseAccount, SupplierBill } from '@/lib/corrections';
 import { getBillsAction, paySupplierBillAction, recordBillAction } from './actions';
@@ -14,10 +15,11 @@ const today = () => new Date().toLocaleDateString('en-CA');
 const naira = (amount: string) => `NGN ${Number(amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
 const AMOUNT = /^[0-9]{1,13}(\.[0-9]{1,2})?$/;
 const STATUS = { unpaid: 'Unpaid', part_paid: 'Part paid', paid: 'Paid' } as const;
-const blankBill = () => ({ supplier_id: '', bill_number: '', entry_date: today(), due_date: '', account_id: '', amount: '', description: '' });
+const blankBill = () => ({ supplier_id: '', bill_number: '', entry_date: today(), due_date: '', account_id: '', amount: '', description: '', vat: '' });
 type State = { native: boolean; bills: SupplierBill[]; accounts: ExpenseAccount[]; banks: CollectionAccount[]; suppliers: { id: string; name: string }[] };
 
 export default function BillsPage() {
+  const vat = useVatStatus();
   const { business } = useBusiness();
   const writer = ['owner', 'admin', 'editor'].includes(business?.userRole ?? '');
   const [state, setState] = useState<State | null>(null), [loadError, setLoadError] = useState('');
@@ -35,7 +37,8 @@ export default function BillsPage() {
     if (!AMOUNT.test(form.amount) || Number(form.amount) <= 0) { setError('Enter an amount above zero with at most two decimal places.'); return; }
     const requestKey = key ?? crypto.randomUUID(); setKey(requestKey); setBusy(true); setError(''); setSaved('');
     const result = await recordBillAction({ request_key: requestKey, supplier_id: form.supplier_id, bill_number: form.bill_number.trim(), entry_date: form.entry_date,
-      ...(form.due_date ? { due_date: form.due_date } : {}), notes: '', lines: [{ account_id: form.account_id, amount: form.amount, description: form.description.trim() }] });
+      ...(form.due_date ? { due_date: form.due_date } : {}), notes: '', lines: [{ account_id: form.account_id, amount: form.amount, description: form.description.trim() }],
+      ...(Number(form.vat) > 0 ? { vat: form.vat } : {}) });
     setBusy(false);
     if (result.success) { setKey(null); setForm(blankBill()); setSaved('Bill recorded.'); await load(); return; }
     if (!result.uncertain) setKey(null);
@@ -61,7 +64,8 @@ export default function BillsPage() {
             <label className="space-y-1 text-sm"><span>Due date (optional)</span><Input type="date" min={form.entry_date} value={form.due_date} disabled={locked} onChange={set('due_date')}/></label>
             <label className="space-y-1 text-sm"><span>What was it for?</span><select aria-label="Expense account" required className="w-full rounded-md border bg-background p-2" value={form.account_id} disabled={locked} onChange={set('account_id')}>
               <option value="">Choose an account</option>{state.accounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}</select></label>
-            <label className="space-y-1 text-sm"><span>Amount (NGN)</span><Input inputMode="decimal" required value={form.amount} disabled={locked} onChange={set('amount')}/></label>
+            <label className="space-y-1 text-sm"><span>{vat?.charging ? 'Amount before VAT (NGN)' : 'Amount (NGN)'}</span><Input inputMode="decimal" required value={form.amount} disabled={locked} onChange={set('amount')}/></label>
+            <VatField status={vat} value={form.vat} onChange={v => setForm(f => ({ ...f, vat: v }))} base={form.amount} inclusive={false} label="VAT on the bill" disabled={locked}/>
             <label className="space-y-1 text-sm sm:col-span-2"><span>Description (optional)</span><Input maxLength={500} value={form.description} disabled={locked} onChange={set('description')}/></label>
             <div className="space-y-2 sm:col-span-2">
               <p className="text-xs text-muted-foreground">Goods bought for stock are recorded with a goods receipt, which is coming later.</p>

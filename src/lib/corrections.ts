@@ -4,7 +4,7 @@ export type ExpenseAccount = { id: string; code: string; name: string };
 export type ReversalInput = { request_key: string; entry_date: string; reason: string };
 export type ExpenseInput = {
   request_key: string; expense_account_id: string; amount: string; entry_date: string;
-  method: 'Cash' | 'Transfer'; bank_account_id?: string; description: string;
+  method: 'Cash' | 'Transfer'; bank_account_id?: string; description: string; vat?: string;
 };
 export type StockAdjustment = {
   id: string; item_id: string; item_name?: string; delta: number; reason: string; entry_date: string; unit_cost: string; value: string;
@@ -19,6 +19,6 @@ export type SupplierBill = {
 };
 export type BillInput = {
   request_key: string; supplier_id: string; bill_number: string; entry_date: string; due_date?: string; notes: string;
-  lines: { account_id: string; amount: string; description: string }[];
+  lines: { account_id: string; amount: string; description: string }[]; vat?: string;
 };
 export type SupplierPaymentInput = { request_key: string; amount: string; entry_date: string; method: 'Cash' | 'Transfer'; bank_account_id?: string };

@@ -32,7 +32,7 @@ class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
-                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement','credit_advance']
+                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement','credit_advance','wht_deduction']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -50,16 +50,19 @@ CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'su
          'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry,'sale_refund':JournalEntry,
          'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry,
          'deposit_application':JournalEntry,'goods_bill':JournalEntry,'customer_advance':JournalEntry,
-         'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry,'credit_advance':JournalEntry}
+         'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry,'credit_advance':JournalEntry,'wht_deduction':JournalEntry}
 # Documents filed under another document type: a bill for received goods is a supplier bill to payments and the bills list.
 DOCUMENT_TYPES={'goods_bill':'bill'}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
 INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance',
-                'gateway_receipt','gateway_settlement','credit_advance'}
+                'gateway_receipt','gateway_settlement','credit_advance','wht_deduction'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
+
+def vat_account_id(session,purpose_name):
+    return raw(session,'SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose=%s',(str(session.business_id),purpose_name)).scalar()
 
 def account(session,source_id):
     row=raw(session,'SELECT m.library_id FROM accounting.account_map m JOIN public.accounts a ON a.id=m.account_id AND a.business_id=m.business_id WHERE m.business_id=%s AND m.account_id=%s AND a.is_active',
@@ -113,6 +116,19 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     lines=[(account(session,l.account_id),Decimal(l.amount),l.credited,l.description or command.narration) for l in command.lines]
     amount=Decimal(command.main_amount) if command.main_amount is not None else sum((l[1] for l in lines),Decimal('0'))
     split_sale=command.kind=='pos' and command.payment_method=='Split'
+    # VAT (E14 R3 2a): only sales and invoices charge output VAT here; such a document posts as one balanced entry.
+    vat_output=raw(session,"SELECT library_id FROM accounting.account_map WHERE business_id=%s AND purpose='vat_output'",(tenant,)).scalar()
+    # Paying VAT to the tax office debits it; only a sale or an invoice credits it, with exactly one VAT line.
+    charged=[l for l in lines if vat_output is not None and l[0].id==vat_output and l[2]]
+    vat_legs=charged if command.kind in {'invoice','pos'} else []
+    charged_vat=sum((l[1] for l in vat_legs),Decimal('0'))
+    if charged and (command.kind not in {'invoice','pos'} or len(charged)!=1):
+        raise HTTPException(422,'Output VAT is charged only by sales and invoices')
+    # Input VAT (2b): only a bill or an expense claims it, with one VAT line; a reclaim or settlement credits it.
+    vat_input=raw(session,"SELECT library_id FROM accounting.account_map WHERE business_id=%s AND purpose='vat_input'",(tenant,)).scalar()
+    claimed=[l for l in lines if vat_input is not None and l[0].id==vat_input and not l[2]] if command.kind!='reversal' else []
+    if claimed and (command.kind not in {'bill','goods_bill','expense'} or len(claimed)!=1):
+        raise HTTPException(422,'Input VAT is claimed only on bills and expenses')
     if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
     if split_sale and command.main_amount is None:raise HTTPException(422,'A split sale names its cash part')
     if command.main_amount is not None and amount<=0:raise HTTPException(422,'Compound main amount must be positive')
@@ -128,10 +144,10 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if mapped!=main.id:raise HTTPException(422,'Counterparty account mapping required')
     if command.kind=='invoice':
         source=raw(session,'SELECT total,tax,status,customer_id FROM public.invoices WHERE id=%s AND business_id=%s FOR UPDATE',(str(command.source_id),tenant)).first()
-        if not source or source.status!='draft' or source.total!=amount or (source.tax or 0)!=0:
-            raise HTTPException(409,'Invoice must be a reconciled tax-free draft matching its authoritative total')
+        if not source or source.status!='draft' or source.total!=amount or (source.tax or 0)!=charged_vat:
+            raise HTTPException(409,'Invoice must be a reconciled draft matching its authoritative total and VAT')
         if str(source.customer_id)!=str(command.counterparty_id):raise HTTPException(422,'Invoice customer mismatch')
-    if command.kind in {'receipt','supplier_payment','credit_note'} or (command.kind in {'deposit_application','gateway_receipt'} and command.target_id):
+    if command.kind in {'receipt','supplier_payment','credit_note','wht_deduction'} or (command.kind in {'deposit_application','gateway_receipt'} and command.target_id):
         if not command.target_id:raise HTTPException(422,'Allocation target required')
         kind='bill' if command.kind=='supplier_payment' else 'invoice'
         mapped=raw(session,'SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type=%s AND source_id=%s',
@@ -193,8 +209,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             paid_from=str(command.main_account_id)
             if paid_from!=cash and str(collection_account(session,'Transfer',command.main_account_id))!=paid_from:
                 raise HTTPException(422,'A refund is paid from the till or a bank account')
-            if not command.credited or len(command.lines)!=1 or command.lines[0].credited or str(command.lines[0].account_id)!=str(purpose(session,'revenue')):
-                raise HTTPException(422,'A refund takes back revenue only')
+            income=[l for l in command.lines if str(l.account_id)!=str(vat_account_id(session,'vat_output'))]
+            if not command.credited or len(income)!=1 or any(l.credited for l in command.lines) or len(command.lines)>2 or str(income[0].account_id)!=str(purpose(session,'revenue')):
+                raise HTTPException(422,'A refund takes back revenue, and any VAT on it')
         elif command.kind in {'booking_deposit','deposit_settlement','deposit_application','customer_advance'}:
             deposits=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='customer_deposits'",(tenant,)).all()
             if len(deposits)!=1:raise HTTPException(409,'Set up deposits before taking one')
@@ -238,18 +255,26 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 banks=[l for l in command.lines if str(l.account_id) not in fees]
                 if str(command.main_account_id)!=online or not command.credited or any(l.credited for l in command.lines) or len(banks)!=1                    or len(command.lines)-len(banks)>1 or str(collection_account(session,'Transfer',banks[0].account_id))!=str(banks[0].account_id):
                     raise HTTPException(422,'A settlement moves money from Card and online payments clearing to the bank, less the fee')
+        elif command.kind=='wht_deduction':
+            # Doc 09 PR-33 (E14 R3 2c): WHT a customer deducted debits WHT credits (1320) and credits their receivable,
+            # allocated to the invoice like the cash they paid. Treatment to be confirmed by the reviewer.
+            if not command.credited or len(command.lines)!=1 or command.lines[0].credited or str(command.lines[0].account_id)!=str(vat_account_id(session,'wht_receivable')):
+                raise HTTPException(422,'WHT moves an amount from the customer to WHT credits')
         elif command.kind=='credit_advance':
             # PR-16 on a paid invoice: the part of a credit note beyond what the invoice still owed debits revenue and
             # credits Customer deposits and advances, kept for the customer (E11).
             deposits=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='customer_deposits'",(tenant,)).all()
             income={str(r.account_id) for r in raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose IN ('revenue','service_revenue')",(tenant,)).all()}
-            if len(deposits)!=1 or str(command.main_account_id)!=str(deposits[0].account_id) or not command.credited or len(command.lines)!=1                or command.lines[0].credited or str(command.lines[0].account_id) not in income or command.counterparty_id is not None:
+            taken=[l for l in command.lines if str(l.account_id)!=str(vat_account_id(session,'vat_output'))]  # and any VAT on it (2c)
+            if len(deposits)!=1 or str(command.main_account_id)!=str(deposits[0].account_id) or not command.credited or len(taken)!=1 or len(command.lines)>2                or any(l.credited for l in command.lines) or str(taken[0].account_id) not in income or command.counterparty_id is not None:
                 raise HTTPException(422,'A credit kept as advance takes back revenue into Customer deposits and advances')
         elif command.kind=='goods_bill':
             # A bill for received goods: debit Goods received not invoiced, credit the supplier's payables (matched by
             # counterparty); price differences are separate stock adjustments.
             grni=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='grni'",(tenant,)).all()
-            if len(grni)!=1 or not command.counterparty_id or not command.credited or len(command.lines)!=1 or command.lines[0].credited                or str(command.lines[0].account_id)!=str(grni[0].account_id):
+            # With VAT (E14 R3 2b), the second line is the input VAT on the bill, checked above.
+            goods=[l for l in command.lines if not (claimed and str(l.account_id)==str(vat_account_id(session,'vat_input')))]
+            if len(grni)!=1 or not command.counterparty_id or not command.credited or len(goods)!=1 or goods[0].credited                or str(goods[0].account_id)!=str(grni[0].account_id):
                 raise HTTPException(422,'A bill for received goods clears Goods received not invoiced against the supplier')
         elif command.kind=='shift_variance':
             # PR-22: a shortage debits Cash over and short and credits the till; a surplus the reverse.
@@ -271,8 +296,12 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if main.id in protected or any(line[0].id in protected for line in lines):
             raise HTTPException(409,'Adopted inventory and NRV control accounts require the inventory valuation workflows')
     transfer_sale=command.kind=='pos' and command.payment_method in {'Transfer','Split'}
-    cls=JournalEntry if transfer_sale else CLASSES[command.kind]
-    side=False if transfer_sale else command.credited if command.kind in {'adjustment','reversal'}|INTERNAL_KINDS else None
+    # A credit note that gives back VAT (2c) is one entry too: revenue and Output VAT debited, the receivable credited.
+    returned=[l for l in lines if vat_output is not None and l[0].id==vat_output and not l[2]] if command.kind=='credit_note' else []
+    if len(returned)>1:raise HTTPException(422,'A credit note gives back VAT on one line')
+    cls=JournalEntry if transfer_sale or vat_legs or claimed or returned else CLASSES[command.kind]
+    # A taxed bill or expense credits payables or the bank; a taxed sale or invoice debits the till, bank or receivable.
+    side=True if claimed or returned else False if transfer_sale or vat_legs else command.credited if command.kind in {'adjustment','reversal'}|INTERNAL_KINDS else None
     tx=native_post(session,cls,main,lines,command.entry_date,command.narration,side,compound)
     if target:
         assignment=Assignment(transaction_id=tx.id,assigned_id=target.id,assigned_type=target.__class__.__name__,

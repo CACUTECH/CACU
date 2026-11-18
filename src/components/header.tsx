@@ -54,6 +54,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/accounting/trial-balance': 'Trial Balance',
   '/accounting/general-ledger': 'General Ledger',
   '/accounting/periods': 'Month Close',
+  '/reports/vat-return': 'VAT Return',
 };
 
 function NotificationBell() {
