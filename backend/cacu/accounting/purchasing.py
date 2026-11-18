@@ -27,6 +27,9 @@ class ReceiveLine(BaseModel):
     item_id: UUID
     quantity: int = Field(gt=0, le=1000000)
     unit_cost: str = Field(pattern=COST)
+    # Batches (E09 R3): for a product that tracks batches, the expiry date is required and the batch number recommended.
+    batch_no: str | None = Field(default=None, max_length=60)
+    expiry: date | None = None
 
 
 class GoodsReceive(BaseModel):
@@ -154,8 +157,18 @@ def receive(session, actor, data: GoodsReceive):
                 left = planned.quantity - planned.received_quantity
                 if line.quantity > left: raise HTTPException(409, f'Only {left} more were ordered' if left else 'All of that product has already been received')
             amount = (Decimal(line.unit_cost) * line.quantity).quantize(CENT, rounding=ROUND_HALF_UP)
+            from cacu.accounting import batches
+            batch = None
+            if batches.tracked(session, line.item_id):
+                if line.expiry is None: raise HTTPException(422, 'Enter the expiry date for each product that tracks batches')
+                if line.expiry < day: raise HTTPException(422, 'These goods are already past their expiry date. Do not receive them into stock.')
+                batches.name_incoming(session, line.batch_no, line.expiry)
+            elif line.batch_no or line.expiry:
+                raise HTTPException(422, 'Turn on batch tracking for that product to record its batch and expiry')
             name = _stock_in(session, actor, data.request_key, line.item_id, line.quantity, amount, day, {'supplier_id': str(supplier), 'note': data.note})
-            total += amount; lines.append((line, amount, name))
+            if batches.tracked(session, line.item_id): batch = batches.filled(session)
+            batches.clear(session)
+            total += amount; lines.append((line, amount, name, batch))
         if total <= 0: raise HTTPException(422, 'A receipt must be worth more than zero')
         number = _next_number(session, 'goods_receipt', 'GR-')
         stock_key = uuid5(data.request_key, 'receipt')
@@ -166,9 +179,11 @@ def receive(session, actor, data: GoodsReceive):
         raw(session, """INSERT INTO accounting.goods_receipt(business_id,id,number,order_id,supplier_id,received_on,received_by,note,total,posting,location_id)
           VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)""", (tenant, str(data.request_key), number, str(order.id) if order else None, str(supplier), day,
           str(actor), data.note.strip(), total, json.dumps({'transaction_no': posting.get('transaction_no')}), outlet))
-        for line, amount, _ in lines:
+        for line, amount, _, batch in lines:
             raw(session, 'INSERT INTO accounting.goods_receipt_line(business_id,receipt_id,item_id,quantity,unit_cost,amount) VALUES(%s,%s,%s,%s,%s,%s)',
                 (tenant, str(data.request_key), str(line.item_id), line.quantity, _cost(Decimal(line.unit_cost)), amount))
+            if batch: raw(session, 'UPDATE accounting.goods_receipt_line SET batch_id=%s WHERE business_id=%s AND receipt_id=%s AND item_id=%s',
+                          (batch, tenant, str(data.request_key), str(line.item_id)))
             if order is not None:
                 raw(session, 'UPDATE public.purchase_order_lines SET received_quantity=received_quantity+%s WHERE business_id=%s AND order_id=%s AND item_id=%s',
                     (line.quantity, tenant, str(order.id), str(line.item_id)))
@@ -226,7 +241,10 @@ def return_goods(session, actor, receipt_id: UUID, data: SupplierReturn):
             amount = (got.unit_cost * line.quantity).quantize(CENT, rounding=ROUND_HALF_UP)
             gap = outlets.short(session, line.item_id, line.quantity)
             if gap: raise HTTPException(409, f'Only {gap[0]} of that product left at {gap[1]} to return')
+            from cacu.accounting import batches
+            batches.name_outgoing(session, getattr(got, 'batch_id', None))  # the same batch goes back (E09 R3)
             _stock_out(session, actor, data.request_key, line.item_id, line.quantity, amount, day)
+            batches.clear(session)
             total += amount; lines.append((line, amount))
         stock_key = uuid5(data.request_key, 'return')
         posting = None

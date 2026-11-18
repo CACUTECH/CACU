@@ -74,7 +74,7 @@ export async function getReceiptAction(id: string): Promise<Result<GoodsReceipt>
 
 export type ReceiveInput = {
   requestKey: string; orderId?: string; supplierId?: string; locationId?: string; note: string;
-  lines: { itemId: string; quantity: number; unitCost: string }[];
+  lines: { itemId: string; quantity: number; unitCost: string; batchNo?: string; expiry?: string }[];
 };
 
 /** Stock goes up at the actual cost and the weighted average moves; Dr Inventory, Cr Goods received not invoiced. */
@@ -82,7 +82,7 @@ export async function receiveGoodsAction(input: ReceiveInput): Promise<Result<Go
   try {
     const data = await accountingRequest<GoodsReceipt>('goods-receipts', { method: 'POST', body: {
       request_key: input.requestKey, order_id: input.orderId || null, supplier_id: input.supplierId || null, location_id: input.locationId || null, note: input.note,
-      lines: input.lines.map(l => ({ item_id: l.itemId, quantity: l.quantity, unit_cost: l.unitCost })) } });
+      lines: input.lines.map(l => ({ item_id: l.itemId, quantity: l.quantity, unit_cost: l.unitCost, ...(l.expiry ? { expiry: l.expiry, batch_no: l.batchNo || null } : {}) })) } });
     revalidatePath('/purchases'); revalidatePath('/catalog');
     return { success: true, data };
   } catch (error) { return failed(error); }
