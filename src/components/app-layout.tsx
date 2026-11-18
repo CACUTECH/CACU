@@ -192,6 +192,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       icon: PieChart,
       children: [
           { href: '/analytics/kpi', label: 'KPIs' },
+          { href: '/analytics/ask', label: 'Ask your books' },
           { href: '/analytics/planning', label: 'Planning & Budgeting' },
           { href: '/analytics/budget-vs-actual', label: 'Budget vs. Actual' },
           { href: '/analytics/reconciliation', label: 'Reconciliation' },
