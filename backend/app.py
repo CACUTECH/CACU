@@ -4,7 +4,7 @@ from decimal import Decimal
 from sqlalchemy.exc import SQLAlchemyError
 from cacu.accounting.session import library_transaction
 from cacu.accounting.reports import cash_flow, financial_summary
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -592,6 +592,23 @@ def kpi_report(business_id:UUID,start_date:date,end_date:date,user_id:UUID=Depen
     from cacu.accounting.kpis import kpis
     with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return kpis(session,start_date,end_date)
+
+# AI on the books (Doc 15; E18 R3): read-only tools the gateway runs with the member's own token. Each tool keeps the
+# permission of the screen its figures come from, so the assistant can never show a member more than the screens do.
+@app.get('/api/v1/businesses/{business_id}/ai/tools')
+def ai_tool_catalogue(business_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.ai_tools import catalogue
+    with library_transaction(user_id,business_id) as session:
+        return catalogue(session)
+
+@app.get('/api/v1/businesses/{business_id}/ai/tools/{tool}')
+def ai_tool_run(business_id:UUID,tool:str,request:Request,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.ai_tools import permission_for, run
+    permission=permission_for(tool)
+    params=dict(request.query_params)
+    if len(params)>6 or any(len(v)>40 for v in params.values()):raise HTTPException(422,'Invalid tool input')
+    with library_transaction(user_id,business_id,permission=permission) as session:
+        return run(session,tool,params)
 
 from cacu.billing.routes import billing_router
 app.include_router(billing_router(current_user))

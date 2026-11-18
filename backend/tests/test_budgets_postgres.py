@@ -48,6 +48,7 @@ def test_a_budget_has_an_amount_per_account_per_month_and_only_owners_and_admins
 
 def test_budget_against_actual_for_the_month_and_the_year_to_date(live):
     year = call(live, 'viewer', lambda s, a: fiscal_year_of(s, TODAY))
+    assert call(live, 'viewer', lambda s, a: against_actual(s, THIS.strftime('%Y-%m')))['has_budget'] is False  # nothing saved yet
     call(live, 'owner', lambda s, a: save(s, a, year, plan(live, year, **{'4000': '2000.00', '6200': '10000.00'})))
     call(live, 'owner', lambda s, a: sale_create(s, a, sale(live, lines=(('Beans', 2, '0'),))))  # ₦3,000 of sales
     call(live, 'owner', lambda s, a: expense_create(s, a, expense(live, amount='15000.00')))     # ₦15,000 on diesel
