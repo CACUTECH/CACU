@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy outside the repository and point AI_EVAL_FIXTURES at it. Staging members of synthetic businesses only. Passwords are never in this file: each password_env names an environment variable.",
+  "fixtures": {
+    "complete":         { "business_id": "00000000-0000-0000-0000-00000000000a", "email": "eval-owner-complete@example.invalid", "password_env": "AI_EVAL_PASSWORD_COMPLETE" },
+    "not_started":      { "business_id": "00000000-0000-0000-0000-00000000000b", "email": "eval-owner-not-started@example.invalid", "password_env": "AI_EVAL_PASSWORD_NOT_STARTED" },
+    "late_start":       { "business_id": "00000000-0000-0000-0000-00000000000c", "email": "eval-owner-late-start@example.invalid", "password_env": "AI_EVAL_PASSWORD_LATE_START" },
+    "pending_transfer": { "business_id": "00000000-0000-0000-0000-00000000000d", "email": "eval-owner-pending@example.invalid", "password_env": "AI_EVAL_PASSWORD_PENDING" },
+    "offline_review":   { "business_id": "00000000-0000-0000-0000-00000000000e", "email": "eval-owner-offline@example.invalid", "password_env": "AI_EVAL_PASSWORD_OFFLINE" },
+    "unmatched_bank":   { "business_id": "00000000-0000-0000-0000-00000000000f", "email": "eval-owner-bank@example.invalid", "password_env": "AI_EVAL_PASSWORD_BANK" },
+    "other":            { "business_id": "00000000-0000-0000-0000-000000000010", "email": "eval-owner-other@example.invalid", "password_env": "AI_EVAL_PASSWORD_OTHER" }
+  },
+  "other_canary_names": ["Zenith Provisions customer names, one per entry"]
+}
