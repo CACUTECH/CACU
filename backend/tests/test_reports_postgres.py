@@ -10,6 +10,7 @@ from cacu.accounting.stock import request_adjustment
 from cacu.accounting.workflows import expense_create
 import cacu.accounting.reports as reports
 from cacu.accounting.reports import cash_flow, general_ledger, trial_balance
+from cacu.accounting.reconcile import check_books
 from test_corrections_postgres import live, call, expense, adjustment, URL
 from test_opening_position_postgres import books
 from test_default_chart_postgres import charted
