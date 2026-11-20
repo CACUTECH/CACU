@@ -15,14 +15,14 @@ export function CollectionAccountPicker({ method, bankAccountId, choices, onMeth
       </select>
     </div>
     {method === 'Transfer' && choices.native ? <div className="space-y-2">
-      <Label htmlFor="collection-bank">Receiving bank account</Label>
-      <select id="collection-bank" value={bankAccountId} disabled={disabled} onChange={event => onBankChange(event.target.value)} required
+      <Label htmlFor="collection-bank">Bank account you expect it in (optional)</Label>
+      <select id="collection-bank" value={bankAccountId} disabled={disabled} onChange={event => onBankChange(event.target.value)}
         className="h-11 w-full rounded-md border bg-background px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <option value="">Select the account that received the payment</option>
+        <option value="">Not sure yet: choose when confirming</option>
         {choices.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
       </select>
-      {choices.accounts.length === 0 && <p role="status" className="text-sm text-muted-foreground">No receiving bank accounts are available. Set up a reviewed bank account before recording a Transfer payment.</p>}
+      <p role="status" className="text-sm text-muted-foreground">Transfers wait for confirmation. The owner confirms the money arrived, or marks it not received, on Daily reconciliation. Until then it does not count as money in the bank.</p>
     </div> : null}
-    <p className="text-sm text-muted-foreground">Record manual payments only after confirming receipt. Card collection is unavailable.</p>
+    <p className="text-sm text-muted-foreground">{method === 'Transfer' && choices.native ? 'Card collection is unavailable.' : 'Record manual payments only after confirming receipt. Card collection is unavailable.'}</p>
   </div>;
 }

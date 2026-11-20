@@ -29,6 +29,8 @@ const INVOICE_STATUS = { open: 'Awaiting payment', paid: 'Paid', review: 'Under 
 export default function BillingPage() {
   const { business } = useBusiness();
   const manager = ['owner', 'admin'].includes(business?.userRole ?? '');
+  // Choosing or changing the plan, cancelling and the saved card are the Owner's (Doc 08, billing.edit).
+  const owner = business?.userRole === 'owner';
   const [state, setState] = useState<State | null>(null), [loadError, setLoadError] = useState('');
   const [period, setPeriod] = useState<BillingInterval>('monthly');
   const [busy, setBusy] = useState<PlanCode | 'renewal' | 'card' | null>(null), [message, setMessage] = useState(''), [error, setError] = useState('');
@@ -152,7 +154,7 @@ export default function BillingPage() {
             {current.card && (
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>Saved for renewals: {cardLine(current.card)}</span>
-                <Button size="sm" variant="outline" disabled={busy !== null} onClick={removeCard}>{busy === 'card' ? 'Removing…' : 'Remove card'}</Button>
+                {owner && <Button size="sm" variant="outline" disabled={busy !== null} onClick={removeCard}>{busy === 'card' ? 'Removing…' : 'Remove card'}</Button>}
               </div>)}
           </CardContent>)}
         {current.subscribed && usageLines(current).length > 0 && (
@@ -168,7 +170,7 @@ export default function BillingPage() {
       </Card>
 
       {current.subscribed && (
-        <PlanEnding current={current} owner={business?.userRole === 'owner'} manager={manager} onChanged={load} />)}
+        <PlanEnding current={current} owner={owner} manager={owner} onChanged={load} />)}
 
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold">Plans</h2>
@@ -200,7 +202,7 @@ export default function BillingPage() {
                 </ul>
               </CardContent>
               <CardFooter className="flex-col items-stretch gap-2">
-                {manager ? (<>
+                {owner ? (<>
                   <Button className="w-full" variant={action.kind === 'cancel' || action.kind === 'schedule' ? 'outline' : 'default'}
                     disabled={['current', 'none'].includes(action.kind) || busy !== null}
                     onClick={() => action.kind === 'schedule' ? schedule(plan.code)
@@ -210,7 +212,7 @@ export default function BillingPage() {
                       : action.label}
                   </Button>
                   {action.note && <p className="text-xs text-muted-foreground">{action.note}</p>}
-                </>) : <p className="text-xs text-muted-foreground">Only an Owner or Admin can change the plan.</p>}
+                </>) : <p className="text-xs text-muted-foreground">Only the business owner can change the plan.</p>}
               </CardFooter>
             </Card>);
         })}

@@ -13,6 +13,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel,ConfigDict,Field
 from python_accounting.models import ReportingPeriod
 from cacu.accounting.posting import PostingCommand,post_command,raw
+from cacu.accounting.session import PERMISSION_MESSAGE,allowed
 from cacu.accounting.workflows import business_today,durable,purpose,role
 
 class AdjustmentRequest(BaseModel):
@@ -69,6 +70,8 @@ def _check(session,item,delta,entry_date):
     if entry_date<cutover or entry_date>business_today(session):raise HTTPException(409,'Stock date must be between the books start date and today')
     period=ReportingPeriod.get_period(session,datetime.combine(entry_date,time(12)))
     if period.status==ReportingPeriod.Status.CLOSED:raise HTTPException(409,'Stock changes cannot use a closed accounting period')
+    from cacu.accounting.periods import refuse_closed_month
+    refuse_closed_month(session,entry_date)
     cost=item.cost_price or Decimal('0')
     value=abs(delta)*cost
     from cacu.accounting.inventory import state, proportion, cents
@@ -109,8 +112,12 @@ def _post(session,actor,adjustment_id,note):
     cost,value=_check(session,item,row.delta,row.entry_date)
     if cost!=row.unit_cost:raise HTTPException(409,'The item cost changed after this request; reject it and ask for a new one')
     if value!=row.value:raise HTTPException(409,'The exact stock value changed after this request; reject it and ask for a new one')
+    from cacu.accounting import batches
+    named=raw(session,"SELECT to_jsonb(a)->>'batch_id' FROM accounting.stock_adjustment a WHERE business_id=%s AND id=%s",(tenant,str(row.id))).scalar()
+    batches.name_outgoing(session,named)
     result=raw(session,'SELECT public.management_write(%s,%s,%s,%s,%s,%s::jsonb)',(tenant,str(row.id),'stock.adjust',str(row.item_id),item.version,
         json.dumps({'delta':row.delta,'reason':row.reason,'entry_date':row.entry_date.isoformat()}))).scalar()
+    batches.clear(session)
     posting=post_movement(session,actor,row.id,adjustment_offset(session))
     result['version']=raw(session,'SELECT version FROM public.catalog_items WHERE business_id=%s AND id=%s',(tenant,str(row.item_id))).scalar()
     raw(session,"UPDATE accounting.stock_adjustment SET status='posted',decided_by=%s,decided_at=now(),decision_note=%s WHERE business_id=%s AND id=%s",
@@ -121,7 +128,7 @@ def _read(session,adjustment_id):
     row=raw(session,f'SELECT {COLUMNS} FROM accounting.stock_adjustment WHERE business_id=%s AND id=%s',(str(session.business_id),str(adjustment_id))).one()
     return _row(row)
 
-def request_adjustment(session,actor,data:AdjustmentRequest):
+def request_adjustment(session,actor,data:AdjustmentRequest,batch_id=None):
     entry_date=data.entry_date
     def execute():
         member=role(session,actor)
@@ -132,10 +139,14 @@ def request_adjustment(session,actor,data:AdjustmentRequest):
         if item.version!=data.expected_version:raise HTTPException(409,'Item changed. Refresh before adjusting stock.')
         cost,value=_check(session,item,data.delta,entry_date)
         tenant=str(session.business_id)
-        raw(session,'INSERT INTO accounting.stock_adjustment(business_id,id,item_id,delta,reason,entry_date,unit_cost,value,requested_by) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
-            (tenant,str(data.request_key),str(data.item_id),data.delta,data.reason.strip(),entry_date,cost,value,str(actor)))
+        if batch_id is None:
+            raw(session,'INSERT INTO accounting.stock_adjustment(business_id,id,item_id,delta,reason,entry_date,unit_cost,value,requested_by) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (tenant,str(data.request_key),str(data.item_id),data.delta,data.reason.strip(),entry_date,cost,value,str(actor)))
+        else:  # E09 R3 batches: taken from this batch when posted
+            raw(session,'INSERT INTO accounting.stock_adjustment(business_id,id,item_id,delta,reason,entry_date,unit_cost,value,requested_by,batch_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (tenant,str(data.request_key),str(data.item_id),data.delta,data.reason.strip(),entry_date,cost,value,str(actor),str(batch_id)))
         rule=policy(session)
-        direct=member in {'owner','admin'} and (rule['stock_threshold'] is None or value<=Decimal(rule['stock_threshold']))
+        direct=member in {'owner','admin'} and allowed(session,'inventory.approve') and (rule['stock_threshold'] is None or value<=Decimal(rule['stock_threshold']))
         result={'item':None,'posting':None}
         if direct:
             result['item'],result['posting']=_post(session,actor,data.request_key,'Within the approval limit')
@@ -152,6 +163,7 @@ def decide(session,actor,adjustment_id:UUID,approve:bool,data:Decision):
     own=str(row.requested_by)==str(actor)
     # The requester may withdraw their own request; deciding anyone else's needs an Owner or Admin.
     if member not in {'owner','admin'} and not(own and not approve):raise HTTPException(403,'Only an Owner or Admin can decide stock adjustments')
+    if not(own and not approve) and not allowed(session,'inventory.approve'):raise HTTPException(403,PERMISSION_MESSAGE)
     if row.status!='pending':raise HTTPException(409,f'This adjustment was already {row.status}')
     if approve and own and policy(session)['separation_of_duties']:raise HTTPException(403,'Someone other than the requester must approve this adjustment')
     if not approve and not data.note.strip() and not own:raise HTTPException(422,'Say why the adjustment is rejected')

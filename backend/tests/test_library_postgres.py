@@ -26,7 +26,7 @@ def database():
     assert DSN and urlparse(DSN).hostname in {'127.0.0.1','localhost','postgres'}, 'Refuse non-local disposable test database'
     assert DSN and DSN.rsplit('/',1)[-1].split('?')[0].endswith('_test'), 'Refuse non-test database'
     with psycopg.connect(DSN) as c:
-        c.execute('DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
+        c.execute('DROP SCHEMA IF EXISTS security_private CASCADE; DROP SCHEMA IF EXISTS ops CASCADE; DROP SCHEMA IF EXISTS authz CASCADE; DROP SCHEMA IF EXISTS platform CASCADE; DROP SCHEMA IF EXISTS accounting CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
         c.execute("""CREATE TABLE public.businesses(id uuid primary key,name text,business_type text NOT NULL DEFAULT 'PRODUCT');
           CREATE TABLE public.memberships(business_id uuid,user_id uuid,role text,is_active boolean NOT NULL DEFAULT true);
           CREATE TABLE public.accounts(id uuid primary key,business_id uuid,name text,is_active boolean default true);
@@ -38,6 +38,15 @@ def database():
           CREATE TABLE public.payments(id uuid primary key,business_id uuid,reference text,purpose text,invoice_id uuid,amount numeric(19,4),currency text,status text,channel text,customer_email text,initialized_by uuid,customer_id uuid);
           CREATE TABLE public.transactions(id uuid primary key,business_id uuid,customer_id uuid,created_by uuid,status text,payment_method text CHECK(payment_method IN ('cash','transfer','card')),total numeric(19,4),subtotal numeric(19,4));
           CREATE TABLE public.transaction_items(id uuid primary key,business_id uuid,transaction_id uuid,catalog_item_id uuid,description text,quantity numeric,unit_price numeric,line_total numeric);
+          -- Legacy bookings table as production has it (kept only in the browser before R2).
+          CREATE TABLE public.appointments(id uuid primary key default gen_random_uuid(),business_id uuid NOT NULL,customer_id uuid,title text NOT NULL,
+            status text NOT NULL DEFAULT 'scheduled',scheduled_at timestamptz NOT NULL,notes text,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),
+            CONSTRAINT appointments_status_check CHECK (status IN ('scheduled','confirmed','completed','cancelled','no_show')),
+            CONSTRAINT appointments_title_check CHECK (char_length(btrim(title)) > 0));
+          CREATE TABLE public.jobs(id uuid primary key default gen_random_uuid(),business_id uuid NOT NULL,customer_id uuid,title text NOT NULL,
+            status text NOT NULL DEFAULT 'open',description text,due_date date,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),
+            CONSTRAINT jobs_status_check CHECK (status IN ('open','in_progress','completed','cancelled')),
+            CONSTRAINT jobs_title_check CHECK (char_length(btrim(title)) > 0));
           CREATE TABLE public.financial_transactions(id uuid primary key,business_id uuid);
           CREATE TABLE public.journal_entries(id uuid primary key,business_id uuid);
           CREATE TABLE public.journal_lines(id uuid primary key,business_id uuid);
@@ -58,7 +67,14 @@ def database():
         for migration in Path('../supabase/migrations').glob('*_ifrs_inventory_and_reporting_close.sql'):
             c.execute(migration.read_text(encoding='utf-8'))
         # Plans and the suspension write gate (Doc 14 SUB-10): native writes check platform.writes_allowed.
-        for name in ['20261102100000_platform_plans.sql','20261105090000_suspension_write_gate.sql']:
+        c.execute("""CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$;
+          GRANT USAGE ON SCHEMA auth TO PUBLIC; GRANT EXECUTE ON FUNCTION auth.uid() TO PUBLIC""")
+        for name in ['20261102100000_platform_plans.sql','20261105090000_suspension_write_gate.sql','20261106100000_authz_foundation.sql',
+                     '20261106110000_permissions_sales_invoices_expenses.sql','20261106120000_permissions_ledger_hr_settings_billing.sql',
+                     '20261107090000_transfer_clearing.sql','20261107100000_pos_checkout.sql','20261107110000_pos_parked_sales_and_refunds.sql','20261107120000_pos_cashier_shifts.sql',
+                     '20261108090000_bookings_and_service_staff.sql','20261108100000_booking_deposits.sql','20261108110000_booking_billing.sql','20261108120000_jobs.sql','20261109090000_purchase_orders.sql',
+                     '20261109100000_goods_receipts.sql','20261109110000_goods_bills.sql','20261110090000_outlet_stock.sql','20261110100000_stock_transfers.sql','20261111090000_customer_messages.sql','20261111100000_customer_reminders.sql','20261112090000_offline_sales.sql','20261113090000_customer_receipts.sql','20261114090000_online_payments.sql','20261115090000_invoice_credit_notes.sql','20261116090000_two_step_sign_in.sql','20261117090000_data_export.sql','20261118090000_business_closure.sql','20261119090000_support_access.sql','20261120090000_month_close.sql','20261121090000_vat.sql','20261122090000_budgets.sql','20261123090000_bank_reconciliation.sql','20261124090000_stock_counts.sql','20261125090000_batches.sql','20261126090000_customer_segments.sql']:
             c.execute(Path(f'../supabase/migrations/{name}').read_text(encoding='utf-8'))
         for tab in ['memberships','accounts','customers','suppliers','catalog_items','invoices','invoice_items','payments','transactions','transaction_items']:
             c.execute(f'ALTER TABLE public.{tab} ENABLE ROW LEVEL SECURITY')
@@ -73,7 +89,7 @@ def database():
         currency=Currency(name='Naira',code='NGN',entity_id=e.id);s.add(currency);s.flush();e.currency_id=currency.id;s.flush()
         accounts={};party=uuid4()
         c.exec_driver_sql('INSERT INTO public.customers VALUES(%s,%s,%s)',(str(party),str(business),'Customer'))
-        for name,kind,section in [('cash','BANK','cash'),('cash2','BANK','cash'),('equity','EQUITY','financing'),('inventory','INVENTORY','operating'),('ar','RECEIVABLE','operating'),('ap','PAYABLE','operating'),('revenue','OPERATING_REVENUE','operating'),('cogs','DIRECT_EXPENSE','operating'),('expense','OPERATING_EXPENSE','operating'),('fixed','NON_CURRENT_ASSET','investing'),('depreciation','CONTRA_ASSET','operating')]:
+        for name,kind,section in [('cash','BANK','cash'),('cash2','BANK','cash'),('equity','EQUITY','financing'),('inventory','INVENTORY','operating'),('ar','RECEIVABLE','operating'),('ap','PAYABLE','operating'),('revenue','OPERATING_REVENUE','operating'),('cogs','DIRECT_EXPENSE','operating'),('expense','OPERATING_EXPENSE','operating'),('fixed','NON_CURRENT_ASSET','investing'),('transfer_clearing','CURRENT_ASSET','operating'),('depreciation','CONTRA_ASSET','operating')]:
             a=Account(name=name,account_type=Account.AccountType[kind],currency_id=currency.id,entity_id=e.id);s.add(a);s.flush()
             ident=uuid4();accounts[name]=(ident,a.id)
             c.exec_driver_sql('INSERT INTO public.accounts(id,business_id,name) VALUES(%s,%s,%s)',(str(ident),str(business),name))
@@ -357,35 +373,45 @@ def cash_balance(c,library_id):
     return c.exec_driver_sql("SELECT coalesce(sum(CASE WHEN entry_type='DEBIT' THEN amount ELSE -amount END),0) FROM accounting.ledger WHERE post_account_id=%s",(library_id,)).scalar()
 
 
-def test_transfer_receipt_posts_to_bank_and_replays_without_duplicate_income(database):
+def test_transfer_receipt_waits_for_confirmation_then_posts_to_the_chosen_bank(database):
+    """BR-010: the invoice stays outstanding until the owner confirms the transfer arrived."""
     from cacu.accounting.workflows import ReceiptCreate,receipt_create,bank_accounts
+    from cacu.accounting.transfers import TransferConfirm,confirm
     d=database;bank=reviewed_bank(d);invoice=issued_service_invoice(d)
-    data=ReceiptCreate(request_key=uuid4(),invoice_id=invoice,amount='40.00',entry_date=date(d[6],2,11),method='Transfer',bank_account_id=bank)
-    result=workflow(d,receipt_create,data)
-    assert result['outstanding']=='60.00' and result['collection_account_id']==str(bank)
-    assert workflow(d,receipt_create,data)==result
+    data=ReceiptCreate(request_key=uuid4(),invoice_id=invoice,amount='40.00',entry_date=date(d[6],2,11),method='Transfer')
+    held=workflow(d,receipt_create,data)
+    assert held['status']=='awaiting_confirmation' and held['outstanding']=='100.00'
+    assert workflow(d,receipt_create,data)==held
+    over=ReceiptCreate(request_key=uuid4(),invoice_id=invoice,amount='60.01',entry_date=date(d[6],2,11),method='Transfer')
+    with pytest.raises(HTTPException) as error:workflow(d,receipt_create,over)  # 40 is already waiting
+    assert error.value.status_code==409
+    with d[0].begin() as c:
+        assert cash_balance(c,d[4]['cash2'][1])==0 and c.exec_driver_sql('SELECT count(*) FROM public.payments').scalar()==0
+    decision=TransferConfirm(request_key=uuid4(),bank_account_id=bank)
+    result=workflow(d,lambda s,a,x:confirm(s,a,data.request_key,x),decision)
+    assert result['status']=='confirmed' and result['posting']['outstanding']=='60.00'
+    assert workflow(d,lambda s,a,x:confirm(s,a,data.request_key,x),decision)==result  # replay-safe
+    with pytest.raises(HTTPException) as error:
+        workflow(d,lambda s,a,x:confirm(s,a,data.request_key,x),TransferConfirm(request_key=uuid4(),bank_account_id=bank))
+    assert error.value.status_code==409  # decided once
     with d[0].begin() as c:
         s=session_for(c,d)
         assert bank_accounts(s)==[{'id':str(bank),'name':'cash2'}]
         assert cash_balance(c,d[4]['cash2'][1])==40 and cash_balance(c,d[4]['cash'][1])==0
         assert c.exec_driver_sql('SELECT channel FROM public.payments').scalar()=='transfer'
-        assert c.exec_driver_sql("SELECT details->>'collection_account_id' FROM accounting.audit_event WHERE event='receipt'").scalar()==str(bank)
         summary=financial_summary(s,date(d[6],1,1),date(d[6],12,31));report=cash_flow(s,date(d[6],1,1),date(d[6],12,31))
         assert summary['net_profit']=='100.00' and summary['receivables']=='60.00'
         assert summary['trial_balance_difference']=='0.00' and report['closing_cash']=='40.00' and report['reconciled']
         s.close()
-    data.bank_account_id=d[4]['cash'][0]
-    with pytest.raises(HTTPException) as error:workflow(d,receipt_create,data)
-    assert error.value.status_code==409
 
 
-@pytest.mark.parametrize('variant',['missing','foreign','inactive','wrong_purpose','wrong_section','non_bank','deleted','cash_with_bank','card'])
+# A transfer with no bank named is valid: it waits for confirmation (BR-010). A named bank must still be reviewed.
+@pytest.mark.parametrize('variant',['foreign','inactive','wrong_purpose','wrong_section','non_bank','deleted','cash_with_bank','card'])
 def test_invalid_collection_selection_rolls_back_receipt(database,variant):
     from cacu.accounting.workflows import ReceiptCreate,receipt_create,bank_accounts
     d=database;bank=reviewed_bank(d);invoice=issued_service_invoice(d)
     chosen=bank;method='Transfer'
     with d[0].begin() as c:
-        if variant=='missing':chosen=None
         if variant=='foreign':
             foreign=uuid4();chosen=uuid4()
             c.exec_driver_sql('INSERT INTO public.businesses VALUES(%s,%s)',(str(foreign),'Foreign'))
@@ -404,7 +430,7 @@ def test_invalid_collection_selection_rolls_back_receipt(database,variant):
         assert c.exec_driver_sql('SELECT count(*) FROM public.payments').scalar()==0
         assert cash_balance(c,d[4]['cash'][1])==cash_balance(c,d[4]['cash2'][1])==0
         assert c.exec_driver_sql("SELECT count(*) FROM accounting.audit_event WHERE event='receipt'").scalar()==0
-        if variant in {'foreign','missing','cash_with_bank','card'}:assert len(bank_accounts(s))==1
+        if variant in {'foreign','cash_with_bank','card'}:assert len(bank_accounts(s))==1
         else:assert bank_accounts(s)==[]
         s.close()
 
@@ -421,9 +447,10 @@ def test_pos_uses_selected_collection_account_and_lowercase_source_method(databa
     result=workflow(d,sale_create,data);assert workflow(d,sale_create,data)==result
     with d[0].begin() as c:
         s=session_for(c,d)
-        assert cash_balance(c,d[4]['cash2'][1])==(100 if method=='Transfer' else 0)
+        assert cash_balance(c,d[4]['cash2'][1])==0  # a transfer is not banked until confirmed (BR-010)
+        assert cash_balance(c,d[4]['transfer_clearing'][1])==(100 if method=='Transfer' else 0)
         assert cash_balance(c,d[4]['cash'][1])==(100 if method=='Cash' else 0)
-        assert c.exec_driver_sql('SELECT payment_method FROM public.transactions').scalar()==method.lower()
+        assert c.exec_driver_sql('SELECT payment_method,status FROM public.transactions').one()==(method.lower(),'pending_payment' if method=='Transfer' else 'completed')
         assert c.exec_driver_sql('SELECT stock_quantity FROM public.catalog_items').scalar()==9
         assert c.exec_driver_sql('SELECT count(*) FROM public.transactions').scalar()==1
         s.close()

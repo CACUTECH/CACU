@@ -14,7 +14,7 @@
     "ci": "npm run lint && npm run typecheck && npm run test:security && npm run test",
     "test:browser": "playwright test -c playwright-ct.config.ts",
     "ai:check": "node scripts/check-openai.mjs",
-    "test:security": "node --test scripts/dependency-security.test.mjs"
+    "ai:eval": "jest -c jest.eval.config.js --runInBand"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

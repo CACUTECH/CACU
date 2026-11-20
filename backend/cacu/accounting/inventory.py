@@ -112,6 +112,8 @@ def dated(session,entry_date,valuation=None):
     from python_accounting.models import ReportingPeriod
     period=ReportingPeriod.get_period(session,datetime.combine(entry_date,time(12)))
     if period.status==ReportingPeriod.Status.CLOSED: raise HTTPException(409,'Valuation cannot use a closed period')
+    from cacu.accounting.periods import refuse_closed_month
+    refuse_closed_month(session,entry_date)
 
 
 def item(session,item_id):
@@ -238,6 +240,10 @@ def restore_return(session,actor,data:StockReturn):
         if not v:raise HTTPException(409,'Adopt valuation first')
         dated(session,data.entry_date,v)
         if r.stock_quantity!=v.quantity:raise HTTPException(409,'Stock quantities do not reconcile to valuation')
+        # Goods from a sale or invoice that carried VAT come back through a refund or a credit note, which give the VAT
+        # back too (E14 R3 2c); this screen would take back revenue only.
+        if raw(session,"SELECT 1 FROM accounting.document_vat WHERE business_id=%s AND source_id=%s AND source_type IN ('pos','invoice') AND original_id IS NULL AND vat>0",(str(session.business_id),str(data.original_source_id))).first():
+            raise HTTPException(409,'This sale carried VAT. Use a refund for a till sale, or a credit note for an invoice, so the VAT goes back too.')
         origin=raw(session,"SELECT * FROM accounting.inventory_value_event WHERE business_id=%s AND source_id=%s AND item_id=%s AND kind='issue'",(str(session.business_id),str(data.original_source_id),str(data.item_id))).first()
         if not origin or data.entry_date<origin.entry_date:raise HTTPException(409,'Original valued fulfillment required')
         returned=raw(session,"SELECT coalesce(sum(quantity),0),coalesce(sum(gross_change),0),coalesce(sum(allowance_change),0) FROM accounting.inventory_value_event WHERE business_id=%s AND origin_id=%s AND kind='return'",(str(session.business_id),str(origin.id))).one()

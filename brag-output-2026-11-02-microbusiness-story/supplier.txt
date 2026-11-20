@@ -1,1 +1,0 @@
-The supplier side matters too. Record the bill, keep the supplier details, and record payments against it. Unpaid and part paid bills stay visible in the workflow. CACU records the payment; it does not send money from a bank account.

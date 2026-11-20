@@ -8,9 +8,10 @@ import { formatNgn } from '@/lib/cash-flow';
 import type { FinancialStatements, StatementSection } from '@/lib/ledger-reports';
 import { getStatementsAction } from '@/app/reports/actions';
 
-type View = 'income' | 'position';
+type View = 'income' | 'position' | 'equity';
 type Row = { label: string; amounts: string[]; kind?: 'heading' | 'total' | 'grand' };
-const TITLES: Record<View, string> = { income: 'Statement of Profit or Loss', position: 'Statement of Financial Position' };
+const TITLES: Record<View, string> = { income: 'Statement of Profit or Loss', position: 'Statement of Financial Position', equity: 'Statement of Changes in Equity' };
+const FILES: Record<View, string> = { income: 'profit-or-loss', position: 'financial-position', equity: 'changes-in-equity' };
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date());
 
 function sectionRows(section: StatementSection): Row[] {
@@ -29,6 +30,13 @@ export function statementRows(data: FinancialStatements, view: View): Row[] {
       ...sectionRows(s.operating_expenses), ...sectionRows(s.other_income), ...sectionRows(s.other_expenses),
       { label: data.income_statement.net_profit[0].startsWith('-') ? 'Net loss' : 'Net profit', amounts: data.income_statement.net_profit, kind: 'grand' }];
   }
+  if (view === 'equity') {
+    // Doc 09: each equity account from its opening to its closing balance, with what moved it; profit on its own line.
+    const c = data.changes_in_equity;
+    if (!c) return [];
+    return [...c.lines.map(l => ({ label: l.code ? `${l.code} ${l.name}` : l.name, amounts: [l.opening, l.movement, l.closing] })),
+      { label: 'Total equity', amounts: [c.total.opening, c.total.movement, c.total.closing], kind: 'grand' as const }];
+  }
   const s = by(data.financial_position.sections), p = data.financial_position;
   return [...sectionRows(s.current_assets), ...sectionRows(s.non_current_assets), { label: 'Total assets', amounts: p.total_assets, kind: 'grand' },
     ...sectionRows(s.current_liabilities), ...sectionRows(s.non_current_liabilities), { label: 'Total liabilities', amounts: p.total_liabilities, kind: 'total' },
@@ -36,6 +44,7 @@ export function statementRows(data: FinancialStatements, view: View): Row[] {
 }
 
 export function columnHeadings(data: FinancialStatements, view: View) {
+  if (view === 'equity') return [`At ${data.periods[0].start_date}`, 'Movements in the period', `At ${data.periods[0].end_date}`];
   return data.periods.map(p => view === 'income' ? `${p.start_date} to ${p.end_date}` : `As of ${p.end_date}`);
 }
 
@@ -61,12 +70,12 @@ export function FinancialStatementsPanel({ view }: { view: View }) {
     if (!data) return;
     const rows = statementRows(data, view), headings = columnHeadings(data, view);
     const notes = data.exceptions.map(e => `Exception: ${e.message}`);
-    const file = `${view === 'income' ? 'profit-or-loss' : 'financial-position'}-${data.periods[0].start_date}-${data.periods[0].end_date}`;
+    const file = `${FILES[view]}-${data.periods[0].start_date}-${data.periods[0].end_date}`;
     if (kind === 'excel') {
       const XLSX = await import('xlsx'); const book = XLSX.utils.book_new();
       const sheet = [...header(data).map(h => [h]), ...notes.map(n => [n]), [], ['', ...headings],
         ...rows.map(r => [r.label, ...r.amounts.map(Number)])];
-      XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(sheet), view === 'income' ? 'Profit or loss' : 'Financial position');
+      XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(sheet), view === 'income' ? 'Profit or loss' : view === 'equity' ? 'Changes in equity' : 'Financial position');
       XLSX.writeFile(book, `${file}.xlsx`);
     } else {
       const { jsPDF } = await import('jspdf'); const { default: autoTable } = await import('jspdf-autotable');
@@ -81,8 +90,8 @@ export function FinancialStatementsPanel({ view }: { view: View }) {
     <form className="flex flex-wrap items-end gap-3 rounded-xl border bg-muted/30 p-4" onSubmit={event => void load(event)}>
       <label className="space-y-1 text-sm"><span>From</span><Input type="date" required value={start} onChange={e => { reset(); setStart(e.target.value); }}/></label>
       <label className="space-y-1 text-sm"><span>To</span><Input type="date" required value={end} onChange={e => { reset(); setEnd(e.target.value); }}/></label>
-      <label className="space-y-1 text-sm"><span>Compare with</span><select aria-label="Compare with" className="block rounded-md border bg-background p-2" value={compare}
-        onChange={e => { reset(); setCompare(e.target.value as typeof compare); }}><option value="">No comparison</option><option value="prior">The period before</option><option value="last_year">Same period last year</option></select></label>
+      {view !== 'equity' && <label className="space-y-1 text-sm"><span>Compare with</span><select aria-label="Compare with" className="block rounded-md border bg-background p-2" value={compare}
+        onChange={e => { reset(); setCompare(e.target.value as typeof compare); }}><option value="">No comparison</option><option value="prior">The period before</option><option value="last_year">Same period last year</option></select></label>}
       <Button type="submit" disabled={loading || !start || !end || start > end}>{loading ? 'Loading…' : 'Run report'}</Button>
     </form>
     {error && <p role="alert" className="text-destructive">{error}</p>}

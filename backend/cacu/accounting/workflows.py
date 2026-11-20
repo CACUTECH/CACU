@@ -1,7 +1,8 @@
 """CACU document workflows calculate amounts from authoritative records."""
 from datetime import date,datetime
-from decimal import Decimal
+from decimal import Decimal,ROUND_HALF_UP
 import hashlib,json
+from types import SimpleNamespace
 from uuid import UUID,uuid5,NAMESPACE_URL
 from typing import Literal
 from fastapi import HTTPException
@@ -29,6 +30,8 @@ class InvoiceCreate(BaseModel):
     performance_status:Literal['satisfied','not_satisfied','over_time']='satisfied'
     performance_evidence:str=Field(default='',max_length=2000)
     performance_date:date|None=None
+    # VAT (E14 R3 2a): whether the prices include VAT; None takes the business's setting. Till credit sales include it.
+    vat_included:bool|None=None
 
 class ReceiptCreate(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -38,15 +41,29 @@ class ReceiptCreate(BaseModel):
     entry_date:date
     method:str=Field(pattern=r'^(Cash|Transfer|Card)$')
     bank_account_id:UUID|None=None
+    # WHT (E14 R3 2c): what the customer deducted and paid to the tax office instead; settles the invoice with the cash.
+    wht:str=Field(default='0.00',pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
+    wht_certificate:str|None=Field(default=None,max_length=60)
+
+class SaleLine(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    item_id:UUID
+    quantity:int=Field(gt=0,le=1000000)
+    discount_percent:str=Field(default='0',pattern=r'^[0-9]{1,3}(\.[0-9]{1,2})?$')
 
 class SaleCreate(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
-    items:list[StockLine]=Field(min_length=1,max_length=100)
+    items:list[SaleLine]=Field(min_length=1,max_length=100)
     entry_date:date
-    method:str=Field(pattern=r'^(Cash|Transfer|Card)$')
+    method:str=Field(pattern=r'^(Cash|Transfer|Card|Split|Credit)$')
     bank_account_id:UUID|None=None
     quoted_total:str=Field(pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
+    cash_received:str|None=Field(default=None,pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
+    transfer_amount:str|None=Field(default=None,pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
+    customer_id:UUID|None=None
+    booking_id:UUID|None=None
+    job_id:UUID|None=None
 
 
 def purpose(session,name):
@@ -59,6 +76,11 @@ def party_account(session,kind,party_id):
     to the receivables or payables account the first time they are used (accounting.map_party)."""
     library=raw(session,'SELECT accounting.map_party(%s,%s,%s)',(str(session.business_id),kind,str(party_id))).scalar()
     return raw(session,'SELECT account_id FROM accounting.account_map WHERE business_id=%s AND library_id=%s',(str(session.business_id),library)).scalar()
+
+def clearing_account(session):
+    rows=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='transfer_clearing'",(str(session.business_id),)).all()
+    if len(rows)!=1:raise HTTPException(409,'Set up the Transfers awaiting confirmation account in your chart before taking transfers')
+    return rows[0].account_id
 
 def collection_account(session,method,bank_account_id):
     if method=='Card':raise HTTPException(409,'Card payments require verified gateway settlement')
@@ -94,6 +116,8 @@ def durable(session,actor,kind,data,execute):
     payload=data.model_dump(mode='json')
     # Preserve existing Cash workflow hashes across this additive API change.
     if payload.get('bank_account_id') is None:payload.pop('bank_account_id',None)
+    for optional in ('booking_id','job_id'):
+        if optional in payload and payload[optional] is None:payload.pop(optional)
     if kind=='invoice':
         if payload.get('performance_status')=='satisfied':payload.pop('performance_status',None)
         if payload.get('performance_evidence')=='':payload.pop('performance_evidence',None)
@@ -108,13 +132,13 @@ def durable(session,actor,kind,data,execute):
     raw(session,'INSERT INTO accounting.workflow_request VALUES(%s,%s,%s,%s::jsonb)',(tenant,str(data.request_key),digest,json.dumps(result)))
     return result
 
-def invoice_create(session,actor,data:InvoiceCreate):
+def invoice_create(session,actor,data:InvoiceCreate,preissued=frozenset()):
     def execute():
         tenant=str(session.business_id)
         if data.issue and (data.performance_status!='satisfied' or (data.performance_date and data.performance_date>data.entry_date)):
             raise HTTPException(409,'Issue invoices only for delivered goods or completed services; advances and over-time contracts require a reviewed recognition workflow')
         if data.entry_date>business_today(session):raise HTTPException(422,'An issued sale cannot be dated in the future')
-        if Decimal(data.tax)!=0:raise HTTPException(409,'Taxed invoices require reviewed tax mappings before cutover')
+        if Decimal(data.tax)!=0:raise HTTPException(409,'CACU works out VAT from your tax settings; leave the tax amount at zero')
         if len({i.catalog_item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate invoice item')
         customer=raw(session,'SELECT id FROM public.customers WHERE business_id=%s AND id=%s',(tenant,str(data.customer_id))).first()
         if not customer:raise HTTPException(422,'Customer unavailable')
@@ -124,9 +148,13 @@ def invoice_create(session,actor,data:InvoiceCreate):
             row=raw(session,"SELECT name,item_type,unit_price,coalesce((to_jsonb(catalog_items)->>'track_stock')::boolean,true) AS track_stock FROM public.catalog_items WHERE business_id=%s AND id=%s AND is_active FOR UPDATE",(tenant,str(item.catalog_item_id))).first()
             if not row or row.unit_price!=Decimal(item.unit_price) or row.unit_price<=0:raise HTTPException(409,'Invoice price differs from authoritative catalog')
             line_total=row.unit_price*item.quantity;total+=line_total;items.append((item,row.name,line_total))
-            if row.item_type=='PRODUCT' and row.track_stock:stock.append({'item_id':item.catalog_item_id,'quantity':item.quantity})
-        raw(session,"INSERT INTO public.invoices(id,business_id,customer_id,invoice_number,status,issue_date,due_date,subtotal,total,tax,notes,type,vat_included) VALUES(%s,%s,%s,%s,'draft',%s,%s,%s,%s,0,%s,'Invoice',false)",
-            (str(data.request_key),tenant,str(data.customer_id),data.invoice_number,data.entry_date,data.due_date,total,total,data.notes))
+            if row.item_type=='PRODUCT' and row.track_stock and str(item.catalog_item_id) not in {str(i) for i in preissued}:stock.append({'item_id':item.catalog_item_id,'quantity':item.quantity})
+        from cacu.accounting import vat
+        settings=vat.setting(session)
+        inclusive=data.vat_included if data.vat_included is not None else bool(settings and settings.invoices_include_vat)
+        figures=vat.split(session,data.entry_date,[(item.catalog_item_id,value) for item,_,value in items],inclusive)
+        raw(session,"INSERT INTO public.invoices(id,business_id,customer_id,invoice_number,status,issue_date,due_date,subtotal,total,tax,notes,type,vat_included) VALUES(%s,%s,%s,%s,'draft',%s,%s,%s,%s,%s,%s,'Invoice',%s)",
+            (str(data.request_key),tenant,str(data.customer_id),data.invoice_number,data.entry_date,data.due_date,figures.net,figures.gross,figures.vat,data.notes,inclusive and figures.vat>0))
         for item,name,value in items:
             raw(session,'INSERT INTO public.invoice_items(id,business_id,invoice_id,catalog_item_id,description,quantity,unit_price,line_total) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
                 (str(uuid5(data.request_key,str(item.catalog_item_id))),tenant,str(data.request_key),str(item.catalog_item_id),name,item.quantity,Decimal(item.unit_price),value))
@@ -135,46 +163,200 @@ def invoice_create(session,actor,data:InvoiceCreate):
             (tenant,str(actor),str(data.request_key),'revenue_performance_confirmed',json.dumps({'scope':'completed_sale','performance_date':str(data.performance_date or data.entry_date),'evidence':data.performance_evidence,'legacy_contract':not bool(data.performance_evidence)})))
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='invoice',source_id=data.request_key,
             main_account_id=ar,entry_date=data.entry_date,narration=data.invoice_number,counterparty_id=data.customer_id,
-            lines=[{'account_id':purpose(session,'revenue'),'amount':format(total,'.2f')}],stock=stock)
-        result=post_command(session,actor,cmd)
+            lines=vat.output_lines(session,purpose(session,'revenue'),figures,True),stock=stock)
+        result=post_command(session,actor,cmd,preissued=preissued)
+        vat.record(session,'invoice',data.request_key,'output',data.entry_date,figures,total,inclusive)
         return {'id':str(data.request_key),'posting':result}
     return durable(session,actor,'invoice',data,execute)
 
+def receipt_posting(session,actor,request_key,invoice_id,amount,method,collection,entry_date):
+    """Posts a receipt against an issued invoice into the given cash or bank account."""
+    tenant=str(session.business_id)
+    row=raw(session,"SELECT i.customer_id,m.account_id FROM public.invoices i JOIN accounting.document_map d ON d.business_id=i.business_id AND d.source_id=i.id AND d.source_type='invoice' JOIN accounting.\"transaction\" t ON t.id=d.transaction_id AND t.business_id=d.business_id JOIN accounting.account_map m ON m.business_id=t.business_id AND m.library_id=t.account_id WHERE i.business_id=%s AND i.id=%s FOR UPDATE OF i",
+            (tenant,str(invoice_id))).first()
+    if not row:raise HTTPException(409,'Invoice must be issued before payment')
+    cmd=PostingCommand(request_key=uuid5(request_key,'posting'),kind='receipt',source_id=request_key,target_id=invoice_id,
+        main_account_id=row.account_id,counterparty_id=row.customer_id,entry_date=entry_date,narration='Manual '+method+' receipt',payment_method=method,
+        lines=[{'account_id':collection,'amount':amount}])
+    return post_command(session,actor,cmd)
+
+def invoice_outstanding(session,invoice_id):
+    """What the customer still owes on an issued invoice, less transfers already waiting for confirmation."""
+    from python_accounting.models import Transaction
+    tenant=str(session.business_id)
+    mapped=raw(session,"SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type='invoice' AND source_id=%s",(tenant,str(invoice_id))).scalar()
+    if not mapped:raise HTTPException(409,'Invoice must be issued before payment')
+    raw(session,'SELECT 1 FROM public.invoices WHERE business_id=%s AND id=%s FOR UPDATE',(tenant,str(invoice_id)))
+    target=session.get(Transaction,mapped)
+    waiting=raw(session,"SELECT coalesce(sum(amount),0) FROM accounting.pending_transfer WHERE business_id=%s AND invoice_id=%s AND status='pending'",(tenant,str(invoice_id))).scalar()
+    # Parts of a customer payment by transfer that is still waiting (E11) count too.
+    parts=raw(session,"""SELECT coalesce(sum((a->>'amount')::numeric),0) FROM accounting.customer_receipt r,jsonb_array_elements(r.allocations) a
+      WHERE r.business_id=%s AND r.status='awaiting_transfer' AND a->>'invoice_id'=%s""",(tenant,str(invoice_id))).scalar()
+    return target.amount-target.cleared(session),Decimal(waiting)+Decimal(parts)
+
 def receipt_create(session,actor,data:ReceiptCreate):
     def execute():
-        tenant=str(session.business_id)
-        row=raw(session,"SELECT i.customer_id,m.account_id FROM public.invoices i JOIN accounting.document_map d ON d.business_id=i.business_id AND d.source_id=i.id AND d.source_type='invoice' JOIN accounting.\"transaction\" t ON t.id=d.transaction_id AND t.business_id=d.business_id JOIN accounting.account_map m ON m.business_id=t.business_id AND m.library_id=t.account_id WHERE i.business_id=%s AND i.id=%s FOR UPDATE OF i",
-                (tenant,str(data.invoice_id))).first()
-        if not row:raise HTTPException(409,'Invoice must be issued before payment')
+        wht=Decimal(data.wht)
+        if wht>0:
+            # The WHT settles part of the invoice now; the cash, whichever way it is paid, settles the rest.
+            outstanding,waiting=invoice_outstanding(session,data.invoice_id)
+            if Decimal(data.amount)+wht>outstanding-waiting:raise HTTPException(409,'Amount and WHT together exceed what is still owed')
+            from cacu.accounting.vat import deduct_wht
+            deducted=deduct_wht(session,actor,data.request_key,data.invoice_id,wht,Decimal(data.amount),data.entry_date,data.wht_certificate)
+            result=_receipt(data)
+            return {**result,'wht':format(wht,'.2f'),'wht_posting':deducted} if isinstance(result,dict) else result
+        return _receipt(data)
+    def _receipt(data):
+        if data.method=='Transfer':
+            # BR-010: a transfer receipt is held until the owner confirms the money arrived; the invoice stays outstanding.
+            if data.bank_account_id is not None:collection_account(session,'Transfer',data.bank_account_id)
+            outstanding,waiting=invoice_outstanding(session,data.invoice_id)
+            if Decimal(data.amount)<=0:raise HTTPException(422,'Enter an amount above zero')
+            if Decimal(data.amount)>outstanding-waiting:raise HTTPException(409,'Amount exceeds outstanding balance, including transfers waiting for confirmation')
+            customer=raw(session,'SELECT customer_id FROM public.invoices WHERE business_id=%s AND id=%s',(str(session.business_id),str(data.invoice_id))).scalar()
+            raw(session,"""INSERT INTO accounting.pending_transfer(business_id,id,source_type,amount,entry_date,invoice_id,customer_id,expected_bank_account_id,created_by)
+              VALUES(%s,%s,'receipt',%s,%s,%s,%s,%s,%s)""",(str(session.business_id),str(data.request_key),Decimal(data.amount),data.entry_date,str(data.invoice_id),
+              str(customer) if customer else None,str(data.bank_account_id) if data.bank_account_id else None,str(actor)))
+            return {'source_id':str(data.request_key),'status':'awaiting_confirmation','amount':format(Decimal(data.amount),'.2f'),
+                    'outstanding':format(outstanding,'.2f'),'payment_method':'Transfer'}
         collection=collection_account(session,data.method,data.bank_account_id)
-        cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='receipt',source_id=data.request_key,target_id=data.invoice_id,
-            main_account_id=row.account_id,counterparty_id=row.customer_id,entry_date=data.entry_date,narration='Manual '+data.method+' receipt',payment_method=data.method,
-            lines=[{'account_id':collection,'amount':data.amount}])
-        return post_command(session,actor,cmd)
+        outstanding,waiting=invoice_outstanding(session,data.invoice_id)
+        if waiting and Decimal(data.amount)>outstanding-waiting:
+            raise HTTPException(409,'Amount exceeds outstanding balance, including transfers waiting for confirmation')
+        return receipt_posting(session,actor,data.request_key,data.invoice_id,data.amount,data.method,collection,data.entry_date)
     return durable(session,actor,'receipt',data,execute)
 
-def sale_create(session,actor,data:SaleCreate):
+CENT=Decimal('0.01')
+
+def sales_policy(session):
+    row=raw(session,'SELECT allow_oversell FROM accounting.sales_policy WHERE business_id=%s',(str(session.business_id),)).first()
+    return {'allow_oversell':bool(row and row.allow_oversell)}
+
+def sale_create(session,actor,data:SaleCreate,offline=None):
+    """Doc 10 checkout: prices from the catalogue; line discounts within the member's cap (sales.edit); cash, transfer
+    (waits for confirmation, BR-010), split cash and transfer, or credit to a named customer (an issued invoice).
+    offline (E17): {'prices': {item: price}, 'outlet': id} for a sale made offline and checked on sync. It is sold at those
+    prices, from that outlet, any stock shortfall is listed rather than refused, and no open shift is required."""
     def execute():
-        tenant=str(session.business_id)
-        collection=collection_account(session,data.method,data.bank_account_id)
+        tenant=str(session.business_id);method=data.method
+        if method=='Card':raise HTTPException(409,'Card payments are not available yet')
         if len({i.item_id for i in data.items})!=len(data.items):raise HTTPException(422,'Duplicate sale item')
-        total=Decimal('0');items=[];stock=[]
+        from cacu.accounting.shifts import before_sale,tag
+        if offline is None:before_sale(session,actor)
+        from cacu.accounting import outlets
+        outlets.use(session,offline['outlet'] if offline and offline.get('outlet') else outlets.selling(session,actor))
+        if data.customer_id is not None and method!='Credit':raise HTTPException(422,'Only a credit sale names a customer here')
+        cap=Decimal(raw(session,'SELECT authz.discount_cap(%s)',(tenant,)).scalar() or 0)
+        total=Decimal('0');discounts=Decimal('0');items=[];stock=[]
         for item in sorted(data.items,key=lambda x:str(x.item_id)):
             row=raw(session,"SELECT name,unit_price,item_type,coalesce((to_jsonb(catalog_items)->>'track_stock')::boolean,true) AS track_stock FROM public.catalog_items WHERE id=%s AND business_id=%s AND is_active FOR UPDATE",(str(item.item_id),tenant)).first()
+            if row and offline:row=SimpleNamespace(**{**row._mapping,'unit_price':Decimal(offline['prices'][str(item.item_id)])})
             if not row or row.unit_price<=0:raise HTTPException(409,'Sale item unavailable')
-            value=row.unit_price*item.quantity;total+=value;items.append((item,row,value))
-            if row.item_type=='PRODUCT' and row.track_stock:stock.append(item)
-        if total!=Decimal(data.quoted_total):raise HTTPException(409,'Checkout total differs from authoritative tax-free prices')
-        raw(session,"INSERT INTO public.transactions(id,business_id,created_by,status,payment_method,total,subtotal) VALUES(%s,%s,%s,'completed',%s,%s,%s)",(str(data.request_key),tenant,str(actor),data.method.lower(),total,total))
-        for item,row,value in items:
-            raw(session,'INSERT INTO public.transaction_items(id,business_id,transaction_id,catalog_item_id,description,quantity,unit_price,line_total) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
-                (str(uuid5(data.request_key,str(item.item_id))),tenant,str(data.request_key),str(item.item_id),row.name,item.quantity,row.unit_price,value))
+            percent=Decimal(item.discount_percent)
+            if percent>0:
+                if method=='Credit':raise HTTPException(422,'Discounts are not available on credit sales yet')
+                if percent>cap:raise HTTPException(403,'Your discount limit is '+format(cap.normalize(),'f')+'%. Ask the business owner for a bigger discount.')
+            gross=row.unit_price*item.quantity
+            discount=(gross*percent/100).quantize(CENT,rounding=ROUND_HALF_UP)
+            value=gross-discount;total+=value;discounts+=discount;items.append((item,row,value,discount))
+            if row.item_type=='PRODUCT' and row.track_stock:stock.append(StockLine(item_id=item.item_id,quantity=item.quantity))
+        if total!=Decimal(data.quoted_total):raise HTTPException(409,'Checkout total differs from catalogue prices and discounts')
+        if total<=0:raise HTTPException(422,'A sale must be for more than zero')
+        # Doc 10 / PR-13: paying for a completed booking at the till; a held deposit is applied to the sale.
+        booking=deposit=None;applied=Decimal('0')
+        if data.booking_id is not None:
+            from cacu.accounting.bookings import billable
+            booking,deposit=billable(session,data.booking_id)
+            if str(booking.service_id) not in {str(i.item_id) for i in data.items}:raise HTTPException(422,'Add the booked service to the sale')
+            if deposit:
+                if method not in {'Cash','Transfer'}:raise HTTPException(422,'A booking with a deposit is paid in cash or by transfer; bill it by invoice for credit')
+                applied=deposit.amount
+                if applied>total:raise HTTPException(409,'The deposit is more than this sale. Refund the difference or add the service at full price.')
+                if method=='Transfer' and applied==total:raise HTTPException(422,'The deposit covers the whole bill. Choose Cash to finish it.')
+        # A completed job is billed at catalogue prices; its materials already left stock when it was completed.
+        job=None;preissued=frozenset()
+        if data.job_id is not None:
+            if data.booking_id is not None:raise HTTPException(422,'Bill a booking and a job separately')
+            from cacu.accounting.jobs import billable_job
+            job,lines,preissued=billable_job(session,data.job_id)
+            if {str(i.item_id):i.quantity for i in data.items}!={str(l.catalog_item_id):int(l.quantity) for l in lines}:
+                raise HTTPException(422,"The sale must be exactly the job's lines")
+            stock=[s for s in stock if str(s.item_id) not in {str(i) for i in preissued}]
+        if method=='Credit':
+            # Credit to a named customer is an issued invoice: receivables, receipts and ageing work as for any invoice.
+            if data.customer_id is None:raise HTTPException(422,'Choose the customer who owes for this sale')
+            if data.cash_received or data.transfer_amount or data.bank_account_id:raise HTTPException(422,'A credit sale takes no payment now')
+            invoice=InvoiceCreate(request_key=uuid5(data.request_key,'credit'),customer_id=data.customer_id,invoice_number='POS-'+str(data.request_key)[:8].upper(),
+                entry_date=data.entry_date,vat_included=True,items=[{'catalog_item_id':item.item_id,'quantity':item.quantity,'unit_price':format(row.unit_price,'.2f')} for item,row,_,_ in items])
+            created=invoice_create(session,actor,invoice,preissued=preissued)
+            tag(session,[actor],'sale',created['id'],Decimal('0'))
+            if booking is not None:
+                from cacu.accounting.bookings import mark_billed
+                mark_billed(session,data.booking_id,'invoice',created['id'],None,actor,{})
+            if job is not None:
+                from cacu.accounting.jobs import mark_job_billed
+                mark_job_billed(session,data.job_id,'invoice',created['id'])
+            return {'saleId':created['id'],'status':'credit','invoice_id':created['id'],'invoice_number':invoice.invoice_number,'posting':created['posting']}
+        cash_part=transfer_part=None;change=None
+        if method=='Split':
+            if data.transfer_amount is None:raise HTTPException(422,'Enter how much was paid by transfer')
+            transfer_part=Decimal(data.transfer_amount);cash_part=total-transfer_part
+            if transfer_part<=0 or cash_part<=0:raise HTTPException(422,'A split sale has both a cash part and a transfer part')
+        elif data.transfer_amount is not None:raise HTTPException(422,'Only a split sale has a transfer amount')
+        if data.cash_received is not None:
+            if method not in {'Cash','Split'}:raise HTTPException(422,'Cash received applies to cash and split sales')
+            due=total-applied if method=='Cash' else cash_part
+            if Decimal(data.cash_received)<due:raise HTTPException(422,'Cash received is less than the cash due')
+            change=Decimal(data.cash_received)-due
+        if method in {'Transfer','Split'}:
+            # BR-010: the transfer waits in Transfers awaiting confirmation. A bank named here is only the one expected.
+            if data.bank_account_id is not None:collection_account(session,'Transfer',data.bank_account_id)
+        elif data.bank_account_id is not None:raise HTTPException(422,'Cash payments cannot select a bank account')
+        main=clearing_account(session) if method=='Transfer' else collection_account(session,'Cash',None)
+        pending=method in {'Transfer','Split'}
+        raw(session,"""INSERT INTO public.transactions(id,business_id,created_by,status,payment_method,total,subtotal,cash_received,change_given,transfer_amount,discount_total)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",(str(data.request_key),tenant,str(actor),'pending_payment' if pending else 'completed',method.lower(),
+            total,total+discounts,Decimal(data.cash_received) if data.cash_received is not None else None,change,
+            transfer_part if method=='Split' else (total-applied if method=='Transfer' else None),discounts))
+        if booking is not None:
+            raw(session,'UPDATE public.transactions SET booking_id=%s,deposit_applied=%s WHERE business_id=%s AND id=%s',(str(data.booking_id),applied,tenant,str(data.request_key)))
+        if job is not None:
+            raw(session,'UPDATE public.transactions SET job_id=%s WHERE business_id=%s AND id=%s',(str(data.job_id),tenant,str(data.request_key)))
+        for item,row,value,discount in items:
+            raw(session,'INSERT INTO public.transaction_items(id,business_id,transaction_id,catalog_item_id,description,quantity,unit_price,line_total,discount) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (str(uuid5(data.request_key,str(item.item_id))),tenant,str(data.request_key),str(item.item_id),row.name,item.quantity,row.unit_price,value,discount))
+        # VAT (E14 R3 2a): till prices include VAT. A taxed sale posts as one entry with revenue and Output VAT credited.
+        from cacu.accounting import vat
+        figures=vat.split(session,data.entry_date,[(item.item_id,value) for item,_,value,_ in items],True)
+        lines=vat.output_lines(session,purpose(session,'revenue'),figures,pending or figures.vat>0)
+        if method=='Split':lines.append({'account_id':clearing_account(session),'amount':format(transfer_part,'.2f'),'credited':False})
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='pos',source_id=data.request_key,
-            main_account_id=collection,entry_date=data.entry_date,narration='POS sale',payment_method=data.method,
-            lines=[{'account_id':purpose(session,'revenue'),'amount':format(total,'.2f')}],stock=stock)
-        return {'saleId':str(data.request_key),'posting':post_command(session,actor,cmd)}
+            main_account_id=main,entry_date=data.entry_date,narration='POS sale',payment_method=method,
+            main_amount=format(cash_part,'.2f') if method=='Split' else None,lines=lines,stock=stock)
+        posting=post_command(session,actor,cmd,allow_shortfall=offline is not None or sales_policy(session)['allow_oversell'],preissued=preissued)
+        vat.record(session,'pos',data.request_key,'output',data.entry_date,figures,total,True)
+        if pending:
+            waiting=transfer_part if method=='Split' else total-applied
+            raw(session,"""INSERT INTO accounting.pending_transfer(business_id,id,source_type,amount,entry_date,expected_bank_account_id,created_by)
+              VALUES(%s,%s,'pos',%s,%s,%s,%s)""",(tenant,str(data.request_key),waiting,data.entry_date,str(data.bank_account_id) if data.bank_account_id else None,str(actor)))
+        # Doc 10 shifts: the sale, and the cash it brought into the till, belong to the seller's open shift.
+        tag(session,[actor],'sale',data.request_key,total if method=='Cash' else cash_part if method=='Split' else Decimal('0'))
+        if booking is not None:
+            if deposit:
+                from cacu.accounting.bookings import apply_at_till
+                apply_at_till(session,actor,data.booking_id,deposit,data.request_key,method,data.entry_date)
+            else:
+                from cacu.accounting.bookings import mark_billed
+                mark_billed(session,data.booking_id,'sale',data.request_key,None,actor,{})
+        if job is not None:
+            from cacu.accounting.jobs import mark_job_billed
+            mark_job_billed(session,data.job_id,'sale',data.request_key)
+        shortfalls=raw(session,'SELECT item_id,quantity FROM accounting.stock_shortfall WHERE business_id=%s AND sale_id=%s',(tenant,str(data.request_key))).all()
+        return {'saleId':str(data.request_key),'status':'pending_payment' if pending else 'completed','posting':posting,
+                'change':format(change,'.2f') if change is not None else None,'discount_total':format(discounts,'.2f'),
+                'deposit_applied':format(applied,'.2f'),'paid_now':format(total-applied,'.2f'),
+                'shortfalls':[{'item_id':str(r.item_id),'quantity':r.quantity} for r in shortfalls]}
     return durable(session,actor,'pos',data,execute)
-
 
 EXPENSE_TYPES={Account.AccountType.OPERATING_EXPENSE,Account.AccountType.OVERHEAD_EXPENSE,Account.AccountType.OTHER_EXPENSE,Account.AccountType.DIRECT_EXPENSE}
 # Cost of sales and stock write-offs change only with stock movements (Doc 09 controls).
@@ -189,6 +371,8 @@ class ExpenseCreate(BaseModel):
     method:str=Field(pattern=r'^(Cash|Transfer)$')
     bank_account_id:UUID|None=None
     description:str=Field(min_length=1,max_length=500)
+    # VAT (E14 R3 2b): the VAT inside the amount paid, as shown on the receipt.
+    vat:str=Field(default='0.00',pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
 
 class ReversalCreate(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -221,10 +405,15 @@ def expense_create(session,actor,data:ExpenseCreate):
         if str(data.expense_account_id) not in {a['id'] for a in expense_accounts(session)}:
             raise HTTPException(422,'Choose an expense account from your chart')
         paid_from=collection_account(session,data.method,data.bank_account_id)
+        from cacu.accounting import vat
+        figures=vat.input_vat(session,data.entry_date,Decimal(data.amount),Decimal(data.vat),True)
+        lines=[{'account_id':data.expense_account_id,'amount':format(Decimal(data.amount)-figures.vat,'.2f')}]
+        if figures.vat>0:lines.append(vat.input_line(session,figures.vat,data.description+': VAT'))
         cmd=PostingCommand(request_key=uuid5(data.request_key,'posting'),kind='expense',source_id=data.request_key,
-            main_account_id=paid_from,entry_date=data.entry_date,narration=data.description,
-            lines=[{'account_id':data.expense_account_id,'amount':data.amount}])
-        return {'id':str(data.request_key),'posting':post_command(session,actor,cmd)}
+            main_account_id=paid_from,entry_date=data.entry_date,narration=data.description,lines=lines)
+        posting=post_command(session,actor,cmd)
+        vat.record(session,'expense',data.request_key,'input',data.entry_date,figures,Decimal(data.amount),True)
+        return {'id':str(data.request_key),'posting':posting}
     return durable(session,actor,'expense',data,execute)
 
 def recent_documents(session,kind,limit=50):
@@ -255,5 +444,10 @@ def reversal_create(session,actor,target_id:UUID,data:ReversalCreate):
             main_account_id=original.account_id,entry_date=data.entry_date,narration=f'Reversal of {original.transaction_no}: {data.reason}',
             lines=[{'account_id':original.account_id,'amount':'0.01'}])
         # post_command audits the reversal in accounting.audit_event; the reason is in its narration.
-        return {'id':str(data.request_key),'reversed':str(target_id),'posting':post_command(session,actor,cmd)}
+        posting=post_command(session,actor,cmd)
+        # An expense that claimed input VAT gives the claim back with it (E14 R3 2c).
+        from cacu.accounting import vat
+        claimed=vat._original(session,'expense',target_id)
+        if claimed:vat.record_back(session,'expense_reversal',data.request_key,data.entry_date,vat.take_back(session,'expense',target_id,claimed.base))
+        return {'id':str(data.request_key),'reversed':str(target_id),'posting':posting}
     return durable(session,actor,'reversal:'+str(target_id),data,execute)

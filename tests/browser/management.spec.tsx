@@ -195,3 +195,49 @@ test('user edit form retains its unconfirmed payload after closing and reopening
     expect(attempts[1]).toEqual(attempts[0]);
     expect(attempts[0]).toMatchObject({ operation: 'member.save', expected_version: 3, details: { name: 'Reviewed member name' } });
 });
+
+const catalogue = {
+    custom_allowed: true,
+    assigned: { member: 'editor-legacy' },
+    templates: [
+        { id: 'owner', code: 'owner', name: 'Owner', builtin: true, legacy: false, role: 'owner', permissions: ['sales.view'], members: 1 },
+        { id: 'cashier', code: 'cashier', name: 'Cashier', builtin: true, legacy: false, role: 'editor', members: 0,
+          permissions: ['sales.view', 'sales.create', 'sales.post', 'customers.view'] },
+        { id: 'editor-legacy', code: 'editor_legacy', name: 'Editor (legacy)', builtin: true, legacy: true, role: 'editor', members: 1,
+          permissions: ['sales.view', 'invoices.view'] },
+    ],
+};
+
+test('access templates: invite with a template, change a member, and see what each template allows', async ({ mount, page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route('**/test/templates', route => route.fulfill({ json: catalogue }));
+    await page.route('**/test/workspace/*', route => route.fulfill({ json: { total: 1, locations: [], data: [{ id: 'member', name: 'Existing member',
+        email: 'member@example.com', role: 'editor', status: 'active', version: 3, all_locations: true, created_at: '2026-10-12T00:00:00Z' }] } }));
+    const invitations: Record<string, unknown>[] = [], changes: unknown[] = [];
+    await page.route('**/test/workspace-mutation', route => { invitations.push(route.request().postDataJSON()); return route.fulfill({ json: { success: true, data: {} } }); });
+    await page.route('**/test/template-change', route => { changes.push(route.request().postDataJSON()); return route.fulfill({ json: { success: true, data: {} } }); });
+    await mount(<UserManagement />);
+    await expect(page.getByRole('cell', { name: 'Editor (legacy)' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Invite user' }).click();
+    await page.getByLabel('Name', { exact: true }).fill('Till');
+    await page.getByLabel('Email', { exact: true }).fill('till@example.com');
+    const picker = page.getByLabel('What they can do');
+    await expect(picker.locator('option')).toHaveText(['Choose a template', 'Cashier']);  // never Owner, never a legacy template
+    await picker.selectOption('cashier');
+    await expect(page.getByLabel('What Cashier can do')).toContainText('Sales: See, Add, Record');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect.poll(() => invitations.length).toBe(1);
+    expect(invitations[0]).toMatchObject({ operation: 'invitation.create', details: { email: 'till@example.com', template_id: 'cashier' } });
+    expect(invitations[0].details).not.toHaveProperty('role');
+
+    await page.getByRole('button', { name: 'Access', exact: true }).click();
+    await page.getByLabel('What they can do').selectOption('cashier');
+    await page.getByRole('button', { name: 'Save access' }).click();
+    await expect.poll(() => changes).toEqual([{ action: 'assign', userId: 'member', templateId: 'cashier' }]);
+
+    await page.getByRole('tab', { name: 'Access templates' }).click();
+    await expect(page.getByRole('heading', { name: 'Cashier' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Owner' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Create custom profile' })).toBeVisible();
+});

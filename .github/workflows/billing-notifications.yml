@@ -1,9 +1,10 @@
 name: Billing notifications
-# Sends queued CACU billing reminders by email (Resend) and SMS or WhatsApp (Termii). Off until the repository variable
+# Sends queued CACU billing reminders, and the receipts and reminders businesses send their customers (Doc 10 E20), by
+# email (Resend) and SMS or WhatsApp (Termii), every 15 minutes. Off until the repository variable
 # CACU_BILLING_NOTIFICATIONS_ENABLED is 'true'; a manual run is a dry run unless "apply" is ticked.
 on:
   schedule:
-    - cron: '52 * * * *'
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
     inputs:
       apply:
@@ -49,4 +50,21 @@ jobs:
             uv run --frozen python -m tools.send_notifications --apply --json
           else
             uv run --frozen python -m tools.send_notifications --json
+          fi
+      - name: Send queued customer messages or dry run
+        env:
+          CACU_DATABASE_URL: ${{ secrets.CACU_DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CACU_EMAIL_FROM: ${{ vars.CACU_EMAIL_FROM }}
+          TERMII_API_KEY: ${{ secrets.TERMII_API_KEY }}
+          TERMII_SENDER_ID: ${{ vars.TERMII_SENDER_ID }}
+          TERMII_CHANNEL: ${{ vars.TERMII_CHANNEL }}
+          TERMII_BASE_URL: ${{ vars.TERMII_BASE_URL }}
+          CACU_APP_URL: ${{ vars.CACU_APP_URL }}
+          APPLY_NOTIFICATIONS: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          if [ "$APPLY_NOTIFICATIONS" = "true" ]; then
+            uv run --frozen python -m tools.send_customer_messages --apply --json
+          else
+            uv run --frozen python -m tools.send_customer_messages --json
           fi

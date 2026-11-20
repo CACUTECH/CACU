@@ -1,1 +1,0 @@
-A customer buys two tins of milk. In point of sale, Bisi finds the item, checks the cart, chooses the payment method, and records the sale. The receipt gives her a record she can return to later.

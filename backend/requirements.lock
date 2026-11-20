@@ -10,14 +10,18 @@ anyio==4.15.1
     #   starlette
 attrs==26.1.0
     # via hypothesis
-certifi==2026.7.22
+certifi==2026.10.19
     # via
     #   httpcore
     #   httpx
+cffi==2.1.1 ; platform_python_implementation != 'PyPy'
+    # via cryptography
 click==8.5.0
     # via uvicorn
 colorama==0.4.6 ; sys_platform == 'win32'
     # via pytest
+cryptography==50.0.2
+    # via cacu-accounting
 fastapi==0.143.0
     # via cacu-accounting
 h11==0.16.0
@@ -39,7 +43,7 @@ opentelemetry-api==1.45.1
     # via fastapi
 packaging==26.3
     # via pytest
-pillow==12.3.0
+pillow==13.0.0
     # via cacu-accounting
 pluggy==1.6.0
     # via pytest
@@ -47,6 +51,8 @@ psycopg==3.2.9
     # via cacu-accounting
 psycopg-binary==3.2.9 ; implementation_name != 'pypy'
     # via psycopg
+pycparser==3.12 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
+    # via cffi
 pydantic==2.11.4
     # via
     #   cacu-accounting

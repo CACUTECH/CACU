@@ -3,6 +3,7 @@ import { accountingRequest, decimalInput, usesPythonAccounting } from '@/lib/acc
 import { randomUUID } from 'node:crypto';
 import { BaseService } from './base-service';
 import { READ_ONLY_MESSAGE } from '@/lib/read-only';
+import { PERMISSION_MESSAGE } from '@/lib/permission';
 
 export type InvoiceInput = {
   requestKey?: string; customer_id: string | null; invoice_number: string; type: string; status: string;
@@ -24,6 +25,7 @@ const INVOICE_STATUS_MESSAGES: Record<string, string> = {
 };
 const INVOICE_CREATE_MESSAGES: Record<string, string> = {
   SUBSCRIPTION_READ_ONLY: READ_ONLY_MESSAGE,
+  PERMISSION_DENIED: PERMISSION_MESSAGE,
   ACCESS_DENIED: 'Only Owners, Admins and Editors can create invoices.',
   UNSUPPORTED_DOCUMENT: 'Only invoices and estimates can be created here. Record a payment on an invoice to issue a receipt.',
   TAX_NOT_CONFIGURED: 'Tax is not set up for this business yet. Create the invoice without VAT.',

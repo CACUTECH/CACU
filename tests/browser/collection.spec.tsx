@@ -9,12 +9,12 @@ test('mobile Transfer receipt preserves selected bank and amount after an interr
   await page.route('**/test/receipt', route => { attempts.push(route.request().postDataJSON()); return attempts.length === 1 ? route.abort() : route.fulfill({ json: { success: true } }); });
   await mount(<ReceiptDemo />);
   await page.getByLabel('Payment method').selectOption('Transfer');
-  await expect(page.getByRole('button', { name: 'Record payment', exact: true })).toBeDisabled();
-  await page.getByLabel('Receiving bank account').selectOption('bank');
+  await expect(page.getByRole('button', { name: 'Record payment', exact: true })).toBeEnabled();  // BR-010: the bank is chosen when confirming
+  await page.getByLabel('Bank account you expect it in (optional)').selectOption('bank');
   await page.getByLabel('Amount received (NGN)').fill('40.00');
   await page.getByRole('button', { name: 'Record payment', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Payment response unavailable');
-  await expect(page.getByLabel('Receiving bank account')).toBeDisabled();
+  await expect(page.getByLabel('Bank account you expect it in (optional)')).toBeDisabled();
   await expect(page.getByLabel('Amount received (NGN)')).toBeDisabled();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Open receipt' }).click();
@@ -24,12 +24,14 @@ test('mobile Transfer receipt preserves selected bank and amount after an interr
   expect(attempts[0]).toMatchObject({ bankAccountId: 'bank', method: 'Transfer', amount: '40.00' });
 });
 
-test('an empty receiving-account list cannot submit a Transfer payment', async ({ mount, page }) => {
+test('with no bank accounts a Transfer payment is still recorded, to wait for confirmation', async ({ mount, page }) => {
   await page.route('**/test/collection-accounts', route => route.fulfill({ json: { native: true, accounts: [] } }));
-  let writes = 0; await page.route('**/test/receipt', route => { writes += 1; return route.fulfill({ json: { success: true } }); });
+  const writes: Record<string, unknown>[] = []; await page.route('**/test/receipt', route => { writes.push(route.request().postDataJSON()); return route.fulfill({ json: { success: true } }); });
   await mount(<ReceiptDemo />);
   await page.getByLabel('Payment method').selectOption('Transfer');
-  await expect(page.getByText(/No receiving bank accounts are available/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Record payment', exact: true })).toBeDisabled();
-  expect(writes).toBe(0);
+  await expect(page.getByText(/Transfers wait for confirmation/)).toBeVisible();
+  await page.getByRole('button', { name: 'Record payment', exact: true }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0]).toMatchObject({ method: 'Transfer' });
+  expect(writes[0].bankAccountId).toBeUndefined();
 });

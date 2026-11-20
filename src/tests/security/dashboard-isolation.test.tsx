@@ -7,6 +7,7 @@ jest.mock('@/components/business-provider', () => ({ useBusiness: () => ({ busin
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
 jest.mock('@/components/data-chart', () => ({ DataChart: () => <div>Saved chart</div> }));
 jest.mock('@/app/reports/actions', () => ({ getDashboardStatsAction: jest.fn(), getRevenueTrendAction: jest.fn() }));
+jest.mock('@/app/pos/shift-actions', () => ({ listShiftsAction: jest.fn().mockResolvedValue({ success: true, data: [] }) }));
 beforeEach(() => {
   mockBusiness = { id: 'A', name: 'Business A', business_type: 'Product' };
   (getDashboardStatsAction as jest.Mock).mockReset();

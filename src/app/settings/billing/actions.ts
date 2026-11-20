@@ -52,6 +52,8 @@ export async function payRenewalAction(): Promise<Result<CheckoutResult>> {
 
 const PLAN_END_REFUSALS: Record<string, string> = {
   BILLING_OWNER_REQUIRED: 'Only the business owner can cancel the subscription.',
+  'PERMISSION_DENIED billing.edit': 'Only the business owner can change the plan.',
+  'PERMISSION_DENIED billing.view': 'You do not have permission to see billing for this business.',
   BILLING_CANCEL_NEEDS_ACTIVE_PLAN: 'There is no running plan or trial to cancel.',
   BILLING_NO_DOWNGRADE_SCHEDULED: 'No move to a smaller plan is coming up.',
   BILLING_KEEP_NOT_IN_BUSINESS: 'Someone or an outlet you chose is no longer active. Refresh and choose again.',

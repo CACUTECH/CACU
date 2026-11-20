@@ -2,6 +2,7 @@ import 'server-only';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
 import { z } from 'zod';
+import { serviceUrl, ServiceUrlError } from '@/lib/service-url';
 
 export class UploadError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -20,7 +21,7 @@ export async function uploadContext() {
   if (!base) throw new UploadError(503, 'Secure uploads are not configured');
   const url = new URL(base);
   if (url.protocol !== 'https:' && !(process.env.NODE_ENV !== 'production' && ['localhost','127.0.0.1'].includes(url.hostname))) throw new UploadError(503, 'Secure uploads require HTTPS');
-  return { supabase, businessId, token: session.access_token, base: url.toString().replace(/\/$/, '') };
+  return { supabase, businessId, token: session.access_token, base: url };
 }
 export function requireSameOrigin(request: Request) {
   const origin = request.headers.get('origin');
@@ -43,10 +44,15 @@ export async function boundedBody(request: Request, limit: number) {
   for (const chunk of chunks) { body.set(chunk,offset); offset+=chunk.byteLength; }
   return body;
 }
-export async function fileRequest(context: Awaited<ReturnType<typeof uploadContext>>, suffix: string, options: RequestInit = {}) {
+/** A request to the file service for this business: its files, or one file by id, with optional query parameters. The host
+ * is the configured service; the business and file ids are checked segment by segment (CodeQL js/request-forgery). */
+export async function fileRequest(context: Awaited<ReturnType<typeof uploadContext>>, fileId: string | null, query?: Record<string, string>, options: RequestInit = {}) {
+  let target: URL;
+  try { target = serviceUrl(context.base, ['api', 'v1', 'businesses', context.businessId, 'files', ...(fileId ? [fileId] : [])], query, true); }
+  catch (error) { if (error instanceof ServiceUrlError) throw new UploadError(422, 'Invalid file request'); throw error; }
   let response: Response;
   try {
-    response = await fetch(`${context.base}/api/v1/businesses/${context.businessId}/files${suffix}`, {
+    response = await fetch(target, {
       ...options, headers: { ...options.headers, Authorization: `Bearer ${context.token}` },
       cache:'no-store', redirect:'error', signal:AbortSignal.timeout(45000),
     });

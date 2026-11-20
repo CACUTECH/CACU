@@ -24,9 +24,11 @@ REVIEWED = {
     'business_plan': 'active membership of the business required',
     'opening_position': 'management_private.authorize owner/admin',
     'save_opening_position': 'management_private.authorize owner/admin',
+    'save_discount_cap': 'management_private.authorize owner',
     'accounting_mode': 'is_business_member',
     'can_read_upload': 'active membership and valid resource',
     'create_invoice_safe': 'has_business_role owner/admin/editor',
+    'discount_caps': 'authz.require settings.view',
     'get_business_kpis': 'is_business_member',
     'get_revenue_trend': 'is_business_member',
     'has_business_role': 'answers only for the caller',
@@ -38,13 +40,33 @@ REVIEWED = {
     'management_read': 'management_private.authorize per section',
     'management_write': 'management_private.authorize per operation',
     'process_sale_safe': 'has_business_role owner/admin/editor',
+    'purchasing_allowed': 'active membership of the business required; returns only whether the plan includes purchasing',
+    'share_receipt': 'authz.has_permission sales.view; sends only a sale of that business, to an address the caller gives',
+    'revoke_receipt_link': 'authz.has_permission sales.view; revokes only links of that business',
+    'public_receipt': 'by unguessable token only (64 hex); returns that one receipt, never customer details; links can be revoked',
+    'send_invoice_reminder': 'authz.has_permission invoices.create; only an invoice of that business, to its own customer',
+    'notification_overview': 'active membership of the business; recipients masked',
+    'save_notification_settings': 'authz.has_permission settings.edit; refused while read-only',
     'record_ledger_entry_safe': 'has_business_role owner/admin/editor',
     'record_payment_atomic': 'has_business_role owner/admin/editor',
     'request_upload_delete': 'owner/admin membership and can_read_upload (active)',
     'reserve_upload': 'active membership with purpose role',
     'update_invoice_status_safe': 'has_business_role owner/admin/editor',
+    'mfa_status': "the caller's own two-step status only; for a business they are not in it says nothing is required",
+    'new_recovery_codes': "the caller's own codes, only right after the second step",
+    'use_recovery_code': "the caller's own codes and authenticators only; five failed tries an hour",
+    'business_closure_status': 'active membership of the business; nothing for anyone else',
+    'close_business': 'management_private.authorize owner, with the business name typed and a reason',
+    'reopen_business': 'management_private.authorize owner, within 90 days of closing',
+    'support_access_status': 'management_private.authorize owner',
+    'grant_support_access': 'management_private.authorize owner; 1 hour to 7 days, with a reason',
+    'end_support_access': 'management_private.authorize owner',
+    'support_cases': "CACU support staff only, after the second step: businesses with a live grant; '[]' for anyone else",
+    'open_support_case': 'CACU support staff only, after the second step, and only a business with a live grant; recorded',
 }
 NO_TENANT_INPUT = {'hr_payroll_defaults', 'billing_plans'}
+# Answer only about the caller themselves, never about the business named.
+CALLER_ONLY = {'mfa_status', 'support_cases'}
 SAMPLE = {'uuid': None, 'text': "'x'", 'jsonb': "'{}'::jsonb", 'date': 'CURRENT_DATE', 'numeric': '1', 'integer': '1',
           'bigint': '1', 'boolean': 'false', 'membership_role[]': "ARRAY['owner']::public.membership_role[]"}
 
@@ -79,7 +101,7 @@ def test_every_callable_definer_is_reviewed_pinned_and_refuses_other_tenants(inv
     for signature, name, config, types in functions:
         assert name in REVIEWED, f'{signature} is callable by signed-in users but has not been reviewed'
         assert any(setting.startswith('search_path=') for setting in config or []), f'{signature} has no fixed search_path'
-        if name in NO_TENANT_INPUT:
+        if name in NO_TENANT_INPUT or name in CALLER_ONLY:
             continue
         first_uuid = True
         args = []

@@ -46,7 +46,7 @@ test('downloads reconstruct attachment headers without trusting upstream headers
   expect(response.status).toBe(200);expect(response.headers.get('content-disposition')).toBe('attachment; filename="receipt.png"');
   expect(response.headers.get('x-content-type-options')).toBe('nosniff');expect(response.headers.get('cache-control')).toBe('private, no-store');
   expect(response.headers.has('set-cookie')).toBe(false);expect(response.headers.has('location')).toBe(false);
-  expect(fetchMock.mock.calls[0][0]).toBe(`https://file-api.example/api/v1/businesses/${business}/files/${ident}`);
+  expect(String(fetchMock.mock.calls[0][0])).toBe(`https://file-api.example/api/v1/businesses/${business}/files/${ident}`);
 });
 
 test('active content never previews and approved images preview with sandbox headers',async()=>{

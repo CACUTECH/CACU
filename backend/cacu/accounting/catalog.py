@@ -49,6 +49,8 @@ def catalog_mutate(session,actor,data:CatalogMutation):
             if movement.entry_date<cutover or movement.entry_date>datetime.now(ZoneInfo(session.business_timezone)).date():raise HTTPException(409,'Stock date must be within the current accounting cutover')
             period=ReportingPeriod.get_period(session,datetime.combine(movement.entry_date,time(12)))
             if period.status==ReportingPeriod.Status.CLOSED:raise HTTPException(409,'Stock changes cannot use a closed accounting period')
+            from cacu.accounting.periods import refuse_closed_month
+            refuse_closed_month(session,movement.entry_date)
             value=abs(movement.delta)*movement.unit_cost
             if value!=value.quantize(Decimal('0.01')):raise HTTPException(409,'Stock valuation requires a reviewed two-decimal unit cost')
             posted=post_movement(session,actor,data.request_key,purpose(session,'equity'))

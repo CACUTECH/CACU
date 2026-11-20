@@ -29,6 +29,7 @@ import { useRouter } from 'next/navigation';
 import { useBusiness } from '@/components/business-provider';
 import { getDashboardStatsAction, getRevenueTrendAction } from './reports/actions';
 import { isRouteAvailableInMode } from '@/lib/business-mode';
+import { OpenShiftsNotice } from '@/components/open-shifts-notice';
 
 type DashboardStats = {
   financials?: { total_income?: number | string; transaction_count?: number; net_profit?: number | string };
@@ -149,6 +150,8 @@ export default function DashboardPage() {
             </Badge>
         </div>
       </div>
+
+      {isRouteAvailableInMode('/pos', business?.business_type) && <OpenShiftsNotice />}
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard 

@@ -352,6 +352,20 @@ def statements(session,start:date,end:date,compare=None):
     position['equity']['lines'].append({'account_id':None,'code':None,'name':'Profit to date not yet closed to retained earnings','amounts':[money(p) for p in profit]})
     equity=[totals['equity'][i]+profit[i] for i in range(len(periods))]
     position['equity']['total']=[money(e) for e in equity]
+    # Statement of changes in equity (Doc 09 statement set), for the period itself: each equity account's opening
+    # balance, what moved it (capital added, drawings, transfers), and its closing balance; profit has its own line.
+    before=defaultdict(lambda:ZERO)
+    for row in rows:
+        if row['transaction_date'].date()<start:before[str(row['source_account_id'])]+=row['amount']*(1 if row['entry_type']=='DEBIT' else -1)
+    owners=sorted((k for k,t in types.items() if t in {'EQUITY','RECONCILIATION'} and (before[k] or moves[0][k] or balances[0][k])),
+                  key=lambda k:(chart.get(k,('',''))[0] or '',k))
+    changes=[{'account_id':k,'code':chart.get(k,(None,None))[0],'name':chart.get(k,(None,'Unknown account'))[1],
+              'opening':money(-before[k]),'movement':money(-moves[0][k]),'closing':money(-balances[0][k])} for k in owners]
+    profit_before=-sum((before[k] for k,t in types.items() if t in PROFIT_TYPES),ZERO)
+    changes.append({'account_id':None,'code':None,'name':'Profit not yet closed to retained earnings','opening':money(profit_before),
+                    'movement':money(profit[0]-profit_before),'closing':money(profit[0])})
+    opening_total=sum((-before[k] for k in owners),ZERO)+profit_before
+    changes_total={'opening':money(opening_total),'movement':money(equity[0]-opening_total),'closing':money(equity[0])}
     assets=[totals['current_assets'][i]+totals['non_current_assets'][i] for i in range(len(periods))]
     liabilities=[totals['current_liabilities'][i]+totals['non_current_liabilities'][i] for i in range(len(periods))]
     exceptions=[]
@@ -364,4 +378,5 @@ def statements(session,start:date,end:date,compare=None):
             'income_statement':{'sections':[income[k] for k,*_ in INCOME_SECTIONS],'gross_profit':[money(g) for g in gross],'net_profit':[money(n) for n in net]},
             'financial_position':{'sections':[position[k] for k,*_ in POSITION_SECTIONS],'total_assets':[money(a) for a in assets],
                 'total_liabilities':[money(l) for l in liabilities],'total_equity':[money(e) for e in equity],
-                'difference':[money(assets[i]-liabilities[i]-equity[i]) for i in range(len(periods))]}}
+                'difference':[money(assets[i]-liabilities[i]-equity[i]) for i in range(len(periods))]},
+            'changes_in_equity':{'lines':changes,'total':changes_total,'profit_for_period':money(net[0])}}

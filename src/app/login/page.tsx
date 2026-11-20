@@ -65,6 +65,13 @@ export default function LoginPage() {
 
       if (error) throw error;
 
+      // Two-step sign-in (SEC-014): with an authenticator set up, the code comes next.
+      const { data: level } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (level?.nextLevel === 'aal2' && level.currentLevel !== 'aal2') {
+        router.push("/login/verify");
+        return;
+      }
+
       toast({
         title: "Login Successful",
         description: "Welcome back to CACU.",

@@ -17,10 +17,55 @@ Source: Supabase security advisor and `pg_proc` on production (read-only, 29 Oct
 | `management_read`, `management_write` | `management_private.authorize` per section or operation | Keep |
 | `process_sale` | Forwards to `process_sale_safe` with a new request key each call, so a retry can post twice; unused | **Revoke** (20261030120000) |
 | `process_sale_safe`, `record_payment_atomic` | Owner/Admin/Editor | Keep |
+| `purchasing_allowed` (added 20261109090000) | Active membership of the business; returns only whether the plan includes purchasing | Keep |
+| `share_receipt`, `revoke_receipt_link` (added 20261111090000) | `authz.has_permission` sales.view; only that business's sales and links | Keep |
+| `public_receipt` (added 20261111090000) | Anyone holding an unguessable 64-hex link token sees that one receipt; no customer details; revocable | Keep (anon by design) |
+| `send_invoice_reminder` (added 20261111100000) | `authz.has_permission` invoices.create; only that business's invoice, to its own customer | Keep |
+| `notification_overview`, `save_notification_settings` (added 20261111090000) | Active membership (read, recipients masked); `settings.edit` and not read-only (save) | Keep |
 | `record_audit` | Any member, including viewers, could write audit rows with any action and record id; unused since the ledger moved to `record_ledger_entry_safe` | **Revoke** (20261030120000) |
 | `request_upload_delete` | Owner/Admin row, then `can_read_upload`, which requires an active membership | Keep |
 | `reserve_upload` | Active membership with a role allowed for the purpose | Keep |
 
 Added since the advisor run: `record_ledger_entry_safe`, `update_invoice_status_safe` (20261030100000) and `create_invoice_safe` (20261030110000), all Owner/Admin/Editor. Also `adopt_default_chart` (Owner/Admin) and `chart_of_accounts` (any member) from 20261031100000, and `save_opening_position`, `approve_opening_position` and `opening_position` (Owner/Admin) from 20261031110000, all through `management_private.authorize`.
 
+Added with POS part 2 (20261107100000): `discount_caps` (needs `settings.view` through `authz.require`) and `save_discount_cap` (Owner only, through `management_private.authorize`).
+
+Added with online payments (20261114090000), callable only by the accounting API's runtime role, never by signed-in users or anonymous visitors: `accounting.payment_link_target` (finds one business and invoice from an unguessable 64-hex pay-link token; live links of connected businesses only), `accounting.payment_webhook_target` (finds one business and its sealed Paystack key from the 64-hex token in its webhook address; the key stays AES-GCM ciphertext) and `accounting.payment_businesses` (the check job's list of connected businesses). Each also names who the API acts as, through `accounting.payments_actor` (not callable by any client role): the person who shared the link or connected Paystack while they may still record payments, otherwise the owner.
+
 `backend/tests/test_definer_access_postgres.py` keeps this list honest: it fails when a callable SECURITY DEFINER function is not in its reviewed list or has no fixed `search_path`, and it calls every listed function as a member of another business and requires a refusal or an empty answer with nothing written. Re-run the advisor after each migration and update this table.
+
+Added with two-step sign-in (20261116090000, E22 part 1):
+- **Callable from the browser (`authenticated`), each answering only for the caller:**
+  - `public.mfa_status`.
+  - `public.new_recovery_codes`, only right after the second step.
+  - `public.use_recovery_code`, five failed tries an hour. It deletes only the caller's own `auth.mfa_factors` rows.
+- **Internal:** `authz.mfa_enrolled`, `authz.mfa_required` and `authz.session_level`, with no grants. `authz.mfa_ok` is granted to `authenticated` and `cacu_runtime`.
+- **Changed:** `authz.has_permission`, `public.is_business_member`, `public.has_business_role` and `management_private.authorize` now also require `authz.mfa_ok`.
+
+Added with the full data export (20261117090000, E22 part 2). All are callable only by the accounting API's runtime role:
+- `accounting.exporting`: the export read policy. It is true only for the business and export in the API's own transaction, while that export is running and its requester is still an active member.
+- `accounting.export_queue`: the job's list of waiting exports, stopped runs and expired files.
+- `accounting.export_settle`: marks an export failed, or deletes a file past its seven days, and nothing else.
+
+Added with closing a business (20261118090000, E22 part 3):
+- **Callable from the browser (`authenticated`):**
+  - `public.business_closure_status`: active members only.
+  - `public.close_business`: through `management_private.authorize`, Owner only. It needs the business name typed and a reason.
+  - `public.reopen_business`: Owner only, within 90 days.
+- **Runtime only:** `platform.purge_closed_businesses`, `platform.closures_due` and `platform.is_closed`.
+- **Changed:**
+  - `platform.writes_allowed` also refuses a closed business.
+  - `platform.read_only_guard` names a closed business, and lets only the removal job's own transaction clear contact details.
+
+Added with support access (20261119090000, E22 part 4):
+- **Callable from the browser (`authenticated`):**
+  - `public.support_access_status`, `public.grant_support_access` and `public.end_support_access`: through `management_private.authorize`, Owner only. A grant lasts 1 hour, 24 hours, 3 days or 7 days and needs a reason.
+  - `public.support_cases`: answers only for the caller. A listed CACU support person, after the second step, sees the businesses with a live grant; anyone else gets an empty list.
+  - `public.open_support_case`: listed CACU support staff only, after the second step, and only for a business with a live grant. Every opening is recorded.
+- **Runtime only:** `ops.set_support_staff` (runbook RB-09) and `authz.supporting`.
+- **Internal (no grants):** `authz.caller`, `authz.support_case`, `authz.support_permits` and the `authz.support_read_only` trigger.
+- **Changed:**
+  - `authz.has_permission` also accepts an opened support case, for `*.view` permissions only, and for `hr.view` only when the Owner ticked staff and pay records.
+  - `public.is_business_member` accepts an opened case; `public.has_business_role` accepts one only where viewers are admitted.
+  - `accounting.authorized` shows an opened case the business's rows; `accounting.lock_membership` names it `support`, which the API refuses on every write.
+  - Every public table with a `business_id` gets the `support_read_only` trigger: a CACU support account cannot change a row in a business it is not a member of.

@@ -22,6 +22,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
     LayoutDashboard, 
     ArrowLeftRight, 
+    ClipboardCheck,
+    ClipboardList,
     Package, 
     FileText, 
     Users, 
@@ -141,7 +143,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname)) {
+    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname) && !pathname.startsWith('/r/')) {
         router.push('/login');
     }
   }, [user, userLoading, pathname, router]);
@@ -161,8 +163,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/jobs', label: 'Work Orders / Jobs', icon: Wrench },
     ] : []),
     { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+    { href: '/reconciliation/daily', label: 'Daily reconciliation', icon: ClipboardCheck },
     { href: '/invoices', label: 'Invoices & Receipts', icon: Receipt },
     { href: '/catalog', label: 'Inventory', icon: Package },
+    ...(businessType !== 'SERVICE' ? [{ href: '/purchases', label: 'Purchase orders', icon: ClipboardList }, { href: '/inventory/counts', label: 'Stock counts', icon: ClipboardCheck }, { href: '/inventory/batches', label: 'Batches & expiry', icon: CalendarClock }] : []),
     { href: '/storefront', label: 'Storefront', icon: Store },
     {
       href: '/accounting',
@@ -176,20 +180,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/accounting/journal-entries', label: 'Journal Adjustments' },
         { href: '/accounting/trial-balance', label: 'Trial Balance' },
         { href: '/accounting/general-ledger', label: 'General Ledger' },
+        { href: '/accounting/periods', label: 'Month Close' },
       ],
     },
     { href: '/reports', label: 'Reports', icon: FileText },
     { href: '/customers', label: 'Customers', icon: Users },
+    { href: '/customers/segments', label: 'Customer segments', icon: Users },
     { 
       href: '/analytics', 
       label: 'Analytics', 
       icon: PieChart,
       children: [
           { href: '/analytics/kpi', label: 'KPIs' },
+          { href: '/analytics/ask', label: 'Ask your books' },
           { href: '/analytics/planning', label: 'Planning & Budgeting' },
           { href: '/analytics/budget-vs-actual', label: 'Budget vs. Actual' },
           { href: '/analytics/reconciliation', label: 'Reconciliation' },
           { href: '/analytics/top-selling', label: 'Top-Selling' },
+          { href: '/analytics/profitability', label: 'Profitability' },
           { href: '/analytics/aging-reports', label: 'Aging Reports' },
       ]
     },
@@ -212,7 +220,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   // Auth page check must happen before loader check
-  if (['/setup', '/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/join'].includes(pathname)) {
+  // Public receipt links (/r/<token>) open without an account (Doc 10 E20).
+  if (['/setup', '/login', '/login/verify', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/join'].includes(pathname) || pathname.startsWith('/r/')) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 

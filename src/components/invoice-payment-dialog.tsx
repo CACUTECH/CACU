@@ -8,9 +8,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useVatStatus } from '@/components/vat-field';
 
 type Invoice = { id: string; invoice_number: string; customer_id?: string; total: number; outstanding?: string };
-type Draft = { invoiceId: string; requestKey: string; amount: string; method: 'Cash' | 'Transfer'; bankAccountId: string; retryOnly?: boolean; choices?: CollectionAccounts };
+type Draft = { invoiceId: string; requestKey: string; amount: string; method: 'Cash' | 'Transfer'; bankAccountId: string; wht?: string; certificate?: string; retryOnly?: boolean; choices?: CollectionAccounts };
 
 export function InvoicePaymentDialog({ invoice, onClose, onSaved }: { invoice: Invoice | null; onClose: () => void; onSaved: () => void }) {
   const drafts = React.useRef(new Map<string, Draft>());
@@ -18,6 +19,7 @@ export function InvoicePaymentDialog({ invoice, onClose, onSaved }: { invoice: I
   const [choices, setChoices] = React.useState<CollectionAccounts | null>(null);
   const [error, setError] = React.useState('');
   const [processing, setProcessing] = React.useState(false);
+  const taxes = useVatStatus();
   React.useEffect(() => {
     let cancelled = false;
     setChoices(null); setError('');
@@ -35,14 +37,15 @@ export function InvoicePaymentDialog({ invoice, onClose, onSaved }: { invoice: I
     event.preventDefault();
     if (!invoice || !draft || draft.invoiceId !== invoice.id || !choices || processing) return;
     if (!/^\d{1,13}(\.\d{1,2})?$/.test(draft.amount) || Number(draft.amount) <= 0) { setError('Enter a positive amount with at most two decimal places.'); return; }
-    if (!draft.retryOnly && choices.native && draft.method === 'Transfer' && !choices.accounts.some(account => account.id === draft.bankAccountId)) { setError('Select an available receiving bank account.'); return; }
+    if (draft.wht && !/^\d{1,13}(\.\d{1,2})?$/.test(draft.wht)) { setError('Enter the WHT with at most two decimal places, or leave it empty.'); return; }
     setProcessing(true); setError('');
     const attempted = { ...draft, retryOnly: true, choices };
     drafts.current.set(invoice.id, attempted);
     setDraft(attempted);
     try {
       const result = await markAsPaidAction({ invoiceId: invoice.id, customerId: invoice.customer_id, requestKey: draft.requestKey,
-        amount: draft.amount, method: draft.method, bankAccountId: choices.native && draft.method === 'Transfer' ? draft.bankAccountId : undefined });
+        amount: draft.amount, method: draft.method, bankAccountId: choices.native && draft.method === 'Transfer' && draft.bankAccountId ? draft.bankAccountId : undefined,
+        ...(Number(draft.wht) > 0 ? { wht: draft.wht, whtCertificate: draft.certificate?.trim() || undefined } : {}) });
       if (!result.success) {
         if (result.retryable === false && !draft.retryOnly) { drafts.current.delete(invoice.id); setDraft({ ...draft, retryOnly: false }); }
         setError(result.error || 'Payment failed. Retry using the same payment details.'); return;
@@ -57,11 +60,18 @@ export function InvoicePaymentDialog({ invoice, onClose, onSaved }: { invoice: I
       <form onSubmit={submit} className="space-y-4">
         <Label htmlFor="receipt-amount">Amount received (NGN)</Label>
         <Input id="receipt-amount" inputMode="decimal" required disabled={processing || !choices || !currentDraft || currentDraft.retryOnly} value={currentDraft?.amount || ''} onChange={event => setDraft(previous => previous && { ...previous, amount: event.target.value })} />
+        {taxes?.wht_enabled && currentDraft && <div className="space-y-2">
+          <Label htmlFor="receipt-wht">WHT the customer deducted (NGN, optional)</Label>
+          <Input id="receipt-wht" inputMode="decimal" placeholder="0.00" disabled={processing || currentDraft.retryOnly} value={currentDraft.wht || ''} onChange={event => setDraft(previous => previous && { ...previous, wht: event.target.value })} />
+          {Number(currentDraft.wht) > 0 && <><Label htmlFor="receipt-wht-certificate">WHT certificate number (if you have it)</Label>
+            <Input id="receipt-wht-certificate" maxLength={60} disabled={processing || currentDraft.retryOnly} value={currentDraft.certificate || ''} onChange={event => setDraft(previous => previous && { ...previous, certificate: event.target.value })} />
+            <p className="text-xs text-muted-foreground">The cash and the WHT together settle the invoice.</p></>}
+        </div>}
         {choices && currentDraft ? <CollectionAccountPicker method={currentDraft.method} bankAccountId={currentDraft.bankAccountId} choices={choices} disabled={processing || currentDraft.retryOnly}
           onMethodChange={method => setDraft({ ...currentDraft, method })} onBankChange={bankAccountId => setDraft({ ...currentDraft, bankAccountId })} /> : !error ? <p role="status">Loading payment accounts...</p> : null}
         {currentDraft?.retryOnly && <p role="status" className="text-sm text-muted-foreground">Retry the original payment details to confirm whether it was recorded.</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="w-full min-h-11" disabled={processing || !choices || !currentDraft || (choices.native && currentDraft.method === 'Transfer' && !currentDraft.bankAccountId)}>{processing ? 'Recording payment...' : currentDraft?.retryOnly ? 'Retry payment' : 'Record payment'}</Button>
+        <Button type="submit" className="w-full min-h-11" disabled={processing || !choices || !currentDraft}>{processing ? 'Recording payment...' : currentDraft?.retryOnly ? 'Retry payment' : 'Record payment'}</Button>
       </form>
     </DialogContent>
   </Dialog>;

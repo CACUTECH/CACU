@@ -2,6 +2,7 @@ import 'server-only';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
 import type { components } from '@/lib/accounting-contract';
+import { serviceUrl } from '@/lib/service-url';
 
 type Draft = components['schemas']['JournalDraft'];
 type Validation = components['schemas']['JournalValidation'];
@@ -20,7 +21,7 @@ export async function validateAccountingJournal(draft: Draft): Promise<Validatio
   const businessId = await getActiveBusinessIdAction();
   const { data: { session }, error } = await supabase.auth.getSession();
   if (error || !session?.access_token) throw new Error('Valid session required');
-  const response = await fetch(new URL(`/v1/businesses/${encodeURIComponent(businessId)}/journals/validate`, url), {
+  const response = await fetch(serviceUrl(url, ['v1', 'businesses', businessId, 'journals', 'validate']), {
     method: 'POST',
     headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(draft), cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15000),

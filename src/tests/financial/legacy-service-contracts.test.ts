@@ -20,7 +20,7 @@ test('checkout retains the UI retry key and decimal quote after a committed sale
   const rpc = jest.fn().mockResolvedValue({ data: 'sale', error: null });
   context(service, rpc);
   Object.assign(service, { checkInventoryThresholds: jest.fn().mockRejectedValue(new Error('Notification unavailable')) });
-  await expect(service.processCheckout({ requestKey: 'retry-key', items: [{ id: 'sku', name: 'Display name', price: 10, quantity: 1 }], paymentMethod: 'Cash', totalAmount: 10 })).resolves.toEqual({ saleId: 'sale' });
+  await expect(service.processCheckout({ requestKey: 'retry-key', items: [{ id: 'sku', name: 'Display name', price: 10, quantity: 1 }], paymentMethod: 'Cash', totalAmount: 10 })).resolves.toEqual({ saleId: 'sale', status: 'completed' });
   expect(rpc).toHaveBeenCalledWith('process_sale_safe', expect.objectContaining({ p_request_key: 'retry-key', p_total_amount: '10.00', p_items: [expect.objectContaining({ price: '10.00' })] }));
 });
 

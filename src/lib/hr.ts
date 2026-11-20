@@ -1,5 +1,6 @@
 /** Shared HR types, labels and safe error messages. Safe to import from client components. */
 import { READ_ONLY_MESSAGE } from '@/lib/read-only';
+import { PERMISSION_MESSAGE } from '@/lib/permission';
 /** Stored status codes (employees_employment_status_check) and the labels shown to people. */
 export const EMPLOYEE_STATUS_LABELS = { active: 'Active', on_leave: 'On leave', suspended: 'Suspended', exited: 'Departed' } as const;
 export type EmployeeStatus = keyof typeof EMPLOYEE_STATUS_LABELS;
@@ -37,6 +38,7 @@ export type HistoryEntry = { event: string; fields: string[] | null; created_at:
 
 const MESSAGES: Record<string, string> = {
   SUBSCRIPTION_READ_ONLY: READ_ONLY_MESSAGE,
+  PERMISSION_DENIED: PERMISSION_MESSAGE,
   ACCESS_DENIED: 'An active Owner or Admin must make HR changes.',
   INVALID_REQUEST: 'The request was incomplete. Refresh and try again.',
   REQUEST_KEY_REUSED: 'This request was already used for a different change. Refresh and try again.',
