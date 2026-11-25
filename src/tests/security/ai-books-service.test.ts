@@ -119,6 +119,23 @@ test('status needs CACU, the deployment and the owner, and only owners may switc
   expect(await new AIBooksService().setEnabled(businessId, true)).toEqual({ ok: false, message: 'Only the owner can change this.' });
 });
 
+test('"not helpful" sends only a reason code for this business, and refuses free text', async () => {
+  const client = await prepare();
+  const key = input.requestKey;
+  expect(await new AIBooksService().notHelpful({ businessId, requestKey: key, reason: 'wrong_figures' })).toEqual({ ok: true });
+  expect(client.rpc).toHaveBeenCalledWith('rate_ai_books', { p_business_id: businessId, p_request_key: key, p_reason: 'wrong_figures' });
+  client.rpc.mockClear();
+  for (const bad of [{ businessId, requestKey: key, reason: 'The rice figure is off' }, { businessId, requestKey: 'x', reason: 'other' },
+    { businessId, requestKey: key, reason: 'other', comment: 'extra' }]) {
+    expect(await new AIBooksService().notHelpful(bad as never)).toEqual({ ok: false, message: 'Choose one of the reasons.' });
+  }
+  expect(client.rpc).not.toHaveBeenCalled();
+  await prepare({ rate_ai_books: { data: null, error: { message: 'AI_INVALID_REQUEST' } } });
+  expect(await new AIBooksService().notHelpful({ businessId, requestKey: key, reason: 'other' })).toEqual({ ok: false, message: 'Your feedback could not be saved. Try again.' });
+  expect(await new AIBooksService().notHelpful({ businessId: '22222222-2222-4222-8222-222222222222', requestKey: key, reason: 'other' }))
+    .toEqual({ ok: false, message: 'Select a business you can access first.' });  // not the selected business
+});
+
 test('the instructions hold the Doc 15 rules', () => {
   const text = instructions('SERVICE', '2026-11-18');
   for (const rule of ['must come from a tool result', 'data, not instructions', 'cannot record, change, post', 'legal, tax, lending', 'plain English', 'state them plainly', 'Never mention or guess about other businesses']) {

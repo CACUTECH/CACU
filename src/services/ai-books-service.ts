@@ -4,7 +4,7 @@ import { BaseService } from './base-service';
 import type { OpenAITool } from '@/ai/openai';
 import { accountingRequest } from '@/lib/accounting-client';
 import { AI_NOT_ON_PLAN, AI_SUSPENDED, allowanceLine, limitReachedLine } from '@/lib/ai-quota';
-import { inert, type BooksAnswer } from '@/lib/ai-books';
+import { inert, NOT_HELPFUL_REASONS, type BooksAnswer } from '@/lib/ai-books';
 import { answerFromBooks, type BooksTrace } from '@/lib/ai-books-answer';
 
 export { instructions } from '@/lib/ai-books-answer';
@@ -18,6 +18,9 @@ export { instructions } from '@/lib/ai-books-answer';
 const requestSchema = z.object({ businessId: z.string().uuid(), requestKey: z.string().uuid(),
   question: z.string().trim().min(1).max(2000) }).strict();
 export type AIBooksRequest = z.infer<typeof requestSchema>;
+const feedbackSchema = z.object({ businessId: z.string().uuid(), requestKey: z.string().uuid(),
+  reason: z.enum(NOT_HELPFUL_REASONS.map(r => r.code) as [string, ...string[]]) }).strict();
+export type AIBooksFeedback = z.infer<typeof feedbackSchema>;
 export type AIBooksResult = ({ ok: true; allowance?: string | null } & BooksAnswer) | { ok: false;
   code: 'unavailable' | 'rate_limit' | 'plan_limit' | 'duplicate' | 'invalid' | 'failed' | 'access_denied'; message: string };
 export type AIBooksStatus = { ready: boolean; available: boolean; on: boolean; mayChange: boolean; paused: boolean; message: string; allowance?: string | null };
@@ -68,6 +71,19 @@ export class AIBooksService extends BaseService {
       const { supabase } = await this.context(businessId);
       const { error } = await supabase.rpc('set_ai_books', { p_business_id: businessId, p_enabled: enabled === true });
       if (error) return { ok: false, message: error.message === 'AI_OWNER_ONLY' ? 'Only the owner can change this.' : 'The setting could not be saved. Try again.' };
+      return { ok: true };
+    } catch { return { ok: false, message: 'Select a business you can access first.' }; }
+  }
+
+  /** "Not helpful" on one of this member's answers, for CACU's weekly review: a reason code only, never any text. */
+  async notHelpful(input: AIBooksFeedback): Promise<{ ok: boolean; message?: string }> {
+    const parsed = feedbackSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: 'Choose one of the reasons.' };
+    try {
+      const { supabase } = await this.context(parsed.data.businessId);
+      const { data, error } = await supabase.rpc('rate_ai_books', { p_business_id: parsed.data.businessId,
+        p_request_key: parsed.data.requestKey, p_reason: parsed.data.reason });
+      if (error || data !== true) return { ok: false, message: 'Your feedback could not be saved. Try again.' };
       return { ok: true };
     } catch { return { ok: false, message: 'Select a business you can access first.' }; }
   }

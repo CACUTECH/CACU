@@ -7,9 +7,9 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
-import { askAIBooksAction, getAIBooksStatusAction, setAIBooksAction } from '@/app/ai/books-actions';
+import { askAIBooksAction, getAIBooksStatusAction, notHelpfulAIBooksAction, setAIBooksAction } from '@/app/ai/books-actions';
 import { AI_BOOKS_LABEL, type BooksAnswer } from '@/lib/ai-books';
-import { BooksAnswerView } from '@/components/ai-books-answer-view';
+import { BooksAnswerView, NotHelpful } from '@/components/ai-books-answer-view';
 import type { AIBooksRequest, AIBooksStatus } from '@/services/ai-books-service';
 
 const EXAMPLES = ['How much profit did I make this month?', 'Who owes my business money?', 'What stock has not sold in 30 days?', 'Can I afford to restock next week?'];
@@ -22,7 +22,7 @@ export default function AskYourBooksPage() {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const [hasAttempt, setHasAttempt] = React.useState(false);
-  const [answers, setAnswers] = React.useState<{ question: string; answer: BooksAnswer }[]>([]);
+  const [answers, setAnswers] = React.useState<{ requestKey: string; question: string; answer: BooksAnswer }[]>([]);
   const attempt = React.useRef<AIBooksRequest | null>(null);
   const inFlight = React.useRef(false);
 
@@ -58,7 +58,7 @@ export default function AskYourBooksPage() {
       if (result.ok) {
         const answer: BooksAnswer = { answer: result.answer, check: result.check, sources: result.sources, limitations: result.limitations, tools: result.tools };
         const allowance = result.allowance;
-        setAnswers(previous => [...previous.slice(-4), { question: original.question, answer }]);
+        setAnswers(previous => [...previous.slice(-4), { requestKey: original.requestKey, question: original.question, answer }]);
         attempt.current = null; setHasAttempt(false); setQuestion('');
         if (allowance !== undefined) setStatus(s => s && { ...s, allowance });
       } else {
@@ -95,9 +95,10 @@ export default function AskYourBooksPage() {
         <p className="text-xs text-muted-foreground">{AI_BOOKS_LABEL} You only see figures your role can see on the screens.</p>
         {status.allowance && <p role="status" className="text-sm font-medium">{status.allowance}</p>}
         <div role="log" aria-label="Answers" aria-live="polite" className="space-y-4">
-          {answers.map((a, i) => <div key={i} className="space-y-2">
+          {answers.map(a => <div key={a.requestKey} className="space-y-2">
             <p className="rounded-lg bg-muted p-3 text-sm whitespace-pre-wrap break-words">{a.question}</p>
             <BooksAnswerView answer={a.answer} />
+            {businessId && <NotHelpful onSend={reason => notHelpfulAIBooksAction({ businessId, requestKey: a.requestKey, reason })} />}
           </div>)}
         </div>
         <form className="space-y-3" onSubmit={e => { e.preventDefault(); void send(); }}>
