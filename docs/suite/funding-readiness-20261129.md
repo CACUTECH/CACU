@@ -1,10 +1,10 @@
-# Funding readiness, parts 1 and 2: the score, recommendations and history (E19 R3)
+# Funding readiness: the score, recommendations, history and the lender pack (E19 R3)
 
 Doc 15 "Funding readiness assessment flow", "Funding readiness scoring" and FRA-001 to FRA-012. The owner chose, on 2026-11-25, to build it in three parts:
 
 1. eligibility, the score and its explanation (done);
 2. recommendations from a fixed library, and monthly history (FRA-002, FRA-003) (done, see below);
-3. the lender pack, shared by an expiring link (FRA-006 to FRA-008).
+3. the lender pack, shared by an expiring link (FRA-006 to FRA-008) (done, see below).
 
 All three stay behind a CACU switch that is off until gate G5.
 
@@ -168,7 +168,70 @@ On the General plan, `history` is `null` and the single-assessment endpoint answ
 
 The screen lists past assessments with the change in score from the one before, marked "Monthly" or "You asked". Opening one shows it in full until "Back to the latest". The General plan sees a line saying what the Oga and Chairman plans add.
 
+## Part 3: the lender pack (FRA-006 to FRA-008, FR-184)
+
+Only the **owner** of a business on the **Chairman** plan (`module.funding = lender_pack`) can share, and only while funding readiness is on. Admins, editors, viewers and CACU support can't.
+
+### What the pack holds (FRA-006)
+
+The pack holds these and nothing else:
+
+- **The management statements for the assessed period:** profit or loss, financial position at the period end, and changes in equity. Cash flow is included too, or a note when some accounts still need a reviewed cash-flow mapping. They are labelled "Management statements, not reviewed" (BR-061).
+- **The assessment with its explanation:** the score, band, model version, and every area and measure with its value and thresholds.
+- **A data-completeness note:**
+  - the months covered and the areas that could be worked out;
+  - the share of trading days with something recorded;
+  - what was waiting to be sorted out when the pack was prepared;
+  - the measures that could not be worked out;
+  - what the score cannot see.
+- **The business profile:** name, kind of business, address, and when the books started in CACU. The API reads these through `accounting.funding_profile`, a definer function that returns only those three fields.
+
+The pack leaves out:
+
+- customer and supplier names;
+- internal ids;
+- cash-flow detail lines;
+- the recommendations, which are the owner's own plan.
+
+### Sharing (FRA-007)
+
+1. **Owner fills in the share.** They enter who the pack is for (name, and optionally organisation), what it is for, and how long the link works: 7, 14, 30 (the default), 60 or 90 days.
+2. **Owner previews it.** `POST …/funding-readiness/shares/preview` builds the pack and returns it with its SHA-256. The screen shows exactly what the lender will see.
+3. **Owner confirms it.** They tick "I agree to share this pack with … for …, for … days", then share. `POST …/funding-readiness/shares` builds the pack again and refuses if its SHA-256 differs from the one previewed ("Your books changed after you looked at the pack. Look at it again before you share it."). What is kept is exactly what the owner saw.
+4. **Owner sends the link.** The response carries the link's token once, as `/pack/<token>`. CACU keeps only the token's SHA-256, so a lost link is withdrawn and shared again. A retried confirmation with the same request key returns the share without the token.
+
+The pack is a fixed snapshot in `accounting.funding_share`. A trigger refuses any change except withdrawing it once, and refuses deletion.
+
+### The lender's link (FRA-008, FR-184)
+
+`/pack/<token>` opens without an account. It calls `public.funding_pack(token)`, a definer function that anyone with the link may call.
+
+| Situation | What the lender sees | Logged in `accounting.funding_share_access` |
+| --- | --- | --- |
+| Live link | The snapshot, who it was shared with and why, and when the link stops working | Yes, as opened |
+| Expired, withdrawn, or funding readiness switched off | Only that it has stopped | Yes, with that outcome |
+| Unknown or malformed token | Nothing | No |
+
+The log keeps only the time and the outcome, never who opened the link or from where.
+
+The lender never gets access to the books. The page is not indexed and sends no referrer.
+
+### For the owner
+
+The screen lists every pack shared, with:
+
+- its recipient and purpose;
+- whether the link works, has expired or was withdrawn;
+- how many times it was opened, and each opening.
+
+**Withdraw the link** stops it straight away. `GET …/funding-readiness/shares` and `POST …/funding-readiness/shares/{id}/withdraw` back this.
+
 ## Not yet
 
-- Part 3: the lender pack and consented sharing.
+- Gate G5, as above. Its checks:
+  - lender validation of the thresholds (FRA-010);
+  - the data protection impact assessment (FRA-012), which should now cover the lender pack and its access log;
+  - counsel's view on credit-reporting rules once lenders use the pack (CMP-17).
+- A downloadable file for the pack. FRA-008 allows a link or a file; this release offers only the link, so nothing leaves CACU.
+
 - Gate G5, as above.

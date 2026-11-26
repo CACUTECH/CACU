@@ -6,6 +6,8 @@
 // Off until CACU switches it on after gate G5.
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
+import { useBusiness } from '@/components/business-provider';
+import { SharePanel } from './share-panel';
 import { fundingAssessAction, fundingAssessmentAction, fundingOverviewAction } from './actions';
 import { asHistory, FUNDING_NOTICE, scoreChange, showDate, showMeasure, type Assessment, type FundingOverview, type HistoryItem } from '@/lib/funding-readiness';
 
@@ -14,6 +16,7 @@ export default function FundingReadinessPage() {
   const [error, setError] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [past, setPast] = React.useState<Assessment | null>(null);
+  const { business } = useBusiness();
 
   const load = React.useCallback(async () => {
     const r = await fundingOverviewAction();
@@ -68,6 +71,9 @@ export default function FundingReadinessPage() {
         <Button variant="outline" size="sm" onClick={() => setPast(null)}>Back to the latest</Button>
       </div>}
       {(past ?? data.latest) && <AssessmentView assessment={(past ?? data.latest)!} />}
+
+      {data.level === 'lender_pack' && business?.userRole === 'owner' && (past ?? data.latest) &&
+        <SharePanel key={(past ?? data.latest)!.id} assessmentId={(past ?? data.latest)!.id} />}
 
       {data.history && data.history.length > 0 && <HistoryView history={data.history} showing={(past ?? data.latest)?.id} onOpen={id => void open(id)} />}
 

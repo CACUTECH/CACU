@@ -41,3 +41,44 @@ export function asHistory(a: Assessment): HistoryItem {
   return { id: a.id, kind: a.kind, assessed_on: a.assessed_on, score: a.score, band: a.band, band_label: a.band_label,
     model_version: a.model_version, period: { start_date: a.period.start_date, end_date: a.period.end_date } };
 }
+
+// --- Part 3: the lender pack (FRA-006..008) ------------------------------------------------------------------------
+type Line = { code: string | null; name: string; amounts: string[] };
+type Section = { key: string; title: string; lines: Line[]; total: string[] };
+/** What a lender sees: a fixed snapshot, never the books (FRA-006, FRA-008). */
+export type FundingPack = {
+  kind: 'cacu_funding_pack'; version: number; notice: string; label: string; prepared_on: string;
+  business: { name: string | null; business_type: string | null; address: string | null; books_started: string | null };
+  period: { start_date: string; end_date: string; months: number };
+  statements: { tier: string; basis: string; currency: string; checks: string[];
+    income_statement: { sections: Section[]; gross_profit: string[]; net_profit: string[] };
+    financial_position: { sections: Section[]; total_assets: string[]; total_liabilities: string[]; total_equity: string[] };
+    changes_in_equity: { lines: { code: string | null; name: string; opening: string; movement: string; closing: string }[];
+      total: { opening: string; movement: string; closing: string }; profit_for_period: string };
+    cash_flow: { sections: { key: string; lines: { label: string; amount: string }[]; total: string }[];
+      opening_cash: string | null; net_change: string | null; closing_cash: string | null; reconciled: boolean | null; note: string | null } };
+  assessment: { assessed_on: string; kind: string; model_version: string; score: number; band: Assessment['band']; band_label: string;
+    band_text: string; based_on: number; dimensions: Dimension[]; information: Assessment['information'] };
+  completeness: { months: number; dimensions_used: number; dimensions_total: number; trading_days_recorded: string | null;
+    open_exceptions_when_prepared: number; not_worked_out: string[]; notes: string[] };
+};
+export type ShareDraft = { assessment_id?: string; recipient_name: string; recipient_organisation?: string | null; purpose: string; expires_in_days: number };
+export type SharePreview = ShareDraft & { pack: FundingPack; pack_sha256: string };
+export type FundingShare = { id: string; assessment_id: string; recipient_name: string; recipient_organisation: string | null; purpose: string;
+  created_at: string; expires_at: string; withdrawn_at: string | null; status: 'live' | 'expired' | 'withdrawn'; pack_sha256: string;
+  times_opened?: number; openings?: { opened_at: string; outcome: 'opened' | 'expired' | 'withdrawn' | 'switched_off' }[]; token?: string | null };
+/** What the public link returns: the pack while the link is live, otherwise only why not. */
+export type PublicPack = { status: 'opened'; recipient_name: string; recipient_organisation: string | null; purpose: string; shared_at: string;
+  expires_at: string; pack: FundingPack } | { status: 'expired' | 'withdrawn' | 'switched_off' };
+
+export const SHARE_DAYS = [7, 14, 30, 60, 90] as const;
+
+export function naira(value: string | null | undefined): string {
+  const n = Number(value ?? 0);
+  const text = `₦${Math.abs(n).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return n < 0 ? `(${text})` : text;
+}
+
+export function showMoment(iso: string): string {
+  return new Date(iso).toLocaleString('en-NG', { day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Lagos' });
+}

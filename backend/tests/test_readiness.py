@@ -123,3 +123,14 @@ def test_recommendations_quote_the_figures_and_skip_what_could_not_be_worked_out
     for d in result['dimensions']:
         for text in d['recommendations']:
             assert 'loan approved' not in text and 'guarantee' not in text.lower()  # FRA-009: never a promise of finance
+
+
+def test_a_share_request_is_checked_before_anything_is_built():
+    from cacu.accounting.funding_pack import ShareDraft, pack_hash
+    draft = {'recipient_name': 'Amaka Obi', 'purpose': 'Working capital loan application'}
+    assert ShareDraft(**draft).expires_in_days == 30  # FRA-007: consent expires after 30 days unless the owner chooses
+    for bad in ({'expires_in_days': 91}, {'expires_in_days': 0}, {'recipient_name': ' '}, {'purpose': 'x'}, {'extra': 1}):
+        with pytest.raises(ValueError):
+            ShareDraft(**{**draft, **bad})
+    assert ShareDraft(**{**draft, 'purpose': '  Working   capital  '}).purpose == 'Working capital'
+    assert pack_hash({'b': 1, 'a': '₦'}) == pack_hash({'a': '₦', 'b': 1})  # key order does not change the hash
