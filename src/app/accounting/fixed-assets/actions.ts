@@ -33,6 +33,7 @@ const asset = z.object({
   useful_life_months: z.number().int().min(1).max(1200).nullable().optional(),
   annual_rate_percent: z.string().regex(/^[0-9]{1,3}(\.[0-9]{1,2})?$/, 'Enter the yearly rate, like 25.').nullable().optional(),
   how: z.enum(['paid', 'credit', 'existing']),
+  vat: amount.optional(),
   pay_method: z.enum(['Cash', 'Transfer']).nullable().optional(), bank_account_id: id.nullable().optional(),
   supplier_id: id.nullable().optional(), bill_number: z.string().trim().max(100).nullable().optional(), due_date: day.nullable().optional(),
   accumulated_depreciation: amount.optional(), brought_in_on: day.nullable().optional(),
@@ -46,13 +47,13 @@ const asset = z.object({
 
 /** Only the fields that belong to how the asset was bought are sent. */
 function body(v: z.infer<typeof asset>) {
-  const { pay_method, bank_account_id, supplier_id, bill_number, due_date, accumulated_depreciation, brought_in_on, useful_life_months, annual_rate_percent, ...rest } = v;
+  const { pay_method, bank_account_id, supplier_id, bill_number, due_date, accumulated_depreciation, brought_in_on, useful_life_months, annual_rate_percent, vat, ...rest } = v;
   return {
     ...rest,
     ...(v.method === 'straight_line' ? { useful_life_months } : { annual_rate_percent }),
     ...(v.how === 'paid' ? { pay_method, ...(pay_method === 'Transfer' ? { bank_account_id } : {}) } : {}),
     ...(v.how === 'credit' ? { supplier_id, bill_number, ...(due_date ? { due_date } : {}) } : {}),
-    ...(v.how === 'existing' ? { accumulated_depreciation: accumulated_depreciation || '0.00', brought_in_on } : {}),
+    ...(v.how === 'existing' ? { accumulated_depreciation: accumulated_depreciation || '0.00', brought_in_on } : { vat: vat || '0.00' }),
   };
 }
 

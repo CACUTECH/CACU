@@ -2754,6 +2754,11 @@ export interface components {
              * @enum {string}
              */
             how: "paid" | "credit" | "existing";
+            /**
+             * Vat
+             * @default 0.00
+             */
+            vat: string;
             /** Pay Method */
             pay_method?: ("Cash" | "Transfer") | null;
             /** Bank Account Id */

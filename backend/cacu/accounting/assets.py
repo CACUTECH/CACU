@@ -3,7 +3,9 @@
 Owner decisions of 26 November 2026:
 
 * An asset is bought **paid** (debit its cost, credit the till or a bank), **on credit** (a supplier bill for its cost,
-  listed and paid with the other bills), or was **already owned** before the books started in CACU. That one is
+  listed and paid with the other bills), or was **already owned** before the books started in CACU. A business
+  registered for VAT claims the input VAT on what it buys, as on any bill or expense: the cost is before VAT and the
+  VAT goes to Input VAT, in the month's VAT return. That one is
   brought in with its depreciation to date: debit its cost, credit its accumulated depreciation and retained earnings.
   It is the position brought in, so the cash flow statement leaves it out, as it does the opening position.
 * **Straight-line** charges (cost less residual value) evenly over the useful life; **reducing balance** charges a
@@ -50,6 +52,8 @@ class AddAsset(BaseModel):
     useful_life_months: int | None = Field(default=None, ge=1, le=1200)
     annual_rate_percent: str | None = Field(default=None, pattern=r'^[0-9]{1,3}(\.[0-9]{1,2})?$')
     how: Literal['paid', 'credit', 'existing']
+    # Bought paid or on credit by a business registered for VAT: the VAT on the supplier's bill, on top of the cost.
+    vat: str = Field(default='0.00', pattern=AMOUNT)
     # Paid: from the till (Cash) or a bank (Transfer).
     pay_method: Literal['Cash', 'Transfer'] | None = None
     bank_account_id: UUID | None = None
@@ -263,7 +267,7 @@ def add_asset(session, actor, data: AddAsset) -> dict:
     existing = raw(session, 'SELECT * FROM accounting.fixed_asset WHERE business_id=%s AND id=%s', (tenant, str(data.request_key))).first()
     if existing:
         return _view(existing, _charged(session))  # a retried request
-    cost, residual, opening = Decimal(data.cost), Decimal(data.residual), Decimal(data.accumulated_depreciation)
+    cost, residual, opening, vat_amount = Decimal(data.cost), Decimal(data.residual), Decimal(data.accumulated_depreciation), Decimal(data.vat)
     if cost <= 0:
         raise HTTPException(422, 'Enter the cost, above zero.')
     if residual >= cost:
@@ -276,6 +280,8 @@ def add_asset(session, actor, data: AddAsset) -> dict:
             raise HTTPException(422, 'Choose the day the asset is brought into the books.')
         if opening > cost - residual:
             raise HTTPException(422, 'Depreciation to date cannot be more than the cost less the residual value.')
+        if vat_amount:
+            raise HTTPException(422, 'An asset owned before your books started has no VAT to claim now.')
         _open_date(session, data.brought_in_on, 'The day it is brought in')
         entry_date, depreciate_from = data.brought_in_on, data.brought_in_on.replace(day=1)
     else:
@@ -290,13 +296,19 @@ def add_asset(session, actor, data: AddAsset) -> dict:
     key = data.request_key
     narration = f'Fixed asset: {data.name}'
     supplier = None
+    figures = None
+    purchase = [{'account_id': cost_account, 'amount': _money(cost), 'description': narration}]
+    if data.how != 'existing':
+        from cacu.accounting import vat
+        figures = vat.input_vat(session, entry_date, cost, vat_amount, False)
+        if figures.vat > 0:
+            purchase.append(vat.input_line(session, figures.vat, f'{narration}: VAT'))
     if data.how == 'paid':
         if data.pay_method is None:
             raise HTTPException(422, 'Choose whether it was paid from the till or a bank.')
         paid_from = collection_account(session, data.pay_method, data.bank_account_id)
         result = post_command(session, actor, PostingCommand(request_key=uuid5(key, 'posting'), kind='asset_purchase', source_id=key,
-            main_account_id=paid_from, entry_date=entry_date, narration=narration, credited=True,
-            lines=[{'account_id': cost_account, 'amount': _money(cost), 'description': narration}]), internal=True)
+            main_account_id=paid_from, entry_date=entry_date, narration=narration, credited=True, lines=purchase), internal=True)
     elif data.how == 'credit':
         number = (data.bill_number or '').strip()
         if data.supplier_id is None or not number:
@@ -313,8 +325,7 @@ def add_asset(session, actor, data: AddAsset) -> dict:
         raw(session, 'INSERT INTO accounting.supplier_bill(business_id,id,supplier_id,bill_number,bill_date,due_date,notes,created_by) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
             (tenant, str(key), str(supplier), number, data.acquired_on, data.due_date, narration, str(actor)))
         result = post_command(session, actor, PostingCommand(request_key=uuid5(key, 'posting'), kind='bill', source_id=key, main_account_id=payables,
-            entry_date=entry_date, narration=f'Bill {number}: {data.name}', counterparty_id=supplier,
-            lines=[{'account_id': cost_account, 'amount': _money(cost), 'description': narration}]))
+            entry_date=entry_date, narration=f'Bill {number}: {data.name}', counterparty_id=supplier, lines=purchase))
     else:
         lines = []
         if opening > 0:
@@ -325,6 +336,9 @@ def add_asset(session, actor, data: AddAsset) -> dict:
         lines.append({'account_id': retained, 'amount': _money(cost - opening), 'credited': True, 'description': f'{data.name}: owned before CACU'})
         result = post_command(session, actor, PostingCommand(request_key=uuid5(key, 'posting'), kind='asset_opening', source_id=key,
             main_account_id=cost_account, entry_date=entry_date, narration=f'{narration} (owned before CACU)', credited=False, lines=lines), internal=True)
+    if figures is not None:
+        from cacu.accounting import vat
+        vat.record(session, 'bill' if data.how == 'credit' else 'asset_purchase', key, 'input', entry_date, figures, cost, False)
     rate = (Decimal(data.annual_rate_percent) / 100) if data.method == 'reducing_balance' else None
     raw(session, """INSERT INTO accounting.fixed_asset(business_id, id, name, category, reference, acquired_on, cost, residual, method, useful_life_months,
         annual_rate, how, depreciate_from, opening_accumulated, supplier_id, transaction_id, created_by)
@@ -430,6 +444,14 @@ def dispose(session, actor, asset_id: UUID, data: Dispose) -> dict:
         WHERE business_id=%s AND id=%s""", (data.disposed_on, proceeds, int(result['transaction_id']), str(actor), tenant, str(asset.id)))
     row = raw(session, 'SELECT * FROM accounting.fixed_asset WHERE business_id=%s AND id=%s', (tenant, str(asset.id))).first()
     return _view(row, _charged(session))
+
+
+def disposal_transactions(session) -> set[int]:
+    """The journals that took assets out of the books, for the cash flow statement."""
+    if not raw(session, "SELECT to_regclass('accounting.fixed_asset') IS NOT NULL").scalar():
+        return set()
+    return {r.disposal_transaction_id for r in raw(session, 'SELECT disposal_transaction_id FROM accounting.fixed_asset WHERE business_id=%s AND disposal_transaction_id IS NOT NULL',
+                                                   (str(session.business_id),)).all()}
 
 
 def brought_in(session) -> set[int]:

@@ -9,8 +9,9 @@ import pytest
 from fastapi import HTTPException
 from cacu.accounting.assets import AddAsset, Dispose, PostDepreciation, add_asset, dispose, overview, post_month, preview
 from cacu.accounting.bills import SupplierPaymentCreate, list_bills, payment_create
-from cacu.accounting.periods import checklist, month_start
-from cacu.accounting.reports import opening_transactions
+from cacu.accounting.periods import checklist, month_end, month_start
+from cacu.accounting.reports import cash_flow, opening_transactions
+from cacu.accounting.vat import VatSettings, save_settings
 from test_corrections_postgres import live, call, URL  # noqa: F401  (fixtures)
 from test_opening_position_postgres import books  # noqa: F401
 from test_default_chart_postgres import charted  # noqa: F401
@@ -152,6 +153,12 @@ def test_a_disposal_takes_the_asset_out_with_its_gain_or_loss(live):
     assert (sold['disposed_on'], sold['carrying_amount'], sold['disposal_result']) == (LAST_MONTH.isoformat(), '0.00', '50000.00')
     assert by_purpose(live, 'asset_computers') == 0 and by_purpose(live, 'accdep_computers') == 0
     assert by_purpose(live, 'disposal_gains') == Decimal('-50000')  # a gain: proceeds 1,150,000 less carrying 1,100,000
+    # IAS 7: the proceeds are an investing receipt, and the gain comes out of operating profit.
+    flows = call(live, 'viewer', lambda s, a: cash_flow(s, LAST_MONTH, month_end(LAST_MONTH)))
+    lines = {(sec['key'], l['label']): l['amount'] for sec in flows['sections'] for l in sec['lines']}
+    assert lines[('investing', 'Fixed assets sold / receipts')] == '1150000.00'
+    assert lines[('operating', 'Gain or loss on disposal of fixed assets')] == '-50000.00'
+    assert next(sec['total'] for sec in flows['sections'] if sec['key'] == 'investing') == '1150000.00'
     again = call(live, 'owner', lambda s, a: dispose(s, a, laptop['id'], Dispose(request_key=key, disposed_on=LAST_MONTH, proceeds='1150000.00', method='Cash')))
     assert again == sold  # a retried request
     with pytest.raises(HTTPException, match='already been disposed of'):
@@ -163,6 +170,23 @@ def test_a_disposal_takes_the_asset_out_with_its_gain_or_loss(live):
     scrapped = call(live, 'owner', lambda s, a: add_asset(s, a, asset(name='Old printer', acquired_on=LAST_MONTH, cost='90000.00')))
     gone = call(live, 'owner', lambda s, a: dispose(s, a, scrapped['id'], Dispose(request_key=uuid4(), disposed_on=LAST_MONTH)))
     assert gone['disposal_result'] == '-90000.00'  # scrapped for nothing: a loss of its carrying amount
+
+
+def test_a_vat_registered_business_claims_the_input_vat_on_what_it_buys(live):
+    started(live, EARLIER_MONTH)
+    with pytest.raises(HTTPException, match='not registered for VAT'):
+        call(live, 'owner', lambda s, a: add_asset(s, a, asset(vat='15000.00')))
+    call(live, 'owner', lambda s, a: save_settings(s, a, VatSettings(registered=True, vat_number='12345678-0001', effective_from=TODAY)))
+    with pytest.raises(HTTPException, match='more than 7.5% allows'):
+        call(live, 'owner', lambda s, a: add_asset(s, a, asset(acquired_on=TODAY, cost='200000.00', vat='15000.01')))
+    key = uuid4()
+    call(live, 'owner', lambda s, a: add_asset(s, a, asset(request_key=key, acquired_on=TODAY, cost='200000.00', vat='15000.00')))
+    assert by_purpose(live, 'asset_computers') == Decimal('200000') and by_purpose(live, 'vat_input') == Decimal('15000')
+    with psycopg.connect(URL) as c:
+        assert c.execute("SELECT standard_net, vat FROM accounting.document_vat WHERE business_id=%s AND source_type='asset_purchase' AND source_id=%s",
+                         (live.business, key)).fetchone() == (Decimal('200000.00'), Decimal('15000.00'))
+    with pytest.raises(HTTPException, match='no VAT to claim'):
+        call(live, 'owner', lambda s, a: add_asset(s, a, asset(how='existing', acquired_on=EARLIER_MONTH - timedelta(days=30), brought_in_on=TODAY, vat='100.00')))
 
 
 def test_asset_kinds_cannot_be_posted_through_the_generic_route(live):

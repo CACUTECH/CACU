@@ -16,7 +16,7 @@ const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/L
 const select = 'h-9 w-full rounded-md border bg-background px-2 text-sm';
 const HOW = { paid: 'Paid', credit: 'On credit', existing: 'Owned before CACU' } as const;
 const blank = (): AssetInput => ({ name: '', category: 'computers', acquired_on: today(), cost: '', residual: '0', method: 'straight_line',
-  useful_life_months: 36, annual_rate_percent: '25', how: 'paid', pay_method: 'Cash', bank_account_id: null, supplier_id: null, bill_number: '',
+  useful_life_months: 36, annual_rate_percent: '25', how: 'paid', vat: '0', pay_method: 'Cash', bank_account_id: null, supplier_id: null, bill_number: '',
   accumulated_depreciation: '0', brought_in_on: today() });
 
 function Field({ id, label, children, hint }: { id: string; label: string; children: React.ReactNode; hint?: string }) {
@@ -61,7 +61,9 @@ function AddAsset({ view, onAdded }: { view: View; onAdded: (a: FixedAsset) => v
         <option value="paid">Paid for now</option><option value="credit">On credit from a supplier</option><option value="existing">Owned before CACU</option>
       </select></Field>
     <Field id="asset-date" label="Date bought"><Input id="asset-date" type="date" max={today()} value={form.acquired_on} onChange={e => set({ acquired_on: e.target.value })} /></Field>
-    <Field id="asset-cost" label="Cost (₦)"><Input id="asset-cost" inputMode="decimal" value={form.cost} onChange={e => set({ cost: e.target.value })} /></Field>
+    <Field id="asset-cost" label={form.how === 'existing' ? 'Cost (₦)' : 'Cost before VAT (₦)'}><Input id="asset-cost" inputMode="decimal" value={form.cost} onChange={e => set({ cost: e.target.value })} /></Field>
+    {form.how !== 'existing' && <Field id="asset-vat" label="VAT on the bill (₦)" hint="Only if your business is registered for VAT; it is claimed in your VAT return. Otherwise leave 0 and include VAT in the cost.">
+      <Input id="asset-vat" inputMode="decimal" value={form.vat ?? ''} onChange={e => set({ vat: e.target.value })} /></Field>}
 
     {form.how === 'paid' && <PayFrom prefix="bought" method={form.pay_method} bank={form.bank_account_id} banks={view.pay_from.banks}
       onChange={(pay_method, bank_account_id) => set({ pay_method, bank_account_id })} />}

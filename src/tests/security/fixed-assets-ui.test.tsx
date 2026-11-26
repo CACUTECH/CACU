@@ -51,13 +51,14 @@ test('an asset bought on credit names its supplier and bill', async () => {
   fireEvent.change(screen.getByLabelText('How it was bought'), { target: { value: 'credit' } });
   fireEvent.change(screen.getByLabelText('Supplier'), { target: { value: '5c1f3a2b-8e4d-4f6a-9b7c-1d2e3f4a5b6c' } });
   fireEvent.change(screen.getByLabelText('Their bill number'), { target: { value: 'IF-77' } });
-  fireEvent.change(screen.getByLabelText('Cost (₦)'), { target: { value: '250000' } });
+  fireEvent.change(screen.getByLabelText('Cost before VAT (₦)'), { target: { value: '250000' } });
+  fireEvent.change(screen.getByLabelText('VAT on the bill (₦)'), { target: { value: '18750' } });
   fireEvent.change(screen.getByLabelText('Useful life (months)'), { target: { value: '60' } });
   expect(screen.getByText('About ₦4,166.67 a month.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Add asset' }));
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Shelves added.'));
   expect(addAssetAction).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ name: 'Shelves', category: 'furniture', how: 'credit',
-    supplier_id: '5c1f3a2b-8e4d-4f6a-9b7c-1d2e3f4a5b6c', bill_number: 'IF-77', cost: '250000', useful_life_months: 60 }));
+    supplier_id: '5c1f3a2b-8e4d-4f6a-9b7c-1d2e3f4a5b6c', bill_number: 'IF-77', cost: '250000', vat: '18750', useful_life_months: 60 }));
 });
 
 test('selling an asset shows the gain before it is recorded', async () => {

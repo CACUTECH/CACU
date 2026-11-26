@@ -24,6 +24,7 @@ export type AssetInput = {
   name: string; category: Category; reference?: string; acquired_on: string; cost: string; residual: string;
   method: 'straight_line' | 'reducing_balance'; useful_life_months?: number | null; annual_rate_percent?: string | null;
   how: 'paid' | 'credit' | 'existing';
+  vat?: string;
   pay_method?: 'Cash' | 'Transfer' | null; bank_account_id?: string | null;
   supplier_id?: string | null; bill_number?: string | null; due_date?: string | null;
   accumulated_depreciation?: string; brought_in_on?: string | null;

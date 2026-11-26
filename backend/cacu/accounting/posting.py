@@ -137,7 +137,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     # Input VAT (2b): only a bill or an expense claims it, with one VAT line; a reclaim or settlement credits it.
     vat_input=raw(session,"SELECT library_id FROM accounting.account_map WHERE business_id=%s AND purpose='vat_input'",(tenant,)).scalar()
     claimed=[l for l in lines if vat_input is not None and l[0].id==vat_input and not l[2]] if command.kind!='reversal' else []
-    if claimed and (command.kind not in {'bill','goods_bill','expense'} or len(claimed)!=1):
+    if claimed and (command.kind not in {'bill','goods_bill','expense','asset_purchase'} or len(claimed)!=1):
         raise HTTPException(422,'Input VAT is claimed only on bills and expenses')
     if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received','payroll','asset_disposal'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
     if split_sale and command.main_amount is None:raise HTTPException(422,'A split sale names its cash part')
@@ -292,8 +292,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             def till_or_bank(account_id):
                 return str(account_id)==cash or str(collection_account(session,'Transfer',account_id))==str(account_id)
             if command.kind=='asset_purchase':
-                # Bought and paid: debit the asset's cost, credit the till or a bank.
-                ok=command.credited and len(command.lines)==1 and not command.lines[0].credited and str(command.lines[0].account_id) in cost and till_or_bank(command.main_account_id)
+                # Bought and paid: debit the asset's cost (and any input VAT, checked above), credit the till or a bank.
+                bought=[l for l in command.lines if not (claimed and str(l.account_id)==str(vat_account_id(session,'vat_input')))]
+                ok=command.credited and len(bought)==1 and not bought[0].credited and str(bought[0].account_id) in cost and till_or_bank(command.main_account_id)
             elif command.kind=='asset_opening':
                 # Owned before the books started: debit its cost, credit its depreciation to date and retained earnings.
                 allowed=accdep|ids({'retained_earnings'})

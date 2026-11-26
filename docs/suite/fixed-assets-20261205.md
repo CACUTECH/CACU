@@ -99,6 +99,23 @@ The rules:
 - **Up to date first:** every earlier month's depreciation must be posted, so the asset leaves at its carrying amount.
 - **Not after its month's charge:** if this month's depreciation already charged the asset, the disposal goes in a later month.
 
+## VAT on assets bought
+
+A business registered for VAT enters the cost before VAT and the VAT shown on the supplier's bill. This works for assets paid now or bought on credit.
+
+- The VAT is debited to Input VAT.
+- It is recorded for the month's VAT return: as a bill when bought on credit, and as `asset_purchase` when paid.
+- It is checked against the standard rate, as on any bill.
+
+A business that is not registered includes the VAT in the cost and enters no VAT. CACU refuses VAT from it, and VAT on an asset owned before CACU.
+
+## In the cash flow statement (IAS 7)
+
+- **Buying:** the purchase is an investing payment when paid. When bought on credit, it becomes an investing payment as the bill is paid.
+- **Depreciation:** it moves no cash, so it nets to nothing.
+- **Selling:** every non-cash leg of a disposal goes to investing as "Fixed assets sold / receipts". That line equals the proceeds. The gain or loss is taken back out of operating profit as "Gain or loss on disposal of fixed assets".
+- **Assets owned before CACU:** they are left out, like the opening position.
+
 ## Fixed once made
 
 The register, the depreciation runs and charges, and disposals are never changed or deleted:
@@ -111,7 +128,6 @@ A mistake is reversed with a journal. The new journal kinds (`asset_purchase`, `
 
 ## To review before release
 
-- **Cash flow on disposal:** the cash flow statement shows a disposal's movement in cost under investing, and its depreciation and gain under operating. The proceeds net out correctly, but IAS 7 would show the proceeds alone under investing. An accountant should review this, or add a cash-flow rule for disposals.
-- **VAT:** input VAT on assets bought on credit or paid is not claimed here. It goes on a separate bill or expense line for now.
+- **The accountant's check:** an accountant should confirm the cash flow treatment above, and VAT on capital goods, before release.
 - **Tax capital allowances:** these differ from book depreciation and are not covered. They are a later piece for the tax computation.
 - **Impairment and revaluation (IAS 36, IAS 16 revaluation model):** not covered.
