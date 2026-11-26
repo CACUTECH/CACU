@@ -192,3 +192,11 @@ test('FRA-008: a lender link shows the fixed pack, and nothing once it has stopp
   expect(await screen.findByText('Pack not available')).toBeInTheDocument();
   expect(mockRpc).toHaveBeenCalledTimes(2);  // a malformed link never reaches the database
 });
+
+test('a viewer sees the latest result but is not offered an assessment the API would refuse', async () => {
+  mockRole = 'viewer';
+  (fundingOverviewAction as jest.Mock).mockResolvedValue({ success: true, data: { ...base, latest: assessment } });
+  render(<FundingReadinessPage />);
+  expect(await screen.findByText('64', { selector: 'p' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /assess|score/i })).not.toBeInTheDocument();
+});

@@ -59,7 +59,8 @@ export default function FundingReadinessPage() {
         {data.eligibility.earliest_date && <p>The earliest your books can qualify is {showDate(data.eligibility.earliest_date)}.</p>}
       </section>}
 
-      {data.eligibility?.eligible && <div className="flex flex-wrap items-center gap-3">
+      {/* Asking counts as a change, so viewers and CACU support see results but cannot ask (the API refuses them too). */}
+      {data.eligibility?.eligible && !['viewer', 'support'].includes(business?.userRole ?? '') && <div className="flex flex-wrap items-center gap-3">
         <Button onClick={() => void assess()} disabled={busy || data.assessed_today}>
           {busy ? 'Working it out…' : data.latest ? 'Assess again' : 'Work out my score'}
         </Button>
