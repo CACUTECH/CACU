@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine, event
 from sqlalchemy.pool import NullPool
 from cacu.accounting import readiness, session as sessions
-from cacu.accounting.readiness import NOTICE, assess, assessment, monthly_queue, overview, run_monthly
+from cacu.accounting.readiness import NOTICE, assess, assessment, overview, run_monthly
 from test_corrections_postgres import live, call, URL  # noqa: F401  (fixtures)
 from test_opening_position_postgres import books  # noqa: F401
 from test_default_chart_postgres import charted  # noqa: F401
@@ -112,6 +112,7 @@ def test_waiting_items_older_than_30_days_block_an_assessment(live):
 
 def plan(live, code):
     with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.actor_kind','system',true),set_config('platform.reason','Funding readiness test',true)")
         c.execute("""INSERT INTO platform.subscriptions(business_id,plan_code,status) VALUES(%s,%s,'active')
             ON CONFLICT (business_id) DO UPDATE SET plan_code=excluded.plan_code""", (live.business, code))
 
@@ -159,6 +160,9 @@ def job(live, monkeypatch):
             connection.autocommit = False
         return engine
     monkeypatch.setattr(readiness, '_connect', connect)
+    # The shared fixture has another active business; the job is checked on this one.
+    everyone = readiness.monthly_queue
+    monkeypatch.setattr(readiness, 'monthly_queue', lambda: [q for q in everyone() if str(q[0]) == str(live.business)])
     monkeypatch.setenv('CACU_DATABASE_URL', URL)
     monkeypatch.setattr(sessions, 'create_engine', test_engine)
     return live
@@ -167,14 +171,14 @@ def job(live, monkeypatch):
 def test_cacu_makes_one_assessment_a_month_once_the_business_qualifies(job):
     live = job
     switch(False)
-    assert monthly_queue() == [] and run_monthly(apply=True) == {'due': 0, 'made': 0, 'not_eligible': 0, 'failed': 0}
+    assert readiness.monthly_queue() == [] and run_monthly(apply=True) == {'due': 0, 'made': 0, 'not_eligible': 0, 'failed': 0}
     switch(True)
-    assert [(str(b), str(o)) for b, o in monthly_queue()] == [(str(live.business), str(live.people['owner']))]
+    assert [(str(b), str(o)) for b, o in readiness.monthly_queue()] == [(str(live.business), str(live.people['owner']))]
     assert run_monthly(apply=False) == {'due': 1, 'made': 0, 'not_eligible': 0, 'failed': 0}  # a dry run makes nothing
     assert run_monthly(apply=True) == {'due': 1, 'made': 0, 'not_eligible': 1, 'failed': 0}  # new books: tried again tomorrow
     started(live, 8)
     assert run_monthly(apply=True) == {'due': 1, 'made': 1, 'not_eligible': 0, 'failed': 0}
-    assert monthly_queue() == [] and run_monthly(apply=True)['due'] == 0  # once this month
+    assert readiness.monthly_queue() == [] and run_monthly(apply=True)['due'] == 0  # once this month
     with psycopg.connect(URL) as c:
         assert c.execute("SELECT kind, requested_by, model_version FROM accounting.funding_assessment").fetchall() == [('monthly', None, 'fra-1')]
         with pytest.raises(psycopg.errors.UniqueViolation):  # never two in one month
