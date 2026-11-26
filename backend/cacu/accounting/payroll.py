@@ -60,7 +60,9 @@ class Settle(BaseModel):
 
 
 def _enabled(session) -> bool:
-    return bool(raw(session, 'SELECT enabled FROM accounting.payroll_switch WHERE singleton').scalar())
+    # On for CACU's preview business ahead of the gate (accounting.is_preview), off for everyone else until then.
+    return bool(raw(session, 'SELECT (SELECT enabled FROM accounting.payroll_switch WHERE singleton) OR accounting.is_preview(%s)',
+                    (str(session.business_id),)).scalar())
 
 
 def _allowed(session, actor):
