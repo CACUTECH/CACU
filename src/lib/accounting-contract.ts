@@ -1481,6 +1481,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/income-tax/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Income Tax Estimate */
+        get: operations["income_tax_estimate_api_v1_businesses__business_id__income_tax__year__get"];
+        /** Income Tax Year */
+        put: operations["income_tax_year_api_v1_businesses__business_id__income_tax__year__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/income-tax/{year}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Income Tax Adjustment */
+        post: operations["income_tax_adjustment_api_v1_businesses__business_id__income_tax__year__adjustments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/income-tax/{year}/adjustments/{adjustment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Income Tax Adjustment Remove */
+        delete: operations["income_tax_adjustment_remove_api_v1_businesses__business_id__income_tax__year__adjustments__adjustment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/ai/tools": {
         parameters: {
             query?: never;
@@ -2810,6 +2862,23 @@ export interface components {
             accumulated_depreciation: string;
             /** Brought In On */
             brought_in_on?: string | null;
+        };
+        /** Adjustment */
+        Adjustment: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "add" | "deduct";
+            /** Label */
+            label: string;
+            /** Amount */
+            amount: string;
         };
         /** AdjustmentRequest */
         AdjustmentRequest: {
@@ -4567,6 +4636,19 @@ export interface components {
         Tags: {
             /** Tags */
             tags: string[];
+        };
+        /** TaxYear */
+        TaxYear: {
+            /**
+             * Losses Brought Forward
+             * @default 0.00
+             */
+            losses_brought_forward: string;
+            /**
+             * Professional Services
+             * @default false
+             */
+            professional_services: boolean;
         };
         /** TransferConfirm */
         TransferConfirm: {
@@ -8082,6 +8164,143 @@ export interface operations {
                 "application/json": components["schemas"]["AssetTax"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    income_tax_estimate_api_v1_businesses__business_id__income_tax__year__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    income_tax_year_api_v1_businesses__business_id__income_tax__year__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxYear"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    income_tax_adjustment_api_v1_businesses__business_id__income_tax__year__adjustments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Adjustment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    income_tax_adjustment_remove_api_v1_businesses__business_id__income_tax__year__adjustments__adjustment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                year: number;
+                adjustment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

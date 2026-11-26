@@ -713,6 +713,34 @@ def fixed_asset_tax(business_id:UUID,asset_id:UUID,request:AssetTax,user_id:UUID
     with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
         return save(session,user_id,asset_id,request)
 
+# Company income tax estimate (R4; Nigeria Tax Act 2025): a yearly estimate from the books, nothing posted. Off until a
+# tax professional reviews it (accounting.income_tax_switch); on for CACU's preview business.
+from cacu.accounting.income_tax import Adjustment as TaxAdjustment, TaxYear
+
+@app.get('/api/v1/businesses/{business_id}/income-tax/{year}')
+def income_tax_estimate(business_id:UUID,year:int,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.income_tax import estimate
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return estimate(session,year)
+
+@app.put('/api/v1/businesses/{business_id}/income-tax/{year}')
+def income_tax_year(business_id:UUID,year:int,request:TaxYear,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.income_tax import save_year
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return save_year(session,user_id,year,request)
+
+@app.post('/api/v1/businesses/{business_id}/income-tax/{year}/adjustments')
+def income_tax_adjustment(business_id:UUID,year:int,request:TaxAdjustment,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.income_tax import add_adjustment
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return add_adjustment(session,user_id,year,request)
+
+@app.delete('/api/v1/businesses/{business_id}/income-tax/{year}/adjustments/{adjustment_id}')
+def income_tax_adjustment_remove(business_id:UUID,year:int,adjustment_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.income_tax import remove_adjustment
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return remove_adjustment(session,user_id,year,adjustment_id)
+
 # AI on the books (Doc 15; E18 R3): read-only tools the gateway runs with the member's own token. Each tool keeps the
 # permission of the screen its figures come from, so the assistant can never show a member more than the screens do.
 @app.get('/api/v1/businesses/{business_id}/ai/tools')
