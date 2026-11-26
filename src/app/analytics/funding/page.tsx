@@ -1,17 +1,22 @@
 "use client";
-// Analytics › Funding readiness (Doc 15 FR-180..185, FRA-001..012; E19 R3 part 1). An indicative self-assessment from
-// the business's own CACU books: whether it qualifies, and if so the score, its band, and every dimension with the
-// measures, values and thresholds behind it (FRA-001). The notice (FRA-009) is on the screen whatever happens.
+// Analytics › Funding readiness (Doc 15 FR-180..185, FRA-001..012; E19 R3 parts 1 and 2). An indicative self-assessment
+// from the business's own CACU books: whether it qualifies, and if so the score, its band, and every dimension with the
+// measures, values and thresholds behind it (FRA-001). On the Oga and Chairman plans, what to do next for each weak
+// dimension (FRA-002) and past assessments, monthly and on request (FRA-003). The notice (FRA-009) is always shown.
 // Off until CACU switches it on after gate G5.
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { fundingAssessAction, fundingOverviewAction } from './actions';
-import { FUNDING_NOTICE, showDate, showMeasure, type Assessment, type FundingOverview } from '@/lib/funding-readiness';
+import { useBusiness } from '@/components/business-provider';
+import { SharePanel } from './share-panel';
+import { fundingAssessAction, fundingAssessmentAction, fundingOverviewAction } from './actions';
+import { asHistory, FUNDING_NOTICE, scoreChange, showDate, showMeasure, type Assessment, type FundingOverview, type HistoryItem } from '@/lib/funding-readiness';
 
 export default function FundingReadinessPage() {
   const [data, setData] = React.useState<FundingOverview | null>(null);
   const [error, setError] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  const [past, setPast] = React.useState<Assessment | null>(null);
+  const { business } = useBusiness();
 
   const load = React.useCallback(async () => {
     const r = await fundingOverviewAction();
@@ -23,9 +28,20 @@ export default function FundingReadinessPage() {
     setBusy(true); setError('');
     try {
       const r = await fundingAssessAction();
-      if (r.success) setData(d => d && { ...d, latest: r.data, assessed_today: true });
+      if (r.success) {
+        setPast(null);
+        setData(d => d && { ...d, latest: r.data, assessed_today: true,
+          history: d.history && (d.history.some(h => h.id === r.data.id) ? d.history : [asHistory(r.data), ...d.history]) });
+      }
       else setError(r.error);
     } finally { setBusy(false); }
+  };
+
+  const open = async (id: string) => {
+    setError('');
+    if (id === data?.latest?.id) { setPast(null); return; }
+    const r = await fundingAssessmentAction(id);
+    if (r.success) setPast(r.data); else setError(r.error);
   };
 
   return <div className="max-w-4xl space-y-6">
@@ -43,14 +59,24 @@ export default function FundingReadinessPage() {
         {data.eligibility.earliest_date && <p>The earliest your books can qualify is {showDate(data.eligibility.earliest_date)}.</p>}
       </section>}
 
-      {data.eligibility?.eligible && <div className="flex flex-wrap items-center gap-3">
+      {/* Asking counts as a change, so viewers and CACU support see results but cannot ask (the API refuses them too). */}
+      {data.eligibility?.eligible && !['viewer', 'support'].includes(business?.userRole ?? '') && <div className="flex flex-wrap items-center gap-3">
         <Button onClick={() => void assess()} disabled={busy || data.assessed_today}>
           {busy ? 'Working it out…' : data.latest ? 'Assess again' : 'Work out my score'}
         </Button>
         {data.assessed_today && <p className="text-sm text-muted-foreground">Assessed today. You can assess again tomorrow.</p>}
       </div>}
 
-      {data.latest && <AssessmentView assessment={data.latest} />}
+      {past && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed p-3 text-sm">
+        <p>You are looking at a past assessment, from {showDate(past.assessed_on)}.</p>
+        <Button variant="outline" size="sm" onClick={() => setPast(null)}>Back to the latest</Button>
+      </div>}
+      {(past ?? data.latest) && <AssessmentView assessment={(past ?? data.latest)!} />}
+
+      {data.level === 'lender_pack' && business?.userRole === 'owner' && (past ?? data.latest) &&
+        <SharePanel key={(past ?? data.latest)!.id} assessmentId={(past ?? data.latest)!.id} />}
+
+      {data.history && data.history.length > 0 && <HistoryView history={data.history} showing={(past ?? data.latest)?.id} onOpen={id => void open(id)} />}
 
       <section aria-label="What the score cannot see" className="text-sm">
         <p className="font-medium">What the score cannot see</p>
@@ -72,6 +98,7 @@ function AssessmentView({ assessment: a }: { assessment: Assessment }) {
         {' '}based on {a.based_on} of 7 dimensions. Scoring model {a.model_version}.
       </p>
     </div>
+    {!a.recommendations_included && <p className="text-sm text-muted-foreground">What to do next for each area, and your past assessments, come with the Oga and Chairman plans.</p>}
     {a.dimensions.map(d => <div key={d.key} className="rounded-lg border p-4 text-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-medium">{d.label}</p>
@@ -86,7 +113,34 @@ function AssessmentView({ assessment: a }: { assessment: Assessment }) {
           {m.score !== null && <span className="ml-2 font-medium text-foreground">{m.score} / 100</span>}
         </span>
       </li>)}</ul>
+      {d.recommendations && d.recommendations.length > 0 && <div className="mt-3 rounded-md bg-muted/50 p-3">
+        <p className="font-medium">What to do next</p>
+        <ul className="list-disc pl-5">{d.recommendations.map(r => <li key={r}>{r}</li>)}</ul>
+      </div>}
     </div>)}
     {a.information.stock_turnover && <p className="text-sm text-muted-foreground">{a.information.stock_turnover.label}: {a.information.stock_turnover.value}</p>}
+  </section>;
+}
+
+function HistoryView({ history, showing, onOpen }: { history: HistoryItem[]; showing?: string; onOpen: (id: string) => void }) {
+  return <section aria-label="Past assessments" className="space-y-2 text-sm">
+    <p className="font-medium">Past assessments</p>
+    <p className="text-muted-foreground">CACU works out a new assessment each month. Ones you asked for are here too.</p>
+    <table className="w-full text-left">
+      <thead><tr className="border-b text-muted-foreground"><th className="py-1 font-normal">Date</th><th className="font-normal">How</th>
+        <th className="text-right font-normal">Score</th><th className="text-right font-normal">Change</th><th className="pl-3 font-normal">Band</th><th /></tr></thead>
+      <tbody>{history.map((h, i) => {
+        const change = scoreChange(history, i);
+        return <tr key={h.id} className="border-b last:border-0">
+          <td className="py-1">{showDate(h.assessed_on)}</td>
+          <td>{h.kind === 'monthly' ? 'Monthly' : 'You asked'}</td>
+          <td className="text-right tabular-nums">{h.score}</td>
+          <td className="text-right tabular-nums">{change === null ? '' : change > 0 ? `+${change}` : `${change}`}</td>
+          <td className="pl-3">{h.band_label}</td>
+          <td className="text-right">{h.id === showing ? <span className="text-muted-foreground">Showing</span> :
+            <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onOpen(h.id)}>View</Button>}</td>
+        </tr>;
+      })}</tbody>
+    </table>
   </section>;
 }

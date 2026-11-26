@@ -1,10 +1,14 @@
-"""Funding readiness on the books (Doc 15 FR-180, FRA-001/003/004/005/009): off until gate G5, eligibility after six
-full months with nothing left waiting, one assessment a day recorded with its model version, models never edited."""
+"""Funding readiness on the books (Doc 15 FR-180, FR-185, FRA-001..005/009): off until gate G5, eligibility after six
+full months with nothing left waiting, one assessment a day on request and one a month made by CACU, each recorded with
+its model version, models never edited; recommendations and history on the Oga and Chairman plans only."""
 from datetime import timedelta
 import psycopg
 import pytest
 from fastapi import HTTPException
-from cacu.accounting.readiness import NOTICE, assess, overview
+from sqlalchemy import create_engine, event
+from sqlalchemy.pool import NullPool
+from cacu.accounting import readiness, session as sessions
+from cacu.accounting.readiness import NOTICE, assess, assessment, overview, run_monthly
 from test_corrections_postgres import live, call, URL  # noqa: F401  (fixtures)
 from test_opening_position_postgres import books  # noqa: F401
 from test_default_chart_postgres import charted  # noqa: F401
@@ -104,3 +108,86 @@ def test_waiting_items_older_than_30_days_block_an_assessment(live):
     assert eligibility['missing'] == [{'key': 'transfers', 'message': 'Confirm or clear the 1 transfer waiting more than 30 days.'}]
     with pytest.raises(HTTPException, match='Confirm or clear'):
         call(live, 'owner', lambda s, a: assess(s, a))
+
+
+def plan(live, code):
+    with psycopg.connect(URL) as c:
+        c.execute("SELECT set_config('platform.actor_kind','system',true),set_config('platform.reason','Funding readiness test',true)")
+        c.execute("""INSERT INTO platform.subscriptions(business_id,plan_code,status) VALUES(%s,%s,'active')
+            ON CONFLICT (business_id) DO UPDATE SET plan_code=excluded.plan_code""", (live.business, code))
+
+
+def test_general_sees_the_score_and_oga_adds_recommendations_and_history(live):
+    switch(True)
+    started(live, 8)
+    plan(live, 'BASE')  # General: the score and its explanation only (FRA-005)
+    made = call(live, 'owner', lambda s, a: assess(s, a))
+    assert made['recommendations_included'] is False and all(d['recommendations'] is None for d in made['dimensions'])
+    seen = call(live, 'viewer', lambda s, a: overview(s))
+    assert seen['level'] == 'score' and seen['history'] is None
+    with pytest.raises(HTTPException) as refused:
+        call(live, 'viewer', lambda s, a: assessment(s, made['id']))
+    assert refused.value.status_code == 403
+
+    plan(live, 'GROW')  # Oga: the recommendations were kept, so they show now, with the history
+    seen = call(live, 'viewer', lambda s, a: overview(s))
+    assert seen['level'] == 'improvement_plan' and seen['latest']['recommendations_included'] is True
+    for d in seen['latest']['dimensions']:
+        assert isinstance(d['recommendations'], list) and len(d['recommendations']) <= 3
+        assert d['recommendations'] == [] or d['score'] < 60  # only dimensions below 60 carry them (FRA-002)
+    assert [(h['id'], h['kind'], h['score']) for h in seen['history']] == [(made['id'], 'request', made['score'])]
+    again = call(live, 'viewer', lambda s, a: assessment(s, made['id']))
+    assert again['id'] == made['id'] and again['dimensions'] == seen['latest']['dimensions']
+
+
+@pytest.fixture
+def job(live, monkeypatch):
+    """The monthly job connects as the API's restricted role, as in production."""
+    def connect():
+        connection = psycopg.connect(URL, autocommit=True)
+        connection.execute('SET ROLE cacu_runtime')
+        connection.autocommit = False
+        return connection
+
+    def test_engine(*args, **kwargs):
+        engine = create_engine(URL.replace('postgresql://', 'postgresql+psycopg://'), poolclass=NullPool)
+
+        @event.listens_for(engine, 'connect')
+        def role(connection, record):
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                cursor.execute('SET ROLE cacu_runtime')
+            connection.autocommit = False
+        return engine
+    monkeypatch.setattr(readiness, '_connect', connect)
+    # The shared fixture has another active business; the job is checked on this one.
+    everyone = readiness.monthly_queue
+    monkeypatch.setattr(readiness, 'monthly_queue', lambda: [q for q in everyone() if str(q[0]) == str(live.business)])
+    monkeypatch.setenv('CACU_DATABASE_URL', URL)
+    monkeypatch.setattr(sessions, 'create_engine', test_engine)
+    return live
+
+
+def test_cacu_makes_one_assessment_a_month_once_the_business_qualifies(job):
+    live = job
+    switch(False)
+    assert readiness.monthly_queue() == [] and run_monthly(apply=True) == {'due': 0, 'made': 0, 'not_eligible': 0, 'failed': 0}
+    switch(True)
+    assert [(str(b), str(o)) for b, o in readiness.monthly_queue()] == [(str(live.business), str(live.people['owner']))]
+    assert run_monthly(apply=False) == {'due': 1, 'made': 0, 'not_eligible': 0, 'failed': 0}  # a dry run makes nothing
+    assert run_monthly(apply=True) == {'due': 1, 'made': 0, 'not_eligible': 1, 'failed': 0}  # new books: tried again tomorrow
+    started(live, 8)
+    assert run_monthly(apply=True) == {'due': 1, 'made': 1, 'not_eligible': 0, 'failed': 0}
+    assert readiness.monthly_queue() == [] and run_monthly(apply=True)['due'] == 0  # once this month
+    with psycopg.connect(URL) as c:
+        assert c.execute("SELECT kind, requested_by, model_version FROM accounting.funding_assessment").fetchall() == [('monthly', None, 'fra-1')]
+        with pytest.raises(psycopg.errors.UniqueViolation):  # never two in one month
+            c.execute("""INSERT INTO accounting.funding_assessment(business_id, model_version, kind, assessed_on, period_start, period_end, score, band, result)
+                SELECT business_id, model_version, kind, CASE WHEN extract(day FROM assessed_on) = 1 THEN assessed_on + 1 ELSE assessed_on - 1 END, period_start, period_end, score, band, result FROM accounting.funding_assessment""")
+
+    # The owner can still ask on the same day; both are in the history, and the monthly run did not use up the request.
+    seen = call(live, 'viewer', lambda s, a: overview(s))
+    assert seen['assessed_today'] is False and [h['kind'] for h in seen['history']] == ['monthly']
+    asked = call(live, 'owner', lambda s, a: assess(s, a))
+    assert asked['kind'] == 'request'
+    assert sorted(h['kind'] for h in call(live, 'viewer', lambda s, a: overview(s))['history']) == ['monthly', 'request']

@@ -1,10 +1,10 @@
-# Funding readiness, part 1: eligibility, the score and its explanation (E19 R3)
+# Funding readiness: the score, recommendations, history and the lender pack (E19 R3)
 
 Doc 15 "Funding readiness assessment flow", "Funding readiness scoring" and FRA-001 to FRA-012. The owner chose, on 2026-11-25, to build it in three parts:
 
-1. eligibility, the score and its explanation (this part);
-2. recommendations from a fixed library, and monthly history (FRA-002, FRA-003);
-3. the lender pack, shared by an expiring link (FRA-006 to FRA-008).
+1. eligibility, the score and its explanation (done);
+2. recommendations from a fixed library, and monthly history (FRA-002, FRA-003) (done, see below);
+3. the lender pack, shared by an expiring link (FRA-006 to FRA-008) (done, see below).
 
 All three stay behind a CACU switch that is off until gate G5.
 
@@ -104,7 +104,7 @@ The API can add assessments but cannot change or remove them.
 `POST /api/v1/businesses/{id}/funding-readiness/assessments` works out a new assessment.
 
 - **Once a day:** a second request on the same day returns the first.
-- **Who can ask:** anyone who can see the ledger (`ledger.view`).
+- **Who can ask:** owners, admins and editors who can see the ledger (`ledger.view`). Asking counts as a change, so it uses the write allowance. Viewers can see results but cannot ask.
 - **Read-only businesses:** it still works while the business is read-only, as exports do. It writes nothing to the books.
 
 `GET /api/v1/businesses/{id}/funding-readiness` returns:
@@ -127,8 +127,111 @@ Below the notice:
 
 The score uses only the business's financial records, never anything about the owner as a person (FRA-011).
 
+## Part 2: recommendations and history
+
+### Recommendations (FRA-002)
+
+Each dimension scoring below 60 gets up to three recommendations, weakest measure first. They come from a fixed library in `readiness.py`, one entry for each measure, filled in with the business's own figures. For example:
+
+- "Confirm or clear the 14 pending transfers older than 7 days." (D1)
+- "Collect the ₦420,000 owed for more than 60 days by 3 customers." (D7)
+
+The D1 open-exceptions entry can give several steps: bank lines, transfers, offline entries and each failing books check. A measure that could not be worked out gets no recommendation. No entry promises finance.
+
+Recommendations are worked out and stored with every assessment, whatever the plan. The API removes them for the General plan, so a business that upgrades sees them on its past assessments too.
+
+### The monthly assessment (FR-185, FRA-003)
+
+CACU works out one assessment a month (`kind = 'monthly'`) for each business that qualifies. It sits alongside the owner's own requests, which stay at most once a day.
+
+- **At most once a month:** a unique index allows one monthly assessment per calendar month. The month is counted in the business's own time zone.
+- **Who is due:** `accounting.funding_monthly_queue()` (security definer, runtime only) lists each business that has all of these:
+  - the switch on;
+  - a plan that includes funding readiness;
+  - active books;
+  - not closed;
+  - no monthly assessment yet this month.
+
+  For each business it gives an active owner to act for.
+- **How it runs:** `python -m tools.run_funding_monthly --apply` reads each business's books through `library_transaction` as a server job (`level='system'`), with that owner's access and `ledger.view`. A business that does not qualify yet (409) is counted as `not_eligible` and tried again the next day. Other failures are counted as `failed`, and the tool then exits 1. The report has counts only, never figures.
+- **Schedule:** `.github/workflows/funding-readiness.yml` runs daily at 03:40 UTC. It is off until the repository variable `CACU_FUNDING_MONTHLY_ENABLED` is `true`, and the queue is empty while the switch is off. A manual run is a dry run unless "apply" is ticked.
+- **Writing:** the monthly assessment writes nothing to the books. Its `requested_by` is empty.
+
+### History (FRA-003, FRA-005)
+
+On the Oga and Chairman plans:
+
+- `GET …/funding-readiness` also returns `history`: the last 24 assessments, newest first, each with its kind, date, score, band, model version and period;
+- `GET …/funding-readiness/assessments/{id}` returns one past assessment in full, as it was worked out.
+
+On the General plan, `history` is `null` and the single-assessment endpoint answers 403.
+
+The screen lists past assessments with the change in score from the one before, marked "Monthly" or "You asked". Opening one shows it in full until "Back to the latest". The General plan sees a line saying what the Oga and Chairman plans add.
+
+## Part 3: the lender pack (FRA-006 to FRA-008, FR-184)
+
+Only the **owner** of a business on the **Chairman** plan (`module.funding = lender_pack`) can share, and only while funding readiness is on. Admins, editors, viewers and CACU support can't.
+
+### What the pack holds (FRA-006)
+
+The pack holds these and nothing else:
+
+- **The management statements for the assessed period:** profit or loss, financial position at the period end, and changes in equity. Cash flow is included too, or a note when some accounts still need a reviewed cash-flow mapping. They are labelled "Management statements, not reviewed" (BR-061).
+- **The assessment with its explanation:** the score, band, model version, and every area and measure with its value and thresholds.
+- **A data-completeness note:**
+  - the months covered and the areas that could be worked out;
+  - the share of trading days with something recorded;
+  - what was waiting to be sorted out when the pack was prepared;
+  - the measures that could not be worked out;
+  - what the score cannot see.
+- **The business profile:** name, kind of business, address, and when the books started in CACU. The API reads these through `accounting.funding_profile`, a definer function that returns only those three fields.
+
+The pack leaves out:
+
+- customer and supplier names;
+- internal ids;
+- cash-flow detail lines;
+- the recommendations, which are the owner's own plan.
+
+### Sharing (FRA-007)
+
+1. **Owner fills in the share.** They enter who the pack is for (name, and optionally organisation), what it is for, and how long the link works: 7, 14, 30 (the default), 60 or 90 days.
+2. **Owner previews it.** `POST …/funding-readiness/shares/preview` builds the pack and returns it with its SHA-256. The screen shows exactly what the lender will see.
+3. **Owner confirms it.** They tick "I agree to share this pack with … for …, for … days", then share. `POST …/funding-readiness/shares` builds the pack again and refuses if its SHA-256 differs from the one previewed ("Your books changed after you looked at the pack. Look at it again before you share it."). What is kept is exactly what the owner saw.
+4. **Owner sends the link.** The response carries the link's token once, as `/pack/<token>`. CACU keeps only the token's SHA-256, so a lost link is withdrawn and shared again. A retried confirmation with the same request key returns the share without the token.
+
+The pack is a fixed snapshot in `accounting.funding_share`. A trigger refuses any change except withdrawing it once, and refuses deletion.
+
+### The lender's link (FRA-008, FR-184)
+
+`/pack/<token>` opens without an account. It calls `public.funding_pack(token)`, a definer function that anyone with the link may call.
+
+| Situation | What the lender sees | Logged in `accounting.funding_share_access` |
+| --- | --- | --- |
+| Live link | The snapshot, who it was shared with and why, and when the link stops working | Yes, as opened |
+| Expired, withdrawn, or funding readiness switched off | Only that it has stopped | Yes, with that outcome |
+| Unknown or malformed token | Nothing | No |
+
+The log keeps only the time and the outcome, never who opened the link or from where.
+
+The lender never gets access to the books. The page is not indexed and sends no referrer.
+
+### For the owner
+
+The screen lists every pack shared, with:
+
+- its recipient and purpose;
+- whether the link works, has expired or was withdrawn;
+- how many times it was opened, and each opening.
+
+**Withdraw the link** stops it straight away. `GET …/funding-readiness/shares` and `POST …/funding-readiness/shares/{id}/withdraw` back this.
+
 ## Not yet
 
-- Part 2: recommendations for each dimension below 60, the monthly run (FR-185) and the history of past assessments.
-- Part 3: the lender pack and consented sharing.
+- Gate G5, as above. Its checks:
+  - lender validation of the thresholds (FRA-010);
+  - the data protection impact assessment (FRA-012), which should now cover the lender pack and its access log;
+  - counsel's view on credit-reporting rules once lenders use the pack (CMP-17).
+- A downloadable file for the pack. FRA-008 allows a link or a file; this release offers only the link, so nothing leaves CACU.
+
 - Gate G5, as above.

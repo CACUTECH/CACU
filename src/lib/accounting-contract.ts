@@ -1274,6 +1274,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/funding-readiness/assessments/{assessment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Funding Assessment */
+        get: operations["funding_assessment_api_v1_businesses__business_id__funding_readiness_assessments__assessment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/funding-readiness/shares/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Funding Share Preview */
+        post: operations["funding_share_preview_api_v1_businesses__business_id__funding_readiness_shares_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/funding-readiness/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Funding Shares */
+        get: operations["funding_shares_api_v1_businesses__business_id__funding_readiness_shares_get"];
+        put?: never;
+        /** Funding Share Create */
+        post: operations["funding_share_create_api_v1_businesses__business_id__funding_readiness_shares_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/funding-readiness/shares/{share_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Funding Share Withdraw */
+        post: operations["funding_share_withdraw_api_v1_businesses__business_id__funding_readiness_shares__share_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/ai/tools": {
         parameters: {
             query?: never;
@@ -4028,6 +4097,45 @@ export interface components {
             /** Name */
             name: string;
             rules: components["schemas"]["Rules"];
+        };
+        /** ShareCreate */
+        ShareCreate: {
+            /** Assessment Id */
+            assessment_id?: string | null;
+            /** Recipient Name */
+            recipient_name: string;
+            /** Recipient Organisation */
+            recipient_organisation?: string | null;
+            /** Purpose */
+            purpose: string;
+            /**
+             * Expires In Days
+             * @default 30
+             */
+            expires_in_days: number;
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Pack Sha256 */
+            pack_sha256: string;
+        };
+        /** ShareDraft */
+        ShareDraft: {
+            /** Assessment Id */
+            assessment_id?: string | null;
+            /** Recipient Name */
+            recipient_name: string;
+            /** Recipient Organisation */
+            recipient_organisation?: string | null;
+            /** Purpose */
+            purpose: string;
+            /**
+             * Expires In Days
+             * @default 30
+             */
+            expires_in_days: number;
         };
         /** ShiftClose */
         ShiftClose: {
@@ -7177,6 +7285,171 @@ export interface operations {
             header?: never;
             path: {
                 business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    funding_assessment_api_v1_businesses__business_id__funding_readiness_assessments__assessment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    funding_share_preview_api_v1_businesses__business_id__funding_readiness_shares_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareDraft"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    funding_shares_api_v1_businesses__business_id__funding_readiness_shares_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    funding_share_create_api_v1_businesses__business_id__funding_readiness_shares_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    funding_share_withdraw_api_v1_businesses__business_id__funding_readiness_shares__share_id__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                share_id: string;
             };
             cookie?: never;
         };

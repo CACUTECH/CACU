@@ -593,8 +593,8 @@ def kpi_report(business_id:UUID,start_date:date,end_date:date,user_id:UUID=Depen
     with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return kpis(session,start_date,end_date)
 
-# Funding readiness (Doc 15; E19 R3 part 1): off until gate G5. Eligibility, the latest score, and a new assessment on
-# request at most once a day. Recording an assessment is allowed while the business is read-only, like exports.
+# Funding readiness (Doc 15; E19 R3 parts 1 and 2): off until gate G5. Eligibility, the latest score, a new assessment
+# on request at most once a day, and (Oga and Chairman) recommendations and past assessments. Recording an assessment is allowed while the business is read-only, like exports.
 @app.get('/api/v1/businesses/{business_id}/funding-readiness')
 def funding_readiness(business_id:UUID,user_id:UUID=Depends(current_user)):
     from cacu.accounting.readiness import overview
@@ -606,6 +606,39 @@ def funding_assess(business_id:UUID,user_id:UUID=Depends(current_user)):
     from cacu.accounting.readiness import assess
     with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='ledger.view') as session:
         return assess(session,user_id)
+
+@app.get('/api/v1/businesses/{business_id}/funding-readiness/assessments/{assessment_id}')
+def funding_assessment(business_id:UUID,assessment_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.readiness import assessment
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return assessment(session,assessment_id)
+
+from cacu.accounting.funding_pack import ShareCreate as FundingShareCreate, ShareDraft as FundingShareDraft
+# Funding readiness part 3 (Doc 15 FRA-006..008, FR-184): the lender pack. The owner previews exactly what will be
+# shared, then confirms; the pack is kept as a fixed snapshot behind a link that expires and can be withdrawn.
+@app.post('/api/v1/businesses/{business_id}/funding-readiness/shares/preview')
+def funding_share_preview(business_id:UUID,request:FundingShareDraft,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.funding_pack import preview
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return preview(session,user_id,request)
+
+@app.post('/api/v1/businesses/{business_id}/funding-readiness/shares')
+def funding_share_create(business_id:UUID,request:FundingShareCreate,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.funding_pack import share
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='ledger.view') as session:
+        return share(session,user_id,request)
+
+@app.get('/api/v1/businesses/{business_id}/funding-readiness/shares')
+def funding_shares(business_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.funding_pack import list_shares
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return list_shares(session,user_id)
+
+@app.post('/api/v1/businesses/{business_id}/funding-readiness/shares/{share_id}/withdraw')
+def funding_share_withdraw(business_id:UUID,share_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.funding_pack import withdraw
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='ledger.view') as session:
+        return withdraw(session,user_id,share_id)
 
 # AI on the books (Doc 15; E18 R3): read-only tools the gateway runs with the member's own token. Each tool keeps the
 # permission of the screen its figures come from, so the assistant can never show a member more than the screens do.

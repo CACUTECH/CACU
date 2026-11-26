@@ -44,6 +44,7 @@ REVIEWED = {
     'share_receipt': 'authz.has_permission sales.view; sends only a sale of that business, to an address the caller gives',
     'revoke_receipt_link': 'authz.has_permission sales.view; revokes only links of that business',
     'public_receipt': 'by unguessable token only (64 hex); returns that one receipt, never customer details; links can be revoked',
+    'funding_pack': 'by unguessable token only (64 hex, stored hashed); returns that one fixed lender pack the owner shared, while live; logs each opening of a real link',
     'send_invoice_reminder': 'authz.has_permission invoices.create; only an invoice of that business, to its own customer',
     'notification_overview': 'active membership of the business; recipients masked',
     'save_notification_settings': 'authz.has_permission settings.edit; refused while read-only',
