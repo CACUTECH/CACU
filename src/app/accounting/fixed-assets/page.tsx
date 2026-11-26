@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useBusiness } from '@/components/business-provider';
+import { CapitalAllowances } from '@/components/fixed-assets/capital-allowances';
 import { addAssetAction, disposeAssetAction, fixedAssetsAction, postDepreciationAction, previewDepreciationAction } from '@/app/accounting/fixed-assets/actions';
 import { CATEGORIES, methodLabel, monthLabel, monthlyStraightLine, naira, type AssetInput, type DepreciationPreview, type FixedAsset, type FixedAssets } from '@/lib/fixed-assets';
 
@@ -211,6 +212,9 @@ export default function FixedAssetsPage() {
       <ul className="space-y-1 text-sm">{gone.map(a => <li key={a.id}><span className="font-medium">{a.name}</span> · {new Date(a.disposed_on!).toLocaleDateString('en-NG')} ·
         sold for {naira(a.disposal_proceeds ?? 0)}{a.disposal_result && Number(a.disposal_result) !== 0 && ` (${Number(a.disposal_result) > 0 ? 'gain' : 'loss'} ${naira(Math.abs(Number(a.disposal_result)))})`}</li>)}</ul>
     </CardContent></Card>}
+
+    {view.capital_allowances && view.assets.length > 0 && <CapitalAllowances manager={manager}
+      firstYear={Math.min(...view.assets.map(a => Number(a.depreciate_from.slice(0, 4))))} />}
 
     {view.runs.length > 0 && <Card><CardHeader><CardTitle>Depreciation posted</CardTitle></CardHeader><CardContent>
       <ul className="space-y-1 text-sm">{view.runs.map(r => <li key={r.month} className="flex justify-between gap-3"><span>{monthLabel(r.month)}</span>

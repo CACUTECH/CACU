@@ -5353,6 +5353,121 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/fixed-assets/capital-allowances/{year}": {
+      "get": {
+        "summary": "Capital Allowances",
+        "operationId": "capital_allowances_api_v1_businesses__business_id__fixed_assets_capital_allowances__year__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/fixed-assets/{asset_id}/tax": {
+      "put": {
+        "summary": "Fixed Asset Tax",
+        "operationId": "fixed_asset_tax_api_v1_businesses__business_id__fixed_assets__asset_id__tax_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetTax"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/ai/tools": {
       "get": {
         "summary": "Ai Tool Catalogue",
@@ -10251,6 +10366,44 @@
           "received_quantity"
         ],
         "title": "ArrivedLine"
+      },
+      "AssetTax": {
+        "properties": {
+          "tax_class": {
+            "type": "string",
+            "pattern": "^[a-z_]{2,40}$",
+            "title": "Tax Class"
+          },
+          "qualifies": {
+            "type": "boolean",
+            "title": "Qualifies",
+            "default": true
+          },
+          "claimed_before": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Claimed Before",
+            "default": "0.00"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tax_class"
+        ],
+        "title": "AssetTax"
       },
       "BatchTracking": {
         "properties": {

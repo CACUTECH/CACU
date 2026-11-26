@@ -1447,6 +1447,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/fixed-assets/capital-allowances/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Capital Allowances */
+        get: operations["capital_allowances_api_v1_businesses__business_id__fixed_assets_capital_allowances__year__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/fixed-assets/{asset_id}/tax": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Fixed Asset Tax */
+        put: operations["fixed_asset_tax_api_v1_businesses__business_id__fixed_assets__asset_id__tax_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/ai/tools": {
         parameters: {
             query?: never;
@@ -2876,6 +2910,23 @@ export interface components {
             item_id: string;
             /** Received Quantity */
             received_quantity: number;
+        };
+        /** AssetTax */
+        AssetTax: {
+            /** Tax Class */
+            tax_class: string;
+            /**
+             * Qualifies
+             * @default true
+             */
+            qualifies: boolean;
+            /**
+             * Claimed Before
+             * @default 0.00
+             */
+            claimed_before: string;
+            /** Note */
+            note?: string | null;
         };
         /** BatchTracking */
         BatchTracking: {
@@ -7961,6 +8012,74 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PostDepreciation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capital_allowances_api_v1_businesses__business_id__fixed_assets_capital_allowances__year__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fixed_asset_tax_api_v1_businesses__business_id__fixed_assets__asset_id__tax_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetTax"];
             };
         };
         responses: {
