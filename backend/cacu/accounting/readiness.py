@@ -1,4 +1,6 @@
-"""Funding readiness, part 1 (Doc 15 FR-180..185 and FRA-001..012; E19 R3): eligibility, the score and its explanation.
+"""Funding readiness (Doc 15 FR-180..185 and FRA-001..012; E19 R3). Part 1: eligibility, the score and its explanation.
+Part 2: recommendations from a fixed library for each weak dimension (FRA-002), the monthly assessment (FR-185) and the
+history of past assessments (FRA-003). Recommendations and history come with the Oga and Chairman plans (FRA-005).
 
 The score is a weighted sum of seven dimensions, each 0 to 100, worked out by fixed rules from the business's own posted
 books. Nothing is learned or estimated, so every point can be explained (FRA-001). The weights and thresholds come
@@ -8,11 +10,15 @@ It is off until gate G5 (accounting.funding_switch) and follows the plan's modul
 The notice in NOTICE appears with every result (FRA-009). The score uses only the business's financial records:
 never the owner's personal characteristics, location or any protected attribute (FRA-011).
 """
+import json
+import os
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from statistics import mean, pstdev
+import psycopg
 from fastapi import HTTPException
 from cacu.accounting.posting import raw
+from cacu.database_tls import database_connect_options
 
 ZERO = Decimal('0')
 HUNDRED = Decimal('100')
@@ -55,6 +61,12 @@ MEASURES = {
 EXPENSE_TYPES = {'OPERATING_EXPENSE', 'DIRECT_EXPENSE', 'OVERHEAD_EXPENSE', 'OTHER_EXPENSE'}
 PROFIT_TYPES = EXPENSE_TYPES | {'OPERATING_REVENUE', 'NON_OPERATING_REVENUE'}
 LOAN_TYPES = {'NON_CURRENT_LIABILITY', 'CURRENT_LIABILITY'}
+# A dimension scoring below this carries recommendations, at most three (FRA-002).
+RECOMMEND_BELOW = 60
+RECOMMEND_MAX = 3
+# What each plan level shows beyond the score (FRA-005).
+PLAN_EXTRAS = {'score': set(), 'improvement_plan': {'recommendations', 'history'}, 'lender_pack': {'recommendations', 'history'}}
+HISTORY_LIMIT = 24
 
 
 def _d(value) -> Decimal:
@@ -113,6 +125,95 @@ def score(figures: dict, model: dict) -> dict:
     chosen = band(overall, model)
     return {'score': overall, 'band': chosen, 'band_label': BANDS[chosen][0], 'band_text': BANDS[chosen][1],
             'based_on': len(used), 'dimensions': dimensions}
+
+
+# --- Recommendations: a fixed library, filled in with the business's own figures (FRA-002) ------------------------
+
+def _plural(count: int, one: str, many: str | None = None) -> str:
+    return f"{count} {one if count == 1 else (many or one + 's')}"
+
+
+def _number(value: Decimal, places='0.1') -> str:
+    text = format(_round(value, places), ',f')
+    return text.rstrip('0').rstrip('.') if '.' in text else text
+
+
+def _naira(value: Decimal) -> str:
+    whole = _round(value, '1')
+    return f"₦{whole:,}" if whole == value else f"₦{_round(value):,}"
+
+
+def _steps(measure: str, row: dict, facts: dict) -> list[str]:
+    """The library entry for one weak measure. Each entry names what to do and the figure behind it; none promises
+    finance or tells the owner how to run the business beyond what the books show."""
+    value = None if row['value'] is None else _d(row['value'])
+    best = _d(row['best'])
+    if measure == 'days_recorded' and value is not None:
+        return [f'Record sales and spending on every trading day: {_number(value)}% of trading days (Monday to Saturday) '
+                'in the period had something recorded.']
+    if measure == 'open_exceptions':
+        e = facts.get('exceptions') or {}
+        steps = []
+        if e.get('bank_lines'):
+            steps.append(f"Match or explain the {_plural(e['bank_lines'], 'unmatched bank statement line')}.")
+        if e.get('transfers'):
+            steps.append(f"Confirm or clear the {_plural(e['transfers'], 'pending transfer')} older than 7 days.")
+        if e.get('offline'):
+            steps.append(f"Review the {_plural(e['offline'], 'offline entry', 'offline entries')} waiting for you.")
+        steps.extend(f'Fix this books check: {message}.' for message in e.get('books_checks', []))
+        return steps
+    if measure == 'revenue_cv' and value is not None:
+        return [f'Your monthly revenue rose and fell a lot (it varied by {_number(value, "0.01")} against a target of '
+                f'{_number(best, "0.01")}). Record every sale in the month it happens, and look at what was different in '
+                'your weakest months.']
+    if measure == 'revenue_growth' and value is not None:
+        change = 'lower' if value < 0 else 'higher'
+        return [f'Revenue in the last 3 months was {_number(abs(value))}% {change} than in the 3 before. See Profitability '
+                'for the products, services and customers behind the change.']
+    if measure == 'net_margin' and value is not None:
+        return [f'Net profit was {_number(value)}% of revenue. See Profitability for the products, services and outlets with '
+                'the lowest margins, and check which spending grew fastest.']
+    if measure == 'profitable_months' and facts.get('months'):
+        return [f"{facts['profitable_count']} of {facts['months']} months made a profit. Look at the spending in the months "
+                'that made a loss.']
+    if measure == 'positive_cash_months' and facts.get('cash_months'):
+        return [f"Trading brought cash in for {facts['positive_cash_count']} of {facts['cash_months']} months. Collect what "
+                'customers owe sooner, and time large purchases for after sales come in.']
+    if measure == 'cash_cover_days' and value is not None:
+        if value <= 0:
+            return [f'At its lowest, your cash and bank balance fell to nothing or below. Aim to keep at least '
+                    f'{_number(best)} days of spending in cash and bank.']
+        return [f'At its lowest, your cash and bank balance covered {_number(value)} days of spending. Aim to keep at least '
+                f'{_number(best)} days.']
+    if measure == 'debt_cover':
+        if value is not None:
+            return [f'Cash from trading covered your monthly loan repayments {_number(value, "0.01")} times. Lenders usually '
+                    f'look for at least {_number(best, "0.01")} times, so grow cash from trading before taking on more.']
+        if row['score'] == 0:
+            return ['Trading did not bring cash in over the period. Bring in more from sales than you spend before taking '
+                    'on a loan.']
+        return []
+    if measure == 'overdue_60_share' and facts.get('overdue_60_customers'):
+        return [f"Collect the {_naira(facts['overdue_60_amount'])} owed for more than 60 days by "
+                f"{_plural(facts['overdue_60_customers'], 'customer')}."]
+    if measure == 'top_customer_share' and value is not None:
+        return [f'Your biggest customer gave {_number(value)}% of your sales. Win more customers so that no single one gives '
+                f'more than {_number(best)}%.']
+    return []
+
+
+def recommend(result: dict, facts: dict) -> dict:
+    """Adds up to three recommendations to each dimension scoring below 60, weakest measure first (FRA-002). A
+    dimension that is strong enough, or could not be scored, has none."""
+    for d in result['dimensions']:
+        steps = []
+        if d['score'] is not None and d['score'] < RECOMMEND_BELOW:
+            weak = sorted((m for m in d['measures'] if m['score'] is not None and m['score'] < RECOMMEND_BELOW),
+                          key=lambda m: m['score'])
+            for m in weak:
+                steps.extend(_steps(m['key'], m, facts))
+        d['recommendations'] = steps[:RECOMMEND_MAX]
+    return result
 
 
 # --- Dates ----------------------------------------------------------------------------------------------------------
@@ -244,7 +345,8 @@ def _top_customer(session, start: date, end: date, opening: set) -> Decimal | No
 
 def figures(session, start: date, end: date, today: date) -> tuple[dict, dict]:
     """Every measure Doc 15 names, from the posted books for the full months start..end. Returns the figures for
-    score() and information that is shown but not scored (stock turnover for product businesses)."""
+    score() and information that is shown but not scored (stock turnover for product businesses). The figures also
+    carry, under 'facts', the counts and amounts the recommendations quote (FRA-002)."""
     from cacu.accounting.reports import cash_flow, ledger_rows, opening_transactions
     from cacu.accounting.receivables import ageing
     opening = opening_transactions(session)
@@ -288,7 +390,8 @@ def figures(session, start: date, end: date, today: date) -> tuple[dict, dict]:
     out = {}
     series = [revenue[m] for m in months]
     out['days_recorded'] = _days_recorded(session, start, end, opening)
-    out['open_exceptions'] = Decimal(exceptions(session, today)['total'])
+    open_now = exceptions(session, today)
+    out['open_exceptions'] = Decimal(open_now['total'])
     average = Decimal(mean(series)) if series else ZERO
     out['revenue_cv'] = Decimal(pstdev(series)) / average if len(series) >= 3 and average > 0 else None
     if len(series) >= 6 and sum(series[-6:-3]) > 0:
@@ -304,7 +407,8 @@ def figures(session, start: date, end: date, today: date) -> tuple[dict, dict]:
         operating = [Decimal(next(s['total'] for s in cash_flow(session, m, _month_end(m))['sections'] if s['key'] == 'operating')) for m in months]
     except HTTPException:
         operating = None  # the cash-flow statement cannot be drawn up until every account has a reviewed mapping
-    out['positive_cash_months'] = Decimal(sum(1 for v in operating if v > 0)) * HUNDRED / len(operating) if operating else None
+    positive_cash = sum(1 for v in operating if v > 0) if operating else 0
+    out['positive_cash_months'] = Decimal(positive_cash) * HUNDRED / len(operating) if operating else None
     days = (end - start).days + 1
     balance, lowest = cash_before, None
     for i in range(days):
@@ -317,10 +421,15 @@ def figures(session, start: date, end: date, today: date) -> tuple[dict, dict]:
     out['no_debt'] = monthly_repayments == 0
     out['debt_cover'] = out['average_operating_cash'] / monthly_repayments if monthly_repayments > 0 and out['average_operating_cash'] is not None else None
 
-    owed = ageing(session, 'receivables', end)['totals']
+    owed_by = ageing(session, 'receivables', end)
+    owed = owed_by['totals']
     gross = sum((Decimal(owed[k]) for k in ('current', 'd1_30', 'd31_60', 'd61_90', 'over_90')), ZERO)
     out['overdue_60_share'] = (Decimal(owed['d61_90']) + Decimal(owed['over_90'])) * HUNDRED / gross if gross > 0 else ZERO
     out['top_customer_share'] = _top_customer(session, start, end, opening)
+    late = [Decimal(r['d61_90']) + Decimal(r['over_90']) for r in owed_by['rows']]
+    out['facts'] = {'exceptions': open_now, 'months': len(months), 'profitable_count': sum(1 for m in months if profit[m] > 0),
+                    'cash_months': len(operating) if operating else 0, 'positive_cash_count': positive_cash,
+                    'overdue_60_amount': sum((v for v in late if v > 0), ZERO), 'overdue_60_customers': sum(1 for v in late if v > 0)}
 
     # Stock turnover, for businesses that held stock in the period (product and hybrid businesses).
     information = {}
@@ -343,13 +452,20 @@ def _available(session) -> dict:
     state = access(session)
     if not state['enabled']:
         return {**state, 'available': False, 'message': 'Funding readiness is not available yet.'}
-    if state['level'] not in {'score', 'improvement_plan', 'lender_pack'}:
+    if state['level'] not in PLAN_EXTRAS:
         return {**state, 'available': False, 'message': 'Your plan does not include funding readiness.'}
     return {**state, 'available': True, 'message': None}
 
 
-def _serialise(row) -> dict:
-    return {**row.result, 'id': str(row.id), 'assessed_on': row.assessed_on.isoformat(), 'created_at': row.created_at.isoformat()}
+def _serialise(row, level: str) -> dict:
+    """An assessment as stored, with what the plan does not include taken out (FRA-005): the General plan sees the score
+    and its explanation, without the recommendations. They are kept, so an upgrade shows them."""
+    result = {**row.result, 'id': str(row.id), 'kind': row.kind, 'assessed_on': row.assessed_on.isoformat(),
+              'created_at': row.created_at.isoformat()}
+    include = 'recommendations' in PLAN_EXTRAS.get(level, set())
+    result['dimensions'] = [{**d, 'recommendations': d.get('recommendations', []) if include else None} for d in result['dimensions']]
+    result['recommendations_included'] = include
+    return result
 
 
 def _latest(session):
@@ -357,12 +473,23 @@ def _latest(session):
                (str(session.business_id),)).first()
 
 
+def _history(session) -> list[dict]:
+    """Past assessments, newest first, so the owner can see progress (FRA-003)."""
+    rows = raw(session, """SELECT id, kind, assessed_on, score, band, model_version, period_start, period_end, created_at
+        FROM accounting.funding_assessment WHERE business_id=%s ORDER BY assessed_on DESC, created_at DESC LIMIT %s""",
+               (str(session.business_id), HISTORY_LIMIT)).all()
+    return [{'id': str(r.id), 'kind': r.kind, 'assessed_on': r.assessed_on.isoformat(), 'score': r.score, 'band': r.band,
+             'band_label': BANDS[r.band][0], 'model_version': r.model_version,
+             'period': {'start_date': r.period_start.isoformat(), 'end_date': r.period_end.isoformat()}} for r in rows]
+
+
 def overview(session) -> dict:
-    """Whether it is available, whether the business qualifies (and if not, what is missing), and the latest result."""
+    """Whether it is available, whether the business qualifies (and if not, what is missing), the latest result and,
+    on the Oga and Chairman plans, the history of past assessments."""
     from cacu.accounting.workflows import business_today
     state = _available(session)
     out = {'available': state['available'], 'level': state['level'], 'message': state['message'], 'notice': NOTICE,
-           'limitations': LIMITATIONS, 'eligibility': None, 'latest': None, 'assessed_today': False}
+           'limitations': LIMITATIONS, 'eligibility': None, 'latest': None, 'assessed_today': False, 'history': None}
     if not state['available']:
         return out
     today = business_today(session)
@@ -370,37 +497,101 @@ def overview(session) -> dict:
     out['eligibility'] = eligibility(session, today, model)
     latest = _latest(session)
     if latest is not None:
-        out['latest'] = _serialise(latest)
-        out['assessed_today'] = latest.assessed_on == today and latest.kind == 'request'
+        out['latest'] = _serialise(latest, state['level'])
+    out['assessed_today'] = _existing(session, 'request', today) is not None
+    if 'history' in PLAN_EXTRAS[state['level']]:
+        out['history'] = _history(session)
     return out
 
 
-def assess(session, actor) -> dict:
-    """An assessment on request, at most once a day (FRA-003): a second request the same day returns the first."""
+def assessment(session, assessment_id) -> dict:
+    """One past assessment in full, as it was worked out (Oga and Chairman plans: history)."""
+    state = _available(session)
+    if not state['available']:
+        raise HTTPException(409, state['message'])
+    if 'history' not in PLAN_EXTRAS[state['level']]:
+        raise HTTPException(403, 'Past assessments come with the Oga and Chairman plans.')
+    row = raw(session, 'SELECT * FROM accounting.funding_assessment WHERE business_id=%s AND id=%s',
+              (str(session.business_id), str(assessment_id))).first()
+    if row is None:
+        raise HTTPException(404, 'Assessment not found')
+    return _serialise(row, state['level'])
+
+
+def _existing(session, kind: str, today: date):
+    if kind == 'request':
+        return raw(session, "SELECT * FROM accounting.funding_assessment WHERE business_id=%s AND kind='request' AND assessed_on=%s",
+                   (str(session.business_id), today)).first()
+    return raw(session, """SELECT * FROM accounting.funding_assessment WHERE business_id=%s AND kind='monthly'
+        AND date_trunc('month', assessed_on::timestamp)=date_trunc('month', %s::date::timestamp)""",
+               (str(session.business_id), today)).first()
+
+
+def assess(session, actor, kind: str = 'request') -> dict:
+    """A new assessment. On request at most once a day: a second request the same day returns the first (FRA-003).
+    The monthly one (FR-185), which CACU makes itself, at most once a calendar month."""
     from cacu.accounting.workflows import business_today
+    if kind not in {'request', 'monthly'}:
+        raise ValueError(kind)
     state = _available(session)
     if not state['available']:
         raise HTTPException(409, state['message'])
     today = business_today(session)
-    existing = raw(session, "SELECT * FROM accounting.funding_assessment WHERE business_id=%s AND kind='request' AND assessed_on=%s",
-                   (str(session.business_id), today)).first()
+    existing = _existing(session, kind, today)
     if existing is not None:
-        return _serialise(existing)
+        return _serialise(existing, state['level'])
     version, model = _model(session)
     checked = eligibility(session, today, model)
     if not checked['eligible']:
         raise HTTPException(409, ' '.join(m['message'] for m in checked['missing']))
     start, end, months = period(_cutover(session), today, model)
     values, information = figures(session, start, end, today)
-    result = {**score(values, model), 'model_version': version, 'notice': NOTICE, 'limitations': LIMITATIONS,
-              'period': {'start_date': start.isoformat(), 'end_date': end.isoformat(), 'months': months},
+    result = {**recommend(score(values, model), values['facts']), 'model_version': version, 'notice': NOTICE,
+              'limitations': LIMITATIONS, 'period': {'start_date': start.isoformat(), 'end_date': end.isoformat(), 'months': months},
               'information': information, 'label': 'From your CACU books, not reviewed'}
-    import json
     row = raw(session, """INSERT INTO accounting.funding_assessment(business_id, model_version, kind, assessed_on, period_start, period_end,
-          score, band, result, requested_by) VALUES (%s,%s,'request',%s,%s,%s,%s,%s,%s::jsonb,%s)
-        ON CONFLICT (business_id, kind, assessed_on) DO NOTHING RETURNING *""",
-              (str(session.business_id), version, today, start, end, result['score'], result['band'], json.dumps(result), str(actor))).first()
-    if row is None:  # another request the same day got there first
-        row = raw(session, "SELECT * FROM accounting.funding_assessment WHERE business_id=%s AND kind='request' AND assessed_on=%s",
-                  (str(session.business_id), today)).first()
-    return _serialise(row)
+          score, band, result, requested_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
+        ON CONFLICT DO NOTHING RETURNING *""",
+              (str(session.business_id), version, kind, today, start, end, result['score'], result['band'], json.dumps(result),
+               str(actor) if actor else None)).first()
+    if row is None:  # another run the same day (or, for the monthly one, the same month) got there first
+        row = _existing(session, kind, today)
+    return _serialise(row, state['level'])
+
+
+# --- The monthly assessment (FR-185) ------------------------------------------------------------------------------
+
+def _connect():
+    dsn = os.environ.get('CACU_DATABASE_URL')
+    if not dsn:
+        raise HTTPException(503, 'Accounting database unavailable')
+    return psycopg.connect(dsn.replace('postgresql+psycopg://', 'postgresql://', 1).replace('postgres://', 'postgresql://', 1),
+                           **database_connect_options())
+
+
+def monthly_queue() -> list[tuple]:
+    """The businesses due a monthly assessment, each with an active owner to act for."""
+    with _connect() as connection, connection.transaction(), connection.cursor() as cursor:
+        cursor.execute('SELECT business_id, owner_id FROM accounting.funding_monthly_queue()')
+        return cursor.fetchall()
+
+
+def run_monthly(apply: bool = False) -> dict:
+    """The monthly job: an assessment for each business due one this month. It reads the books as a server job for an
+    active owner, with that owner's access and no more. A business that does not qualify yet is counted, not failed,
+    and tried again on the next run. Only counts come back, never business figures."""
+    from cacu.accounting import session as sessions
+    queue = monthly_queue()
+    report = {'due': len(queue), 'made': 0, 'not_eligible': 0, 'failed': 0}
+    if not apply:
+        return report
+    for business_id, owner_id in queue:
+        try:
+            with sessions.library_transaction(owner_id, business_id, permission='ledger.view', level='system') as session:
+                assess(session, None, 'monthly')
+            report['made'] += 1
+        except HTTPException as exc:
+            report['not_eligible' if exc.status_code == 409 else 'failed'] += 1
+        except Exception:  # noqa: BLE001 - one business's failure must not stop the others; details stay out of the report
+            report['failed'] += 1
+    return report

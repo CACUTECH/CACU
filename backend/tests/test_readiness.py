@@ -83,3 +83,43 @@ def test_the_period_is_the_full_months_since_the_books_began_up_to_twelve():
     assert period(date(2026, 3, 1), date(2026, 11, 25), MODEL) == (date(2026, 3, 1), date(2026, 10, 31), 8)
     assert period(date(2024, 6, 10), date(2026, 1, 5), MODEL) == (date(2025, 1, 1), date(2025, 12, 31), 12)
     assert period(date(2026, 11, 2), date(2026, 11, 25), MODEL)[2] == 0
+
+
+FACTS = {'exceptions': {'bank_lines': 2, 'transfers': 14, 'offline': 1, 'books_checks': ['Receivables do not agree with account 1200'], 'total': 18},
+         'months': 12, 'profitable_count': 4, 'cash_months': 12, 'positive_cash_count': 5,
+         'overdue_60_amount': Decimal('420000'), 'overdue_60_customers': 3}
+
+
+def test_each_weak_dimension_gets_up_to_three_specific_recommendations_weakest_first():
+    from cacu.accounting.readiness import recommend
+    figures = {**{k: Decimal(str(v)) for k, v in BEST.items()}, 'days_recorded': Decimal('60'), 'open_exceptions': Decimal('18'),
+               'overdue_60_share': Decimal('45'), 'top_customer_share': Decimal('65')}
+    result = recommend(score(figures, MODEL), FACTS)
+    by = {d['key']: d for d in result['dimensions']}
+    # D1 is 18: open exceptions (0) come before days recorded (36), and only three are kept (FRA-002).
+    assert by['D1']['recommendations'] == ['Match or explain the 2 unmatched bank statement lines.',
+                                           'Confirm or clear the 14 pending transfers older than 7 days.',
+                                           'Review the 1 offline entry waiting for you.']
+    assert by['D7']['recommendations'] == ['Your biggest customer gave 65% of your sales. Win more customers so that no single one gives more than 20%.',
+                                           'Collect the ₦420,000 owed for more than 60 days by 3 customers.']
+    assert all(by[k]['recommendations'] == [] for k in ('D2', 'D3', 'D4', 'D5', 'D6'))  # 60 or more: none
+
+
+def test_recommendations_quote_the_figures_and_skip_what_could_not_be_worked_out():
+    from cacu.accounting.readiness import recommend
+    figures = {**{k: Decimal(str(v)) for k, v in BEST.items()}, 'net_margin': Decimal('-4'), 'profitable_months': Decimal('33.3'),
+               'cash_cover_days': Decimal('-2'), 'positive_cash_months': Decimal('41.7'), 'revenue_growth': None, 'debt_cover': None,
+               'no_debt': True, 'average_operating_cash': Decimal('-100')}
+    result = recommend(score(figures, MODEL), FACTS)
+    by = {d['key']: d for d in result['dimensions']}
+    assert by['D4']['recommendations'] == [  # months with a profit score 14, the margin 24
+        '4 of 12 months made a profit. Look at the spending in the months that made a loss.',
+        'Net profit was -4% of revenue. See Profitability for the products, services and outlets with the lowest margins, and check which spending grew fastest.']
+    assert by['D5']['recommendations'] == [
+        'At its lowest, your cash and bank balance fell to nothing or below. Aim to keep at least 30 days of spending in cash and bank.',
+        'Trading brought cash in for 5 of 12 months. Collect what customers owe sooner, and time large purchases for after sales come in.']
+    assert by['D6']['recommendations'] == ['Trading did not bring cash in over the period. Bring in more from sales than you spend before taking on a loan.']
+    assert by['D3']['score'] is None and by['D3']['recommendations'] == []
+    for d in result['dimensions']:
+        for text in d['recommendations']:
+            assert 'loan approved' not in text and 'guarantee' not in text.lower()  # FRA-009: never a promise of finance

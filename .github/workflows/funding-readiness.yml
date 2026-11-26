@@ -1,0 +1,46 @@
+name: Funding readiness
+# The monthly funding readiness assessment (Doc 15 FR-185, FRA-003; E19 R3 part 2). Runs daily: each business gets one
+# assessment a calendar month, once it qualifies. Off until the repository variable CACU_FUNDING_MONTHLY_ENABLED is
+# 'true' (after gate G5, with CACU's funding readiness switch); a manual run is a dry run unless "apply" is ticked.
+on:
+  schedule:
+    - cron: '40 3 * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Make the assessments that are due (approved production operation)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: funding-readiness
+  cancel-in-progress: false
+jobs:
+  monthly:
+    if: github.event_name == 'workflow_dispatch' || vars.CACU_FUNDING_MONTHLY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: billing-operations
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.11'
+      - run: uv sync --frozen --no-editable
+      - name: Make the monthly assessments or dry run
+        env:
+          CACU_DATABASE_URL: ${{ secrets.CACU_DATABASE_URL }}
+          APPLY_MONTHLY: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: |
+          if [ "$APPLY_MONTHLY" = "true" ]; then
+            uv run --frozen python -m tools.run_funding_monthly --apply --json
+          else
+            uv run --frozen python -m tools.run_funding_monthly --json
+          fi

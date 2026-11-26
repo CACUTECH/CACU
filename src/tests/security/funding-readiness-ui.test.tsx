@@ -1,14 +1,14 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import FundingReadinessPage from '@/app/analytics/funding/page';
-import { fundingAssessAction, fundingOverviewAction } from '@/app/analytics/funding/actions';
+import { fundingAssessAction, fundingAssessmentAction, fundingOverviewAction } from '@/app/analytics/funding/actions';
 import { FUNDING_NOTICE, type Assessment, type FundingOverview } from '@/lib/funding-readiness';
 
-jest.mock('@/app/analytics/funding/actions', () => ({ fundingOverviewAction: jest.fn(), fundingAssessAction: jest.fn() }));
+jest.mock('@/app/analytics/funding/actions', () => ({ fundingOverviewAction: jest.fn(), fundingAssessAction: jest.fn(), fundingAssessmentAction: jest.fn() }));
 
 const base: FundingOverview = { available: true, level: 'score', message: null, notice: FUNDING_NOTICE, limitations: ['The score reflects only what is recorded in CACU.'],
-  eligibility: { eligible: true, missing: [], earliest_date: null }, latest: null, assessed_today: false };
-const assessment: Assessment = { id: 'a1', assessed_on: '2026-11-25', created_at: '2026-11-25T10:00:00Z', model_version: 'fra-1', score: 64, band: 'developing',
+  eligibility: { eligible: true, missing: [], earliest_date: null }, latest: null, assessed_today: false, history: null };
+const assessment: Assessment = { id: 'a1', kind: 'request', recommendations_included: false, assessed_on: '2026-11-25', created_at: '2026-11-25T10:00:00Z', model_version: 'fra-1', score: 64, band: 'developing',
   band_label: 'Developing', band_text: 'A few areas to improve before approaching a lender.', based_on: 6, notice: FUNDING_NOTICE, limitations: [],
   label: 'From your CACU books, not reviewed', period: { start_date: '2026-04-01', end_date: '2026-10-31', months: 7 },
   information: { stock_turnover: { label: 'Times your stock was sold and replaced over the period (shown, not scored)', value: '4.2' } },
@@ -66,4 +66,36 @@ test('a refused assessment shows the reason and keeps the page', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Work out my score' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Confirm or clear the 1 transfer');
   expect(screen.getByRole('button', { name: 'Work out my score' })).toBeEnabled();
+});
+
+test('General: no recommendations or history, and the screen says which plans include them', async () => {
+  (fundingOverviewAction as jest.Mock).mockResolvedValue({ success: true, data: { ...base, latest: assessment } });
+  render(<FundingReadinessPage />);
+  expect(await screen.findByText(/come with the Oga and Chairman plans/)).toBeInTheDocument();
+  expect(screen.queryByText('What to do next')).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Past assessments' })).not.toBeInTheDocument();
+});
+
+test('FRA-002/003: Oga sees what to do next for a weak area, and past assessments with the change in score', async () => {
+  const weak: Assessment = { ...assessment, id: 'a2', kind: 'monthly', assessed_on: '2026-12-01', score: 70, recommendations_included: true,
+    dimensions: assessment.dimensions.map(d => d.key === 'D1'
+      ? { ...d, score: 45, recommendations: ['Confirm or clear the 14 pending transfers older than 7 days.'] } : { ...d, recommendations: [] }) };
+  const history = [
+    { id: 'a2', kind: 'monthly', assessed_on: '2026-12-01', score: 70, band: 'developing', band_label: 'Developing', model_version: 'fra-1', period: weak.period },
+    { id: 'a1', kind: 'request', assessed_on: '2026-11-25', score: 64, band: 'developing', band_label: 'Developing', model_version: 'fra-1', period: assessment.period },
+  ];
+  (fundingOverviewAction as jest.Mock).mockResolvedValue({ success: true, data: { ...base, level: 'improvement_plan', latest: weak, history } });
+  (fundingAssessmentAction as jest.Mock).mockResolvedValue({ success: true, data: { ...assessment, recommendations_included: true } });
+  render(<FundingReadinessPage />);
+  expect(await screen.findByText('Confirm or clear the 14 pending transfers older than 7 days.')).toBeInTheDocument();
+  expect(screen.getAllByText('What to do next')).toHaveLength(1);
+  const rows = screen.getAllByRole('row');
+  expect(rows[1]).toHaveTextContent('1 December 2026Monthly70+6DevelopingShowing');
+  expect(rows[2]).toHaveTextContent('25 November 2026You asked64Developing');
+  fireEvent.click(screen.getByRole('button', { name: 'View' }));
+  expect(await screen.findByText(/looking at a past assessment, from 25 November 2026/)).toBeInTheDocument();
+  expect(fundingAssessmentAction).toHaveBeenCalledWith('a1');
+  expect(screen.getByText('64', { selector: 'p' })).toBeInTheDocument();  // the big score, not the table
+  fireEvent.click(screen.getByRole('button', { name: 'Back to the latest' }));
+  expect(await screen.findByText('70', { selector: 'p' })).toBeInTheDocument();
 });

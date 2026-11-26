@@ -4662,6 +4662,59 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/funding-readiness/assessments/{assessment_id}": {
+      "get": {
+        "summary": "Funding Assessment",
+        "operationId": "funding_assessment_api_v1_businesses__business_id__funding_readiness_assessments__assessment_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "assessment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assessment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/ai/tools": {
       "get": {
         "summary": "Ai Tool Catalogue",

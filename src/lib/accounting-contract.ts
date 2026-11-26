@@ -1274,6 +1274,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/funding-readiness/assessments/{assessment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Funding Assessment */
+        get: operations["funding_assessment_api_v1_businesses__business_id__funding_readiness_assessments__assessment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/ai/tools": {
         parameters: {
             query?: never;
@@ -7177,6 +7194,38 @@ export interface operations {
             header?: never;
             path: {
                 business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    funding_assessment_api_v1_businesses__business_id__funding_readiness_assessments__assessment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                assessment_id: string;
             };
             cookie?: never;
         };
