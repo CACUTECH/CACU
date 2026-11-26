@@ -205,7 +205,9 @@ def settle(session, actor, run_id, request: Settle) -> dict:
     source = uuid5(request.request_key, 'payroll-settlement')
     if raw(session, 'SELECT 1 FROM accounting.payroll_settlement WHERE business_id=%s AND id=%s', (tenant, str(source))).first():
         return _state(session, run)  # a retried request
-    posting = raw(session, 'SELECT * FROM accounting.payroll_posting WHERE business_id=%s AND run_id=%s FOR UPDATE', (tenant, str(run_id))).first()
+    # No row lock: the write session already holds the business's lock, so two payments cannot both pass the "never more
+    # than owed" check (and FOR UPDATE would need UPDATE rights on a table nobody may update).
+    posting = raw(session, 'SELECT * FROM accounting.payroll_posting WHERE business_id=%s AND run_id=%s', (tenant, str(run_id))).first()
     if posting is None:
         raise HTTPException(409, 'Post this payroll to the books before recording payments.')
     if request.entry_date < posting.entry_date:
