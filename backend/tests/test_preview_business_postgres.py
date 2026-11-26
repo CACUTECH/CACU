@@ -3,7 +3,7 @@ CACU's switches are on for it only while they stay off for everyone else. Only C
 import json
 import psycopg
 import pytest
-from cacu.accounting.payroll import overview as payroll_books
+from cacu.accounting.payroll import _enabled as payroll_on
 from cacu.accounting.posting import raw
 from test_corrections_postgres import live, call, URL  # noqa: F401  (fixtures)
 from test_opening_position_postgres import books  # noqa: F401
@@ -32,12 +32,12 @@ def asked_by(live, who):
 
 def test_switched_off_features_are_on_for_the_preview_business_only(live):
     preview(live, False)
-    assert call(live, 'owner', lambda s, a: payroll_books(s, a))['enabled'] is False
+    assert call(live, 'owner', lambda s, a: payroll_on(s)) is False
     assert call(live, 'owner', lambda s, a: raw(s, 'SELECT accounting.funding_access(%s)', (str(live.business),)).scalar())['enabled'] is False
     assert asked_by(live, 'owner') is False
 
     preview(live, True)
-    assert call(live, 'owner', lambda s, a: payroll_books(s, a))['enabled'] is True
+    assert call(live, 'owner', lambda s, a: payroll_on(s)) is True
     assert call(live, 'owner', lambda s, a: raw(s, 'SELECT accounting.funding_access(%s)', (str(live.business),)).scalar())['enabled'] is True
     assert asked_by(live, 'owner') is True and asked_by(live, 'viewer') is True
     assert asked_by(live, 'outsider') is False  # answered only to the business's own members
