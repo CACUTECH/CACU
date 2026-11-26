@@ -75,10 +75,14 @@ CREATE TABLE accounting.depreciation_charge (
 CREATE FUNCTION accounting.fixed_asset_fixed() RETURNS trigger
  LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
 BEGIN
- IF TG_OP = 'UPDATE' AND TG_TABLE_NAME = 'fixed_asset' AND OLD.disposed_on IS NULL AND NEW.disposed_on IS NOT NULL
-    AND (to_jsonb(NEW) - ARRAY['disposed_on', 'disposal_proceeds', 'disposal_transaction_id', 'disposed_by'])
-      = (to_jsonb(OLD) - ARRAY['disposed_on', 'disposal_proceeds', 'disposal_transaction_id', 'disposed_by']) THEN
-  RETURN NEW;
+ -- The table is checked on its own first: PL/pgSQL may evaluate a whole condition, and the run and charge tables have
+ -- no disposal columns.
+ IF TG_OP = 'UPDATE' AND TG_TABLE_NAME = 'fixed_asset' THEN
+  IF (to_jsonb(OLD) ->> 'disposed_on') IS NULL AND (to_jsonb(NEW) ->> 'disposed_on') IS NOT NULL
+     AND (to_jsonb(NEW) - ARRAY['disposed_on', 'disposal_proceeds', 'disposal_transaction_id', 'disposed_by'])
+       = (to_jsonb(OLD) - ARRAY['disposed_on', 'disposal_proceeds', 'disposal_transaction_id', 'disposed_by']) THEN
+   RETURN NEW;
+  END IF;
  END IF;
  RAISE EXCEPTION 'Fixed asset records are never changed: reverse a mistake with a journal instead' USING ERRCODE = '55000';
 END $$;
