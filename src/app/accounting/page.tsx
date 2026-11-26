@@ -9,7 +9,8 @@ import {
     Wallet, 
     FileText, 
     ClipboardList, 
-    Sparkles 
+    Sparkles,
+    Truck
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -67,6 +68,12 @@ export default function AccountingPage() {
                     title="Journal Adjustments"
                     description="Record manual ledger entries for corrections, payroll, or depreciation with debit/credit validation."
                     href="/accounting/journal-entries"
+                />
+                <FeatureCard
+                    icon={Truck}
+                    title="Fixed Assets"
+                    description="Keep a register of equipment, vehicles and buildings, post each month's depreciation and record sales or write-offs."
+                    href="/accounting/fixed-assets"
                 />
                 <FeatureCard
                     icon={Scale}

@@ -206,11 +206,14 @@ def financial_summary(session,start:date,end:date):
 
 
 def opening_transactions(session):
-    """Transactions that carry the approved opening position: the opening journal and one entry per customer or supplier."""
+    """Transactions that carry the approved opening position: the opening journal, one entry per customer or supplier, and
+    each fixed asset brought in."""
     evidence=session.connection().exec_driver_sql('SELECT reconciliation_evidence FROM accounting.business_map WHERE business_id=%s',
         (str(session.business_id),)).scalar() or {}
     ids={evidence.get('transaction_id')}|{d.get('transaction_id') for d in evidence.get('opening_documents',[])}
-    return {i for i in ids if i is not None}
+    # Fixed assets owned before the books started are brought in later, against retained earnings: positions too.
+    from cacu.accounting.assets import brought_in
+    return {i for i in ids if i is not None}|brought_in(session)
 
 LABELS={'tier':'Management statements, not reviewed','basis':'Accrual','currency':'NGN'}
 
