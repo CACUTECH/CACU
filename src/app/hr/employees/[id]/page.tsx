@@ -2,26 +2,29 @@ import Link from 'next/link';
 import { HRService } from '@/services/hr-service';
 import { EmployeeForm } from '@/components/hr/employee-form';
 import { EmployeeStatusPanel } from '@/components/hr/employee-status-panel';
+import { RemittanceDetailsForm } from '@/components/hr/remittance-details-form';
+import type { RemittanceDetails } from '@/lib/remittances';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { lagosToday, type HistoryEntry } from '@/lib/hr';
 
 const EVENTS: Record<string, string> = {
   'employee.save': 'Details saved', 'employee.status': 'Status changed', 'employee.depart': 'Departure recorded',
+  'employee.remittance': 'Where deductions go changed',
 };
 const FIELD_LABELS: Record<string, string> = {
   full_name: 'name', job_title: 'job title', employment_status: 'status', monthly_salary: 'monthly gross', pay_basic: 'basic pay',
   pay_housing: 'housing', pay_transport: 'transport', pay_other: 'other allowances', annual_rent: 'declared rent', nhis_monthly: 'NHIS',
   pension_enrolled: 'pension', nhf_enrolled: 'NHF', tax_id: 'tax ID', pension_pin: 'pension PIN', start_date: 'start date',
-  end_date: 'last working day', departure_reason: 'departure reason', created_by: '', created_at: '', id: '', business_id: '',
+  end_date: 'last working day', departure_reason: 'departure reason', tax_state: 'state taxed in', pfa: 'PFA', created_by: '', created_at: '', id: '', business_id: '',
 };
 
 export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const service = new HRService();
-  let employee, history: HistoryEntry[] = [];
+  let employee, history: HistoryEntry[] = [], remittance: RemittanceDetails = { tax_state: null, pfa: null };
   try {
     employee = await service.getEmployee(id);
-    if (employee) history = await service.history(id);
+    if (employee) [history, remittance] = await Promise.all([service.history(id), service.remittanceDetails(id)]);
   } catch {
     return <div role="alert">Employee record could not be loaded. <Link href={`/hr/employees/${id}`}>Retry</Link></div>;
   }
@@ -31,6 +34,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
     <h1 className="font-headline text-3xl font-bold">{employee.full_name}</h1>
     <EmployeeStatusPanel employee={employee} today={lagosToday()} />
     <EmployeeForm key={employee.version} employee={employee} />
+    <RemittanceDetailsForm employeeId={employee.id} details={remittance} />
     <Card><CardHeader><CardTitle>Change history</CardTitle></CardHeader><CardContent>
       {history.length ? <ul className="space-y-2 text-sm">{history.map((entry, i) => {
         const fields = (entry.fields || []).map(f => FIELD_LABELS[f] ?? f.replace(/_/g, ' ')).filter(Boolean);

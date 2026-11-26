@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { HRService } from '@/services/hr-service';
 import { PayrollRunActions } from '@/components/hr/payroll-controls';
 import { PayrollBooksPanel } from '@/components/hr/payroll-books';
+import { RemittanceSchedules } from '@/components/hr/remittance-schedules';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,8 +12,9 @@ const COLUMNS = [['gross', 'Gross'], ['pension_employee', 'Pension'], ['nhf', 'N
 
 export default async function PayrollRunPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let detail;
-  try { detail = await new HRService().payrollRun(id); }
+  let detail, schedule = null;
+  const service = new HRService();
+  try { detail = await service.payrollRun(id); if (detail?.run.status === 'approved') schedule = await service.remittanceSchedule(id).catch(() => null); }
   catch { return <div role="alert">Payroll run could not be loaded. <Link href={`/hr/payroll/${id}`}>Retry</Link></div>; }
   if (!detail) return <div role="alert">Payroll run not found in this business. <Link href="/hr/payroll">Return to payroll</Link></div>;
   const { run, payslips } = detail;
@@ -30,6 +32,7 @@ export default async function PayrollRunPage({ params }: { params: Promise<{ id:
       <p className="mb-3 text-sm">Approval locks this payroll as the record for the month. It does not pay employees or post to accounting: posting to the books is a separate step once it is approved.</p>
       <PayrollRunActions id={run.id} version={run.version} reviewed={!!run.rules_reviewed_at} /></CardContent></Card>}
     {run.status === 'approved' && <PayrollBooksPanel runId={run.id} />}
+    {schedule && <RemittanceSchedules schedule={schedule} />}
     <div className="overflow-x-auto rounded-md border"><Table>
       <TableHeader><TableRow><TableHead>Employee</TableHead>{COLUMNS.map(([key, label]) => <TableHead key={key} className="text-right">{label}</TableHead>)}</TableRow></TableHeader>
       <TableBody>{payslips.map(slip => <TableRow key={slip.id}>
