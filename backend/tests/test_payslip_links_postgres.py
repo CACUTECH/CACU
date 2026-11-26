@@ -49,6 +49,12 @@ def opened(token):
         return c.execute('SELECT public.public_payslip(%s)', (token,)).fetchone()[0]
 
 
+def payslip_events(d, employee):
+    """The payslip entries in the employee's HR history, oldest first (hr_history lists newest first)."""
+    history = query(d, 'SELECT public.hr_history(%s,%s)', (d[1], employee))[0][0]
+    return [h['event'] for h in reversed(history) if h['event'].startswith('payslip.')]
+
+
 def test_an_approved_payslip_opens_by_its_link_with_identity_numbers_masked(slips):
     d, ada, draft = slips
     with pytest.raises(psycopg.Error, match='PAYROLL_RUN_NOT_APPROVED'):
@@ -72,7 +78,7 @@ def test_an_approved_payslip_opens_by_its_link_with_identity_numbers_masked(slip
         query(d, 'SELECT * FROM hr_payslip_links')
     status = call(d, 'SELECT public.hr_payslip_links(%s,%s)', (d[1], run))
     assert [(s['payslip_id'], s['open_count']) for s in status] == [(str(slip), 1)]
-    events = [e for (e,) in query(d, "SELECT event FROM hr_private.audit WHERE record_id=%s AND event LIKE 'payslip.%%' ORDER BY id", (ada,))]
+    events = payslip_events(d, ada)
     assert events == ['payslip.shared']
 
 
@@ -93,7 +99,7 @@ def test_links_are_replaced_withdrawn_and_expire(slips):
     for days in (0, 91, None):
         with pytest.raises(psycopg.Error, match='INVALID_EXPIRY'):
             share(d, slip, days=days)
-    events = [e for (e,) in query(d, "SELECT event FROM hr_private.audit WHERE record_id=%s AND event LIKE 'payslip.%%' ORDER BY id", (ada,))]
+    events = payslip_events(d, ada)
     assert events == ['payslip.shared', 'payslip.shared', 'payslip.withdrawn', 'payslip.shared']
 
 

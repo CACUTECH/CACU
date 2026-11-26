@@ -40,8 +40,8 @@ BEGIN
  END IF;
  IF fund IS NOT NULL AND char_length(fund) NOT BETWEEN 2 AND 80 THEN RAISE EXCEPTION 'INVALID_PFA' USING ERRCODE = '22023'; END IF;
  SELECT * INTO before FROM public.hr_remittance_details WHERE business_id = p_business_id AND employee_id = p_employee_id FOR UPDATE;
- IF before.tax_state IS DISTINCT FROM state THEN changed := changed || 'tax_state'; END IF;
- IF before.pfa IS DISTINCT FROM fund THEN changed := changed || 'pfa'; END IF;
+ IF before.tax_state IS DISTINCT FROM state THEN changed := changed || 'tax_state'::text; END IF;
+ IF before.pfa IS DISTINCT FROM fund THEN changed := changed || 'pfa'::text; END IF;
  BEGIN
   INSERT INTO public.hr_remittance_details(business_id, employee_id, tax_state, pfa, updated_by) VALUES (p_business_id, p_employee_id, state, fund, actor)
   ON CONFLICT (business_id, employee_id) DO UPDATE SET tax_state = excluded.tax_state, pfa = excluded.pfa, updated_by = excluded.updated_by, updated_at = now();

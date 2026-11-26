@@ -36,8 +36,8 @@ def test_tax_state_and_pfa_are_saved_by_managers_and_recorded_in_history(staff):
     ada = hire(d)['id']
     assert save(d, ada, 'Lagos', '  Stanbic   IBTC Pension Managers ') == {'tax_state': 'Lagos', 'pfa': 'Stanbic IBTC Pension Managers'}
     assert save(d, ada, 'Lagos', 'Stanbic IBTC Pension Managers') == {'tax_state': 'Lagos', 'pfa': 'Stanbic IBTC Pension Managers'}  # no change
-    history = query(d, "SELECT details->'fields' FROM hr_private.audit WHERE record_id=%s AND event='employee.remittance'", (ada,))
-    assert [h[0] for h in history] == [['tax_state', 'pfa']]  # the unchanged save is not recorded
+    history = query(d, 'SELECT public.hr_history(%s,%s)', (d[1], ada))[0][0]
+    assert [h['fields'] for h in history if h['event'] == 'employee.remittance'] == [['tax_state', 'pfa']]  # the unchanged save is not recorded
     with pytest.raises(psycopg.Error, match='INVALID_TAX_STATE'):
         save(d, ada, 'Lagos State', None)
     with pytest.raises(psycopg.Error, match='EMPLOYEE_NOT_FOUND'):
