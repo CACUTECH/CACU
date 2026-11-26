@@ -1394,6 +1394,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/fixed-assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fixed Assets */
+        get: operations["fixed_assets_api_v1_businesses__business_id__fixed_assets_get"];
+        put?: never;
+        /** Fixed Asset Add */
+        post: operations["fixed_asset_add_api_v1_businesses__business_id__fixed_assets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/fixed-assets/{asset_id}/dispose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fixed Asset Dispose */
+        post: operations["fixed_asset_dispose_api_v1_businesses__business_id__fixed_assets__asset_id__dispose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/fixed-assets/depreciation/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fixed Asset Depreciation Preview */
+        get: operations["fixed_asset_depreciation_preview_api_v1_businesses__business_id__fixed_assets_depreciation__month__get"];
+        put?: never;
+        /** Fixed Asset Depreciation Post */
+        post: operations["fixed_asset_depreciation_post_api_v1_businesses__business_id__fixed_assets_depreciation__month__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/ai/tools": {
         parameters: {
             query?: never;
@@ -2659,6 +2712,71 @@ export interface components {
              */
             note: string;
         };
+        /** AddAsset */
+        AddAsset: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Name */
+            name: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "buildings" | "vehicles" | "machinery" | "furniture" | "computers" | "other";
+            /** Reference */
+            reference?: string | null;
+            /**
+             * Acquired On
+             * Format: date
+             */
+            acquired_on: string;
+            /** Cost */
+            cost: string;
+            /**
+             * Residual
+             * @default 0.00
+             */
+            residual: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "straight_line" | "reducing_balance";
+            /** Useful Life Months */
+            useful_life_months?: number | null;
+            /** Annual Rate Percent */
+            annual_rate_percent?: string | null;
+            /**
+             * How
+             * @enum {string}
+             */
+            how: "paid" | "credit" | "existing";
+            /**
+             * Vat
+             * @default 0.00
+             */
+            vat: string;
+            /** Pay Method */
+            pay_method?: ("Cash" | "Transfer") | null;
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+            /** Supplier Id */
+            supplier_id?: string | null;
+            /** Bill Number */
+            bill_number?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /**
+             * Accumulated Depreciation
+             * @default 0.00
+             */
+            accumulated_depreciation: string;
+            /** Brought In On */
+            brought_in_on?: string | null;
+        };
         /** AdjustmentRequest */
         AdjustmentRequest: {
             /**
@@ -3236,6 +3354,28 @@ export interface components {
             /** Bank Account Id */
             bank_account_id?: string | null;
         };
+        /** Dispose */
+        Dispose: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Disposed On
+             * Format: date
+             */
+            disposed_on: string;
+            /**
+             * Proceeds
+             * @default 0.00
+             */
+            proceeds: string;
+            /** Method */
+            method?: ("Cash" | "Transfer") | null;
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+        };
         /** EquityClassification */
         EquityClassification: {
             /** Ledger Id */
@@ -3802,6 +3942,14 @@ export interface components {
              */
             separation_of_duties: boolean;
         };
+        /** PostDepreciation */
+        PostDepreciation: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+        };
         /** PostRun */
         PostRun: {
             /**
@@ -3821,7 +3969,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill" | "customer_advance" | "gateway_receipt" | "gateway_settlement" | "credit_advance" | "wht_deduction" | "payroll" | "payroll_payment" | "payroll_remittance";
+            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill" | "customer_advance" | "gateway_receipt" | "gateway_settlement" | "credit_advance" | "wht_deduction" | "payroll" | "payroll_payment" | "payroll_remittance" | "asset_purchase" | "asset_opening" | "depreciation" | "asset_disposal";
             /**
              * Source Id
              * Format: uuid
@@ -7643,6 +7791,176 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Settle"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fixed_assets_api_v1_businesses__business_id__fixed_assets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fixed_asset_add_api_v1_businesses__business_id__fixed_assets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAsset"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fixed_asset_dispose_api_v1_businesses__business_id__fixed_assets__asset_id__dispose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Dispose"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fixed_asset_depreciation_preview_api_v1_businesses__business_id__fixed_assets_depreciation__month__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fixed_asset_depreciation_post_api_v1_businesses__business_id__fixed_assets_depreciation__month__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostDepreciation"];
             };
         };
         responses: {

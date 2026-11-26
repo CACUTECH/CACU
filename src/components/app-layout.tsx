@@ -57,6 +57,7 @@ import { MobileNav } from './mobile-nav';
 import { createClient } from '@/lib/supabase/client';
 import { useBusiness } from '@/components/business-provider';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
+import { visibleNav } from '@/lib/preview';
 
 type NavLink = { href: string; label: string; icon: LucideIcon; children?: { href: string; label: string; icon?: LucideIcon }[] };
 
@@ -136,6 +137,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { business: activeBusiness } = useBusiness();
   const businessProfile = activeBusiness ? { ...activeBusiness, role: activeBusiness.userRole } : null;
   const businessType: BusinessType = activeBusiness?.business_type ?? 'PRODUCT';
+  // CACU's preview business sees every module, including those still held back for other businesses.
+  const [preview, setPreview] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setPreview(false);
+    if (!activeBusiness?.id) return;
+    void supabase.rpc('cacu_preview', { p_business_id: activeBusiness.id }).then(({ data, error }) => { if (live) setPreview(!error && data === true); },
+      () => { if (live) setPreview(false); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBusiness?.id]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -177,6 +189,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { href: '/accounting/chart-of-accounts', label: 'Chart of Accounts' },
         { href: '/accounting/expenses', label: 'Expenses' },
         { href: '/accounting/bills', label: 'Bills' },
+        { href: '/accounting/fixed-assets', label: 'Fixed Assets' },
         { href: '/accounting/journal-entries', label: 'Journal Adjustments' },
         { href: '/accounting/trial-balance', label: 'Trial Balance' },
         { href: '/accounting/general-ledger', label: 'General Ledger' },
@@ -252,7 +265,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {navItems.filter(item => !['/credit', '/hr', '/community', '/apps', '/storefront'].includes(item.href)).map((item) => (
+            {visibleNav(navItems, preview).map((item) => (
               <NavItem key={item.label} item={item} pathname={pathname} />
             ))}
           </SidebarMenu>

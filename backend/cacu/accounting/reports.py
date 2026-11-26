@@ -50,6 +50,10 @@ def cash_flow(session,start:date,end:date):
     # The approved opening position is dated on the start date but is the position brought in,
     # not activity: its cash is opening cash and its other legs are not flows of the period.
     brought_in=opening_transactions(session)
+    # A fixed asset sold (IAS 7.16): its proceeds are an investing receipt and its gain or loss is taken out of operating
+    # profit, so every non-cash leg of the disposal goes to investing and the gain or loss is reversed in operating.
+    from cacu.accounting.assets import disposal_transactions
+    disposals=disposal_transactions(session)
     for row in rows:
         signed=row['amount']*(1 if row['entry_type']=='DEBIT' else -1)
         before=row['transaction_date'].date()<start or row['transaction_id'] in brought_in
@@ -71,6 +75,12 @@ def cash_flow(session,start:date,end:date):
                 'transaction_no':row['transaction_no'],'date':row['transaction_date'].date().isoformat(),
                 'account_id':str(row['source_account_id']),'account_name':row['name'],
                 'description':row['narration'],'amount':money(value)})
+        if row['transaction_id'] in disposals:
+            if profit:
+                add('operating','Net profit',flow)
+                add('operating','Gain or loss on disposal of fixed assets',-flow)
+            add('investing','Fixed assets sold / receipts',flow)
+            continue
         if profit:
             add('operating','Net profit',flow)
             if section!='operating':add('operating','Profit classified outside operating activities',-flow)
@@ -206,11 +216,14 @@ def financial_summary(session,start:date,end:date):
 
 
 def opening_transactions(session):
-    """Transactions that carry the approved opening position: the opening journal and one entry per customer or supplier."""
+    """Transactions that carry the approved opening position: the opening journal, one entry per customer or supplier, and
+    each fixed asset brought in."""
     evidence=session.connection().exec_driver_sql('SELECT reconciliation_evidence FROM accounting.business_map WHERE business_id=%s',
         (str(session.business_id),)).scalar() or {}
     ids={evidence.get('transaction_id')}|{d.get('transaction_id') for d in evidence.get('opening_documents',[])}
-    return {i for i in ids if i is not None}
+    # Fixed assets owned before the books started are brought in later, against retained earnings: positions too.
+    from cacu.accounting.assets import brought_in
+    return {i for i in ids if i is not None}|brought_in(session)
 
 LABELS={'tier':'Management statements, not reviewed','basis':'Accrual','currency':'NGN'}
 

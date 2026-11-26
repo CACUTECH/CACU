@@ -2,7 +2,8 @@
 
 Owner decisions of 17 November 2026: a closed month takes no posting by any route (the ledger refuses it,
 accounting.ledger_month_open). Closing is refused while the trial balance does not balance at the month's end, or
-while receivables, payables or stock differ from their control accounts. The other checklist steps are warnings
+while receivables, payables or stock differ from their control accounts. Since R4 fixed assets (26 November 2026) it
+is also refused while a month with assets to depreciate has no depreciation posted. The other checklist steps are warnings
 that the closer ticks or explains; the answers are kept with the close. Closing needs ledger.post and ledger.approve;
 reopening is Owner only, with a reason. Months close in order from the month the books started, only once ended, and
 only the latest closed month can be reopened.
@@ -27,6 +28,7 @@ STEPS = {
     'receivables': ('Customer balances on open invoices match the receivables account', True),
     'payables': ('Supplier balances on open bills match the payables account', True),
     'stock': ('Stock on hand at cost matches the inventory account', True),
+    'depreciation': ('Depreciation posted for the month, for every fixed asset', True),
     'transfers': ('No transfers waiting for confirmation more than 7 days', False),
     'gateway': ('Card and online payments clearing is settled', False),
     'bank_cash': ('Bank and cash balances agree with your statements and cash count', False),
@@ -101,6 +103,10 @@ def checklist(session, month: date):
     steps = {'trial_balance': (at_end['difference'] == '0.00', None if at_end['difference'] == '0.00' else f"Debits and credits differ by {at_end['difference']}")}
     for check in ('receivables', 'payables', 'stock'):
         steps[check] = (check not in differing, differing.get(check))
+    # Fixed assets (R4): a month with assets to depreciate closes only once its depreciation is posted.
+    from cacu.accounting.assets import needs_depreciation
+    due = needs_depreciation(session, month)
+    steps['depreciation'] = (not due, 'Post depreciation for the month on the Fixed assets page' if due else None)
     waiting = [t for t in list_transfers(session, 'pending') if t['age_days'] > 7]
     steps['transfers'] = (not waiting, f'{len(waiting)} waiting more than 7 days' if waiting else None)
     clearing = raw(session, "SELECT account_id::text FROM accounting.account_map WHERE business_id=%s AND purpose='gateway_clearing'",

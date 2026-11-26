@@ -663,6 +663,40 @@ def payroll_settle(business_id:UUID,run_id:UUID,request:PayrollSettle,user_id:UU
     with library_transaction(user_id,business_id,write=True,permission='payroll.approve') as session:
         return settle(session,user_id,run_id,request)
 
+# Fixed assets (R4; IAS 16): the register, each month's depreciation (posted by a deliberate step, months in order)
+# and disposals. Anyone who can see the ledger sees the register; only an Owner or Admin changes it.
+from cacu.accounting.assets import AddAsset, Dispose as AssetDispose, PostDepreciation
+
+@app.get('/api/v1/businesses/{business_id}/fixed-assets')
+def fixed_assets(business_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.assets import overview
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return overview(session)
+
+@app.post('/api/v1/businesses/{business_id}/fixed-assets')
+def fixed_asset_add(business_id:UUID,request:AddAsset,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.assets import add_asset
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return add_asset(session,user_id,request)
+
+@app.post('/api/v1/businesses/{business_id}/fixed-assets/{asset_id}/dispose')
+def fixed_asset_dispose(business_id:UUID,asset_id:UUID,request:AssetDispose,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.assets import dispose
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return dispose(session,user_id,asset_id,request)
+
+@app.get('/api/v1/businesses/{business_id}/fixed-assets/depreciation/{month}')
+def fixed_asset_depreciation_preview(business_id:UUID,month:str,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.assets import preview
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return preview(session,month)
+
+@app.post('/api/v1/businesses/{business_id}/fixed-assets/depreciation/{month}')
+def fixed_asset_depreciation_post(business_id:UUID,month:str,request:PostDepreciation,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.assets import post_month
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return post_month(session,user_id,month,request)
+
 # AI on the books (Doc 15; E18 R3): read-only tools the gateway runs with the member's own token. Each tool keeps the
 # permission of the screen its figures come from, so the assistant can never show a member more than the screens do.
 @app.get('/api/v1/businesses/{business_id}/ai/tools')

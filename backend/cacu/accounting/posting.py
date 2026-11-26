@@ -33,7 +33,7 @@ class PostingCommand(BaseModel):
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
                  'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement','credit_advance','wht_deduction',
-                 'payroll','payroll_payment','payroll_remittance']
+                 'payroll','payroll_payment','payroll_remittance','asset_purchase','asset_opening','depreciation','asset_disposal']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -52,13 +52,19 @@ CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'su
          'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry,
          'deposit_application':JournalEntry,'goods_bill':JournalEntry,'customer_advance':JournalEntry,
          'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry,'credit_advance':JournalEntry,'wht_deduction':JournalEntry,
-         'payroll':JournalEntry,'payroll_payment':JournalEntry,'payroll_remittance':JournalEntry}
+         'payroll':JournalEntry,'payroll_payment':JournalEntry,'payroll_remittance':JournalEntry,
+         'asset_purchase':JournalEntry,'asset_opening':JournalEntry,'depreciation':JournalEntry,'asset_disposal':JournalEntry}
 # Documents filed under another document type: a bill for received goods is a supplier bill to payments and the bills list.
 DOCUMENT_TYPES={'goods_bill':'bill'}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
 INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance',
-                'gateway_receipt','gateway_settlement','credit_advance','wht_deduction','payroll','payroll_payment','payroll_remittance'}
+                'gateway_receipt','gateway_settlement','credit_advance','wht_deduction','payroll','payroll_payment','payroll_remittance',
+                'asset_purchase','asset_opening','depreciation','asset_disposal'}
+# Fixed assets (R4): the cost and accumulated depreciation account of each category.
+ASSET_CATEGORIES=('buildings','vehicles','machinery','furniture','computers','other')
+ASSET_COST={f'asset_{c}' for c in ASSET_CATEGORIES}
+ASSET_DEPRECIATION={f'accdep_{c}' for c in ASSET_CATEGORIES}
 # Payroll to the books (FR-203): the liabilities a run creates and its payments and remittances clear.
 PAYROLL_LIABILITIES={'salaries_payable','paye_payable','pension_payable','nhf_payable','nhis_payable'}
 
@@ -131,9 +137,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     # Input VAT (2b): only a bill or an expense claims it, with one VAT line; a reclaim or settlement credits it.
     vat_input=raw(session,"SELECT library_id FROM accounting.account_map WHERE business_id=%s AND purpose='vat_input'",(tenant,)).scalar()
     claimed=[l for l in lines if vat_input is not None and l[0].id==vat_input and not l[2]] if command.kind!='reversal' else []
-    if claimed and (command.kind not in {'bill','goods_bill','expense'} or len(claimed)!=1):
+    if claimed and (command.kind not in {'bill','goods_bill','expense','asset_purchase'} or len(claimed)!=1):
         raise HTTPException(422,'Input VAT is claimed only on bills and expenses')
-    if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received','payroll'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
+    if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received','payroll','asset_disposal'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
     if split_sale and command.main_amount is None:raise HTTPException(422,'A split sale names its cash part')
     if command.main_amount is not None and amount<=0:raise HTTPException(422,'Compound main amount must be positive')
     if command.entry_date<raw(session,'SELECT cutover_date FROM accounting.business_map WHERE business_id=%s',(tenant,)).scalar():
@@ -275,6 +281,33 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             from_bank=paid_from!=cash and str(collection_account(session,'Transfer',command.main_account_id))==paid_from
             if not command.credited or len(command.lines)!=1 or command.lines[0].credited or not(paid_from==cash or from_bank)                or str(command.lines[0].account_id) not in {str(vat_account_id(session,p)) for p in owed}:
                 raise HTTPException(422,'A payroll payment moves money from the till or a bank to clear what is owed')
+        elif command.kind in {'asset_purchase','asset_opening','depreciation','asset_disposal'}:
+            # Fixed assets (R4). The assets workflow builds these; here the shape is checked so nothing else can be
+            # posted under these kinds.
+            def ids(purposes):
+                return {str(r.account_id) for r in raw(session,'SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose=ANY(%s)',(tenant,list(purposes))).all()}
+            cost,accdep=ids(ASSET_COST),ids(ASSET_DEPRECIATION)
+            main_id=str(command.main_account_id)
+            cash=str(collection_account(session,'Cash',None))
+            def till_or_bank(account_id):
+                return str(account_id)==cash or str(collection_account(session,'Transfer',account_id))==str(account_id)
+            if command.kind=='asset_purchase':
+                # Bought and paid: debit the asset's cost (and any input VAT, checked above), credit the till or a bank.
+                bought=[l for l in command.lines if not (claimed and str(l.account_id)==str(vat_account_id(session,'vat_input')))]
+                ok=command.credited and len(bought)==1 and not bought[0].credited and str(bought[0].account_id) in cost and till_or_bank(command.main_account_id)
+            elif command.kind=='asset_opening':
+                # Owned before the books started: debit its cost, credit its depreciation to date and retained earnings.
+                allowed=accdep|ids({'retained_earnings'})
+                ok=not command.credited and main_id in cost and all(l.credited and str(l.account_id) in allowed for l in command.lines)
+            elif command.kind=='depreciation':
+                # A month's depreciation: debit Depreciation, credit each category's accumulated depreciation.
+                ok=not command.credited and main_id in ids({'depreciation'}) and all(l.credited and str(l.account_id) in accdep for l in command.lines)
+            else:
+                # A disposal: credit the cost; debit its depreciation and any proceeds; the difference is a gain or loss.
+                gains=ids({'disposal_gains'})
+                ok=command.credited and main_id in cost and command.main_amount is not None and all(
+                    str(l.account_id) in gains or (not l.credited and (str(l.account_id) in accdep or till_or_bank(l.account_id))) for l in command.lines)
+            if not ok:raise HTTPException(422,'Fixed asset entries are posted by the fixed assets workflow')
         elif command.kind=='wht_deduction':
             # Doc 09 PR-33 (E14 R3 2c): WHT a customer deducted debits WHT credits (1320) and credits their receivable,
             # allocated to the invoice like the cash they paid. Treatment to be confirmed by the reviewer.
