@@ -2,7 +2,8 @@
 
 A yearly estimate from the books, every step shown, for the owner and their tax adviser. Nothing posts to the ledger
 and CACU files nothing. Off until a tax professional reviews it (accounting.income_tax_switch); on for CACU's preview
-business. Tax years are calendar years: accounts made up to 31 December.
+business. Tax year Y is the twelve months ending on the last day of the business's year-end month in Y (31 December
+unless it says otherwise, accounting.tax_profile).
 
     Profit before tax (from the books)
   + depreciation in the books (replaced by capital allowances)
@@ -13,6 +14,8 @@ business. Tax years are calendar years: accounts made up to 31 December.
   = assessable profit                                   -> development levy 4% (if not a small company)
   + balancing charges  - capital allowances  - balancing allowances
   = total profits                                       -> companies income tax 30% (if not a small company)
+  - withholding tax customers deducted in the year, with a credit note (certificate) -> income tax to pay
+    (credits beyond the tax are carried forward; deductions still awaiting a certificate are shown, not used)
 
 Owner decisions of 26 November 2026: a small company has turnover up to N50 million (the Act's text; the June 2026
 transition guidelines say N100 million) and fixed assets up to N250 million, and is not a professional services firm;
@@ -39,6 +42,11 @@ class TaxYear(BaseModel):
     model_config = ConfigDict(extra='forbid')
     losses_brought_forward: str = Field(default='0.00', pattern=AMOUNT)
     professional_services: bool = False
+
+
+class TaxProfile(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    year_end_month: int = Field(ge=1, le=12)
 
 
 class Adjustment(BaseModel):
@@ -87,8 +95,10 @@ def estimate(session, year: int) -> dict:
     from cacu.accounting.allowances import figures as allowance_figures
     _require(session)
     _year(year)
+    from cacu.accounting.tax_years import period, year_end_month
     tenant = str(session.business_id)
-    start, end = date(year, 1, 1), date(year, 12, 31)
+    end_month = year_end_month(session)
+    start, end = period(year, end_month)
     rule = raw(session, 'SELECT * FROM accounting.income_tax_rule WHERE singleton').first()
     told = raw(session, 'SELECT * FROM accounting.tax_year WHERE business_id=%s AND year=%s', (tenant, year)).first()
     adjustments = raw(session, 'SELECT * FROM accounting.tax_adjustment WHERE business_id=%s AND year=%s ORDER BY created_at', (tenant, year)).all()
@@ -125,6 +135,13 @@ def estimate(session, year: int) -> dict:
         reasons.append('the business provides professional services')
     cit = ZERO if small else (total_profits * rule.cit_rate).quantize(CENT, ROUND_HALF_UP)
     levy = ZERO if small else (assessable * rule.levy_rate).quantize(CENT, ROUND_HALF_UP)
+    # Withholding tax customers deducted in the year (VAT part 2c): a credit against income tax once the credit note
+    # (certificate) is in hand. More than the tax is carried forward.
+    wht = raw(session, """SELECT coalesce(sum(amount) FILTER (WHERE certificate IS NOT NULL), 0) AS credited,
+        coalesce(sum(amount) FILTER (WHERE certificate IS NULL), 0) AS awaiting, count(*) FILTER (WHERE certificate IS NULL) AS missing
+        FROM accounting.wht_deduction WHERE business_id=%s AND entry_date BETWEEN %s AND %s""", (tenant, start, end)).first()
+    wht_used = min(Decimal(wht.credited), cit)
+    cit_to_pay = cit - wht_used
 
     steps = [('Profit before tax, from the books', profit), ('Add: depreciation in the books', depreciation),
              ('Less: book gain on disposals' if disposal_gain >= 0 else 'Add: book loss on disposals', -disposal_gain),
@@ -135,7 +152,11 @@ def estimate(session, year: int) -> dict:
     return {'year': year, 'small_company': small, 'not_small_because': reasons,
             'turnover': _money(turnover), 'fixed_assets': _money(fixed_assets),
             'steps': [{'label': label, 'amount': _money(value)} for label, value in steps if label in {'Adjusted profit', 'Assessable profit', 'Total profits', 'Profit before tax, from the books'} or value],
-            'companies_income_tax': _money(cit), 'development_levy': _money(levy), 'total_due': _money(cit + levy),
+            'period': {'start': start.isoformat(), 'end': end.isoformat(), 'year_end_month': end_month},
+            'companies_income_tax': _money(cit), 'development_levy': _money(levy), 'total_due': _money(cit_to_pay + levy),
+            'wht': {'credited': _money(Decimal(wht.credited)), 'used': _money(wht_used), 'carried_forward': _money(Decimal(wht.credited) - wht_used),
+                    'awaiting_certificate': _money(Decimal(wht.awaiting)), 'awaiting_count': int(wht.missing)},
+            'income_tax_to_pay': _money(cit_to_pay),
             'cit_rate_percent': _money(rule.cit_rate * 100), 'levy_rate_percent': _money(rule.levy_rate * 100),
             'small_turnover': _money(rule.small_turnover), 'small_fixed_assets': _money(rule.small_fixed_assets),
             'losses_carried_forward': _money(losses_carried), 'allowances_carried_forward': _money(allowances_carried),
@@ -155,6 +176,16 @@ def save_year(session, actor, year: int, data: TaxYear) -> dict:
         professional_services=excluded.professional_services, updated_by=excluded.updated_by, updated_at=now()""",
         (str(session.business_id), year, Decimal(data.losses_brought_forward), data.professional_services, str(actor)))
     return estimate(session, year)
+
+
+def save_profile(session, actor, data: TaxProfile) -> dict:
+    """Sets the month the business's accounts end in, for its tax years."""
+    _require(session)
+    _manager(session, actor)
+    raw(session, """INSERT INTO accounting.tax_profile(business_id, year_end_month, updated_by) VALUES (%s,%s,%s)
+        ON CONFLICT (business_id) DO UPDATE SET year_end_month=excluded.year_end_month, updated_by=excluded.updated_by, updated_at=now()""",
+        (str(session.business_id), data.year_end_month, str(actor)))
+    return {'year_end_month': data.year_end_month}
 
 
 def add_adjustment(session, actor, year: int, data: Adjustment) -> dict:

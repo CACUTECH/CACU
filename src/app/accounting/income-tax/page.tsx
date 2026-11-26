@@ -8,18 +8,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useBusiness } from '@/components/business-provider';
-import { addTaxAdjustmentAction, incomeTaxAction, removeTaxAdjustmentAction, saveTaxYearAction } from '@/app/accounting/income-tax/actions';
+import { addTaxAdjustmentAction, incomeTaxAction, removeTaxAdjustmentAction, saveTaxYearAction, saveYearEndAction } from '@/app/accounting/income-tax/actions';
 import { naira } from '@/lib/fixed-assets';
 import type { IncomeTaxEstimate } from '@/lib/income-tax';
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const day = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' });
 const TOTALS = new Set(['Profit before tax, from the books', 'Adjusted profit', 'Assessable profit', 'Total profits']);
 
 export default function IncomeTaxPage() {
   const { business } = useBusiness();
   const manager = ['owner', 'admin'].includes(business?.userRole ?? '');
   const thisYear = new Date().getFullYear();
-  const years = Array.from({ length: Math.max(thisYear - 2026 + 1, 1) }, (_, i) => thisYear - i).filter(y => y >= 2026);
-  const [year, setYear] = React.useState(years[0] ?? 2026);
+  // Up to next year: with a year end before December, the current tax year ends next year.
+  const years = Array.from({ length: thisYear - 2026 + 2 }, (_, i) => thisYear + 1 - i).filter(y => y >= 2026);
+  const [year, setYear] = React.useState(thisYear >= 2026 ? thisYear : 2026);
+  const [reload, setReload] = React.useState(0);
   const [view, setView] = React.useState<IncomeTaxEstimate | null | undefined>(undefined);
   const [loadError, setLoadError] = React.useState('');
   const [losses, setLosses] = React.useState('0'), [professional, setProfessional] = React.useState(false);
@@ -33,7 +37,7 @@ export default function IncomeTaxPage() {
   React.useEffect(() => {
     setView(undefined);
     void incomeTaxAction(year).then(r => { if (r.success) show(r.data); else { setView(null); setLoadError(r.error); } });
-  }, [year]);
+  }, [year, reload]);
 
   const run = async (work: () => ReturnType<typeof incomeTaxAction>, after?: () => void) => {
     setBusy(true); setError('');
@@ -52,7 +56,8 @@ export default function IncomeTaxPage() {
     <div className="flex items-center gap-2"><Label htmlFor="tax-year">Tax year</Label>
       <select id="tax-year" className="h-9 rounded-md border bg-background px-2 text-sm" value={year} onChange={e => setYear(Number(e.target.value))}>
         {years.map(y => <option key={y} value={y}>{y}</option>)}
-      </select></div>
+      </select>
+      <span className="text-sm text-muted-foreground">{day(view.period.start)} to {day(view.period.end)}</span></div>
     {!view.reviewed && <p role="note" className="rounded-md border border-amber-500 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
       This follows CACU&apos;s reading of the Nigeria Tax Act 2025 and is still to be confirmed by a tax professional. Check it with your tax adviser before you file.</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -64,12 +69,16 @@ export default function IncomeTaxPage() {
         : <><p className="text-sm text-muted-foreground">Estimated for {view.year}</p>
             <p className="text-3xl font-bold tabular-nums">{naira(view.total_due)}</p>
             <p className="text-sm">Companies income tax {naira(view.companies_income_tax)} ({Number(view.cit_rate_percent)}% of total profits) · development levy {naira(view.development_levy)} ({Number(view.levy_rate_percent)}% of assessable profit)</p>
+            {Number(view.wht.used) > 0 && <p className="text-sm">Less withholding tax your customers deducted (with credit notes): {naira(view.wht.used)}, leaving income tax of {naira(view.income_tax_to_pay)}.</p>}
             <p className="text-sm text-muted-foreground">Not a small company because {view.not_small_because.join(' and ')}.</p></>}
     </CardContent></Card>
 
     <Card><CardHeader><CardTitle>How it is worked out</CardTitle></CardHeader><CardContent>
       <table className="w-full text-sm"><tbody>{view.steps.map(s => <tr key={s.label} className={TOTALS.has(s.label) ? 'border-t font-medium' : ''}>
         <td className="py-1.5 pr-3">{s.label}</td><td className="py-1.5 text-right tabular-nums">{naira(s.amount)}</td></tr>)}</tbody></table>
+      {view.wht.awaiting_count > 0 && <p className="mt-3 text-sm text-muted-foreground">
+        {naira(view.wht.awaiting_certificate)} of withholding tax on {view.wht.awaiting_count} invoice{view.wht.awaiting_count === 1 ? '' : 's'} is waiting for the customer&apos;s credit note. Add the credit note number on the invoice to count it.</p>}
+      {Number(view.wht.carried_forward) > 0 && <p className="mt-3 text-sm text-muted-foreground">Withholding tax credits of {naira(view.wht.carried_forward)} are more than the tax and carry forward.</p>}
       {(Number(view.losses_carried_forward) > 0 || Number(view.allowances_carried_forward) > 0) && <p className="mt-3 text-sm text-muted-foreground">
         Carried to next year: losses {naira(view.losses_carried_forward)}, unused capital allowances {naira(view.allowances_carried_forward)}.</p>}
     </CardContent></Card>
@@ -99,6 +108,15 @@ export default function IncomeTaxPage() {
           The business provides professional services (never counts as a small company)</label>
         <div className="sm:col-span-2"><Button type="submit" size="sm" disabled={busy}>Save</Button></div>
       </form>
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4 text-sm">
+        <Label htmlFor="year-end">Your accounts end in</Label>
+        <select id="year-end" className="h-9 rounded-md border bg-background px-2" value={view.period.year_end_month} disabled={busy}
+          onChange={e => { const month = Number(e.target.value); setBusy(true); setError('');
+            void saveYearEndAction(month).then(r => { setBusy(false); if (r.success) setReload(n => n + 1); else setError(r.error); }); }}>
+          {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+        </select>
+        <span className="text-muted-foreground">Each tax year is the 12 months to the end of that month.</span>
+      </div>
     </CardContent></Card>}
 
     <p className="text-xs text-muted-foreground">{view.note}</p>

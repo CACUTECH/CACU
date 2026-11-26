@@ -17,7 +17,7 @@ stays off until then; it is on for CACU's preview business):
 * An asset owned before CACU carries the allowances already claimed on it under earlier law; only what is left of
   the 99% is allowed.
 
-Tax years are calendar years: the computation assumes accounts made up to 31 December.
+Tax years end on the last day of the business's year-end month (31 December unless it says otherwise).
 """
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
@@ -64,10 +64,11 @@ def _settings(session) -> dict:
     return {str(r.asset_id): r for r in raw(session, 'SELECT * FROM accounting.asset_tax WHERE business_id=%s', (str(session.business_id),)).all()}
 
 
-def computation(asset, rate: Decimal, claimed_before: Decimal, year: int) -> dict | None:
+def computation(asset, rate: Decimal, claimed_before: Decimal, year: int, end_month: int = 12) -> dict | None:
     """The asset's allowance for one tax year, or None when it was not held in that year at all."""
-    start = asset.depreciate_from.year
-    gone = asset.disposed_on.year if asset.disposed_on else None
+    from cacu.accounting.tax_years import year_of
+    start = year_of(asset.depreciate_from, end_month)
+    gone = year_of(asset.disposed_on, end_month) if asset.disposed_on else None
     if year < start or (gone is not None and year > gone):
         return None
     cost = asset.cost
@@ -96,6 +97,8 @@ def schedule(session, year: int) -> dict:
 def figures(session, year: int) -> dict:
     """The schedule itself, also used by the income tax estimate."""
     from cacu.accounting.assets import _assets
+    from cacu.accounting.tax_years import year_end_month
+    end_month = year_end_month(session)
     if not 2026 <= year <= 2100:
         raise HTTPException(422, 'Capital allowances start with 2026, when the Nigeria Tax Act 2025 took effect.')
     table, settings = rates(session), _settings(session)
@@ -105,7 +108,7 @@ def figures(session, year: int) -> dict:
         tax_class = chosen.tax_class if chosen else DEFAULT_CLASS[asset.category]
         qualifies = chosen.qualifies if chosen else True
         rate = table[tax_class].rate
-        figures = computation(asset, rate, chosen.claimed_before if chosen else ZERO, year)
+        figures = computation(asset, rate, chosen.claimed_before if chosen else ZERO, year, end_month)
         if figures is None:
             continue
         row = {'asset_id': str(asset.id), 'name': asset.name, 'category': asset.category, 'tax_class': tax_class,

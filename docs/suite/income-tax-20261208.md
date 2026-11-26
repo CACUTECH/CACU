@@ -11,7 +11,7 @@ The owner decided, on 26 November 2026:
 
 | Step | From |
 | --- | --- |
-| Profit before tax | Every income and expense account for the calendar year |
+| Profit before tax | Every income and expense account for the tax year |
 | + depreciation in the books | Depreciation (6700); replaced by capital allowances |
 | − book gain on disposals / + book loss | Gains and losses on disposal (4950); replaced by balancing charges and allowances |
 | + expenses the law does not allow, − income that is not taxable | Adjustments the owner enters |
@@ -20,8 +20,24 @@ The owner decided, on 26 November 2026:
 | **= Assessable profit** | **Development levy 4%** |
 | + balancing charges − capital allowances − balancing allowances | The capital allowance schedule for the year |
 | **= Total profits** | **Companies income tax 30%** |
+| − withholding tax credits | Deductions customers made in the year, with their credit note (certificate) |
+| **= Income tax to pay** (+ the levy) | |
 
 A loss, or allowances greater than profit, is carried to the next year and shown on the page.
+
+## Withholding tax credits
+
+Withholding tax a customer deducted from a payment (recorded on the invoice, VAT part 2c) counts against the income tax once the customer's credit note number is entered.
+
+- **Deductions still waiting for a credit note** are listed with their total and are not used.
+- **Credits beyond the tax** carry forward.
+- **The levy:** credits come off companies income tax, not the development levy.
+
+## Tax year
+
+Tax year Y is the 12 months ending on the last day of the business's year-end month in Y. It is 31 December unless the business sets another month (`accounting.tax_profile`, set by an Owner or Admin on the page).
+
+For example, with a March year end, tax year 2027 runs from 1 April 2026 to 31 March 2027. Capital allowances follow the same years.
 
 **A small company** pays neither tax nor levy, but still files. It must meet all three conditions:
 
@@ -47,16 +63,16 @@ All need `ledger.view`; changes need an Owner or Admin.
 - `PUT /income-tax/{year}`
 - `POST /income-tax/{year}/adjustments`
 - `DELETE /income-tax/{year}/adjustments/{id}`
+- `PUT /income-tax/settings` (year-end month)
 
 ## To confirm before release (tax professional)
 
 1. The small company turnover limit, ₦50m or ₦100m, and whether "fixed assets" means their cost or their carrying amount.
-2. The rates (CIT 30%, development levy 4%), and that the levy is charged on assessable profit.
+2. The rates (CIT 30%, development levy 4%), that the levy is charged on assessable profit, and that withholding tax credits come off income tax only.
 3. Whether a balancing charge is added after losses, as CACU does now, or before.
 4. **Not modelled yet:**
-   - years that are not calendar years, and part years;
+   - a business's first or last part year, or a change of year end;
    - the minimum effective tax rate for large companies;
-   - withholding tax credits against the tax due;
    - tax incentives (such as economic development incentives).
 5. Then set `reviewed_at` on `accounting.income_tax_rule` and `accounting.capital_allowance_rate`, and turn the switches on in production.
 

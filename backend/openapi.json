@@ -5468,6 +5468,59 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/income-tax/settings": {
+      "put": {
+        "summary": "Income Tax Settings",
+        "operationId": "income_tax_settings_api_v1_businesses__business_id__income_tax_settings_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxProfile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/income-tax/{year}": {
       "get": {
         "summary": "Income Tax Estimate",
@@ -14573,6 +14626,22 @@
           "tags"
         ],
         "title": "Tags"
+      },
+      "TaxProfile": {
+        "properties": {
+          "year_end_month": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Year End Month"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "year_end_month"
+        ],
+        "title": "TaxProfile"
       },
       "TaxYear": {
         "properties": {

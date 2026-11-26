@@ -34,6 +34,12 @@ export async function addTaxAdjustmentAction(value: number, requestKey: string, 
   catch (error) { return failed(error, 'The adjustment was not added. Try again.'); }
 }
 
+export async function saveYearEndAction(month: number): Promise<{ success: true } | { success: false; error: string }> {
+  if (!Number.isInteger(month) || month < 1 || month > 12) return { success: false, error: 'Choose the month your accounts end.' };
+  try { await accountingRequest('income-tax/settings', { method: 'PUT', body: { year_end_month: month } }); return { success: true }; }
+  catch (error) { return { success: false, error: error instanceof Error ? error.message : 'That was not saved. Try again.' }; }
+}
+
 export async function removeTaxAdjustmentAction(value: number, id: string): Promise<Result> {
   if (!year.safeParse(value).success || !z.string().uuid().safeParse(id).success) return { success: false, error: 'Adjustment not found' };
   try { return { success: true, data: await accountingRequest<IncomeTaxEstimate>(`income-tax/${value}/adjustments/${encodeURIComponent(id)}`, { method: 'DELETE' }) }; }

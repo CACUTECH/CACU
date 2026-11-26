@@ -38,3 +38,9 @@ def test_an_asset_owned_before_cacu_carries_what_was_already_claimed():
 
 def test_every_asset_category_has_a_default_class():
     assert set(DEFAULT_CLASS) == {'buildings', 'vehicles', 'machinery', 'furniture', 'computers', 'other'}
+
+
+def test_a_march_year_end_moves_the_first_allowance_year():
+    laptop = asset(start=date(2026, 5, 1))
+    assert computation(laptop, Decimal('0.20'), Decimal('0'), 2026, end_month=3) is None  # bought after the year to March 2026
+    assert computation(laptop, Decimal('0.20'), Decimal('0'), 2027, end_month=3)['allowance'] == Decimal('200000.00')
