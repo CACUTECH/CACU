@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { HRService } from '@/services/hr-service';
 import { PayrollRunActions } from '@/components/hr/payroll-controls';
+import { PayrollBooksPanel } from '@/components/hr/payroll-books';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -26,8 +27,9 @@ export default async function PayrollRunPage({ params }: { params: Promise<{ id:
       {run.cancelled_at && ` · cancelled ${new Date(run.cancelled_at).toLocaleString('en-NG')}`}. Rules: {run.rules?.source || 'custom'}{run.rules_reviewed_at ? ', reviewed' : ', unreviewed defaults'}.
     </p>
     {run.status === 'draft' && <Card><CardHeader><CardTitle>Review and approve</CardTitle></CardHeader><CardContent>
-      <p className="mb-3 text-sm">Approval locks this payroll as the record for the month. It does not pay employees or post to accounting.</p>
+      <p className="mb-3 text-sm">Approval locks this payroll as the record for the month. It does not pay employees or post to accounting: posting to the books is a separate step once it is approved.</p>
       <PayrollRunActions id={run.id} version={run.version} reviewed={!!run.rules_reviewed_at} /></CardContent></Card>}
+    {run.status === 'approved' && <PayrollBooksPanel runId={run.id} />}
     <div className="overflow-x-auto rounded-md border"><Table>
       <TableHeader><TableRow><TableHead>Employee</TableHead>{COLUMNS.map(([key, label]) => <TableHead key={key} className="text-right">{label}</TableHead>)}</TableRow></TableHeader>
       <TableBody>{payslips.map(slip => <TableRow key={slip.id}>

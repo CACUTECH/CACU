@@ -640,6 +640,29 @@ def funding_share_withdraw(business_id:UUID,share_id:UUID,user_id:UUID=Depends(c
     with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='ledger.view') as session:
         return withdraw(session,user_id,share_id)
 
+# Payroll to the books (Doc 03 FR-203; E21 R4): an approved run is posted by a separate step, then paying staff and
+# remitting deductions are recorded against it. Off until the R4 gate (accounting.payroll_switch). Owner or Admin
+# with payroll.approve.
+from cacu.accounting.payroll import PostRun as PayrollPostRun, Settle as PayrollSettle
+
+@app.get('/api/v1/businesses/{business_id}/payroll/books')
+def payroll_books(business_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.payroll import overview
+    with library_transaction(user_id,business_id,permission='payroll.approve') as session:
+        return overview(session,user_id)
+
+@app.post('/api/v1/businesses/{business_id}/payroll/runs/{run_id}/post')
+def payroll_post(business_id:UUID,run_id:UUID,request:PayrollPostRun,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.payroll import post_run
+    with library_transaction(user_id,business_id,write=True,permission='payroll.approve') as session:
+        return post_run(session,user_id,run_id,request)
+
+@app.post('/api/v1/businesses/{business_id}/payroll/runs/{run_id}/payments')
+def payroll_settle(business_id:UUID,run_id:UUID,request:PayrollSettle,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.payroll import settle
+    with library_transaction(user_id,business_id,write=True,permission='payroll.approve') as session:
+        return settle(session,user_id,run_id,request)
+
 # AI on the books (Doc 15; E18 R3): read-only tools the gateway runs with the member's own token. Each tool keeps the
 # permission of the screen its figures come from, so the assistant can never show a member more than the screens do.
 @app.get('/api/v1/businesses/{business_id}/ai/tools')
