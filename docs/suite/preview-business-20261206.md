@@ -2,8 +2,8 @@
 
 The owner decided, on 26 November 2026, that one business, chosen by CACU, sees every CACU feature before it is released to everyone. Its members see:
 
-- **Every module in the menu**, including those still held back for other businesses: HR, Credit, Community, Integrations and Storefront. Credit, Community, Integrations and Storefront still open on their "not available yet" screens, because nothing behind them is built.
-- **Features behind CACU's own switches**, on for this business only: payroll posting (`accounting.payroll_switch`), funding readiness (`accounting.funding_switch`) and capital allowances (`accounting.capital_allowance_switch`). Both stay off for everyone else until their release gates.
+- **Every module in the menu**, including those still held back for other businesses: HR, Credit, Community, Integrations, Storefront and the Income Tax Estimate. Credit, Community, Integrations and Storefront still open on their "not available yet" screens, because nothing behind them is built.
+- **Features behind CACU's own switches**, on for this business only: payroll posting (`accounting.payroll_switch`), funding readiness (`accounting.funding_switch`) capital allowances (`accounting.capital_allowance_switch`) and the income tax estimate (`accounting.income_tax_switch`). Both stay off for everyone else until their release gates.
 
 **Plan limits and billing are unchanged.** For example, funding readiness still shows only what the business's plan includes.
 
@@ -13,7 +13,8 @@ The owner decided, on 26 November 2026, that one business, chosen by CACU, sees 
 - `accounting.is_preview(business)` is checked by each CACU switch as well as its own setting:
   - payroll posting checks it in `payroll._enabled`;
   - funding readiness checks it in `accounting.funding_access`, the monthly queue and lender pack links;
-  - capital allowances check it in `allowances.enabled`.
+  - capital allowances check it in `allowances.enabled`;
+  - the income tax estimate checks it in `income_tax.enabled`.
 - `public.cacu_preview(business)` tells the app's menu whether to show held-back modules. It answers only to the business's own active members.
 
 ## Later features

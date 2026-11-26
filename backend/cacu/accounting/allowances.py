@@ -89,8 +89,13 @@ def computation(asset, rate: Decimal, claimed_before: Decimal, year: int) -> dic
 
 def schedule(session, year: int) -> dict:
     """Every asset's capital allowance for a tax year, with the totals for the tax computation."""
-    from cacu.accounting.assets import _assets
     _require(session)
+    return figures(session, year)
+
+
+def figures(session, year: int) -> dict:
+    """The schedule itself, also used by the income tax estimate."""
+    from cacu.accounting.assets import _assets
     if not 2026 <= year <= 2100:
         raise HTTPException(422, 'Capital allowances start with 2026, when the Nigeria Tax Act 2025 took effect.')
     table, settings = rates(session), _settings(session)

@@ -5468,6 +5468,242 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/income-tax/{year}": {
+      "get": {
+        "summary": "Income Tax Estimate",
+        "operationId": "income_tax_estimate_api_v1_businesses__business_id__income_tax__year__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Income Tax Year",
+        "operationId": "income_tax_year_api_v1_businesses__business_id__income_tax__year__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Year"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxYear"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/income-tax/{year}/adjustments": {
+      "post": {
+        "summary": "Income Tax Adjustment",
+        "operationId": "income_tax_adjustment_api_v1_businesses__business_id__income_tax__year__adjustments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Year"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Adjustment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/income-tax/{year}/adjustments/{adjustment_id}": {
+      "delete": {
+        "summary": "Income Tax Adjustment Remove",
+        "operationId": "income_tax_adjustment_remove_api_v1_businesses__business_id__income_tax__year__adjustments__adjustment_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Year"
+            }
+          },
+          {
+            "name": "adjustment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Adjustment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/ai/tools": {
       "get": {
         "summary": "Ai Tool Catalogue",
@@ -10151,6 +10387,43 @@
         ],
         "title": "AddAsset"
       },
+      "Adjustment": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "add",
+              "deduct"
+            ],
+            "title": "Direction"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Label"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Amount"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "direction",
+          "label",
+          "amount"
+        ],
+        "title": "Adjustment"
+      },
       "AdjustmentRequest": {
         "properties": {
           "request_key": {
@@ -14300,6 +14573,24 @@
           "tags"
         ],
         "title": "Tags"
+      },
+      "TaxYear": {
+        "properties": {
+          "losses_brought_forward": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Losses Brought Forward",
+            "default": "0.00"
+          },
+          "professional_services": {
+            "type": "boolean",
+            "title": "Professional Services",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TaxYear"
       },
       "TransferConfirm": {
         "properties": {
