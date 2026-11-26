@@ -593,6 +593,20 @@ def kpi_report(business_id:UUID,start_date:date,end_date:date,user_id:UUID=Depen
     with library_transaction(user_id,business_id,permission='ledger.view') as session:
         return kpis(session,start_date,end_date)
 
+# Funding readiness (Doc 15; E19 R3 part 1): off until gate G5. Eligibility, the latest score, and a new assessment on
+# request at most once a day. Recording an assessment is allowed while the business is read-only, like exports.
+@app.get('/api/v1/businesses/{business_id}/funding-readiness')
+def funding_readiness(business_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.readiness import overview
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return overview(session)
+
+@app.post('/api/v1/businesses/{business_id}/funding-readiness/assessments')
+def funding_assess(business_id:UUID,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.readiness import assess
+    with library_transaction(user_id,business_id,write=True,while_read_only=True,permission='ledger.view') as session:
+        return assess(session,user_id)
+
 # AI on the books (Doc 15; E18 R3): read-only tools the gateway runs with the member's own token. Each tool keeps the
 # permission of the screen its figures come from, so the assistant can never show a member more than the screens do.
 @app.get('/api/v1/businesses/{business_id}/ai/tools')
