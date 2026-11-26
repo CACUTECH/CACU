@@ -9,7 +9,7 @@ import { lagosToday, type HistoryEntry } from '@/lib/hr';
 
 const EVENTS: Record<string, string> = {
   'employee.save': 'Details saved', 'employee.status': 'Status changed', 'employee.depart': 'Departure recorded',
-  'employee.remittance': 'Where deductions go changed',
+  'employee.remittance': 'Where deductions go changed', 'payslip.shared': 'Payslip link shared', 'payslip.withdrawn': 'Payslip link withdrawn',
 };
 const FIELD_LABELS: Record<string, string> = {
   full_name: 'name', job_title: 'job title', employment_status: 'status', monthly_salary: 'monthly gross', pay_basic: 'basic pay',

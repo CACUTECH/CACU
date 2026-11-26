@@ -3,6 +3,8 @@ import { HRService } from '@/services/hr-service';
 import { PayrollRunActions } from '@/components/hr/payroll-controls';
 import { PayrollBooksPanel } from '@/components/hr/payroll-books';
 import { RemittanceSchedules } from '@/components/hr/remittance-schedules';
+import { PayslipLinks } from '@/components/hr/payslip-links';
+import type { PayslipLinkStatus } from '@/lib/payslips';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,9 +14,14 @@ const COLUMNS = [['gross', 'Gross'], ['pension_employee', 'Pension'], ['nhf', 'N
 
 export default async function PayrollRunPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let detail, schedule = null;
+  let detail, schedule = null, links: PayslipLinkStatus[] | null = null;
   const service = new HRService();
-  try { detail = await service.payrollRun(id); if (detail?.run.status === 'approved') schedule = await service.remittanceSchedule(id).catch(() => null); }
+  try {
+    detail = await service.payrollRun(id);
+    // The schedules and payslip links are extras: if either cannot load, the run itself still shows.
+    const optional = <T,>(load: () => Promise<T>) => Promise.resolve().then(load).catch(() => null);
+    if (detail?.run.status === 'approved') [schedule, links] = await Promise.all([optional(() => service.remittanceSchedule(id)), optional(() => service.payslipLinks(id))]);
+  }
   catch { return <div role="alert">Payroll run could not be loaded. <Link href={`/hr/payroll/${id}`}>Retry</Link></div>; }
   if (!detail) return <div role="alert">Payroll run not found in this business. <Link href="/hr/payroll">Return to payroll</Link></div>;
   const { run, payslips } = detail;
@@ -33,6 +40,7 @@ export default async function PayrollRunPage({ params }: { params: Promise<{ id:
       <PayrollRunActions id={run.id} version={run.version} reviewed={!!run.rules_reviewed_at} /></CardContent></Card>}
     {run.status === 'approved' && <PayrollBooksPanel runId={run.id} />}
     {schedule && <RemittanceSchedules schedule={schedule} />}
+    {links && <PayslipLinks period={periodLabel(run.period)} payslips={payslips.map(p => ({ id: p.id, employee_name: p.employee_name }))} links={links} />}
     <div className="overflow-x-auto rounded-md border"><Table>
       <TableHeader><TableRow><TableHead>Employee</TableHead>{COLUMNS.map(([key, label]) => <TableHead key={key} className="text-right">{label}</TableHead>)}</TableRow></TableHeader>
       <TableBody>{payslips.map(slip => <TableRow key={slip.id}>

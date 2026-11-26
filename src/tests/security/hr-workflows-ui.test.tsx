@@ -105,11 +105,14 @@ test('payroll run page lists payslips, totals and excluded staff', async () => {
   (HRService as jest.Mock).mockImplementation(() => ({ payrollRun: jest.fn().mockResolvedValue({
     run: { id: 'run', version: 1, period: '2026-10-01', status: 'approved', created_at: '2026-10-28T10:00:00Z', approved_at: '2026-10-28T11:00:00Z', rules: { source: 'NTA' }, rules_reviewed_at: '2026-10-28T09:00:00Z',
       excluded: [{ id: 'x', name: 'Legacy employee', reason: 'No pay structure' }] },
-    payslips: [slip('Ada', '401580'), slip('Bayo', '401580')] }) }));
+    payslips: [slip('Ada', '401580'), slip('Bayo', '401580')] }),
+    remittanceSchedule: jest.fn().mockRejectedValue(new Error('unavailable')), payslipLinks: jest.fn().mockResolvedValue([]) }));
   render(await PayrollRunPage({ params: Promise.resolve({ id: 'run' }) }));
   expect(screen.getByRole('heading', { name: /October 2026 payroll/ })).toBeInTheDocument();
   expect(screen.getByText('Total (2)')).toBeInTheDocument();
   expect(screen.getByText('₦803,160.00')).toBeInTheDocument();
   expect(screen.getByText(/No pay structure/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Approve payroll' })).not.toBeInTheDocument();
+  expect(screen.getByText('Payslips for staff')).toBeInTheDocument();  // a schedule that fails to load leaves the run showing
+  expect(screen.queryByText('Remittance schedules')).not.toBeInTheDocument();
 });

@@ -143,7 +143,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname) && !pathname.startsWith('/r/') && !pathname.startsWith('/pack/')) {
+    if (!userLoading && !user && !['/login', '/signup', '/verify-email', '/setup', '/forgot-password', '/reset-password', '/join'].includes(pathname) && !pathname.startsWith('/r/') && !pathname.startsWith('/pack/') && !pathname.startsWith('/payslip/')) {
         router.push('/login');
     }
   }, [user, userLoading, pathname, router]);
@@ -221,8 +221,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   // Auth page check must happen before loader check
-  // Public receipt links (/r/<token>) open without an account (Doc 10 E20), as do lender pack links (/pack/<token>, E19).
-  if (['/setup', '/login', '/login/verify', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/join'].includes(pathname) || pathname.startsWith('/r/') || pathname.startsWith('/pack/')) {
+  // Public receipt links (/r/<token>) open without an account (Doc 10 E20), as do lender pack links (/pack/<token>, E19) and payslip links (/payslip/<token>, E21).
+  if (['/setup', '/login', '/login/verify', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/join'].includes(pathname) || pathname.startsWith('/r/') || pathname.startsWith('/pack/') || pathname.startsWith('/payslip/')) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 
