@@ -93,10 +93,12 @@ def test_waiting_items_older_than_30_days_block_an_assessment(live):
     started(live, 8)
     call(live, 'owner', lambda s, a: sale_create(s, a, sale(live, method='Transfer')))  # waits for the bank to confirm
     assert call(live, 'viewer', lambda s, a: overview(s))['eligibility']['eligible'] is True  # waiting, but not for 30 days yet
+    # A waiting transfer cannot be edited (its trigger refuses), so copy it as one recorded 45 days ago.
     with psycopg.connect(URL) as c:
-        moved = c.execute("UPDATE accounting.pending_transfer SET entry_date=%s WHERE business_id=%s AND status='pending'",
-                          (TODAY - timedelta(days=45), live.business)).rowcount
-    assert moved == 1
+        copied = c.execute("""INSERT INTO accounting.pending_transfer(business_id, id, source_type, amount, entry_date, customer_id, created_by)
+            SELECT business_id, gen_random_uuid(), source_type, amount, %s, customer_id, created_by FROM accounting.pending_transfer
+            WHERE business_id=%s AND status='pending'""", (TODAY - timedelta(days=45), live.business)).rowcount
+    assert copied == 1
     eligibility = call(live, 'viewer', lambda s, a: overview(s))['eligibility']
     assert eligibility['eligible'] is False
     assert eligibility['missing'] == [{'key': 'transfers', 'message': 'Confirm or clear the 1 transfer waiting more than 30 days.'}]

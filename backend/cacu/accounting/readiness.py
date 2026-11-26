@@ -322,9 +322,9 @@ def figures(session, start: date, end: date, today: date) -> tuple[dict, dict]:
     out['overdue_60_share'] = (Decimal(owed['d61_90']) + Decimal(owed['over_90'])) * HUNDRED / gross if gross > 0 else ZERO
     out['top_customer_share'] = _top_customer(session, start, end, opening)
 
+    # Stock turnover, for businesses that held stock in the period (product and hybrid businesses).
     information = {}
-    kind = raw(session, 'SELECT business_type FROM public.businesses WHERE id=%s', (str(session.business_id),)).scalar()
-    if kind in {'PRODUCT', 'HYBRID'}:
+    if stock_before or stock_moves:
         level, ends = stock_before, []
         for m in months:
             for i in range((_month_end(m) - m).days + 1):
