@@ -54,6 +54,12 @@ export default function AnalyticsPage() {
                 />
                 <FeatureCard
                     icon={Scale}
+                    title="Funding readiness"
+                    description="An indicative self-assessment of how your records and results look for a funding conversation. Not a credit rating."
+                    href="/analytics/funding"
+                />
+                <FeatureCard
+                    icon={Scale}
                     title="Budget vs. Actual Analysis"
                     description="Compare your actual financial performance against your budget to identify variances."
                     href="/analytics/budget-vs-actual"

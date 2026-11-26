@@ -2,11 +2,11 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AskYourBooksPage from '@/app/analytics/ask/page';
 import { BooksAnswerView } from '@/components/ai-books-answer-view';
-import { askAIBooksAction, getAIBooksStatusAction, setAIBooksAction } from '@/app/ai/books-actions';
+import { askAIBooksAction, getAIBooksStatusAction, notHelpfulAIBooksAction, setAIBooksAction } from '@/app/ai/books-actions';
 import { AI_BOOKS_LABEL, type BooksAnswer } from '@/lib/ai-books';
 
 jest.mock('@/app/business-actions', () => ({ getActiveBusinessIdAction: jest.fn().mockResolvedValue('11111111-1111-4111-8111-111111111111') }));
-jest.mock('@/app/ai/books-actions', () => ({ getAIBooksStatusAction: jest.fn(), setAIBooksAction: jest.fn(), askAIBooksAction: jest.fn() }));
+jest.mock('@/app/ai/books-actions', () => ({ getAIBooksStatusAction: jest.fn(), setAIBooksAction: jest.fn(), askAIBooksAction: jest.fn(), notHelpfulAIBooksAction: jest.fn() }));
 
 let keys = 0;
 Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () => `00000000-0000-4000-8000-${String(++keys).padStart(12, '0')}` });
@@ -49,6 +49,27 @@ test('a member asks a question and sees the answer; a retry reuses the same requ
   expect(first.question).toBe('Who owes my business money?');
   expect(screen.getByText('11 of 100 AI questions left this month')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /switch/i })).not.toBeInTheDocument();   // not the owner
+});
+
+test('"not helpful" on an answer sends that answer\'s request and a reason, offers no text box, and retries after a failure', async () => {
+  (getAIBooksStatusAction as jest.Mock).mockResolvedValue(status());
+  (askAIBooksAction as jest.Mock).mockResolvedValue({ ok: true, ...answer });
+  (notHelpfulAIBooksAction as jest.Mock).mockResolvedValueOnce({ ok: false, message: 'Your feedback could not be saved. Try again.' })
+    .mockResolvedValueOnce({ ok: true });
+  render(<AskYourBooksPage />);
+  fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'How much profit did I make this month?' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Not helpful' }));
+  const reasons = screen.getByRole('group', { name: 'Why was this answer not helpful?' });
+  expect(reasons.querySelector('textarea, input')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'The figures look wrong' }));
+  expect(await screen.findByText('Your feedback could not be saved. Try again.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'The figures look wrong' }));
+  expect(await screen.findByText(/CACU reviews this feedback each week/)).toBeInTheDocument();
+  const asked = (askAIBooksAction as jest.Mock).mock.calls[0][0];
+  expect((notHelpfulAIBooksAction as jest.Mock).mock.calls.map(c => c[0])).toEqual([1, 2].map(() =>
+    ({ businessId: '11111111-1111-4111-8111-111111111111', requestKey: asked.requestKey, reason: 'wrong_figures' })));
+  expect(screen.queryByRole('button', { name: 'Not helpful' })).not.toBeInTheDocument();
 });
 
 test('AI-012: the owner sees what is sent and switches it on; others are told to ask the owner', async () => {

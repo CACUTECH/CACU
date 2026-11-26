@@ -7,13 +7,15 @@ import pytest
 from test_ai_chat_postgres import URL, MODEL, FINGERPRINT, database, enable, member, rpc  # noqa: F401  (fixture)
 
 pytestmark = pytest.mark.skipif(not URL, reason='Dedicated AI test database required')
-MIGRATION = Path(__file__).resolve().parents[2] / 'supabase/migrations/20261127090000_ai_books.sql'
+MIGRATIONS = [Path(__file__).resolve().parents[2] / f'supabase/migrations/{name}.sql'
+              for name in ('20261127090000_ai_books', '20261128090000_ai_books_feedback')]
 
 
 @pytest.fixture(autouse=True)
 def books(database):
     with psycopg.connect(URL, autocommit=True) as c:
-        c.execute(MIGRATION.read_text(encoding='utf-8'))
+        for migration in MIGRATIONS:
+            c.execute(migration.read_text(encoding='utf-8'))
     yield
 
 
@@ -105,6 +107,43 @@ def test_a_member_cannot_trip_the_ceiling_with_made_up_token_counts():
     assert record(owner, business, key, tokens=(9_000_000, 9_000_000)) == {'paused': False}  # counted as 50,000 each way
     with psycopg.connect(URL) as c:
         assert c.execute('SELECT input_tokens, output_tokens FROM ai_private.books_answers').fetchone() == (50000, 50000)
+
+
+def test_only_the_asker_marks_a_completed_answer_not_helpful_with_a_fixed_reason():
+    owner, business = member()
+    admin, _ = member(business, 'admin')
+    stranger, _ = member()
+    enable()
+    cacu_books()
+    rpc(owner, 'set_ai_books', (business, True))
+    key, failed = uuid4(), uuid4()
+    reserve(owner, business, key)
+    record(owner, business, key)
+    reserve(owner, business, failed)
+    rpc(owner, 'record_ai_books', (business, failed, [], 0, 0, 10, 'none', 'failed'))
+
+    assert rpc(owner, 'rate_ai_books', (business, key, 'wrong_figures')) is True
+    assert rpc(owner, 'rate_ai_books', (business, key, 'hard_to_follow')) is True  # the asker may change the reason
+    for actor, request, reason in ((owner, key, 'I asked about rice, it said beans'),  # no free text
+                                   (owner, key, None), (owner, uuid4(), 'other'),  # nothing recorded under this key
+                                   (owner, failed, 'other'),  # a failed answer has nothing to judge
+                                   (admin, key, 'other')):  # another member's answer
+        with pytest.raises(psycopg.errors.InvalidParameterValue, match='AI_INVALID_REQUEST'):
+            rpc(actor, 'rate_ai_books', (business, request, reason))
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        rpc(stranger, 'rate_ai_books', (business, key, 'other'))
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        rpc(None, 'rate_ai_books', (business, key, 'other'), role='anon')
+
+    with psycopg.connect(URL) as c:
+        assert c.execute('SELECT feedback, feedback_at IS NOT NULL FROM ai_private.books_answers WHERE request_key=%s', (key,)).fetchone() == ('hard_to_follow', True)
+        columns = {r[0] for r in c.execute("SELECT column_name FROM information_schema.columns WHERE table_schema='ai_private' AND table_name='books_answers'")}
+        assert not columns & {'question', 'answer', 'prompt', 'content', 'comment', 'note'}
+        weekly = c.execute('SELECT tool, answers, figures_flagged, not_helpful, hard_to_follow, wrong_figures FROM ai_private.books_feedback_weekly').fetchall()
+        assert weekly == [('profit_summary', 1, 0, 1, 1, 0)]  # the failed answer is not counted
+        c.execute('SET LOCAL ROLE authenticated')
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute('SELECT * FROM ai_private.books_feedback_weekly')
 
 
 def test_books_answers_use_the_plan_allowance_and_shared_limits():

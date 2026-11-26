@@ -10,6 +10,16 @@ export type BooksAnswer = { answer: string; check: FigureCheck; sources: BooksSo
 
 export const AI_BOOKS_LABEL = 'Written by AI from your CACU books. It may be wrong, and it is not financial, legal or tax advice.';
 
+/** "Not helpful" reasons (Doc 15 monitoring). A fixed list, so nothing from the question or answer is kept (AI-009). */
+export const NOT_HELPFUL_REASONS = [
+  { code: 'wrong_figures', label: 'The figures look wrong' },
+  { code: 'missed_something', label: 'It left something out' },
+  { code: 'hard_to_follow', label: 'Hard to understand' },
+  { code: 'not_what_i_asked', label: 'It did not answer my question' },
+  { code: 'other', label: 'Something else' },
+] as const;
+export type NotHelpfulReason = typeof NOT_HELPFUL_REASONS[number]['code'];
+
 /** Text as inert data (AI-007): no markup, no control or invisible format characters; line breaks kept. */
 export function inert(text: string, limit = 4000): string {
   return text.replace(/<[^>]*>/g, ' ')
