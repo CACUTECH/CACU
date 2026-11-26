@@ -1,4 +1,6 @@
 import { BaseService } from './base-service';
+import { TAX_STATES, type RemittanceDetails, type RemittanceSchedule } from '@/lib/remittances';
+import { LINK_DAYS, type PayslipLinkStatus, type SharedPayslip } from '@/lib/payslips';
 import { EMPLOYEE_COLUMNS, HR_OPERATIONS, UUID_PATTERN, hrErrorMessage, isIsoDate,
   type EmployeeRecord, type HistoryEntry, type HRMutation, type PayrollRules } from '@/lib/hr';
 
@@ -99,6 +101,75 @@ export class HRService extends BaseService {
     const defaults = await supabase.rpc('hr_payroll_defaults');
     if (defaults.error || !defaults.data) throw new HRError('Payroll rules unavailable');
     return { rules: defaults.data as PayrollRules, version: 0, reviewed_at: null };
+  }
+
+  /** An employee's tax state and PFA, for the remittance schedules (E21 R4). */
+  async remittanceDetails(employeeId: string): Promise<RemittanceDetails> {
+    if (!UUID_PATTERN.test(employeeId)) return { tax_state: null, pfa: null };
+    const { supabase, businessId } = await this.managerContext();
+    const { data, error } = await supabase.from('hr_remittance_details').select('tax_state,pfa').eq('business_id', businessId).eq('employee_id', employeeId).maybeSingle();
+    if (error) throw new HRError('Remittance details unavailable');
+    return (data as RemittanceDetails | null) ?? { tax_state: null, pfa: null };
+  }
+
+  async saveRemittanceDetails(employeeId: string, details: RemittanceDetails): Promise<RemittanceDetails> {
+    if (!UUID_PATTERN.test(employeeId)) throw new HRError('Employee not found in this business');
+    if (details.tax_state !== null && !(TAX_STATES as readonly string[]).includes(details.tax_state)) throw new HRError('Choose the state this employee is taxed in.');
+    const pfa = details.pfa?.trim() || null;
+    if (pfa !== null && (pfa.length < 2 || pfa.length > 80)) throw new HRError('Enter the PFA name in 2 to 80 characters.');
+    const { supabase, businessId } = await this.managerContext();
+    const { data, error } = await supabase.rpc('hr_save_remittance_details', { p_business_id: businessId, p_employee_id: employeeId, p_tax_state: details.tax_state, p_pfa: pfa });
+    if (error) {
+      const known: Record<string, string> = { INVALID_TAX_STATE: 'Choose the state this employee is taxed in.', INVALID_PFA: 'Enter the PFA name in 2 to 80 characters.',
+        EMPLOYEE_NOT_FOUND: 'Employee not found in this business' };
+      const code = /^[A-Z_]+/.exec(error.message || '')?.[0] ?? '';
+      throw new HRError(known[code] ?? hrErrorMessage(error.message));
+    }
+    return data as RemittanceDetails;
+  }
+
+  /** The PAYE, pension, NHF and NHIS schedules for an approved run, from its payslips. */
+  async remittanceSchedule(runId: string): Promise<RemittanceSchedule | null> {
+    if (!UUID_PATTERN.test(runId)) return null;
+    const { supabase, businessId } = await this.managerContext();
+    const { data, error } = await supabase.rpc('hr_remittance_schedule', { p_business_id: businessId, p_run_id: runId });
+    if (error) {
+      if (/PAYROLL_RUN_NOT_(APPROVED|FOUND)/.test(error.message || '')) return null;
+      throw new HRError('Remittance schedules unavailable');
+    }
+    return data as RemittanceSchedule;
+  }
+
+  /** The live payslip links of an approved run (E21 R4). */
+  async payslipLinks(runId: string): Promise<PayslipLinkStatus[]> {
+    if (!UUID_PATTERN.test(runId)) return [];
+    const { supabase, businessId } = await this.managerContext();
+    const { data, error } = await supabase.rpc('hr_payslip_links', { p_business_id: businessId, p_run_id: runId });
+    if (error || !Array.isArray(data)) throw new HRError('Payslip links unavailable');
+    return data as PayslipLinkStatus[];
+  }
+
+  /** A new link for one approved payslip, replacing any live one. The token is only ever returned here. */
+  async sharePayslip(payslipId: string, days: number): Promise<SharedPayslip> {
+    if (!UUID_PATTERN.test(payslipId)) throw new HRError('Payslip not found in this business');
+    if (!(LINK_DAYS as readonly number[]).includes(days)) throw new HRError('Choose how long the link works.');
+    const { supabase, businessId } = await this.managerContext();
+    const { data, error } = await supabase.rpc('hr_share_payslip', { p_business_id: businessId, p_payslip_id: payslipId, p_days: days });
+    if (error) {
+      const known: Record<string, string> = { PAYSLIP_NOT_FOUND: 'Payslip not found in this business',
+        PAYROLL_RUN_NOT_APPROVED: 'Only payslips of an approved payroll can be shared.', INVALID_EXPIRY: 'Choose how long the link works.' };
+      const code = /^[A-Z_]+/.exec(error.message || '')?.[0] ?? '';
+      throw new HRError(known[code] ?? hrErrorMessage(error.message));
+    }
+    return data as SharedPayslip;
+  }
+
+  async withdrawPayslipLink(payslipId: string): Promise<boolean> {
+    if (!UUID_PATTERN.test(payslipId)) throw new HRError('Payslip not found in this business');
+    const { supabase, businessId } = await this.managerContext();
+    const { data, error } = await supabase.rpc('hr_withdraw_payslip_link', { p_business_id: businessId, p_payslip_id: payslipId });
+    if (error) throw new HRError(hrErrorMessage(error.message));
+    return data === true;
   }
 
   async write(input: HRMutation) {

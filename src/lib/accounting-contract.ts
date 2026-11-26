@@ -1343,6 +1343,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/payroll/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Payroll Books */
+        get: operations["payroll_books_api_v1_businesses__business_id__payroll_books_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/payroll/runs/{run_id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Payroll Post */
+        post: operations["payroll_post_api_v1_businesses__business_id__payroll_runs__run_id__post_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/payroll/runs/{run_id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Payroll Settle */
+        post: operations["payroll_settle_api_v1_businesses__business_id__payroll_runs__run_id__payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/ai/tools": {
         parameters: {
             query?: never;
@@ -3751,6 +3802,14 @@ export interface components {
              */
             separation_of_duties: boolean;
         };
+        /** PostRun */
+        PostRun: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+        };
         /** PostingCommand */
         PostingCommand: {
             /**
@@ -3762,7 +3821,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill" | "customer_advance" | "gateway_receipt" | "gateway_settlement" | "credit_advance" | "wht_deduction";
+            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill" | "customer_advance" | "gateway_receipt" | "gateway_settlement" | "credit_advance" | "wht_deduction" | "payroll" | "payroll_payment" | "payroll_remittance";
             /**
              * Source Id
              * Format: uuid
@@ -4097,6 +4156,35 @@ export interface components {
             /** Name */
             name: string;
             rules: components["schemas"]["Rules"];
+        };
+        /** Settle */
+        Settle: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "net_pay" | "paye" | "pension" | "nhf" | "nhis";
+            /** Amount */
+            amount: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "Cash" | "Transfer";
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+            /** Reference */
+            reference?: string | null;
         };
         /** ShareCreate */
         ShareCreate: {
@@ -7454,6 +7542,109 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payroll_books_api_v1_businesses__business_id__payroll_books_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payroll_post_api_v1_businesses__business_id__payroll_runs__run_id__post_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostRun"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payroll_settle_api_v1_businesses__business_id__payroll_runs__run_id__payments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Settle"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -32,7 +32,8 @@ class PostingCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
-                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement','credit_advance','wht_deduction']
+                 'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement','credit_advance','wht_deduction',
+                 'payroll','payroll_payment','payroll_remittance']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -50,13 +51,16 @@ CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'su
          'transfer':ContraEntry,'reversal':JournalEntry,'transfer_confirmation':JournalEntry,'transfer_not_received':JournalEntry,'sale_refund':JournalEntry,
          'shift_variance':JournalEntry,'booking_deposit':JournalEntry,'deposit_settlement':JournalEntry,
          'deposit_application':JournalEntry,'goods_bill':JournalEntry,'customer_advance':JournalEntry,
-         'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry,'credit_advance':JournalEntry,'wht_deduction':JournalEntry}
+         'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry,'credit_advance':JournalEntry,'wht_deduction':JournalEntry,
+         'payroll':JournalEntry,'payroll_payment':JournalEntry,'payroll_remittance':JournalEntry}
 # Documents filed under another document type: a bill for received goods is a supplier bill to payments and the bills list.
 DOCUMENT_TYPES={'goods_bill':'bill'}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
 INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance',
-                'gateway_receipt','gateway_settlement','credit_advance','wht_deduction'}
+                'gateway_receipt','gateway_settlement','credit_advance','wht_deduction','payroll','payroll_payment','payroll_remittance'}
+# Payroll to the books (FR-203): the liabilities a run creates and its payments and remittances clear.
+PAYROLL_LIABILITIES={'salaries_payable','paye_payable','pension_payable','nhf_payable','nhis_payable'}
 
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
@@ -129,7 +133,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     claimed=[l for l in lines if vat_input is not None and l[0].id==vat_input and not l[2]] if command.kind!='reversal' else []
     if claimed and (command.kind not in {'bill','goods_bill','expense'} or len(claimed)!=1):
         raise HTTPException(422,'Input VAT is claimed only on bills and expenses')
-    if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
+    if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received','payroll'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
     if split_sale and command.main_amount is None:raise HTTPException(422,'A split sale names its cash part')
     if command.main_amount is not None and amount<=0:raise HTTPException(422,'Compound main amount must be positive')
     if command.entry_date<raw(session,'SELECT cutover_date FROM accounting.business_map WHERE business_id=%s',(tenant,)).scalar():
@@ -255,6 +259,22 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 banks=[l for l in command.lines if str(l.account_id) not in fees]
                 if str(command.main_account_id)!=online or not command.credited or any(l.credited for l in command.lines) or len(banks)!=1                    or len(command.lines)-len(banks)>1 or str(collection_account(session,'Transfer',banks[0].account_id))!=str(banks[0].account_id):
                     raise HTTPException(422,'A settlement moves money from Card and online payments clearing to the bank, less the fee')
+        elif command.kind=='payroll':
+            # FR-203: credit Salaries payable with the net pay owed (the main account), debit salary expense and
+            # employer pension, credit PAYE, pension, NHF and NHIS payable. The payroll workflow builds the lines from
+            # the approved run; here the shape is checked so nothing else can be posted under this kind.
+            liabilities={str(vat_account_id(session,p)) for p in PAYROLL_LIABILITIES-{'salaries_payable'}}
+            if str(command.main_account_id)!=str(vat_account_id(session,'salaries_payable')) or not command.credited or command.main_amount is None                or any(l.credited and str(l.account_id) not in liabilities for l in command.lines) or not any(not l.credited for l in command.lines):
+                raise HTTPException(422,'A payroll journal credits net pay to Salaries payable and each deduction to its liability')
+        elif command.kind in {'payroll_payment','payroll_remittance'}:
+            # Paying staff clears Salaries payable; a remittance clears PAYE, pension, NHF or NHIS payable. Both are
+            # paid from the till or a reviewed bank account.
+            owed={'salaries_payable'} if command.kind=='payroll_payment' else PAYROLL_LIABILITIES-{'salaries_payable'}
+            cash=str(collection_account(session,'Cash',None))
+            paid_from=str(command.main_account_id)
+            from_bank=paid_from!=cash and str(collection_account(session,'Transfer',command.main_account_id))==paid_from
+            if not command.credited or len(command.lines)!=1 or command.lines[0].credited or not(paid_from==cash or from_bank)                or str(command.lines[0].account_id) not in {str(vat_account_id(session,p)) for p in owed}:
+                raise HTTPException(422,'A payroll payment moves money from the till or a bank to clear what is owed')
         elif command.kind=='wht_deduction':
             # Doc 09 PR-33 (E14 R3 2c): WHT a customer deducted debits WHT credits (1320) and credits their receivable,
             # allocated to the invoice like the cash they paid. Treatment to be confirmed by the reviewer.
