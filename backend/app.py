@@ -697,6 +697,22 @@ def fixed_asset_depreciation_post(business_id:UUID,month:str,request:PostDepreci
     with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
         return post_month(session,user_id,month,request)
 
+# Capital allowances (R4; Nigeria Tax Act 2025): tax depreciation on the register for the tax computation. Off until a tax
+# professional confirms the rates (accounting.capital_allowance_switch); on for CACU's preview business.
+from cacu.accounting.allowances import AssetTax
+
+@app.get('/api/v1/businesses/{business_id}/fixed-assets/capital-allowances/{year}')
+def capital_allowances(business_id:UUID,year:int,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.allowances import schedule
+    with library_transaction(user_id,business_id,permission='ledger.view') as session:
+        return schedule(session,year)
+
+@app.put('/api/v1/businesses/{business_id}/fixed-assets/{asset_id}/tax')
+def fixed_asset_tax(business_id:UUID,asset_id:UUID,request:AssetTax,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.allowances import save
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return save(session,user_id,asset_id,request)
+
 # AI on the books (Doc 15; E18 R3): read-only tools the gateway runs with the member's own token. Each tool keeps the
 # permission of the screen its figures come from, so the assistant can never show a member more than the screens do.
 @app.get('/api/v1/businesses/{business_id}/ai/tools')

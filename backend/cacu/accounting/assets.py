@@ -232,6 +232,11 @@ def needs_depreciation(session, month: date) -> bool:
     return any(chargeable(a, month) for a in _assets(session))
 
 
+def _allowances_on(session) -> bool:
+    from cacu.accounting.allowances import enabled
+    return enabled(session)
+
+
 def overview(session) -> dict:
     from cacu.accounting.workflows import bank_accounts
     charged = _charged(session)
@@ -243,6 +248,7 @@ def overview(session) -> dict:
             'totals': {'cost': _money(sum((Decimal(a['cost']) for a in live), ZERO)),
                        'accumulated_depreciation': _money(sum((Decimal(a['accumulated_depreciation']) for a in live), ZERO)),
                        'carrying_amount': _money(sum((Decimal(a['carrying_amount']) for a in live), ZERO))},
+            'capital_allowances': _allowances_on(session),
             'categories': CATEGORY_NAMES, 'pay_from': {'cash': _purpose(session, 'cash') is not None, 'banks': bank_accounts(session)}}
 
 

@@ -17,7 +17,21 @@ export type FixedAssets = {
   assets: FixedAsset[]; runs: DepreciationRun[]; due: string[];
   totals: { cost: string; accumulated_depreciation: string; carrying_amount: string };
   pay_from: { cash: boolean; banks: { id: string; name: string }[] };
+  capital_allowances?: boolean;
 };
+
+/** Capital allowances (Nigeria Tax Act 2025) for one tax year, from the register. */
+export type AllowanceRow = {
+  asset_id: string; name: string; category: Category; tax_class: string; class_label: string; rate_percent: string; qualifies: boolean;
+  cost: string; claimed_before: string; note: string | null; set: boolean;
+  opening?: string; allowance?: string; proceeds?: string | null; balancing?: string; closing?: string;
+};
+export type CapitalAllowances = {
+  year: number; assets: AllowanceRow[]; reviewed: boolean; note: string;
+  totals: { allowance: string; balancing_charge: string; balancing_allowance: string };
+  classes: { tax_class: string; label: string; rate_percent: string }[];
+};
+export type AssetTaxInput = { tax_class: string; qualifies: boolean; claimed_before: string; note?: string | null };
 export type DepreciationPreview = { month: string; total: string; charges: { asset_id: string; name: string; category_name: string; amount: string }[] };
 
 export type AssetInput = {

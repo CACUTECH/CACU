@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { accountingRequest } from '@/lib/accounting-client';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveBusinessIdAction } from '@/app/business-actions';
-import type { AssetInput, DepreciationPreview, DisposeInput, FixedAsset, FixedAssets } from '@/lib/fixed-assets';
+import type { AssetInput, AssetTaxInput, CapitalAllowances, DepreciationPreview, DisposeInput, FixedAsset, FixedAssets } from '@/lib/fixed-assets';
 
 type Result<T> = { success: true; data: T } | { success: false; error: string };
 const failed = (error: unknown, fallback: string) => ({ success: false as const, error: error instanceof Error ? error.message : fallback });
@@ -100,4 +100,24 @@ export async function disposeAssetAction(assetId: string, requestKey: string, in
     revalidatePath('/accounting/fixed-assets');
     return { success: true, data };
   } catch (error) { return failed(error, 'The disposal was not recorded. Try again.'); }
+}
+
+export async function capitalAllowancesAction(year: number): Promise<Result<CapitalAllowances>> {
+  if (!Number.isInteger(year) || year < 2026 || year > 2100) return { success: false, error: 'Choose a year from 2026.' };
+  try { return { success: true, data: await accountingRequest<CapitalAllowances>(`fixed-assets/capital-allowances/${year}`) }; }
+  catch (error) { return failed(error, 'Capital allowances could not be worked out.'); }
+}
+
+const assetTax = z.object({
+  tax_class: z.string().regex(/^[a-z_]{2,40}$/, 'Choose a class.'), qualifies: z.boolean(),
+  claimed_before: amount, note: z.string().trim().max(500).nullable().optional().transform(v => v || null),
+});
+
+export async function saveAssetTaxAction(assetId: string, input: AssetTaxInput): Promise<Result<AssetTaxInput>> {
+  const target = id.safeParse(assetId); const parsed = assetTax.safeParse(input);
+  if (!target.success) return { success: false, error: 'Fixed asset not found' };
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Check the tax details and try again.' };
+  try {
+    return { success: true, data: await accountingRequest<AssetTaxInput>(`fixed-assets/${encodeURIComponent(target.data)}/tax`, { method: 'PUT', body: parsed.data }) };
+  } catch (error) { return failed(error, 'The tax details were not saved. Try again.'); }
 }
