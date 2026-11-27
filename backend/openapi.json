@@ -4915,6 +4915,79 @@
         }
       }
     },
+    "/api/v1/businesses/{business_id}/payroll/runs/{run_id}/payments/{settlement_id}/reverse": {
+      "post": {
+        "summary": "Payroll Payment Reverse",
+        "operationId": "payroll_payment_reverse_api_v1_businesses__business_id__payroll_runs__run_id__payments__settlement_id__reverse_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "settlement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Settlement Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReversePayment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{business_id}/payroll/books": {
       "get": {
         "summary": "Payroll Books",
@@ -5058,6 +5131,69 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Settle"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{business_id}/fixed-assets/{asset_id}/remove": {
+      "post": {
+        "summary": "Fixed Asset Remove",
+        "operationId": "fixed_asset_remove_api_v1_businesses__business_id__fixed_assets__asset_id__remove_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Business Id"
+            }
+          },
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Remove"
               }
             }
           }
@@ -13203,7 +13339,9 @@
               "asset_purchase",
               "asset_opening",
               "depreciation",
-              "asset_disposal"
+              "asset_disposal",
+              "asset_removal",
+              "payroll_reversal"
             ],
             "title": "Kind"
           },
@@ -13680,6 +13818,28 @@
         ],
         "title": "RefundRequest"
       },
+      "Remove": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "reason"
+        ],
+        "title": "Remove"
+      },
       "ReopenMonth": {
         "properties": {
           "reason": {
@@ -13744,6 +13904,28 @@
           "reason"
         ],
         "title": "ReversalCreate"
+      },
+      "ReversePayment": {
+        "properties": {
+          "request_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Key"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_key",
+          "reason"
+        ],
+        "title": "ReversePayment"
       },
       "Rules": {
         "properties": {

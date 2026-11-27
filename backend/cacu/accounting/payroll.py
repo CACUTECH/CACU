@@ -9,7 +9,8 @@ built from the run's own totals:
 
 It is dated the last day of the payroll month, or today if that is still to come. Then paying staff and remitting
 each deduction are recorded against the run, from the till or a reviewed bank account, each clearing what it owes and
-never more. Postings and payments are fixed once made; a mistake is reversed by a journal.
+never more. Postings and payments are fixed once made. A payment recorded in error is reversed by the Owner, with a
+reason, by a journal dated that day; what it paid is owed again.
 
 Off until the R4 release gate (accounting.payroll_switch): a professional must validate the payroll posting fixtures,
 with statutory sign-off, before any business posts payroll.
@@ -57,6 +58,12 @@ class Settle(BaseModel):
             raise ValueError('Amount must be positive')
         return value
 
+
+
+class ReversePayment(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_key: UUID
+    reason: str = Field(min_length=5, max_length=500)
 
 
 def _enabled(session) -> bool:
@@ -127,16 +134,20 @@ def _state(session, run: dict) -> dict:
     out = {'run': run, 'posted': None, 'outstanding': None, 'settlements': []}
     if posting is None:
         return out
-    paid = raw(session, """SELECT id, kind, amount, entry_date, paid_from, reference, created_at FROM accounting.payroll_settlement
-        WHERE business_id=%s AND run_id=%s ORDER BY entry_date, created_at""", (tenant, run['id'])).all()
+    paid = raw(session, """SELECT s.id, s.kind, s.amount, s.entry_date, s.paid_from, s.reference, s.created_at, r.reason AS reversal_reason,
+        r.reversed_at FROM accounting.payroll_settlement s
+        LEFT JOIN accounting.payroll_settlement_reversal r ON r.business_id=s.business_id AND r.settlement_id=s.id
+        WHERE s.business_id=%s AND s.run_id=%s ORDER BY s.entry_date, s.created_at""", (tenant, run['id'])).all()
     owed = _owed(posting.totals)
     for p in paid:
-        owed[p.kind] -= p.amount
+        if p.reversed_at is None:  # a reversed payment is owed again
+            owed[p.kind] -= p.amount
     names = dict(raw(session, 'SELECT id::text, name FROM public.accounts WHERE business_id=%s', (tenant,)).all())
     out['posted'] = {'entry_date': posting.entry_date.isoformat(), 'posted_at': posting.posted_at.isoformat(), 'transaction_id': posting.transaction_id}
     out['outstanding'] = {k: _money(v) for k, v in owed.items()}
     out['settlements'] = [{'id': str(p.id), 'kind': p.kind, 'label': SETTLEMENTS[p.kind][1], 'amount': _money(p.amount),
-                           'entry_date': p.entry_date.isoformat(), 'paid_from': names.get(str(p.paid_from), 'Account'), 'reference': p.reference}
+                           'entry_date': p.entry_date.isoformat(), 'paid_from': names.get(str(p.paid_from), 'Account'), 'reference': p.reference,
+                           'reversed': p.reversed_at is not None, 'reversal_reason': p.reversal_reason}
                           for p in paid]
     return out
 
@@ -233,4 +244,32 @@ def settle(session, actor, run_id, request: Settle) -> dict:
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (tenant, str(source), str(run_id), request.kind, amount, request.entry_date, str(paid_from), request.reference,
          int(result['transaction_id']), str(actor)))
+    return _state(session, run)
+
+
+def reverse_payment(session, actor, run_id, settlement_id, request: ReversePayment) -> dict:
+    """Reverses a payment or remittance recorded in error: the exact reverse, dated today; what it paid is owed again."""
+    from cacu.accounting.periods import refuse_closed_month
+    from cacu.accounting.posting import mirror
+    from cacu.accounting.workflows import business_today, role
+    _allowed(session, actor)
+    if role(session, actor) != 'owner':
+        raise HTTPException(403, 'Only the business owner can reverse a payroll payment.')
+    tenant = str(session.business_id)
+    run = _run(session, run_id)
+    paid = raw(session, 'SELECT * FROM accounting.payroll_settlement WHERE business_id=%s AND run_id=%s AND id=%s', (tenant, str(run_id), str(settlement_id))).first()
+    if paid is None:
+        raise HTTPException(404, 'Payment not found for this payroll run')
+    if raw(session, 'SELECT 1 FROM accounting.payroll_settlement_reversal WHERE business_id=%s AND settlement_id=%s', (tenant, str(settlement_id))).first():
+        return _state(session, run)  # reversed already
+    reason = ' '.join(request.reason.split())
+    if len(reason) < 5:
+        raise HTTPException(422, 'Say why the payment is being reversed.')
+    today = business_today(session)
+    refuse_closed_month(session, today)
+    label = SETTLEMENTS[paid.kind][1]
+    result = mirror(session, actor, paid.transaction_id, 'payroll_reversal', uuid5(request.request_key, 'posting'), uuid5(UUID(str(settlement_id)), 'reversal'),
+                    today, f'Reversed (recorded in error): {label}, {paid.entry_date:%d %b %Y}')
+    raw(session, 'INSERT INTO accounting.payroll_settlement_reversal(business_id, settlement_id, transaction_id, reason, reversed_by) VALUES (%s,%s,%s,%s,%s)',
+        (tenant, str(settlement_id), int(result['transaction_id']), reason, str(actor)))
     return _state(session, run)

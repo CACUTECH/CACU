@@ -6,7 +6,7 @@ export type PayrollBooksRun = {
   run: PayrollRunTotals;
   posted: { entry_date: string; posted_at: string; transaction_id: number } | null;
   outstanding: Record<SettlementKind, string> | null;
-  settlements: { id: string; kind: SettlementKind; label: string; amount: string; entry_date: string; paid_from: string; reference: string | null }[];
+  settlements: { id: string; kind: SettlementKind; label: string; amount: string; entry_date: string; paid_from: string; reference: string | null; reversed?: boolean; reversal_reason?: string | null }[];
 };
 export type PayrollBooks = { enabled: boolean; message: string | null; runs: PayrollBooksRun[];
   pay_from: { cash: boolean; banks: { id: string; name: string }[] } };

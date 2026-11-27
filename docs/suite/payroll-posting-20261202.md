@@ -8,6 +8,13 @@ The owner chose, on 2026-11-26:
 - recording **paying staff** and **remitting** each deduction, not only the journal;
 - a **CACU switch, off** until a professional validates payroll posting.
 
+## Reversing a payment recorded in error
+
+`POST /payroll/runs/{run_id}/payments/{payment_id}/reverse`, Owner only, with a reason.
+
+- **The journal:** the payment or remittance is reversed by a journal dated today. The original is kept, marked "Reversed" with the reason, and what it paid is owed again.
+- **The posting itself is not reversed:** HR locks an approved run, so nothing could be redone. A wrong run is corrected with a journal, or in the next month's payroll.
+
 ## Off until the R4 gate
 
 `accounting.payroll_switch` starts off. The R4 release gate needs two things before it is turned on:

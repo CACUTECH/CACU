@@ -40,3 +40,13 @@ export async function settlePayrollAction(runId: string, requestKey: string, inp
       { method: 'POST', body: { ...rest, ...(rest.method === 'Transfer' ? { bank_account_id } : {}), request_key: key.data } }) };
   } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'The payment could not be recorded. Try again.' }; }
 }
+
+export async function reversePayrollPaymentAction(runId: string, settlementId: string, requestKey: string, reason: string): Promise<Result<PayrollBooksRun>> {
+  const run = id.safeParse(runId); const payment = id.safeParse(settlementId); const key = id.safeParse(requestKey);
+  if (!run.success || !payment.success || !key.success) return { success: false, error: 'Payment not found' };
+  if (reason.trim().length < 5) return { success: false, error: 'Say why the payment is being reversed.' };
+  try {
+    return { success: true, data: await accountingRequest<PayrollBooksRun>(`payroll/runs/${encodeURIComponent(run.data)}/payments/${encodeURIComponent(payment.data)}/reverse`,
+      { method: 'POST', body: { request_key: key.data, reason: reason.trim() } }) };
+  } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'The payment was not reversed. Try again.' }; }
+}

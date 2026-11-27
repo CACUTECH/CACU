@@ -1,12 +1,12 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import FixedAssetsPage from '@/app/accounting/fixed-assets/page';
-import { addAssetAction, disposeAssetAction, fixedAssetsAction, postDepreciationAction, previewDepreciationAction } from '@/app/accounting/fixed-assets/actions';
+import { addAssetAction, disposeAssetAction, fixedAssetsAction, postDepreciationAction, previewDepreciationAction, removeAssetAction } from '@/app/accounting/fixed-assets/actions';
 import { methodLabel, monthlyStraightLine, type FixedAsset } from '@/lib/fixed-assets';
 
 let mockRole = 'owner';
 jest.mock('@/app/accounting/fixed-assets/actions', () => ({ fixedAssetsAction: jest.fn(), addAssetAction: jest.fn(), postDepreciationAction: jest.fn(),
-  previewDepreciationAction: jest.fn(), disposeAssetAction: jest.fn() }));
+  previewDepreciationAction: jest.fn(), disposeAssetAction: jest.fn(), removeAssetAction: jest.fn() }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: () => ({ business: { id: 'b1', userRole: mockRole } }) }));
 let uuid = 0;
 Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () => `3a571056-45cf-4239-96bb-${String(++uuid).padStart(12, '0')}` });
@@ -80,4 +80,21 @@ test('viewers see the register but cannot change it', async () => {
   expect(await screen.findByText('Shop laptop')).toBeInTheDocument();
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
   expect(previewDepreciationAction).not.toHaveBeenCalled();
+});
+
+test('the owner removes an asset entered in error, with a reason', async () => {
+  (removeAssetAction as jest.Mock).mockResolvedValue({ success: true });
+  render(<FixedAssetsPage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Entered in error' }));
+  fireEvent.change(screen.getByLabelText('Why it is being removed'), { target: { value: 'Entered twice' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Remove asset' }));
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Shop laptop removed, and everything it put in the books reversed.'));
+  expect(removeAssetAction).toHaveBeenCalledWith(laptop.id, expect.any(String), 'Entered twice');
+});
+
+test('an admin can sell or scrap but not remove', async () => {
+  mockRole = 'admin';
+  render(<FixedAssetsPage />);
+  expect(await screen.findByRole('button', { name: 'Sell or scrap' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Entered in error' })).not.toBeInTheDocument();
 });
