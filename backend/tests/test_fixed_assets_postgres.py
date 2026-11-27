@@ -197,3 +197,22 @@ def test_asset_kinds_cannot_be_posted_through_the_generic_route(live):
                 request_key=uuid4(), kind=kind, source_id=uuid4(), main_account_id=uuid4(), entry_date=TODAY,
                 narration='Sneaky', lines=[PostingLine(account_id=uuid4(), amount='1.00')])))
         assert refused.value.status_code == 422
+
+
+def test_an_asset_added_into_a_posted_month_starts_with_the_next_unposted_month(live):
+    started(live, EARLIER_MONTH)
+    call(live, 'owner', lambda s, a: add_asset(s, a, asset()))
+    first = post(live, EARLIER_MONTH)
+    late = call(live, 'owner', lambda s, a: add_asset(s, a, asset(name='Till printer', acquired_on=EARLIER_MONTH + timedelta(days=10), cost='120000.00')))
+    assert late['depreciate_from'] == LAST_MONTH.strftime('%Y-%m')  # September is already posted
+    again = post(live, EARLIER_MONTH)  # a retried post returns what was posted, not a fresh preview
+    assert (again['total'], again['transaction_id']) == (first['total'], first['transaction_id'])
+    assert len(again['charges']) == 1
+
+
+def test_a_fully_depreciated_asset_does_not_hold_up_month_close(live):
+    started(live, EARLIER_MONTH)
+    call(live, 'owner', lambda s, a: add_asset(s, a, asset(name='Phone', cost='90000.00', useful_life_months=1)))
+    assert post(live, EARLIER_MONTH)['total'] == '90000.00'
+    assert call(live, 'viewer', lambda s, a: overview(s))['due'] == []
+    assert step(live, LAST_MONTH)['passed'] is True

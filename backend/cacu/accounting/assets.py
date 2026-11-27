@@ -7,7 +7,9 @@ Owner decisions of 26 November 2026:
   registered for VAT claims the input VAT on what it buys, as on any bill or expense: the cost is before VAT and the
   VAT goes to Input VAT, in the month's VAT return. That one is
   brought in with its depreciation to date: debit its cost, credit its accumulated depreciation and retained earnings.
-  It is the position brought in, so the cash flow statement leaves it out, as it does the opening position.
+  It is the position brought in, so the cash flow statement leaves it out, as it does the opening position. Its
+  depreciation to date runs only to the day the books started; the months since are charged by the monthly runs, so
+  they reach the year's profit rather than retained earnings.
 * **Straight-line** charges (cost less residual value) evenly over the useful life; **reducing balance** charges a
   yearly rate on the carrying amount. Both are charged monthly, from the month the asset is bought or brought in, and
   never below its residual value. Nothing is charged in the month an asset is disposed of.
@@ -61,7 +63,7 @@ class AddAsset(BaseModel):
     supplier_id: UUID | None = None
     bill_number: str | None = Field(default=None, max_length=100)
     due_date: date | None = None
-    # Already owned: depreciation to the end of the month before it is brought in, and the day it is brought in.
+    # Already owned: depreciation up to the day the books started in CACU, and the day it is brought in.
     accumulated_depreciation: str = Field(default='0.00', pattern=AMOUNT)
     brought_in_on: date | None = None
 
@@ -208,28 +210,49 @@ def _view(asset, charged: dict) -> dict:
     return out
 
 
+def _has_left(asset, charged: dict) -> bool:
+    """Whether the asset still has depreciation to charge above its residual value."""
+    return asset.cost - asset.opening_accumulated - charged.get(str(asset.id), ZERO) > asset.residual
+
+
+def _due(asset, month: date, charged: dict) -> bool:
+    return chargeable(asset, month) and _has_left(asset, charged)
+
+
 def due_months(session, today: date | None = None) -> list[date]:
-    """Ended months that need depreciation and have none posted yet, oldest first."""
+    """Ended months that need depreciation and have none posted yet, oldest first. A fully depreciated asset makes no
+    month due."""
     from cacu.accounting.periods import month_end, next_month
     from cacu.accounting.workflows import business_today
     today = today or business_today(session)
     assets = _assets(session)
     if not assets:
         return []
-    runs = _runs(session)
+    runs, charged = _runs(session), _charged(session)
     month, due = min(a.depreciate_from for a in assets), []
     while month_end(month) <= today:
-        if month not in runs and any(chargeable(a, month) for a in assets):
+        if month not in runs and any(_due(a, month, charged) for a in assets):
             due.append(month)
         month = next_month(month)
     return due
 
 
 def needs_depreciation(session, month: date) -> bool:
-    """For month close: the month has assets to depreciate and no depreciation posted."""
+    """For month close: the month has assets with depreciation left to charge, and none posted."""
     if month in _runs(session):
         return False
-    return any(chargeable(a, month) for a in _assets(session))
+    charged = _charged(session)
+    return any(_due(a, month, charged) for a in _assets(session))
+
+
+def _first_unposted(session, month: date) -> date:
+    """The first month from this one whose depreciation is not yet posted: an asset added into a posted month starts
+    being charged there (straight-line spreads what is left over the rest of its life)."""
+    from cacu.accounting.periods import next_month
+    runs = _runs(session)
+    while month in runs:
+        month = next_month(month)
+    return month
 
 
 def _allowances_on(session) -> bool:
@@ -285,16 +308,17 @@ def add_asset(session, actor, data: AddAsset) -> dict:
         if data.brought_in_on is None:
             raise HTTPException(422, 'Choose the day the asset is brought into the books.')
         if opening > cost - residual:
-            raise HTTPException(422, 'Depreciation to date cannot be more than the cost less the residual value.')
+            raise HTTPException(422, 'Depreciation up to the day your books started cannot be more than the cost less the residual value.')
         if vat_amount:
             raise HTTPException(422, 'An asset owned before your books started has no VAT to claim now.')
         _open_date(session, data.brought_in_on, 'The day it is brought in')
-        entry_date, depreciate_from = data.brought_in_on, data.brought_in_on.replace(day=1)
+        # Depreciation to date runs to the books' start; the months since are charged by the runs not yet posted.
+        entry_date, depreciate_from = data.brought_in_on, _first_unposted(session, cutover.replace(day=1))
     else:
         if opening:
             raise HTTPException(422, 'Only an asset owned before your books started has depreciation to date.')
         _open_date(session, data.acquired_on, 'The purchase date')
-        entry_date, depreciate_from = data.acquired_on, data.acquired_on.replace(day=1)
+        entry_date, depreciate_from = data.acquired_on, _first_unposted(session, data.acquired_on.replace(day=1))
     category = data.category
     needed = {f'asset_{category}'} | ({f'accdep_{category}'} if data.how == 'existing' and opening > 0 else set())
     accounts = _ensure(session, actor, needed)
@@ -365,8 +389,12 @@ def post_month(session, actor, value: str, data: PostDepreciation) -> dict:
     tenant = str(session.business_id)
     month = _month(value)
     runs = _runs(session)
-    if month in runs:
-        return preview(session, value) | {'posted': True}  # posted already, by this request or another
+    if month in runs:  # posted already, by this request or another: what was posted
+        run = runs[month]
+        names = {str(a.id): a.name for a in _assets(session)}
+        rows = raw(session, 'SELECT asset_id, amount FROM accounting.depreciation_charge WHERE business_id=%s AND month=%s', (tenant, month)).all()
+        return {'month': value, 'total': _money(run.total), 'transaction_id': run.transaction_id, 'posted': True,
+                'charges': [{'asset_id': str(r.asset_id), 'name': names.get(str(r.asset_id), 'Asset'), 'amount': _money(r.amount)} for r in rows]}
     end = month_end(month)
     if end > business_today(session):
         raise HTTPException(409, 'Depreciation is posted once the month has ended.')
@@ -419,7 +447,8 @@ def dispose(session, actor, asset_id: UUID, data: Dispose) -> dict:
     proceeds = Decimal(data.proceeds)
     _open_date(session, data.disposed_on, 'The disposal date')
     month = data.disposed_on.replace(day=1)
-    if month < asset.depreciate_from:
+    came_in = raw(session, 'SELECT transaction_date::date FROM accounting."transaction" WHERE business_id=%s AND id=%s', (tenant, asset.transaction_id)).scalar()
+    if came_in is not None and data.disposed_on < came_in:
         raise HTTPException(422, 'An asset cannot be disposed of before it was bought or brought in.')
     earlier = [m for m in due_months(session) if m < month]
     if earlier:

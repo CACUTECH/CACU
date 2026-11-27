@@ -44,3 +44,10 @@ def test_a_march_year_end_moves_the_first_allowance_year():
     laptop = asset(start=date(2026, 5, 1))
     assert computation(laptop, Decimal('0.20'), Decimal('0'), 2026, end_month=3) is None  # bought after the year to March 2026
     assert computation(laptop, Decimal('0.20'), Decimal('0'), 2027, end_month=3)['allowance'] == Decimal('200000.00')
+
+
+def test_an_asset_bought_before_2026_starts_in_2026_with_what_was_claimed_under_the_old_law():
+    van = SimpleNamespace(cost=Decimal('10000000.00'), acquired_on=date(2025, 10, 1), depreciate_from=date(2025, 10, 1), disposed_on=None, disposal_proceeds=None)
+    assert computation(van, Decimal('0.25'), Decimal('0'), 2025) is None  # no allowance under this Act before 2026
+    year = computation(van, Decimal('0.25'), Decimal('2500000.00'), 2026)
+    assert (year['opening'], year['allowance']) == (Decimal('7500000.00'), Decimal('2500000.00'))

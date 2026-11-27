@@ -19,6 +19,7 @@ stays off until then; it is on for CACU's preview business):
 
 Tax years end on the last day of the business's year-end month (31 December unless it says otherwise).
 """
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 from fastapi import HTTPException
@@ -67,7 +68,10 @@ def _settings(session) -> dict:
 def computation(asset, rate: Decimal, claimed_before: Decimal, year: int, end_month: int = 12) -> dict | None:
     """The asset's allowance for one tax year, or None when it was not held in that year at all."""
     from cacu.accounting.tax_years import year_of
-    start = year_of(asset.depreciate_from, end_month)
+    # From the year it was bought, but never before 2026, when the Act took effect: allowances for earlier years were
+    # given under the old law and are entered as already claimed.
+    bought = getattr(asset, 'acquired_on', None) or asset.depreciate_from
+    start = max(year_of(bought, end_month), 2026)
     gone = year_of(asset.disposed_on, end_month) if asset.disposed_on else None
     if year < start or (gone is not None and year > gone):
         return None
@@ -144,8 +148,8 @@ def save(session, actor, asset_id: UUID, data: AssetTax) -> dict:
     if data.tax_class not in rates(session):
         raise HTTPException(422, 'Choose a capital allowance class.')
     claimed = Decimal(data.claimed_before)
-    if claimed and asset.how != 'existing':
-        raise HTTPException(422, 'Only an asset owned before CACU can have allowances already claimed.')
+    if claimed and asset.how != 'existing' and asset.acquired_on >= date(2026, 1, 1):
+        raise HTTPException(422, 'Only an asset bought before 2026, or owned before CACU, can have allowances already claimed.')
     if claimed > asset.cost * (1 - RETAINED):
         raise HTTPException(422, 'Allowances already claimed cannot be more than 99% of the cost.')
     note = (data.note or '').strip() or None

@@ -33,6 +33,15 @@ export function PayrollBooksPanel({ runId }: { runId: string }) {
     });
   }, [runId]);
 
+  // Keep the chosen payment on something still owed: once net pay is paid in full it leaves the list, and the form
+  // must not keep sending it while the list shows another.
+  const outstanding = state?.outstanding;
+  React.useEffect(() => {
+    if (!outstanding) return;
+    const stillOwed = KINDS.filter(k => Number(outstanding[k] ?? 0) > 0);
+    setForm(f => stillOwed.length && !stillOwed.includes(f.kind) ? { ...f, kind: stillOwed[0] } : f);
+  }, [outstanding]);
+
   if (!books && !error) return null;
   if (books && !books.enabled) return null;  // off until the R4 gate: nothing to show
   if (!books) return <p role="alert" className="text-sm text-destructive">{error}</p>;

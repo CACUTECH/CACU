@@ -68,3 +68,16 @@ test('a refused payment shows why and keeps what was typed', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('Only ₦420,000.00 is still owed');
   expect(screen.getByLabelText('Amount (₦)')).toHaveValue('500000');
 });
+
+test('once net pay is paid in full, the next payment is for something still owed', async () => {
+  const paid = { ...posted, outstanding: { ...posted.outstanding!, net_pay: '0.00' } };
+  (payrollBooksAction as jest.Mock).mockResolvedValue({ success: true, data: books(paid) });
+  (settlePayrollAction as jest.Mock).mockResolvedValue({ success: true, data: paid });
+  render(<PayrollBooksPanel runId={RUN} />);
+  const what = await screen.findByLabelText('What you paid');
+  expect((what as HTMLSelectElement).value).toBe('paye');
+  fireEvent.change(screen.getByLabelText('Amount (₦)'), { target: { value: '40000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+  await screen.findByText('Posted to the books on 2026-11-26.');
+  expect(settlePayrollAction).toHaveBeenCalledWith(RUN, expect.any(String), expect.objectContaining({ kind: 'paye', amount: '40000' }));
+});

@@ -68,6 +68,15 @@ ASSET_DEPRECIATION={f'accdep_{c}' for c in ASSET_CATEGORIES}
 # Payroll to the books (FR-203): the liabilities a run creates and its payments and remittances clear.
 PAYROLL_LIABILITIES={'salaries_payable','paye_payable','pension_payable','nhf_payable','nhis_payable'}
 
+def _till(session):
+    """The till's account, or None for a business without one: entries that move no cash (or move it through a bank)
+    must not need it."""
+    from cacu.accounting.workflows import collection_account
+    try:
+        return str(collection_account(session,'Cash',None))
+    except HTTPException:
+        return None
+
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
 
@@ -276,7 +285,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             # Paying staff clears Salaries payable; a remittance clears PAYE, pension, NHF or NHIS payable. Both are
             # paid from the till or a reviewed bank account.
             owed={'salaries_payable'} if command.kind=='payroll_payment' else PAYROLL_LIABILITIES-{'salaries_payable'}
-            cash=str(collection_account(session,'Cash',None))
+            cash=_till(session)
             paid_from=str(command.main_account_id)
             from_bank=paid_from!=cash and str(collection_account(session,'Transfer',command.main_account_id))==paid_from
             if not command.credited or len(command.lines)!=1 or command.lines[0].credited or not(paid_from==cash or from_bank)                or str(command.lines[0].account_id) not in {str(vat_account_id(session,p)) for p in owed}:
@@ -288,7 +297,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 return {str(r.account_id) for r in raw(session,'SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose=ANY(%s)',(tenant,list(purposes))).all()}
             cost,accdep=ids(ASSET_COST),ids(ASSET_DEPRECIATION)
             main_id=str(command.main_account_id)
-            cash=str(collection_account(session,'Cash',None))
+            cash=_till(session)
             def till_or_bank(account_id):
                 return str(account_id)==cash or str(collection_account(session,'Transfer',account_id))==str(account_id)
             if command.kind=='asset_purchase':

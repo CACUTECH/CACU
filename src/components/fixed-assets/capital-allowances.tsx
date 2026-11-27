@@ -46,9 +46,10 @@ function TaxForm({ row, data, onSaved, onCancel }: { row: AllowanceRow; data: Al
 }
 
 export function CapitalAllowances({ manager, firstYear }: { manager: boolean; firstYear: number }) {
+  // Up to next year: with a year end before December, the tax year in progress ends next year.
   const thisYear = new Date().getFullYear();
-  const years = Array.from({ length: Math.max(thisYear - Math.max(firstYear, 2026) + 1, 1) }, (_, i) => thisYear - i).filter(y => y >= 2026);
-  const [year, setYear] = React.useState(years[0] ?? 2026);
+  const years = Array.from({ length: Math.max(thisYear + 1 - Math.max(firstYear, 2026) + 1, 1) }, (_, i) => thisYear + 1 - i).filter(y => y >= 2026);
+  const [year, setYear] = React.useState(Math.max(thisYear, 2026));
   const [data, setData] = React.useState<Allowances | null | undefined>(undefined);
   const [error, setError] = React.useState('');
   const [editing, setEditing] = React.useState<string | null>(null);

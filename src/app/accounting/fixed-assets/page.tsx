@@ -78,7 +78,7 @@ function AddAsset({ view, onAdded }: { view: View; onAdded: (a: FixedAsset) => v
     {form.how === 'existing' && <>
       <Field id="asset-brought" label="Bring into the books on" hint="On or after the day your books started in CACU.">
         <Input id="asset-brought" type="date" max={today()} value={form.brought_in_on ?? ''} onChange={e => set({ brought_in_on: e.target.value })} /></Field>
-      <Field id="asset-accumulated" label="Depreciation to date (₦)" hint="Up to the end of the month before it is brought in.">
+      <Field id="asset-accumulated" label="Depreciation to date (₦)" hint="Up to the day your books started in CACU. Months since then are charged by the monthly depreciation.">
         <Input id="asset-accumulated" inputMode="decimal" value={form.accumulated_depreciation ?? ''} onChange={e => set({ accumulated_depreciation: e.target.value })} /></Field>
     </>}
 
