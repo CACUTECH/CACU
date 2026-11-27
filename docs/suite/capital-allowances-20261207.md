@@ -46,6 +46,28 @@ On **Accounting › Fixed Assets**, a **Capital allowances (tax)** card shows th
 
 Owners and Admins set each asset's tax details: its class, whether it qualifies, any allowances already claimed before CACU, and a note.
 
+## Part business use (added 27 November 2026)
+
+An asset also used privately, such as a car the owner drives home, has a **business use** percentage (100% unless set).
+
+- Only the business share of each year's allowance is claimed. The card shows the private share not claimed.
+- The tax written-down value still falls by the full allowance, so the private share is lost rather than carried forward.
+- On disposal, the balancing charge or allowance is scaled by the same share.
+- The private share of the asset's running costs is not worked out here. Enter it in the income tax estimate as an expense the law does not allow.
+
+Stored in `accounting.asset_tax.business_use` (migration `20261214090000_asset_part_use.sql`).
+
+## Non-taxable income (added 27 November 2026)
+
+An asset also used to earn income that is not taxable can be marked so (off unless set).
+
+- **Non-taxable income** for the year is what the owner enters in the income tax estimate as "income that is not taxable".
+- **Total income** is the revenue in the books for the tax year.
+- When non-taxable income is **10% or more** of total income, a marked asset claims only the taxable share of its allowance and balancing figure. Below 10%, it claims in full.
+- This applies after any private use: a 60% business-use asset with 25% non-taxable income claims 60% × 75% of the allowance.
+
+Stored in `accounting.asset_tax.earns_exempt` (migration `20261215090000_asset_exempt_use.sql`).
+
 ## API
 
 - `GET /fixed-assets/capital-allowances/{year}`: needs `ledger.view`.
@@ -58,8 +80,9 @@ Both refuse while the switch is off for the business.
 1. **The rates and classes.** The sources disagree on agricultural equipment (10% or 20%) and on intangibles.
 2. **Allowance years:** whether a full year is allowed in the year an asset is bought, and none in the year it is sold.
 3. **Disposals:** whether a balancing allowance is still given, or only the charge on proceeds above the tax written-down value.
-4. **Assets partly used** for non-taxable income: the allowance is prorated unless that income is under 10% of the total. This is not modelled yet.
+4. **Assets partly used** for non-taxable income: CACU prorates by the income share (non-taxable income from the estimate's adjustments over book revenue) unless it is under 10%. Confirm the measure (income, not use of the asset) and that the 10% is of total income.
 5. **Assets owned before 2026:** the transitional rule for remaining years (the years already claimed are deducted).
-6. **The 1% kept:** whether it is held back from the allowance, as CACU does now, or recorded only notionally.
+6. **Private use (part business use):** that only the business share is claimed while the written-down value falls by the full allowance, and that balancing figures are scaled the same way.
+7. **The 1% kept:** whether it is held back from the allowance, as CACU does now, or recorded only notionally.
 
 Once confirmed, set `reviewed_at` on `accounting.capital_allowance_rate`, and turn on `accounting.capital_allowance_switch` in production.

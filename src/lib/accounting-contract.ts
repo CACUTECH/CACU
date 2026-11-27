@@ -3149,6 +3149,16 @@ export interface components {
             claimed_before: string;
             /** Note */
             note?: string | null;
+            /**
+             * Business Use
+             * @default 100
+             */
+            business_use: string;
+            /**
+             * Earns Exempt
+             * @default false
+             */
+            earns_exempt: boolean;
         };
         /** BatchTracking */
         BatchTracking: {

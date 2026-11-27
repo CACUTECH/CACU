@@ -6,6 +6,8 @@ import pytest
 from fastapi import HTTPException
 from cacu.accounting.allowances import AssetTax, save, schedule
 from cacu.accounting.assets import add_asset, overview
+from cacu.accounting.posting import PostingCommand, post_command
+from decimal import Decimal
 from test_fixed_assets_postgres import EARLIER_MONTH, asset, started
 from test_corrections_postgres import live, call, URL  # noqa: F401  (fixtures)
 from test_opening_position_postgres import books  # noqa: F401
@@ -61,6 +63,12 @@ def test_owners_set_each_assets_class_and_whether_it_qualifies(live):
         call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='spaceship')))
     call(live, 'admin', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='software')))
     assert call(live, 'viewer', lambda s, a: schedule(s, TODAY.year))['assets'][0]['allowance'] == '300000.00'  # 25%
+    with pytest.raises(HTTPException, match='more than 0%'):
+        call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='software', business_use='0')))
+    call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='software', business_use='75')))
+    part = call(live, 'viewer', lambda s, a: schedule(s, TODAY.year))
+    assert (part['assets'][0]['allowance'], part['assets'][0]['private_use'], part['assets'][0]['business_use_percent']) == ('225000.00', '75000.00', '75.00')
+    assert part['totals']['allowance'] == '225000.00'
     call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='software', qualifies=False, note='Bought from an unregistered seller; no VAT charged')))
     year = call(live, 'viewer', lambda s, a: schedule(s, TODAY.year))
     assert year['assets'][0]['qualifies'] is False and 'allowance' not in year['assets'][0] and year['totals']['allowance'] == '0.00'
@@ -77,4 +85,30 @@ def test_an_unknown_asset_is_not_found(live):
     with pytest.raises(HTTPException) as missing:
         call(live, 'owner', lambda s, a: save(s, a, uuid4(), AssetTax(tax_class='plant')))
     assert missing.value.status_code == 404
+    switch(False)
+
+
+def test_an_asset_earning_non_taxable_income_claims_the_taxable_share_from_10_percent(live):
+    started(live, EARLIER_MONTH)
+    switch(True)
+    laptop = call(live, 'owner', lambda s, a: add_asset(s, a, asset()))
+    call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='other_equipment', earns_exempt=True)))
+    call(live, 'owner', lambda s, a: post_command(s, a, PostingCommand(request_key=uuid4(), kind='adjustment', source_id=uuid4(),
+        main_account_id=live.codes['1000'], entry_date=TODAY, narration='Sales', credited=False,
+        lines=[{'account_id': live.codes['4000'], 'amount': '1000000.00', 'credited': True}])))
+
+    def exempt(amount):
+        with psycopg.connect(URL) as c:
+            c.execute("""INSERT INTO accounting.tax_adjustment(business_id, id, year, direction, label, amount, created_by)
+                VALUES (%s,%s,%s,'deduct','Dividend from a Nigerian company',%s,%s)""", (live.business, uuid4(), TODAY.year, amount, live.people['owner']))
+        return call(live, 'viewer', lambda s, a: schedule(s, TODAY.year))
+
+    small = exempt('10.00')
+    assert small['non_taxable']['applies'] is False and small['assets'][0]['allowance'] == '240000.00'  # far under 10%: no cut
+    total = Decimal(small['non_taxable']['total_income'])
+    big = exempt(format(total * Decimal('0.25'), '.2f'))  # now well over 10% of income
+    share = Decimal(big['non_taxable']['share_percent']) / 100
+    assert big['non_taxable']['applies'] is True and share >= Decimal('0.25')
+    row = big['assets'][0]
+    assert Decimal(row['allowance']) + Decimal(row['exempt_use']) == Decimal('240000.00') and Decimal(row['allowance']) < Decimal('180000.01')
     switch(False)

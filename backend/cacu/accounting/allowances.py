@@ -16,6 +16,14 @@ stays off until then; it is on for CACU's preview business):
   allowance. Whether the Act still gives a balancing allowance is for the reviewer to confirm.
 * An asset owned before CACU carries the allowances already claimed on it under earlier law; only what is left of
   the 99% is allowed.
+* **Part business use** (a car also used privately): only the business share of each year's allowance, and of a
+  balancing charge or allowance, is claimed. The tax written-down value still falls by the full allowance, so the
+  private share is lost rather than carried forward. The private share of running costs is not handled here: it is
+  an expense the law does not allow, entered as an adjustment in the income tax estimate.
+* **Non-taxable income:** an asset also used to earn income that is not taxable claims only the taxable share of its
+  allowance (and balancing figure), unless non-taxable income is under 10% of the year's total income. Non-taxable
+  income is what the owner enters in the income tax estimate as "income that is not taxable"; total income is the
+  revenue in the books for the tax year.
 
 Tax years end on the last day of the business's year-end month (31 December unless it says otherwise).
 """
@@ -29,6 +37,7 @@ from cacu.accounting.posting import raw
 ZERO = Decimal('0')
 CENT = Decimal('0.01')
 RETAINED = Decimal('0.01')
+EXEMPT_THRESHOLD = Decimal('0.10')  # non-taxable income below 10% of total income: no apportionment
 OFF_MESSAGE = 'Capital allowances are not available yet.'
 # The class each kind of asset takes unless the owner chooses another.
 DEFAULT_CLASS = {'buildings': 'building', 'vehicles': 'motor_vehicle', 'machinery': 'plant', 'furniture': 'furniture',
@@ -41,6 +50,8 @@ class AssetTax(BaseModel):
     qualifies: bool = True
     claimed_before: str = Field(default='0.00', pattern=r'^[0-9]{1,13}(\.[0-9]{1,2})?$')
     note: str | None = Field(default=None, max_length=500)
+    business_use: str = Field(default='100', pattern=r'^[0-9]{1,3}(\.[0-9]{1,2})?$')
+    earns_exempt: bool = False
 
 
 def enabled(session) -> bool:
@@ -63,6 +74,42 @@ def rates(session) -> dict:
 
 def _settings(session) -> dict:
     return {str(r.asset_id): r for r in raw(session, 'SELECT * FROM accounting.asset_tax WHERE business_id=%s', (str(session.business_id),)).all()}
+
+
+def business_share(asset_figures: dict, business_use: Decimal) -> dict:
+    """The year's figures with only the business share of the allowance and balancing figure claimed."""
+    share = business_use / 100
+    if share >= 1:
+        return {**asset_figures, 'private_use': ZERO}
+    full = asset_figures['allowance']
+    claimed = (full * share).quantize(CENT, ROUND_HALF_UP)
+    return {**asset_figures, 'allowance': claimed, 'private_use': full - claimed,
+            'balancing': (asset_figures['balancing'] * share).quantize(CENT, ROUND_HALF_UP)}
+
+
+def exempt_share(asset_figures: dict, share: Decimal) -> dict:
+    """The figures with the non-taxable share of income taken out of the allowance and balancing figure."""
+    if share <= 0:
+        return {**asset_figures, 'exempt_use': ZERO}
+    keep = 1 - min(share, Decimal('1'))
+    full = asset_figures['allowance']
+    claimed = (full * keep).quantize(CENT, ROUND_HALF_UP)
+    return {**asset_figures, 'allowance': claimed, 'exempt_use': full - claimed,
+            'balancing': (asset_figures['balancing'] * keep).quantize(CENT, ROUND_HALF_UP)}
+
+
+def income_split(session, year: int, end_month: int) -> dict:
+    """The year's non-taxable income (from the income tax estimate's adjustments) against its total income (revenue in
+    the books), and whether the share is large enough to apportion allowances."""
+    from cacu.accounting.income_tax import _sum
+    from cacu.accounting.tax_years import period
+    start, end = period(year, end_month)
+    total = -_sum(session, start, end, "a.account_type::text IN ('OPERATING_REVENUE', 'NON_OPERATING_REVENUE')")
+    exempt = Decimal(raw(session, "SELECT coalesce(sum(amount), 0) FROM accounting.tax_adjustment WHERE business_id=%s AND year=%s AND direction='deduct'",
+                         (str(session.business_id), year)).scalar())
+    share = min(exempt / total, Decimal('1')) if total > 0 else (Decimal('1') if exempt > 0 else ZERO)
+    applies = share >= EXEMPT_THRESHOLD
+    return {'non_taxable_income': exempt, 'total_income': total, 'share': share, 'applies': applies}
 
 
 def computation(asset, rate: Decimal, claimed_before: Decimal, year: int, end_month: int = 12) -> dict | None:
@@ -106,6 +153,7 @@ def figures(session, year: int) -> dict:
     if not 2026 <= year <= 2100:
         raise HTTPException(422, 'Capital allowances start with 2026, when the Nigeria Tax Act 2025 took effect.')
     table, settings = rates(session), _settings(session)
+    split = income_split(session, year, end_month)
     rows, totals = [], {'allowance': ZERO, 'balancing_charge': ZERO, 'balancing_allowance': ZERO}
     for asset in _assets(session):
         chosen = settings.get(str(asset.id))
@@ -115,10 +163,15 @@ def figures(session, year: int) -> dict:
         figures = computation(asset, rate, chosen.claimed_before if chosen else ZERO, year, end_month)
         if figures is None:
             continue
+        business_use = chosen.business_use if chosen else Decimal('100')
+        figures = business_share(figures, business_use)
+        earns_exempt = bool(chosen.earns_exempt) if chosen else False
+        figures = exempt_share(figures, split['share'] if earns_exempt and split['applies'] else ZERO)
         row = {'asset_id': str(asset.id), 'name': asset.name, 'category': asset.category, 'tax_class': tax_class,
                'class_label': table[tax_class].label, 'rate_percent': _money(rate * 100), 'qualifies': qualifies,
                'cost': _money(asset.cost), 'claimed_before': _money(chosen.claimed_before if chosen else ZERO),
-               'note': chosen.note if chosen else None, 'set': chosen is not None}
+               'note': chosen.note if chosen else None, 'set': chosen is not None, 'business_use_percent': _money(business_use),
+               'earns_exempt': earns_exempt}
         if qualifies:
             row.update({k: (_money(v) if v is not None else None) for k, v in figures.items()})
             totals['allowance'] += figures['allowance']
@@ -129,6 +182,9 @@ def figures(session, year: int) -> dict:
         rows.append(row)
     unreviewed = any(r.reviewed_at is None for r in table.values())
     return {'year': year, 'assets': rows, 'totals': {k: _money(v) for k, v in totals.items()},
+            'non_taxable': {'income': _money(split['non_taxable_income']), 'total_income': _money(split['total_income']),
+                            'share_percent': _money((split['share'] * 100).quantize(CENT, ROUND_HALF_UP)), 'applies': split['applies'],
+                            'threshold_percent': _money(EXEMPT_THRESHOLD * 100)},
             'classes': [{'tax_class': k, 'label': r.label, 'rate_percent': _money(r.rate * 100)} for k, r in table.items()],
             'reviewed': not unreviewed,
             'note': 'Prepared from your fixed asset register for your tax computation. The rates follow CACU\'s reading of the '
@@ -152,10 +208,15 @@ def save(session, actor, asset_id: UUID, data: AssetTax) -> dict:
         raise HTTPException(422, 'Only an asset bought before 2026, or owned before CACU, can have allowances already claimed.')
     if claimed > asset.cost * (1 - RETAINED):
         raise HTTPException(422, 'Allowances already claimed cannot be more than 99% of the cost.')
+    business_use = Decimal(data.business_use)
+    if not ZERO < business_use <= 100:
+        raise HTTPException(422, 'Business use must be more than 0% and at most 100%.')
     note = (data.note or '').strip() or None
-    raw(session, """INSERT INTO accounting.asset_tax(business_id, asset_id, tax_class, qualifies, claimed_before, note, updated_by)
-        VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (business_id, asset_id) DO UPDATE SET tax_class=excluded.tax_class,
-        qualifies=excluded.qualifies, claimed_before=excluded.claimed_before, note=excluded.note, updated_by=excluded.updated_by, updated_at=now()""",
-        (tenant, str(asset_id), data.tax_class, data.qualifies, claimed, note, str(actor)))
-    return {'asset_id': str(asset_id), 'tax_class': data.tax_class, 'qualifies': data.qualifies, 'claimed_before': _money(claimed), 'note': note}
+    raw(session, """INSERT INTO accounting.asset_tax(business_id, asset_id, tax_class, qualifies, claimed_before, note, business_use, earns_exempt, updated_by)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (business_id, asset_id) DO UPDATE SET tax_class=excluded.tax_class,
+        qualifies=excluded.qualifies, claimed_before=excluded.claimed_before, note=excluded.note, business_use=excluded.business_use,
+        earns_exempt=excluded.earns_exempt, updated_by=excluded.updated_by, updated_at=now()""",
+        (tenant, str(asset_id), data.tax_class, data.qualifies, claimed, note, business_use, data.earns_exempt, str(actor)))
+    return {'asset_id': str(asset_id), 'tax_class': data.tax_class, 'qualifies': data.qualifies, 'claimed_before': _money(claimed), 'note': note,
+            'business_use': _money(business_use), 'earns_exempt': data.earns_exempt}
 
