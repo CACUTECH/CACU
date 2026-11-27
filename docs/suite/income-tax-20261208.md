@@ -1,6 +1,6 @@
 # Company income tax estimate (R4, Nigeria Tax Act 2025)
 
-A yearly estimate of companies income tax (CIT) and the development levy, worked out from the books with every step shown, for the owner and their tax adviser. **Nothing posts to the ledger, and CACU files nothing.**
+A yearly estimate of companies income tax (CIT) and the development levy, worked out from the books with every step shown, for the owner and their tax adviser. The estimate posts nothing; the Owner can post a finished year's tax to the books (below). CACU files nothing.
 
 The owner decided, on 26 November 2026:
 
@@ -47,6 +47,20 @@ For example, with a March year end, tax year 2027 runs from 1 April 2026 to 31 M
 
 The page says which condition a business fails.
 
+## In the books (owner decision of 27 November 2026)
+
+Once the tax year has ended and the estimate is final, the **Owner** posts it, dated the year's last day:
+
+| Debit | Credit |
+| --- | --- |
+| Income tax expense (7900): income tax + development levy | Income tax payable (2350): what is left to pay |
+| | WHT credits (1320): withholding tax used against it |
+
+- **Paying it:** payments to the tax office are recorded against it by an Owner or Admin, from the till or a bank, never more than is owed. Income tax payable has the `income_tax` purpose, so payments appear as "Income taxes paid" in the cash flow statement.
+- **Reversing:** the Owner can reverse a payment recorded in error, or the posting itself while nothing is paid on it, with a reason. Each reversal is its own journal dated that day, and the original is kept.
+- **Posted figures are fixed.** If the estimate changes after posting, reverse the posting and post again.
+- **Records:** `accounting.tax_accrual` and `accounting.tax_payment`, both behind the income tax switch.
+
 ## Screen: Accounting › Income Tax Estimate (`/accounting/income-tax`)
 
 - **The menu entry:** held back (`HELD_BACK` in `src/lib/preview.ts`), so only the preview business sees it until release.
@@ -64,6 +78,8 @@ All need `ledger.view`; changes need an Owner or Admin.
 - `POST /income-tax/{year}/adjustments`
 - `DELETE /income-tax/{year}/adjustments/{id}`
 - `PUT /income-tax/settings` (year-end month)
+- `POST /income-tax/{year}/post` and `POST /income-tax/{year}/reverse` (Owner)
+- `POST /income-tax/{year}/payments` (Owner or Admin), and `POST /income-tax/{year}/payments/{id}/reverse` (Owner)
 
 ## To confirm before release (tax professional)
 

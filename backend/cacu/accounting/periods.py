@@ -147,7 +147,8 @@ def overview(session):
     history = raw(session, """SELECT event, details, created_at FROM accounting.audit_event
         WHERE business_id=%s AND event IN ('period_closed','period_reopened') ORDER BY created_at DESC LIMIT 50""",
                   (str(session.business_id),)).all()
-    return {'months': list(reversed(months)), 'next_to_close': next_to_close, 'latest_closed': latest_closed,
+    from cacu.accounting.years import overview as years
+    return {'months': list(reversed(months)), 'next_to_close': next_to_close, 'latest_closed': latest_closed, 'years': years(session),
             'checklist': checklist(session, date.fromisoformat(next_to_close)) if next_to_close else [],
             'history': [{'event': h.event, 'month': h.details.get('month'), 'reason': h.details.get('reason'),
                          'at': h.created_at.isoformat()} for h in history]}
@@ -207,6 +208,9 @@ def reopen_month(session, actor, value: str, data: ReopenMonth):
     rows = _rows(session)
     if (row := rows.get(month)) is None or row.status != 'closed':
         raise HTTPException(409, 'This month is not closed.')
+    from cacu.accounting.years import in_closed_year
+    if in_closed_year(session, month):
+        raise HTTPException(409, 'This month is in a closed year. Reopen the year first.')
     if any(m > month and r.status == 'closed' for m, r in rows.items()):
         raise HTTPException(409, 'Reopen the later months first. Only the latest closed month can be reopened.')
     raw(session, """UPDATE accounting.period_close SET status='reopened',reopened_by=%s,reopened_at=now(),reopen_reason=%s

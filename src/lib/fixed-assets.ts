@@ -43,7 +43,7 @@ export type AssetInput = {
   supplier_id?: string | null; bill_number?: string | null; due_date?: string | null;
   accumulated_depreciation?: string; brought_in_on?: string | null;
 };
-export type DisposeInput = { disposed_on: string; proceeds: string; method?: 'Cash' | 'Transfer' | null; bank_account_id?: string | null };
+export type DisposeInput = { disposed_on: string; proceeds: string; vat?: string; method?: 'Cash' | 'Transfer' | null; bank_account_id?: string | null };
 
 export const naira = (value: string | number) => `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const monthLabel = (month: string) => new Date(`${month.slice(0, 7)}-01T00:00:00`).toLocaleDateString('en-NG', { month: 'long', year: 'numeric' });

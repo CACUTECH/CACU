@@ -2,10 +2,11 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MonthClosePage from '@/app/accounting/periods/page';
-import { closeMonthAction, periodsAction, reopenMonthAction } from '@/app/accounting/periods/actions';
+import { closeMonthAction, closeYearAction, periodsAction, reopenMonthAction, reopenYearAction } from '@/app/accounting/periods/actions';
 import { unanswered, type CloseStep, type PeriodOverview } from '@/lib/periods';
 
-jest.mock('@/app/accounting/periods/actions', () => ({ periodsAction: jest.fn(), closeMonthAction: jest.fn(), reopenMonthAction: jest.fn() }));
+jest.mock('@/app/accounting/periods/actions', () => ({ periodsAction: jest.fn(), closeMonthAction: jest.fn(), reopenMonthAction: jest.fn(),
+  closeYearAction: jest.fn(), reopenYearAction: jest.fn() }));
 
 const step = (key: string, label: string, blocking: boolean, passed: boolean, detail: string | null = null): CloseStep =>
   ({ key, label, blocking, passed, detail, needs_answer: !passed && !blocking });
@@ -60,4 +61,28 @@ test('a refusal from the books is shown as it is', async () => {
   (periodsAction as jest.Mock).mockResolvedValue({ success: false, error: 'Start your books before closing a month.' });
   render(<MonthClosePage />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Start your books before closing a month.');
+});
+
+const ready = { ...closed, years: [{ year: 2026, start: '2025-11-01', end: '2026-10-31', status: 'open' as const, ended: true, months_open: [], profit: null, closed_at: null }] };
+const shut = { ...closed, years: [{ ...ready.years[0], status: 'closed' as const, profit: '1250000.00', closed_at: '2026-11-27T10:00:00Z' }] };
+
+test('a finished year with every month closed can be closed, and the latest closed year reopened with a reason', async () => {
+  (periodsAction as jest.Mock).mockResolvedValueOnce({ success: true, data: ready }).mockResolvedValueOnce({ success: true, data: shut }).mockResolvedValue({ success: true, data: ready });
+  (closeYearAction as jest.Mock).mockResolvedValue({ success: true });
+  (reopenYearAction as jest.Mock).mockResolvedValue({ success: true });
+  render(<MonthClosePage />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Close year' }));
+  expect(await screen.findByText(/Closed · profit ₦1,250,000.00/)).toBeInTheDocument();
+  expect(closeYearAction).toHaveBeenCalledWith(2026);
+  await userEvent.click(screen.getByRole('button', { name: 'Reopen year' }));
+  await userEvent.type(screen.getByLabelText('Why does the year need reopening?'), 'Auditor adjustment');
+  await userEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+  await waitFor(() => expect(reopenYearAction).toHaveBeenCalledWith(2026, 'Auditor adjustment'));
+});
+
+test('a year with open months says so and cannot be closed', async () => {
+  (periodsAction as jest.Mock).mockResolvedValue({ success: true, data: { ...ready, years: [{ ...ready.years[0], months_open: ['2026-10-01'] }] } });
+  render(<MonthClosePage />);
+  expect(await screen.findByText('1 month still open')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Close year' })).not.toBeInTheDocument();
 });

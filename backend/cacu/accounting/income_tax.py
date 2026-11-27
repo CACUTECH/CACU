@@ -21,11 +21,18 @@ Owner decisions of 26 November 2026: a small company has turnover up to N50 mill
 transition guidelines say N100 million) and fixed assets up to N250 million, and is not a professional services firm;
 it pays neither. The figures live in one reviewed row, accounting.income_tax_rule. The fixed assets test uses the
 carrying amount in the books at the year's end; whether cost is meant is for the reviewer.
+
+In the books (owner decision of 27 November 2026): once the year has ended and its estimate is final, the Owner posts
+it, dated the year's last day: Dr Income tax expense, Cr Income tax payable (what is left to pay) and Cr WHT credits
+(withholding tax used). Payments to the tax office are recorded against it from the till or a bank, never more than is
+owed. The Owner can reverse the posting while nothing is paid on it, and any payment, with a reason, by a journal dated
+that day; the original is kept. Posted figures are fixed: a later change to the estimate needs the posting reversed and
+posted again.
 """
 from datetime import date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid5
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from cacu.accounting.posting import raw
@@ -47,6 +54,27 @@ class TaxYear(BaseModel):
 class TaxProfile(BaseModel):
     model_config = ConfigDict(extra='forbid')
     year_end_month: int = Field(ge=1, le=12)
+
+
+class PostTax(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_key: UUID
+
+
+class PayTax(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_key: UUID
+    amount: str = Field(pattern=AMOUNT)
+    entry_date: date
+    method: Literal['Cash', 'Transfer']
+    bank_account_id: UUID | None = None
+    reference: str | None = Field(default=None, max_length=120)
+
+
+class Reverse(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_key: UUID
+    reason: str = Field(min_length=5, max_length=500)
 
 
 class Adjustment(BaseModel):
@@ -103,7 +131,9 @@ def estimate(session, year: int) -> dict:
     told = raw(session, 'SELECT * FROM accounting.tax_year WHERE business_id=%s AND year=%s', (tenant, year)).first()
     adjustments = raw(session, 'SELECT * FROM accounting.tax_adjustment WHERE business_id=%s AND year=%s ORDER BY created_at', (tenant, year)).all()
 
-    profit = -_sum(session, start, end, 'a.account_type::text = ANY(%s)', (list(PROFIT_TYPES),))
+    # Profit before tax: the income tax expense posted for the year (7900) is left out, or posting the tax would
+    # shrink the profit it was worked out from.
+    profit = -_sum(session, start, end, "a.account_type::text = ANY(%s) AND m.purpose IS DISTINCT FROM 'income_tax_expense'", (list(PROFIT_TYPES),))
     turnover = -_sum(session, start, end, "a.account_type::text = 'OPERATING_REVENUE'")
     depreciation = _sum(session, start, end, "m.purpose = 'depreciation'")
     disposal_gain = -_sum(session, start, end, "m.purpose = 'disposal_gains'")
@@ -162,6 +192,7 @@ def estimate(session, year: int) -> dict:
             'losses_carried_forward': _money(losses_carried), 'allowances_carried_forward': _money(allowances_carried),
             'told': {'losses_brought_forward': _money(brought), 'professional_services': professional},
             'adjustments': [{'id': str(a.id), 'direction': a.direction, 'label': a.label, 'amount': _money(a.amount)} for a in adjustments],
+            'books': books(session, year),
             'reviewed': rule.reviewed_at is not None,
             'note': 'An estimate from your books for you and your tax adviser to check. It follows CACU\'s reading of the Nigeria Tax Act 2025, '
                     'to be confirmed by a tax professional. CACU does not file tax returns.'}
@@ -204,4 +235,157 @@ def remove_adjustment(session, actor, year: int, adjustment_id: UUID) -> dict:
     _require(session)
     _manager(session, actor)
     raw(session, 'DELETE FROM accounting.tax_adjustment WHERE business_id=%s AND year=%s AND id=%s', (str(session.business_id), year, str(adjustment_id)))
+    return estimate(session, year)
+
+
+# Income tax in the books.
+
+ACCOUNTS = {'income_tax': 'Income tax payable', 'income_tax_expense': 'Income tax expense'}
+
+
+def _owner(session, actor, what: str):
+    from cacu.accounting.workflows import role
+    if role(session, actor) != 'owner':
+        raise HTTPException(403, f'Only the business owner can {what}.')
+
+
+def _live(session, year: int):
+    return raw(session, 'SELECT * FROM accounting.tax_accrual WHERE business_id=%s AND year=%s AND reversed_at IS NULL', (str(session.business_id), year)).first()
+
+
+def books(session, year: int) -> dict:
+    """The year's tax as posted, what has been paid on it and what is still owed."""
+    tenant = str(session.business_id)
+    accrual = _live(session, year)
+    reversed_ = raw(session, 'SELECT posted_at, reversed_at, reversal_reason, payable FROM accounting.tax_accrual WHERE business_id=%s AND year=%s AND reversed_at IS NOT NULL ORDER BY reversed_at',
+                    (tenant, year)).all()
+    out = {'posted': None, 'payments': [], 'outstanding': None,
+           'reversed': [{'payable': _money(r.payable), 'reversed_at': r.reversed_at.isoformat(), 'reason': r.reversal_reason} for r in reversed_]}
+    if accrual is None:
+        return out
+    names = dict(raw(session, 'SELECT id::text, name FROM public.accounts WHERE business_id=%s', (tenant,)).all())
+    paid = raw(session, 'SELECT * FROM accounting.tax_payment WHERE business_id=%s AND accrual_id=%s ORDER BY entry_date, created_at', (tenant, str(accrual.id))).all()
+    owed = accrual.payable - sum((p.amount for p in paid if p.reversed_at is None), ZERO)
+    out['posted'] = {'id': str(accrual.id), 'entry_date': accrual.entry_date.isoformat(), 'companies_income_tax': _money(accrual.companies_income_tax),
+                     'development_levy': _money(accrual.development_levy), 'wht_used': _money(accrual.wht_used), 'payable': _money(accrual.payable),
+                     'transaction_id': accrual.transaction_id, 'posted_at': accrual.posted_at.isoformat()}
+    out['payments'] = [{'id': str(p.id), 'amount': _money(p.amount), 'entry_date': p.entry_date.isoformat(), 'paid_from': names.get(str(p.paid_from), 'Account'),
+                        'reference': p.reference, 'reversed': p.reversed_at is not None, 'reversal_reason': p.reversal_reason} for p in paid]
+    out['outstanding'] = _money(owed)
+    return out
+
+
+def post_tax(session, actor, year: int, request: PostTax) -> dict:
+    """Posts the year's estimated tax, dated the year's last day. Posting a year again returns what was posted."""
+    from cacu.accounting.assets import _ensure
+    from cacu.accounting.periods import refuse_closed_month
+    from cacu.accounting.posting import PostingCommand, post_command
+    from cacu.accounting.tax_years import period, year_end_month
+    from cacu.accounting.workflows import business_today
+    _require(session)
+    _owner(session, actor, 'post income tax to the books')
+    _year(year)
+    if _live(session, year):
+        return estimate(session, year)
+    _, end = period(year, year_end_month(session))
+    if end >= business_today(session):
+        raise HTTPException(409, 'Post the year\'s tax once the year has ended.')
+    refuse_closed_month(session, end)
+    view = estimate(session, year)
+    cit, levy, wht = Decimal(view['companies_income_tax']), Decimal(view['development_levy']), Decimal(view['wht']['used'])
+    if cit + levy <= 0:
+        raise HTTPException(409, 'There is no income tax or levy to post for this year.')
+    accounts = _ensure(session, actor, {'income_tax', 'income_tax_expense'}, names=ACCOUNTS)
+    lines = []
+    if cit + levy - wht > 0:
+        lines.append({'account_id': accounts['income_tax'], 'amount': _money(cit + levy - wht), 'credited': True, 'description': f'Income tax and development levy for {year}'})
+    if wht > 0:
+        lines.append({'account_id': _wht_account(session), 'amount': _money(wht), 'credited': True, 'description': f'Withholding tax credits used for {year}'})
+    key = request.request_key
+    result = post_command(session, actor, PostingCommand(request_key=uuid5(key, 'posting'), kind='income_tax_accrual', source_id=key,
+        main_account_id=accounts['income_tax_expense'], entry_date=end, narration=f'Income tax for the year to {end:%d %B %Y}', credited=False, lines=lines), internal=True)
+    import json
+    raw(session, """INSERT INTO accounting.tax_accrual(business_id, id, year, entry_date, companies_income_tax, development_levy, wht_used, payable, estimate, transaction_id, posted_by)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s)""",
+        (str(session.business_id), str(key), year, end, cit, levy, wht, cit + levy - wht, json.dumps({k: v for k, v in view.items() if k != 'books'}),
+         int(result['transaction_id']), str(actor)))
+    return estimate(session, year)
+
+
+def _wht_account(session):
+    found = raw(session, "SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='wht_receivable'", (str(session.business_id),)).scalar()
+    if found is None:
+        raise HTTPException(409, 'Withholding tax credits need the WHT credits account: turn withholding tax on in Settings › Taxes.')
+    return found
+
+
+def pay_tax(session, actor, year: int, request: PayTax) -> dict:
+    """Records a payment to the tax office against the year's posted tax, never more than is owed."""
+    from cacu.accounting.posting import PostingCommand, post_command
+    from cacu.accounting.workflows import business_today, collection_account
+    _require(session)
+    _manager(session, actor)
+    tenant = str(session.business_id)
+    if raw(session, 'SELECT 1 FROM accounting.tax_payment WHERE business_id=%s AND id=%s', (tenant, str(request.request_key))).first():
+        return estimate(session, year)  # a retried request
+    accrual = _live(session, year)
+    if accrual is None:
+        raise HTTPException(409, 'Post the year\'s tax to the books before recording payments.')
+    amount = Decimal(request.amount)
+    if amount <= 0:
+        raise HTTPException(422, 'Enter an amount above zero.')
+    if request.entry_date > business_today(session):
+        raise HTTPException(422, 'A payment cannot be dated in the future.')
+    left = Decimal(books(session, year)['outstanding'])
+    if amount > left:
+        raise HTTPException(409, f'Only ₦{left:,.2f} is still owed for this year.')
+    paid_from = collection_account(session, request.method, request.bank_account_id)
+    reference = (request.reference or '').strip() or None
+    result = post_command(session, actor, PostingCommand(request_key=uuid5(request.request_key, 'posting'), kind='income_tax_payment', source_id=request.request_key,
+        main_account_id=paid_from, entry_date=request.entry_date, credited=True, narration=f'Income tax paid for {year}' + (f' ({reference})' if reference else ''),
+        lines=[{'account_id': raw(session, "SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='income_tax'", (tenant,)).scalar(),
+                'amount': _money(amount), 'credited': False}]), internal=True)
+    raw(session, """INSERT INTO accounting.tax_payment(business_id, id, accrual_id, amount, entry_date, paid_from, reference, transaction_id, created_by)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (tenant, str(request.request_key), str(accrual.id), amount, request.entry_date, str(paid_from), reference,
+                                                 int(result['transaction_id']), str(actor)))
+    return estimate(session, year)
+
+
+def _reverse(session, actor, table: str, row, request: Reverse, narration: str):
+    from cacu.accounting.periods import refuse_closed_month
+    from cacu.accounting.posting import mirror
+    from cacu.accounting.workflows import business_today
+    reason = ' '.join(request.reason.split())
+    if len(reason) < 5:
+        raise HTTPException(422, 'Say why it is being reversed.')
+    today = business_today(session)
+    refuse_closed_month(session, today)
+    result = mirror(session, actor, row.transaction_id, 'tax_reversal', uuid5(request.request_key, 'posting'), uuid5(UUID(str(row.id)), 'reversal'), today, narration)
+    raw(session, f'UPDATE accounting.{table} SET reversed_at=now(), reversal_reason=%s, reversal_transaction_id=%s, reversed_by=%s WHERE business_id=%s AND id=%s',
+        (reason, int(result['transaction_id']), str(actor), str(session.business_id), str(row.id)))
+
+
+def reverse_tax(session, actor, year: int, request: Reverse) -> dict:
+    """Reverses the year's posted tax while nothing is paid on it, so a changed estimate can be posted again."""
+    _require(session)
+    _owner(session, actor, 'reverse income tax in the books')
+    accrual = _live(session, year)
+    if accrual is None:
+        return estimate(session, year)  # nothing posted, or reversed already
+    if raw(session, 'SELECT 1 FROM accounting.tax_payment WHERE business_id=%s AND accrual_id=%s AND reversed_at IS NULL', (str(session.business_id), str(accrual.id))).first():
+        raise HTTPException(409, 'Payments have been recorded against this year\'s tax. Reverse them first.')
+    _reverse(session, actor, 'tax_accrual', accrual, request, f'Reversed: income tax for {year}')
+    return estimate(session, year)
+
+
+def reverse_tax_payment(session, actor, year: int, payment_id: UUID, request: Reverse) -> dict:
+    """Reverses a tax payment recorded in error: what it paid is owed again."""
+    _require(session)
+    _owner(session, actor, 'reverse a tax payment')
+    payment = raw(session, """SELECT p.* FROM accounting.tax_payment p JOIN accounting.tax_accrual a ON a.business_id=p.business_id AND a.id=p.accrual_id
+        WHERE p.business_id=%s AND p.id=%s AND a.year=%s""", (str(session.business_id), str(payment_id), year)).first()
+    if payment is None:
+        raise HTTPException(404, 'Tax payment not found')
+    if payment.reversed_at is None:
+        _reverse(session, actor, 'tax_payment', payment, request, f'Reversed (recorded in error): income tax paid for {year}')
     return estimate(session, year)

@@ -85,7 +85,7 @@ export async function postDepreciationAction(value: string, requestKey: string):
 }
 
 const disposal = z.object({
-  disposed_on: day, proceeds: amount, method: z.enum(['Cash', 'Transfer']).nullable().optional(), bank_account_id: id.nullable().optional(),
+  disposed_on: day, proceeds: amount, vat: amount.optional(), method: z.enum(['Cash', 'Transfer']).nullable().optional(), bank_account_id: id.nullable().optional(),
 }).refine(v => Number(v.proceeds) === 0 || (v.method && (v.method === 'Cash' || v.bank_account_id)), 'Choose the till or the bank the money went into.');
 
 export async function disposeAssetAction(assetId: string, requestKey: string, input: DisposeInput): Promise<Result<FixedAsset>> {
@@ -96,7 +96,7 @@ export async function disposeAssetAction(assetId: string, requestKey: string, in
   const sold = Number(rest.proceeds) > 0;
   try {
     const data = await accountingRequest<FixedAsset>(`fixed-assets/${encodeURIComponent(target.data)}/dispose`, { method: 'POST',
-      body: { request_key: key.data, ...rest, ...(sold ? { method, ...(method === 'Transfer' ? { bank_account_id } : {}) } : {}) } });
+      body: { request_key: key.data, ...rest, vat: sold ? rest.vat || '0.00' : '0.00', ...(sold ? { method, ...(method === 'Transfer' ? { bank_account_id } : {}) } : {}) } });
     revalidatePath('/accounting/fixed-assets');
     return { success: true, data };
   } catch (error) { return failed(error, 'The disposal was not recorded. Try again.'); }

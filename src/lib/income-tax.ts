@@ -9,5 +9,13 @@ export type IncomeTaxEstimate = {
   small_turnover: string; small_fixed_assets: string; losses_carried_forward: string; allowances_carried_forward: string;
   told: { losses_brought_forward: string; professional_services: boolean };
   adjustments: { id: string; direction: 'add' | 'deduct'; label: string; amount: string }[];
+  books: TaxBooks;
   reviewed: boolean; note: string;
+};
+
+export type TaxBooks = {
+  posted: { id: string; entry_date: string; companies_income_tax: string; development_levy: string; wht_used: string; payable: string; transaction_id: number; posted_at: string } | null;
+  payments: { id: string; amount: string; entry_date: string; paid_from: string; reference: string | null; reversed: boolean; reversal_reason: string | null }[];
+  outstanding: string | null;
+  reversed: { payable: string; reversed_at: string; reason: string }[];
 };

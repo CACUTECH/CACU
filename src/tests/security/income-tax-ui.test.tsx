@@ -1,11 +1,12 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import IncomeTaxPage from '@/app/accounting/income-tax/page';
-import { addTaxAdjustmentAction, incomeTaxAction, saveTaxYearAction, saveYearEndAction } from '@/app/accounting/income-tax/actions';
+import { addTaxAdjustmentAction, incomeTaxAction, payTaxAction, postTaxAction, reverseTaxAction, saveTaxYearAction, saveYearEndAction } from '@/app/accounting/income-tax/actions';
 import type { IncomeTaxEstimate } from '@/lib/income-tax';
 
 let mockRole = 'owner';
-jest.mock('@/app/accounting/income-tax/actions', () => ({ incomeTaxAction: jest.fn(), saveTaxYearAction: jest.fn(), addTaxAdjustmentAction: jest.fn(), removeTaxAdjustmentAction: jest.fn(), saveYearEndAction: jest.fn() }));
+jest.mock('@/app/accounting/income-tax/actions', () => ({ incomeTaxAction: jest.fn(), saveTaxYearAction: jest.fn(), addTaxAdjustmentAction: jest.fn(), removeTaxAdjustmentAction: jest.fn(), saveYearEndAction: jest.fn(),
+  postTaxAction: jest.fn(), payTaxAction: jest.fn(), reverseTaxAction: jest.fn(), bankAccountsAction: jest.fn().mockResolvedValue({ success: true, data: [] }) }));
 jest.mock('@/components/business-provider', () => ({ useBusiness: () => ({ business: { id: 'b1', userRole: mockRole } }) }));
 Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () => '3a571056-45cf-4239-96bb-331e35c39b65' });
 
@@ -18,7 +19,8 @@ const base: IncomeTaxEstimate = { year: new Date().getFullYear(), small_company:
   wht: { credited: '0.00', used: '0.00', carried_forward: '0.00', awaiting_certificate: '0.00', awaiting_count: 0 }, income_tax_to_pay: '2988000.00',
   companies_income_tax: '2988000.00', development_levy: '408000.00', total_due: '3396000.00', cit_rate_percent: '30.00', levy_rate_percent: '4.00',
   small_turnover: '50000000.00', small_fixed_assets: '250000000.00', losses_carried_forward: '0.00', allowances_carried_forward: '0.00',
-  told: { losses_brought_forward: '0.00', professional_services: false }, adjustments: [], reviewed: false, note: 'CACU does not file tax returns.' };
+  told: { losses_brought_forward: '0.00', professional_services: false }, adjustments: [],
+  books: { posted: null, payments: [], outstanding: null, reversed: [] }, reviewed: false, note: 'CACU does not file tax returns.' };
 
 beforeEach(() => { jest.clearAllMocks(); mockRole = 'owner'; (incomeTaxAction as jest.Mock).mockResolvedValue({ success: true, data: base }); });
 
@@ -73,4 +75,40 @@ test('an owner sets a March year end and the estimate reloads', async () => {
   fireEvent.change(await screen.findByLabelText('Your accounts end in'), { target: { value: '3' } });
   await waitFor(() => expect(incomeTaxAction).toHaveBeenCalledTimes(2));
   expect(saveYearEndAction).toHaveBeenCalledWith(3);
+});
+
+const ended = { ...base, period: { start: '2025-11-01', end: '2026-10-31', year_end_month: 10 } };
+const posted = { ...ended, books: { posted: { id: 'p1', entry_date: '2026-10-31', companies_income_tax: '2988000.00', development_levy: '408000.00', wht_used: '0.00',
+  payable: '3396000.00', transaction_id: 9, posted_at: '2026-11-27T10:00:00Z' }, payments: [], outstanding: '3396000.00', reversed: [] } };
+
+test('the owner posts a finished year\'s tax to the books; nothing is offered before the year ends', async () => {
+  (incomeTaxAction as jest.Mock).mockResolvedValue({ success: true, data: ended });
+  (postTaxAction as jest.Mock).mockResolvedValue({ success: true, data: posted });
+  render(<IncomeTaxPage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Post ₦3,396,000.00 to the books' }));
+  expect(await screen.findByText(/Still to pay:/)).toHaveTextContent('₦3,396,000.00');
+  expect(postTaxAction).toHaveBeenCalledWith(base.year, '3a571056-45cf-4239-96bb-331e35c39b65');
+});
+
+test('before the year ends the owner is told when it can be posted', async () => {
+  render(<IncomeTaxPage />);
+  expect(await screen.findByText(/Once the year ends on/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /to the books/ })).not.toBeInTheDocument();
+});
+
+test('payments are recorded against the posted tax, and the owner can reverse one with a reason', async () => {
+  const paid = { ...posted, books: { ...posted.books, outstanding: '2396000.00',
+    payments: [{ id: 't1', amount: '1000000.00', entry_date: '2026-11-27', paid_from: 'The till', reference: null, reversed: false, reversal_reason: null }] } };
+  (incomeTaxAction as jest.Mock).mockResolvedValue({ success: true, data: posted });
+  (payTaxAction as jest.Mock).mockResolvedValue({ success: true, data: paid });
+  (reverseTaxAction as jest.Mock).mockResolvedValue({ success: true, data: posted });
+  render(<IncomeTaxPage />);
+  fireEvent.change(await screen.findByLabelText('Amount paid (₦)'), { target: { value: '1000000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+  expect(await screen.findByText(/Still to pay:/)).toHaveTextContent('₦2,396,000.00');
+  expect(payTaxAction).toHaveBeenCalledWith(base.year, expect.any(String), expect.objectContaining({ amount: '1000000', method: 'Cash', bank_account_id: null }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reverse' }));
+  fireEvent.change(screen.getByLabelText('Why it is being reversed'), { target: { value: 'Paid twice' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Reverse payment' }));
+  await waitFor(() => expect(reverseTaxAction).toHaveBeenCalledWith(base.year, expect.any(String), 'Paid twice', 't1'));
 });

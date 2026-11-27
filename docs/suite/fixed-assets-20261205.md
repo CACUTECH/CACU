@@ -113,11 +113,22 @@ A business registered for VAT enters the cost before VAT and the VAT shown on th
 
 A business that is not registered includes the VAT in the cost and enters no VAT. CACU refuses VAT from it, and VAT on an asset owned before CACU.
 
+## VAT on selling an asset
+
+A business registered for VAT charges output VAT when it sells a fixed asset.
+
+- **What it enters:** the price before VAT, and the VAT charged. The VAT is checked against the standard rate.
+- **Where it goes:** the VAT goes to Output VAT and into the month's VAT return.
+- **The gain or loss** is worked out on the price before VAT.
+- **An exempt sale,** such as land, is entered with no VAT and recorded as an exempt supply.
+- **Not registered:** a business that isn't registered charges no VAT, and CACU refuses VAT from it.
+- **Removing a sold asset entered in error** takes that VAT back as well.
+
 ## In the cash flow statement (IAS 7)
 
 - **Buying:** the purchase is an investing payment when paid. When bought on credit, it becomes an investing payment as the bill is paid.
 - **Depreciation:** it moves no cash, so it nets to nothing.
-- **Selling:** every non-cash leg of a disposal goes to investing as "Fixed assets sold / receipts". That line equals the proceeds. The gain or loss is taken back out of operating profit as "Gain or loss on disposal of fixed assets".
+- **Selling:** every non-cash leg of a disposal, except any VAT on the sale, goes to investing as "Fixed assets sold / receipts". That line equals the proceeds before VAT; the VAT collected stays in operating, with the rest of VAT. The gain or loss is taken back out of operating profit as "Gain or loss on disposal of fixed assets".
 - **Assets owned before CACU:** they are left out, like the opening position.
 
 ## Fixed once made

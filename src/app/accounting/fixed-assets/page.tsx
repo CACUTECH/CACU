@@ -100,14 +100,14 @@ function AddAsset({ view, onAdded }: { view: View; onAdded: (a: FixedAsset) => v
 }
 
 function DisposeForm({ asset, view, onDone, onCancel }: { asset: FixedAsset; view: View; onDone: (a: FixedAsset) => void; onCancel: () => void }) {
-  const [on, setOn] = React.useState(today()), [proceeds, setProceeds] = React.useState('0');
+  const [on, setOn] = React.useState(today()), [proceeds, setProceeds] = React.useState('0'), [vat, setVat] = React.useState('0');
   const [method, setMethod] = React.useState<'Cash' | 'Transfer'>('Cash'), [bank, setBank] = React.useState<string | null>(null);
   const [key] = React.useState(() => crypto.randomUUID());
   const [busy, setBusy] = React.useState(false), [error, setError] = React.useState('');
   const result = Number(proceeds || 0) - Number(asset.carrying_amount);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError('');
-    const r = await disposeAssetAction(asset.id, key, { disposed_on: on, proceeds: proceeds || '0', method, bank_account_id: bank });
+    const r = await disposeAssetAction(asset.id, key, { disposed_on: on, proceeds: proceeds || '0', vat: vat || '0', method, bank_account_id: bank });
     setBusy(false);
     if (r.success) onDone(r.data); else setError(r.error);
   };
@@ -115,7 +115,9 @@ function DisposeForm({ asset, view, onDone, onCancel }: { asset: FixedAsset; vie
     <p className="text-sm sm:col-span-3">Selling or scrapping <span className="font-medium">{asset.name}</span>, worth {naira(asset.carrying_amount)} in the books.
       {Number.isFinite(result) && result !== 0 && <> That is a {result > 0 ? 'gain' : 'loss'} of {naira(Math.abs(result))}.</>}</p>
     <Field id="sold-on" label="Date"><Input id="sold-on" type="date" max={today()} value={on} onChange={e => setOn(e.target.value)} /></Field>
-    <Field id="sold-for" label="Sold for (₦)" hint="0 if it was scrapped or given away."><Input id="sold-for" inputMode="decimal" value={proceeds} onChange={e => setProceeds(e.target.value)} /></Field>
+    <Field id="sold-for" label="Sold for, before VAT (₦)" hint="0 if it was scrapped or given away."><Input id="sold-for" inputMode="decimal" value={proceeds} onChange={e => setProceeds(e.target.value)} /></Field>
+    {Number(proceeds) > 0 && <Field id="sold-vat" label="VAT charged (₦)" hint="Only if your business is registered for VAT: 7.5% of the price, or 0 for an exempt sale such as land.">
+      <Input id="sold-vat" inputMode="decimal" value={vat} onChange={e => setVat(e.target.value)} /></Field>}
     {Number(proceeds) > 0 && <PayFrom prefix="sold" method={method} bank={bank} banks={view.pay_from.banks} onChange={(m, b) => { setMethod(m); setBank(b); }} />}
     <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
       <Button type="submit" size="sm" disabled={busy}>{busy ? 'Recording…' : 'Record disposal'}</Button>

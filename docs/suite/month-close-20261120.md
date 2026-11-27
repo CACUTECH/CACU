@@ -55,3 +55,19 @@
   - Owner-only reopening of the latest month, with a reason.
   - The ledger refuses a closed month, and the API's plain message.
 - `src/tests/security/month-close-ui.test.tsx`: answering warnings, closing and reopening, a blocked close, and a refusal from the books.
+
+## Year-end close (R4, owner decision of 27 November 2026)
+
+**Closing a year.** Once every month of a financial year is closed, the Owner can close the year (**Years** on the Month Close page). Then:
+
+- none of its months can be reopened until the year is;
+- the statement of financial position shows the profit of closed years as **Retained earnings from closed years**, and only what came after as **Profit for the year**.
+
+**Rules:**
+
+- **When:** a year closes only once it has ended, and years close in order.
+- **Which year end:** years end on the business's year-end month (set on the Income Tax Estimate page; 31 December unless set).
+- **Reopening:** the Owner can reopen only the latest closed year, with a reason. The closing is kept, marked reopened.
+- **The record:** `accounting.year_close`. API: `POST /periods/years/{year}/close` and `POST /periods/years/{year}/reopen`.
+
+**Why there is no closing journal.** The reports reconcile their profit with the accounting library's own income statement. A closing entry would wipe the year's income and expenses there and break that check, notably in the cash flow statement. So closing a year locks it and changes how the balance sheet presents profit, and posts nothing.
