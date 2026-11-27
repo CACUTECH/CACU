@@ -131,7 +131,9 @@ def estimate(session, year: int) -> dict:
     told = raw(session, 'SELECT * FROM accounting.tax_year WHERE business_id=%s AND year=%s', (tenant, year)).first()
     adjustments = raw(session, 'SELECT * FROM accounting.tax_adjustment WHERE business_id=%s AND year=%s ORDER BY created_at', (tenant, year)).all()
 
-    profit = -_sum(session, start, end, 'a.account_type::text = ANY(%s)', (list(PROFIT_TYPES),))
+    # Profit before tax: the income tax expense posted for the year (7900) is left out, or posting the tax would
+    # shrink the profit it was worked out from.
+    profit = -_sum(session, start, end, "a.account_type::text = ANY(%s) AND m.purpose IS DISTINCT FROM 'income_tax_expense'", (list(PROFIT_TYPES),))
     turnover = -_sum(session, start, end, "a.account_type::text = 'OPERATING_REVENUE'")
     depreciation = _sum(session, start, end, "m.purpose = 'depreciation'")
     disposal_gain = -_sum(session, start, end, "m.purpose = 'disposal_gains'")
