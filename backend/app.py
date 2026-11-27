@@ -382,6 +382,21 @@ def close_accounting_month(business_id:UUID,month:str,data:CloseMonth,user_id:UU
         if not allowed(session,'ledger.approve'):raise HTTPException(403,'Closing a month needs permission to post and approve ledger entries.')
         return close_month(session,user_id,month,data)
 
+# Year-end close (R4): the Owner closes a finished year once its months are closed; nothing posts.
+from cacu.accounting.years import ReopenYear
+
+@app.post('/api/v1/businesses/{business_id}/periods/years/{year}/close')
+def close_accounting_year(business_id:UUID,year:int,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.years import close_year
+    with library_transaction(user_id,business_id,write=True,permission='ledger.approve') as session:
+        return close_year(session,user_id,year)
+
+@app.post('/api/v1/businesses/{business_id}/periods/years/{year}/reopen')
+def reopen_accounting_year(business_id:UUID,year:int,data:ReopenYear,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.years import reopen_year
+    with library_transaction(user_id,business_id,write=True,permission='ledger.approve') as session:
+        return reopen_year(session,user_id,year,data)
+
 @app.post('/api/v1/businesses/{business_id}/periods/{month}/reopen')
 def reopen_accounting_month(business_id:UUID,month:str,data:ReopenMonth,user_id:UUID=Depends(current_user)):
     with library_transaction(user_id,business_id,write=True,permission='ledger.approve') as session:

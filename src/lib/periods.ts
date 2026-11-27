@@ -2,7 +2,8 @@
 export type CloseStep = { key: string; label: string; blocking: boolean; passed: boolean; detail: string | null; needs_answer: boolean };
 export type PeriodMonth = { month: string; status: 'open' | 'closed' | 'reopened'; closed_at: string | null };
 export type PeriodHistory = { event: 'period_closed' | 'period_reopened'; month: string; reason: string | null; at: string };
-export type PeriodOverview = { months: PeriodMonth[]; next_to_close: string | null; latest_closed: string | null; checklist: CloseStep[]; history: PeriodHistory[] };
+export type PeriodYear = { year: number; start: string; end: string; status: 'open' | 'closed'; ended: boolean; months_open: string[]; profit: string | null; closed_at: string | null };
+export type PeriodOverview = { months: PeriodMonth[]; next_to_close: string | null; latest_closed: string | null; checklist: CloseStep[]; history: PeriodHistory[]; years?: PeriodYear[] };
 export type Answer = { done: boolean; note: string };
 
 export const monthName = (month: string) => new Date(`${month}T12:00:00`).toLocaleDateString('en-NG', { month: 'long', year: 'numeric' });

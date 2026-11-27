@@ -360,9 +360,22 @@ def statements(session,start:date,end:date,compare=None):
     net=[gross[i]-sums['operating_expenses'][i]+sums['other_income'][i]-sums['other_expenses'][i] for i in range(len(periods))]
     position={};totals={}
     for key,title,kinds,sign in POSITION_SECTIONS:position[key],totals[key]=section(key,title,kinds,sign,balances)
-    # Books are not closed at year end yet, so all profit to date is shown as its own line in equity.
+    # Profit has no closing journal (year-end close posts nothing, so every report still reconciles with the library):
+    # the profit of closed years is shown as retained earnings, and only what came after as profit for the year.
     profit=[-sum((v[k] for k,t in types.items() if t in PROFIT_TYPES),ZERO) for v in balances]
-    position['equity']['lines'].append({'account_id':None,'code':None,'name':'Profit to date not yet closed to retained earnings','amounts':[money(p) for p in profit]})
+    from cacu.accounting.years import closed_through
+    cut=[closed_through(session,e) for _,e in periods]
+    retained=[ZERO]*len(periods)
+    if any(cut):
+        for row in rows:
+            if row['account_type'] in PROFIT_TYPES:
+                day=row['transaction_date'].date()
+                for i,c in enumerate(cut):
+                    if c and day<=c:retained[i]-=row['amount']*(1 if row['entry_type']=='DEBIT' else -1)
+        position['equity']['lines'].append({'account_id':None,'code':None,'name':'Retained earnings from closed years','amounts':[money(r) for r in retained]})
+        position['equity']['lines'].append({'account_id':None,'code':None,'name':'Profit for the year','amounts':[money(profit[i]-retained[i]) for i in range(len(periods))]})
+    else:
+        position['equity']['lines'].append({'account_id':None,'code':None,'name':'Profit to date not yet closed to retained earnings','amounts':[money(p) for p in profit]})
     equity=[totals['equity'][i]+profit[i] for i in range(len(periods))]
     position['equity']['total']=[money(e) for e in equity]
     # Statement of changes in equity (Doc 09 statement set), for the period itself: each equity account's opening

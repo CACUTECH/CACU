@@ -21,3 +21,13 @@ export async function reopenMonthAction(month: string, reason: string): Promise<
     return { success: true, data: await accountingRequest<PeriodOverview>(`periods/${monthKey(month)}/reopen`, { method: 'POST', body: { reason } }) };
   } catch (error) { return failed(error); }
 }
+
+export async function closeYearAction(year: number): Promise<{ success: true } | { success: false; error: string }> {
+  try { await accountingRequest(`periods/years/${year}/close`, { method: 'POST', body: {} }); return { success: true }; }
+  catch (error) { return { success: false, error: error instanceof Error ? error.message : 'That did not work. Try again.' }; }
+}
+
+export async function reopenYearAction(year: number, reason: string): Promise<{ success: true } | { success: false; error: string }> {
+  try { await accountingRequest(`periods/years/${year}/reopen`, { method: 'POST', body: { reason } }); return { success: true }; }
+  catch (error) { return { success: false, error: error instanceof Error ? error.message : 'That did not work. Try again.' }; }
+}
