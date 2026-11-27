@@ -161,7 +161,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     charged=[l for l in lines if vat_output is not None and l[0].id==vat_output and l[2]]
     vat_legs=charged if command.kind in {'invoice','pos'} else []
     charged_vat=sum((l[1] for l in vat_legs),Decimal('0'))
-    if charged and (command.kind not in {'invoice','pos'} or len(charged)!=1):
+    if charged and (command.kind not in {'invoice','pos','asset_disposal'} or len(charged)!=1):
         raise HTTPException(422,'Output VAT is charged only by sales and invoices')
     # Input VAT (2b): only a bill or an expense claims it, with one VAT line; a reclaim or settlement credits it.
     vat_input=raw(session,"SELECT library_id FROM accounting.account_map WHERE business_id=%s AND purpose='vat_input'",(tenant,)).scalar()
@@ -334,9 +334,10 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 ok=not command.credited and main_id in ids({'depreciation'}) and all(l.credited and str(l.account_id) in accdep for l in command.lines)
             else:
                 # A disposal: credit the cost; debit its depreciation and any proceeds; the difference is a gain or loss.
-                gains=ids({'disposal_gains'})
+                gains=ids({'disposal_gains'});output=str(vat_account_id(session,'vat_output'))
                 ok=command.credited and main_id in cost and command.main_amount is not None and all(
-                    str(l.account_id) in gains or (not l.credited and (str(l.account_id) in accdep or till_or_bank(l.account_id))) for l in command.lines)
+                    str(l.account_id) in gains or (l.credited and str(l.account_id)==output)
+                    or (not l.credited and (str(l.account_id) in accdep or till_or_bank(l.account_id))) for l in command.lines)
             if not ok:raise HTTPException(422,'Fixed asset entries are posted by the fixed assets workflow')
         elif command.kind in {'income_tax_accrual','income_tax_payment'}:
             # Income tax in the books (R4): the year's tax debits Income tax expense and credits Income tax payable and

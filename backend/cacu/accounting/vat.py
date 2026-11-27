@@ -341,6 +341,27 @@ def input_vat(session, day: date, base: Decimal, vat: Decimal, inclusive: bool) 
     return figures
 
 
+def output_vat(session, day: date, base: Decimal, vat: Decimal) -> Split:
+    """VAT charged on a sale outside the till and invoices (a fixed asset sold): base is the price before VAT. Charged
+    only while registered, and no more than the standard rate allows; none charged is recorded as an exempt supply."""
+    figures = Split()
+    if vat < 0:
+        raise HTTPException(422, 'VAT cannot be below zero.')
+    if not charging(session, day):
+        if vat > 0:
+            raise HTTPException(409, 'Your business is not registered for VAT on that date, so it charges no VAT. Enter the price with no VAT.')
+        return figures
+    figures.rate = rate(session, 'standard', day)
+    most = (base * figures.rate / 100).quantize(CENT, rounding=ROUND_HALF_UP)
+    if vat > most:
+        raise HTTPException(422, f'VAT of {vat:.2f} is more than {figures.rate.normalize()}% of the price ({most:.2f}).')
+    if vat > 0:
+        figures.standard_net, figures.vat = base, vat
+    else:
+        figures.exempt_net = base  # an exempt or zero-rated sale, such as land
+    return figures
+
+
 def input_line(session, vat: Decimal, description: str):
     account_id = account(session, 'vat_input')
     if account_id is None:

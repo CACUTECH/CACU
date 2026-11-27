@@ -216,3 +216,24 @@ def test_a_fully_depreciated_asset_does_not_hold_up_month_close(live):
     assert post(live, EARLIER_MONTH)['total'] == '90000.00'
     assert call(live, 'viewer', lambda s, a: overview(s))['due'] == []
     assert step(live, LAST_MONTH)['passed'] is True
+
+
+def test_a_vat_registered_business_charges_output_vat_when_it_sells_an_asset(live):
+    started(live, EARLIER_MONTH)
+    laptop = call(live, 'owner', lambda s, a: add_asset(s, a, asset()))
+    post(live, EARLIER_MONTH)
+    with pytest.raises(HTTPException, match='not registered for VAT'):
+        call(live, 'owner', lambda s, a: dispose(s, a, laptop['id'], Dispose(request_key=uuid4(), disposed_on=LAST_MONTH, proceeds='1150000.00', vat='86250.00', method='Cash')))
+    call(live, 'owner', lambda s, a: save_settings(s, a, VatSettings(registered=True, vat_number='12345678-0001', effective_from=EARLIER_MONTH)))
+    with pytest.raises(HTTPException, match='more than 7.5%'):
+        call(live, 'owner', lambda s, a: dispose(s, a, laptop['id'], Dispose(request_key=uuid4(), disposed_on=LAST_MONTH, proceeds='1150000.00', vat='86250.01', method='Cash')))
+    key = uuid4()
+    sold = call(live, 'owner', lambda s, a: dispose(s, a, laptop['id'], Dispose(request_key=key, disposed_on=LAST_MONTH, proceeds='1150000.00', vat='86250.00', method='Cash')))
+    assert sold['disposal_result'] == '50000.00'  # the gain is on the price before VAT
+    assert by_purpose(live, 'vat_output') == Decimal('-86250') and by_purpose(live, 'disposal_gains') == Decimal('-50000')
+    with psycopg.connect(URL) as c:
+        assert c.execute("SELECT direction, standard_net, vat FROM accounting.document_vat WHERE business_id=%s AND source_type='asset_disposal' AND source_id=%s",
+                         (live.business, key)).fetchone() == ('output', Decimal('1150000.00'), Decimal('86250.00'))
+    flows = call(live, 'viewer', lambda s, a: cash_flow(s, LAST_MONTH, month_end(LAST_MONTH)))
+    lines = {(sec['key'], l['label']): l['amount'] for sec in flows['sections'] for l in sec['lines']}
+    assert lines[('investing', 'Fixed assets sold / receipts')] == '1150000.00'  # the VAT collected is not an investing receipt

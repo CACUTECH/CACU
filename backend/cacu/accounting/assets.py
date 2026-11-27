@@ -91,6 +91,8 @@ class Dispose(BaseModel):
     request_key: UUID
     disposed_on: date
     proceeds: str = Field(default='0.00', pattern=AMOUNT)
+    # A business registered for VAT charges it on the sale, on top of the price (proceeds are before VAT).
+    vat: str = Field(default='0.00', pattern=AMOUNT)
     method: Literal['Cash', 'Transfer'] | None = None
     bank_account_id: UUID | None = None
 
@@ -461,8 +463,12 @@ def dispose(session, actor, asset_id: UUID, data: Dispose) -> dict:
                (tenant, str(data.request_key))).first():
             return _view(asset, _charged(session))  # a retried request
         raise HTTPException(409, 'This asset has already been disposed of.')
-    proceeds = Decimal(data.proceeds)
+    proceeds, vat_charged = Decimal(data.proceeds), Decimal(data.vat)
     _open_date(session, data.disposed_on, 'The disposal date')
+    from cacu.accounting import vat
+    if vat_charged and proceeds <= 0:
+        raise HTTPException(422, 'VAT is charged only on a sale: enter what the asset was sold for.')
+    figures = vat.output_vat(session, data.disposed_on, proceeds, vat_charged) if proceeds > 0 else None
     month = data.disposed_on.replace(day=1)
     came_in = raw(session, 'SELECT transaction_date::date FROM accounting."transaction" WHERE business_id=%s AND id=%s', (tenant, asset.transaction_id)).scalar()
     if came_in is not None and data.disposed_on < came_in:
@@ -483,8 +489,13 @@ def dispose(session, actor, asset_id: UUID, data: Dispose) -> dict:
     if proceeds > 0:
         if data.method is None:
             raise HTTPException(422, 'Choose whether the money came into the till or a bank.')
-        lines.append({'account_id': collection_account(session, data.method, data.bank_account_id), 'amount': _money(proceeds), 'credited': False,
+        lines.append({'account_id': collection_account(session, data.method, data.bank_account_id), 'amount': _money(proceeds + vat_charged), 'credited': False,
                       'description': f'{asset.name}: sold'})
+        if vat_charged > 0:
+            output = vat.account(session, 'vat_output')
+            if output is None:
+                raise HTTPException(409, 'Turn VAT on again in Settings › Taxes to add the VAT accounts.')
+            lines.append({'account_id': output, 'amount': _money(vat_charged), 'credited': True, 'description': f'{asset.name}: VAT on sale'})
     result_amount = proceeds - carrying
     if result_amount != 0:
         lines.append({'account_id': accounts['disposal_gains'], 'amount': _money(abs(result_amount)), 'credited': result_amount > 0,
@@ -492,6 +503,8 @@ def dispose(session, actor, asset_id: UUID, data: Dispose) -> dict:
     result = post_command(session, actor, PostingCommand(request_key=uuid5(data.request_key, 'posting'), kind='asset_disposal', source_id=data.request_key,
         main_account_id=accounts[f'asset_{asset.category}'], entry_date=data.disposed_on, narration=f'Disposal: {asset.name}', credited=True,
         main_amount=_money(asset.cost), lines=lines), internal=True)
+    if figures is not None:
+        vat.record(session, 'asset_disposal', data.request_key, 'output', data.disposed_on, figures, proceeds, False)
     raw(session, """UPDATE accounting.fixed_asset SET disposed_on=%s, disposal_proceeds=%s, disposal_transaction_id=%s, disposed_by=%s
         WHERE business_id=%s AND id=%s""", (data.disposed_on, proceeds, int(result['transaction_id']), str(actor), tenant, str(asset.id)))
     row = raw(session, 'SELECT * FROM accounting.fixed_asset WHERE business_id=%s AND id=%s', (tenant, str(asset.id))).first()
@@ -555,6 +568,12 @@ def remove(session, actor, asset_id: UUID, data: Remove) -> dict:
     note = f'Removed (entered in error): {asset.name}'
     if asset.disposal_transaction_id:
         mirror(session, actor, asset.disposal_transaction_id, 'asset_removal', uuid5(key, 'disposal'), _removal_source(asset.id, 'disposal'), today, f'{note}: disposal reversed')
+        sale = raw(session, "SELECT source_id FROM accounting.document_map WHERE business_id=%s AND source_type='asset_disposal' AND transaction_id=%s",
+                   (tenant, asset.disposal_transaction_id)).scalar()
+        if sale is not None and asset.disposal_proceeds:
+            back = vat.take_back(session, 'asset_disposal', sale, asset.disposal_proceeds)
+            if back is not None:
+                vat.record_back(session, 'asset_removal', _removal_source(asset.id, 'disposal'), today, back)
     charged = _charged(session).get(str(asset.id), ZERO)
     if charged > 0:
         accounts = _ensure(session, actor, {'depreciation', f'accdep_{asset.category}'})

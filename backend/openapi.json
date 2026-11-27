@@ -12178,6 +12178,12 @@
             "title": "Proceeds",
             "default": "0.00"
           },
+          "vat": {
+            "type": "string",
+            "pattern": "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+            "title": "Vat",
+            "default": "0.00"
+          },
           "method": {
             "anyOf": [
               {

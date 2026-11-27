@@ -3610,6 +3610,11 @@ export interface components {
              * @default 0.00
              */
             proceeds: string;
+            /**
+             * Vat
+             * @default 0.00
+             */
+            vat: string;
             /** Method */
             method?: ("Cash" | "Transfer") | null;
             /** Bank Account Id */

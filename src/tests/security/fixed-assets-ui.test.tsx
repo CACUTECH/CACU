@@ -65,12 +65,13 @@ test('selling an asset shows the gain before it is recorded', async () => {
   (disposeAssetAction as jest.Mock).mockResolvedValue({ success: true, data: { ...laptop, disposed_on: '2026-10-20', disposal_proceeds: '1150000.00', disposal_result: '50000.00' } });
   render(<FixedAssetsPage />);
   fireEvent.click(await screen.findByRole('button', { name: 'Sell or scrap' }));
-  fireEvent.change(screen.getByLabelText('Sold for (₦)'), { target: { value: '1150000' } });
+  fireEvent.change(screen.getByLabelText('Sold for, before VAT (₦)'), { target: { value: '1150000' } });
+  fireEvent.change(screen.getByLabelText('VAT charged (₦)'), { target: { value: '86250' } });
   expect(screen.getByRole('form', { name: 'Dispose of Shop laptop' })).toHaveTextContent('That is a gain of ₦50,000.00.');
   fireEvent.change(screen.getByLabelText('Money went into'), { target: { value: '0b9b3f0e-2d8a-4f6c-8a43-6f2b1d7a9c10' } });
   fireEvent.click(screen.getByRole('button', { name: 'Record disposal' }));
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Shop laptop taken out of the books, with a gain of ₦50,000.00.'));
-  expect(disposeAssetAction).toHaveBeenCalledWith(laptop.id, expect.any(String), expect.objectContaining({ proceeds: '1150000', method: 'Transfer',
+  expect(disposeAssetAction).toHaveBeenCalledWith(laptop.id, expect.any(String), expect.objectContaining({ proceeds: '1150000', vat: '86250', method: 'Transfer',
     bank_account_id: '0b9b3f0e-2d8a-4f6c-8a43-6f2b1d7a9c10' }));
 });
 

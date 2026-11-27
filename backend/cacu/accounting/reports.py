@@ -75,7 +75,7 @@ def cash_flow(session,start:date,end:date):
                 'transaction_no':row['transaction_no'],'date':row['transaction_date'].date().isoformat(),
                 'account_id':str(row['source_account_id']),'account_name':row['name'],
                 'description':row['narration'],'amount':money(value)})
-        if row['transaction_id'] in disposals:
+        if row['transaction_id'] in disposals and row['purpose']!='vat_output':  # VAT collected on the sale stays operating
             if profit:
                 add('operating','Net profit',flow)
                 add('operating','Gain or loss on disposal of fixed assets',-flow)
