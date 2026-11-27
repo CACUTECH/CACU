@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useBusiness } from '@/components/business-provider';
-import { addTaxAdjustmentAction, incomeTaxAction, removeTaxAdjustmentAction, saveTaxYearAction, saveYearEndAction } from '@/app/accounting/income-tax/actions';
+import { addTaxAdjustmentAction, bankAccountsAction, incomeTaxAction, removeTaxAdjustmentAction, saveTaxYearAction, saveYearEndAction } from '@/app/accounting/income-tax/actions';
 import { naira } from '@/lib/fixed-assets';
+import { TaxBooks } from '@/components/income-tax/tax-books';
 import type { IncomeTaxEstimate } from '@/lib/income-tax';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -24,6 +25,7 @@ export default function IncomeTaxPage() {
   const years = Array.from({ length: thisYear - 2026 + 2 }, (_, i) => thisYear + 1 - i).filter(y => y >= 2026);
   const [year, setYear] = React.useState(thisYear >= 2026 ? thisYear : 2026);
   const [reload, setReload] = React.useState(0);
+  const [banks, setBanks] = React.useState<{ id: string; name: string }[]>([]);
   const [view, setView] = React.useState<IncomeTaxEstimate | null | undefined>(undefined);
   const [loadError, setLoadError] = React.useState('');
   const [losses, setLosses] = React.useState('0'), [professional, setProfessional] = React.useState(false);
@@ -38,6 +40,7 @@ export default function IncomeTaxPage() {
     setView(undefined);
     void incomeTaxAction(year).then(r => { if (r.success) show(r.data); else { setView(null); setLoadError(r.error); } });
   }, [year, reload]);
+  React.useEffect(() => { void bankAccountsAction().then(r => { if (r.success) setBanks(r.data); }); }, []);
 
   const run = async (work: () => ReturnType<typeof incomeTaxAction>, after?: () => void) => {
     setBusy(true); setError('');
@@ -82,6 +85,8 @@ export default function IncomeTaxPage() {
       {(Number(view.losses_carried_forward) > 0 || Number(view.allowances_carried_forward) > 0) && <p className="mt-3 text-sm text-muted-foreground">
         Carried to next year: losses {naira(view.losses_carried_forward)}, unused capital allowances {naira(view.allowances_carried_forward)}.</p>}
     </CardContent></Card>
+
+    <TaxBooks view={view} role={business?.userRole ?? ''} banks={banks} onChange={show} />
 
     <Card><CardHeader><CardTitle>Adjustments</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
       <p className="text-muted-foreground">Add back spending the law does not allow (fines, penalties, private spending) and take off income that is not taxable. Your tax adviser can tell you what applies.</p>

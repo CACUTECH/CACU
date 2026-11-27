@@ -727,7 +727,31 @@ def fixed_asset_tax(business_id:UUID,asset_id:UUID,request:AssetTax,user_id:UUID
 
 # Company income tax estimate (R4; Nigeria Tax Act 2025): a yearly estimate from the books, nothing posted. Off until a
 # tax professional reviews it (accounting.income_tax_switch); on for CACU's preview business.
-from cacu.accounting.income_tax import Adjustment as TaxAdjustment, TaxProfile, TaxYear
+from cacu.accounting.income_tax import Adjustment as TaxAdjustment, PayTax, PostTax, Reverse as TaxReverse, TaxProfile, TaxYear
+
+@app.post('/api/v1/businesses/{business_id}/income-tax/{year}/post')
+def income_tax_post(business_id:UUID,year:int,request:PostTax,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.income_tax import post_tax
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return post_tax(session,user_id,year,request)
+
+@app.post('/api/v1/businesses/{business_id}/income-tax/{year}/reverse')
+def income_tax_reverse(business_id:UUID,year:int,request:TaxReverse,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.income_tax import reverse_tax
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return reverse_tax(session,user_id,year,request)
+
+@app.post('/api/v1/businesses/{business_id}/income-tax/{year}/payments')
+def income_tax_pay(business_id:UUID,year:int,request:PayTax,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.income_tax import pay_tax
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return pay_tax(session,user_id,year,request)
+
+@app.post('/api/v1/businesses/{business_id}/income-tax/{year}/payments/{payment_id}/reverse')
+def income_tax_payment_reverse(business_id:UUID,year:int,payment_id:UUID,request:TaxReverse,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.income_tax import reverse_tax_payment
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return reverse_tax_payment(session,user_id,year,payment_id,request)
 
 @app.put('/api/v1/businesses/{business_id}/income-tax/settings')
 def income_tax_settings(business_id:UUID,request:TaxProfile,user_id:UUID=Depends(current_user)):

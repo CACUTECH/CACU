@@ -45,3 +45,37 @@ export async function removeTaxAdjustmentAction(value: number, id: string): Prom
   try { return { success: true, data: await accountingRequest<IncomeTaxEstimate>(`income-tax/${value}/adjustments/${encodeURIComponent(id)}`, { method: 'DELETE' }) }; }
   catch (error) { return failed(error, 'The adjustment was not removed. Try again.'); }
 }
+
+const uuid = z.string().uuid();
+
+export async function postTaxAction(value: number, requestKey: string): Promise<Result> {
+  if (!year.safeParse(value).success || !uuid.safeParse(requestKey).success) return { success: false, error: 'Refresh the page and try again.' };
+  try { return { success: true, data: await accountingRequest<IncomeTaxEstimate>(`income-tax/${value}/post`, { method: 'POST', body: { request_key: requestKey } }) }; }
+  catch (error) { return failed(error, 'The tax was not posted. Try again.'); }
+}
+
+export async function payTaxAction(value: number, requestKey: string, input: { amount: string; entry_date: string; method: 'Cash' | 'Transfer'; bank_account_id: string | null; reference: string }): Promise<Result> {
+  const body = z.object({ amount: amount.refine(v => Number(v) > 0, 'Enter an amount above zero.'), entry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose the date it was paid.'),
+    method: z.enum(['Cash', 'Transfer']), bank_account_id: uuid.nullable(), reference: z.string().trim().max(120) })
+    .refine(v => v.method === 'Cash' || !!v.bank_account_id, 'Choose the bank it was paid from.').safeParse(input);
+  if (!year.safeParse(value).success || !uuid.safeParse(requestKey).success) return { success: false, error: 'Refresh the page and try again.' };
+  if (!body.success) return { success: false, error: body.error.issues[0]?.message ?? 'Check the payment and try again.' };
+  const { bank_account_id, reference, ...rest } = body.data;
+  try {
+    return { success: true, data: await accountingRequest<IncomeTaxEstimate>(`income-tax/${value}/payments`, { method: 'POST',
+      body: { ...rest, request_key: requestKey, ...(rest.method === 'Transfer' ? { bank_account_id } : {}), ...(reference ? { reference } : {}) } }) };
+  } catch (error) { return failed(error, 'The payment was not recorded. Try again.'); }
+}
+
+export async function reverseTaxAction(value: number, requestKey: string, reason: string, paymentId?: string): Promise<Result> {
+  if (!year.safeParse(value).success || !uuid.safeParse(requestKey).success || (paymentId && !uuid.safeParse(paymentId).success)) return { success: false, error: 'Refresh the page and try again.' };
+  if (reason.trim().length < 5) return { success: false, error: 'Say why it is being reversed.' };
+  const path = paymentId ? `income-tax/${value}/payments/${encodeURIComponent(paymentId)}/reverse` : `income-tax/${value}/reverse`;
+  try { return { success: true, data: await accountingRequest<IncomeTaxEstimate>(path, { method: 'POST', body: { request_key: requestKey, reason: reason.trim() } }) }; }
+  catch (error) { return failed(error, 'It was not reversed. Try again.'); }
+}
+
+export async function bankAccountsAction(): Promise<{ success: true; data: { id: string; name: string }[] } | { success: false; error: string }> {
+  try { return { success: true, data: (await accountingRequest<{ id: string; name: string }[]>('collection-accounts')).map(b => ({ id: b.id, name: b.name })) }; }
+  catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Bank accounts unavailable' }; }
+}

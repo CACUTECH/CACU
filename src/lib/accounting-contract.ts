@@ -1515,6 +1515,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/income-tax/{year}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Income Tax Post */
+        post: operations["income_tax_post_api_v1_businesses__business_id__income_tax__year__post_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/income-tax/{year}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Income Tax Reverse */
+        post: operations["income_tax_reverse_api_v1_businesses__business_id__income_tax__year__reverse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/income-tax/{year}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Income Tax Pay */
+        post: operations["income_tax_pay_api_v1_businesses__business_id__income_tax__year__payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/income-tax/{year}/payments/{payment_id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Income Tax Payment Reverse */
+        post: operations["income_tax_payment_reverse_api_v1_businesses__business_id__income_tax__year__payments__payment_id__reverse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/income-tax/settings": {
         parameters: {
             query?: never;
@@ -4078,6 +4146,30 @@ export interface components {
             /** Email */
             email?: string | null;
         };
+        /** PayTax */
+        PayTax: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "Cash" | "Transfer";
+            /** Bank Account Id */
+            bank_account_id?: string | null;
+            /** Reference */
+            reference?: string | null;
+        };
         /** PaystackConnect */
         PaystackConnect: {
             /**
@@ -4129,6 +4221,14 @@ export interface components {
              */
             request_key: string;
         };
+        /** PostTax */
+        PostTax: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+        };
         /** PostingCommand */
         PostingCommand: {
             /**
@@ -4140,7 +4240,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill" | "customer_advance" | "gateway_receipt" | "gateway_settlement" | "credit_advance" | "wht_deduction" | "payroll" | "payroll_payment" | "payroll_remittance" | "asset_purchase" | "asset_opening" | "depreciation" | "asset_disposal" | "asset_removal" | "payroll_reversal";
+            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill" | "customer_advance" | "gateway_receipt" | "gateway_settlement" | "credit_advance" | "wht_deduction" | "payroll" | "payroll_payment" | "payroll_remittance" | "asset_purchase" | "asset_opening" | "depreciation" | "asset_disposal" | "asset_removal" | "payroll_reversal" | "income_tax_accrual" | "income_tax_payment" | "tax_reversal";
             /**
              * Source Id
              * Format: uuid
@@ -4376,6 +4476,16 @@ export interface components {
              * Format: date
              */
             entry_date: string;
+            /** Reason */
+            reason: string;
+        };
+        /** Reverse */
+        Reverse: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
             /** Reason */
             reason: string;
         };
@@ -8311,6 +8421,151 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AssetTax"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    income_tax_post_api_v1_businesses__business_id__income_tax__year__post_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostTax"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    income_tax_reverse_api_v1_businesses__business_id__income_tax__year__reverse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reverse"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    income_tax_pay_api_v1_businesses__business_id__income_tax__year__payments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayTax"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    income_tax_payment_reverse_api_v1_businesses__business_id__income_tax__year__payments__payment_id__reverse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                year: number;
+                payment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reverse"];
             };
         };
         responses: {

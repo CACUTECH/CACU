@@ -34,7 +34,7 @@ class PostingCommand(BaseModel):
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
                  'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement','credit_advance','wht_deduction',
                  'payroll','payroll_payment','payroll_remittance','asset_purchase','asset_opening','depreciation','asset_disposal',
-                 'asset_removal','payroll_reversal']
+                 'asset_removal','payroll_reversal','income_tax_accrual','income_tax_payment','tax_reversal']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -55,16 +55,18 @@ CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'su
          'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry,'credit_advance':JournalEntry,'wht_deduction':JournalEntry,
          'payroll':JournalEntry,'payroll_payment':JournalEntry,'payroll_remittance':JournalEntry,
          'asset_purchase':JournalEntry,'asset_opening':JournalEntry,'depreciation':JournalEntry,'asset_disposal':JournalEntry,
-         'asset_removal':JournalEntry,'payroll_reversal':JournalEntry}
+         'asset_removal':JournalEntry,'payroll_reversal':JournalEntry,
+         'income_tax_accrual':JournalEntry,'income_tax_payment':JournalEntry,'tax_reversal':JournalEntry}
 # Documents filed under another document type: a bill for received goods is a supplier bill to payments and the bills list.
 DOCUMENT_TYPES={'goods_bill':'bill'}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
 INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance',
                 'gateway_receipt','gateway_settlement','credit_advance','wht_deduction','payroll','payroll_payment','payroll_remittance',
-                'asset_purchase','asset_opening','depreciation','asset_disposal','asset_removal','payroll_reversal'}
+                'asset_purchase','asset_opening','depreciation','asset_disposal','asset_removal','payroll_reversal',
+                'income_tax_accrual','income_tax_payment','tax_reversal'}
 # Reversing journals built by mirror() from a posted entry: corrections of fixed assets and payroll payments.
-MIRROR_KINDS={'asset_removal','payroll_reversal'}
+MIRROR_KINDS={'asset_removal','payroll_reversal','tax_reversal'}
 # Fixed assets (R4): the cost and accumulated depreciation account of each category.
 ASSET_CATEGORIES=('buildings','vehicles','machinery','furniture','computers','other')
 ASSET_COST={f'asset_{c}' for c in ASSET_CATEGORIES}
@@ -336,6 +338,18 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 ok=command.credited and main_id in cost and command.main_amount is not None and all(
                     str(l.account_id) in gains or (not l.credited and (str(l.account_id) in accdep or till_or_bank(l.account_id))) for l in command.lines)
             if not ok:raise HTTPException(422,'Fixed asset entries are posted by the fixed assets workflow')
+        elif command.kind in {'income_tax_accrual','income_tax_payment'}:
+            # Income tax in the books (R4): the year's tax debits Income tax expense and credits Income tax payable and
+            # any WHT credits used; paying it debits Income tax payable from the till or a bank.
+            payable=str(vat_account_id(session,'income_tax'))
+            if command.kind=='income_tax_accrual':
+                allowed={payable,str(vat_account_id(session,'wht_receivable'))}
+                ok=not command.credited and str(command.main_account_id)==str(vat_account_id(session,'income_tax_expense')) and all(l.credited and str(l.account_id) in allowed for l in command.lines)
+            else:
+                cash=_till(session);paid_from=str(command.main_account_id)
+                from_bank=paid_from!=cash and str(collection_account(session,'Transfer',command.main_account_id))==paid_from
+                ok=command.credited and len(command.lines)==1 and not command.lines[0].credited and str(command.lines[0].account_id)==payable and (paid_from==cash or from_bank)
+            if not ok:raise HTTPException(422,'Income tax entries are posted by the income tax workflow')
         elif command.kind in MIRROR_KINDS:
             # Built only by mirror(), from the posted entry being reversed; nothing else posts these.
             if not command.lines:raise HTTPException(422,'A correction reverses a posted entry')

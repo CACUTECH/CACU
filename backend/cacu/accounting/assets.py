@@ -134,15 +134,17 @@ def _purpose(session, name):
     return rows[0].account_id if len(rows) == 1 else None
 
 
-def _ensure(session, actor, kinds):
-    """Adds the fixed asset accounts these entries need to the chart, once (the same request key each time)."""
+def _ensure(session, actor, kinds, names=None):
+    """Adds the system accounts these entries need to the chart, once (the same request key each time). names gives
+    each kind's account name: the fixed asset accounts unless another workflow passes its own."""
     from cacu.accounting.accounts import add_account
+    names = names or ACCOUNT_NAMES
     tenant = str(session.business_id)
     for kind in sorted(kinds):
         if _purpose(session, kind) is None:
-            add_account(session, actor, uuid5(UUID(int=0), f'cacu:{kind}:{tenant}'), kind, ACCOUNT_NAMES[kind])
+            add_account(session, actor, uuid5(UUID(int=0), f'cacu:{kind}:{tenant}'), kind, names[kind])
         if _purpose(session, kind) is None:
-            raise HTTPException(409, f'{ACCOUNT_NAMES[kind]} could not be added to your chart')
+            raise HTTPException(409, f'{names[kind]} could not be added to your chart')
     return {kind: _purpose(session, kind) for kind in kinds}
 
 
