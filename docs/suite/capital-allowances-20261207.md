@@ -21,7 +21,7 @@ The Act took effect on 1 January 2026. CACU's reading follows PwC Worldwide Tax 
 - **Qualifying:** an asset qualifies only where any VAT due on it was charged, or import duty paid where it was imported. The owner marks an asset that doesn't qualify, with a note.
 - **On disposal:** proceeds above the tax written-down value are a **balancing charge** (taxable). Proceeds below it are shown as a **balancing allowance**.
 - **Assets owned before CACU:** they carry the allowances already claimed under earlier law, and only what is left of the 99% is allowed.
-- **Tax years** are calendar years: the computation assumes accounts made up to 31 December.
+- **Tax years** end on the last day of the business's year-end month: 31 December unless it sets another month on the Income Tax Estimate page.
 
 ## Default classes
 

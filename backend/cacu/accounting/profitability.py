@@ -25,7 +25,16 @@ def _money(value):
 
 
 def _span(start: date, end: date):
+    """For ledger dates, which are business-local dates stored without a zone."""
     return datetime.combine(start, time.min), datetime.combine(end + timedelta(days=1), time.min)
+
+
+def _moments(session, start: date, end: date):
+    """For moments recorded with a zone (when stock left, when a job was completed): midnight in the business's own
+    timezone, so a sale just after midnight in Lagos counts its cost on the same day as its revenue."""
+    from zoneinfo import ZoneInfo
+    zone = ZoneInfo(session.business_timezone)
+    return datetime.combine(start, time.min, zone), datetime.combine(end + timedelta(days=1), time.min, zone)
 
 
 def _vat_factors(session, source_type):
@@ -42,6 +51,7 @@ def report(session, start: date, end: date):
     validate_dates(start, end)
     tenant = str(session.business_id)
     lo, hi = _span(start, end)
+    since, until = _moments(session, start, end)
     items = {r.id: {'item_id': r.id, 'name': r.name, 'kind': 'service' if r.item_type == 'SERVICE' else 'product', 'quantity': 0,
                     'revenue': ZERO, 'cost': ZERO}
              for r in raw(session, 'SELECT id::text, name, item_type FROM public.catalog_items WHERE business_id=%s', (tenant,)).all()}
@@ -88,7 +98,7 @@ def report(session, start: date, end: date):
           OR EXISTS (SELECT FROM public.jobs j WHERE j.business_id=e.business_id AND j.id=e.source_id)
           OR EXISTS (SELECT FROM accounting.sale_refund s WHERE s.business_id=e.business_id AND s.id=e.source_id)
           OR EXISTS (SELECT FROM accounting.invoice_credit c WHERE c.business_id=e.business_id AND c.id=e.source_id))""",
-                 (tenant, lo, hi)).all() if raw(session, "SELECT to_regclass('public.jobs') IS NOT NULL").scalar() else []:
+                 (tenant, since, until)).all() if raw(session, "SELECT to_regclass('public.jobs') IS NOT NULL").scalar() else []:
         cost = (-int(r.quantity) * Decimal(r.unit_cost)).quantize(CENT)
         if r.item in items:
             items[r.item]['cost'] += cost
@@ -107,7 +117,7 @@ def report(session, start: date, end: date):
     if costing_allowed(session) and raw(session, "SELECT to_regclass('public.jobs') IS NOT NULL").scalar():
         jobs = []
         for j in raw(session, """SELECT j.id FROM public.jobs j WHERE j.business_id=%s AND j.status='completed'
-            AND j.completed_at>=%s AND j.completed_at<%s ORDER BY j.number""", (tenant, lo, hi)).all():
+            AND j.completed_at>=%s AND j.completed_at<%s ORDER BY j.number""", (tenant, since, until)).all():
             d = job_detail(session, None, j.id)
             if d.get('profit'):
                 jobs.append({'job_id': d['id'], 'number': d['number'], 'revenue': d['revenue'], 'materials': d['materials_cost'],

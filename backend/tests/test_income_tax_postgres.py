@@ -6,7 +6,7 @@ from uuid import uuid4
 import psycopg
 import pytest
 from fastapi import HTTPException
-from cacu.accounting.income_tax import Adjustment, TaxYear, add_adjustment, estimate, remove_adjustment, save_year
+from cacu.accounting.income_tax import Adjustment, TaxProfile, TaxYear, add_adjustment, estimate, remove_adjustment, save_profile, save_year
 from cacu.accounting.posting import PostingCommand, post_command
 from test_corrections_postgres import live, call, URL  # noqa: F401  (fixtures)
 from test_opening_position_postgres import books  # noqa: F401
@@ -90,4 +90,35 @@ def test_adjustments_and_losses_change_the_estimate_and_nothing_posts(live):
     assert ledger_rows(live) == rows  # an estimate, never a posting
     with pytest.raises(HTTPException, match='starts with 2026'):
         call(live, 'viewer', lambda s, a: estimate(s, 2025))
+    preview(live, False)
+
+
+def withheld(live, amount, certificate):
+    with psycopg.connect(URL) as c:
+        c.execute("""INSERT INTO accounting.wht_deduction(business_id, id, invoice_id, customer_id, amount, entry_date, certificate, created_by)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", (live.business, uuid4(), uuid4(), uuid4(), amount, TODAY, certificate, live.people['owner']))
+
+
+def test_withholding_tax_with_a_credit_note_comes_off_the_income_tax(live):
+    preview(live, True)
+    sell(live, '60000000.00')
+    before = call(live, 'viewer', lambda s, a: estimate(s, YEAR))
+    withheld(live, '500000.00', 'WHT-0001')
+    withheld(live, '200000.00', None)  # still waiting for the customer's credit note
+    view = call(live, 'viewer', lambda s, a: estimate(s, YEAR))
+    assert view['wht']['credited'] == '500000.00' and view['wht']['awaiting_certificate'] == '200000.00' and view['wht']['awaiting_count'] == 1
+    used = min(Decimal('500000'), Decimal(view['companies_income_tax']))
+    assert Decimal(view['income_tax_to_pay']) == Decimal(view['companies_income_tax']) - used
+    assert Decimal(view['total_due']) == Decimal(before['total_due']) - used
+    preview(live, False)
+
+
+def test_a_business_with_a_march_year_end_gets_its_own_tax_year(live):
+    preview(live, True)
+    with pytest.raises(HTTPException) as refused:
+        call(live, 'editor', lambda s, a: save_profile(s, a, TaxProfile(year_end_month=3)))
+    assert refused.value.status_code == 403
+    call(live, 'owner', lambda s, a: save_profile(s, a, TaxProfile(year_end_month=3)))
+    view = call(live, 'viewer', lambda s, a: estimate(s, YEAR + 1))
+    assert view['period'] == {'start': f'{YEAR}-04-01', 'end': f'{YEAR + 1}-03-31', 'year_end_month': 3}
     preview(live, False)

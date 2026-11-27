@@ -715,7 +715,13 @@ def fixed_asset_tax(business_id:UUID,asset_id:UUID,request:AssetTax,user_id:UUID
 
 # Company income tax estimate (R4; Nigeria Tax Act 2025): a yearly estimate from the books, nothing posted. Off until a
 # tax professional reviews it (accounting.income_tax_switch); on for CACU's preview business.
-from cacu.accounting.income_tax import Adjustment as TaxAdjustment, TaxYear
+from cacu.accounting.income_tax import Adjustment as TaxAdjustment, TaxProfile, TaxYear
+
+@app.put('/api/v1/businesses/{business_id}/income-tax/settings')
+def income_tax_settings(business_id:UUID,request:TaxProfile,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.income_tax import save_profile
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return save_profile(session,user_id,request)
 
 @app.get('/api/v1/businesses/{business_id}/income-tax/{year}')
 def income_tax_estimate(business_id:UUID,year:int,user_id:UUID=Depends(current_user)):
