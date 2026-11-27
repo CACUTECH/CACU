@@ -1,10 +1,12 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { PayrollBooksPanel } from '@/components/hr/payroll-books';
-import { payrollBooksAction, postPayrollAction, settlePayrollAction } from '@/app/hr/payroll/books-actions';
+import { payrollBooksAction, postPayrollAction, reversePayrollPaymentAction, settlePayrollAction } from '@/app/hr/payroll/books-actions';
 import type { PayrollBooks, PayrollBooksRun } from '@/lib/payroll-books';
 
-jest.mock('@/app/hr/payroll/books-actions', () => ({ payrollBooksAction: jest.fn(), postPayrollAction: jest.fn(), settlePayrollAction: jest.fn() }));
+jest.mock('@/app/hr/payroll/books-actions', () => ({ payrollBooksAction: jest.fn(), postPayrollAction: jest.fn(), settlePayrollAction: jest.fn(), reversePayrollPaymentAction: jest.fn() }));
+let mockRole = 'owner';
+jest.mock('@/components/business-provider', () => ({ useBusiness: () => ({ business: { id: 'b1', userRole: mockRole } }) }));
 Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () => '3a571056-45cf-4239-96bb-331e35c39b65' });
 
 const RUN = '7d3c9a57-1b0e-4c64-9a52-5e1f4f2f0a11';
@@ -15,7 +17,7 @@ const posted: PayrollBooksRun = { run: totals, posted: { entry_date: '2026-11-26
   outstanding: { net_pay: '420000.00', paye: '40000.00', pension: '72000.00', nhf: '0.00', nhis: '3000.00' }, settlements: [] };
 const books = (run: PayrollBooksRun): PayrollBooks => ({ enabled: true, message: null, runs: [run], pay_from: { cash: true, banks: [{ id: '0b9b3f0e-2d8a-4f6c-8a43-6f2b1d7a9c10', name: 'GTBank' }] } });
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => { jest.clearAllMocks(); mockRole = 'owner'; });
 
 test('R4 gate: nothing shows while payroll posting is off, or to someone without payroll.approve', async () => {
   (payrollBooksAction as jest.Mock).mockResolvedValue({ success: true, data: { enabled: false, message: 'Posting payroll to the books is not available yet.', runs: [], pay_from: { cash: false, banks: [] } } });
@@ -80,4 +82,28 @@ test('once net pay is paid in full, the next payment is for something still owed
   fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
   await screen.findByText('Posted to the books on 2026-11-26.');
   expect(settlePayrollAction).toHaveBeenCalledWith(RUN, expect.any(String), expect.objectContaining({ kind: 'paye', amount: '40000' }));
+});
+
+test('the owner reverses a payment recorded in error, with a reason; others cannot', async () => {
+  const withPayment: PayrollBooksRun = { ...posted, outstanding: { ...posted.outstanding!, net_pay: '20000.00' },
+    settlements: [{ id: 's1', kind: 'net_pay', label: 'Net pay to staff', amount: '400000.00', entry_date: '2026-11-26', paid_from: 'GTBank', reference: null }] };
+  (payrollBooksAction as jest.Mock).mockResolvedValue({ success: true, data: books(withPayment) });
+  (reversePayrollPaymentAction as jest.Mock).mockResolvedValue({ success: true, data: { ...withPayment, outstanding: posted.outstanding,
+    settlements: [{ ...withPayment.settlements[0], reversed: true, reversal_reason: 'Wrong bank account' }] } });
+  render(<PayrollBooksPanel runId={RUN} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Reverse' }));
+  fireEvent.change(screen.getByLabelText('Why it is being reversed'), { target: { value: 'Wrong bank account' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Reverse payment' }));
+  expect(await screen.findByText('Reversed: Wrong bank account')).toBeInTheDocument();
+  expect(reversePayrollPaymentAction).toHaveBeenCalledWith(RUN, 's1', '3a571056-45cf-4239-96bb-331e35c39b65', 'Wrong bank account');
+  expect(screen.getByText('Net pay to staff', { selector: 'td' }).nextElementSibling).toHaveTextContent('₦420,000.00');
+});
+
+test('an admin sees payments but no reverse button', async () => {
+  mockRole = 'admin';
+  (payrollBooksAction as jest.Mock).mockResolvedValue({ success: true, data: books({ ...posted,
+    settlements: [{ id: 's1', kind: 'net_pay', label: 'Net pay to staff', amount: '400000.00', entry_date: '2026-11-26', paid_from: 'GTBank', reference: null }] }) });
+  render(<PayrollBooksPanel runId={RUN} />);
+  expect(await screen.findByText(/Net pay to staff from GTBank/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Reverse' })).not.toBeInTheDocument();
 });

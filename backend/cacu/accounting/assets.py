@@ -19,7 +19,9 @@ Owner decisions of 26 November 2026:
 * A **disposal** takes the asset out of the books: debit its accumulated depreciation and any proceeds, credit its
   cost; the difference is a gain or loss on disposal.
 
-The register, its runs and disposals are fixed once made; a mistake is reversed by a journal.
+The register, its runs and disposals are fixed once made. An asset entered in error is **removed** by the Owner, with
+a reason: its disposal, its depreciation and its purchase (or bringing-in) are each reversed by a journal dated the day
+of removal, and it leaves the register. A purchase on credit can be removed only while nothing is paid on its bill.
 """
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
@@ -93,6 +95,12 @@ class Dispose(BaseModel):
     bank_account_id: UUID | None = None
 
 
+class Remove(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_key: UUID
+    reason: str = Field(min_length=5, max_length=500)
+
+
 class PostDepreciation(BaseModel):
     model_config = ConfigDict(extra='forbid')
     request_key: UUID
@@ -158,7 +166,14 @@ def _open_date(session, day: date, what: str):
 # The register and its depreciation.
 
 def _assets(session):
-    return raw(session, 'SELECT * FROM accounting.fixed_asset WHERE business_id=%s ORDER BY acquired_on, created_at', (str(session.business_id),)).all()
+    """The register, without assets removed as entered in error."""
+    return raw(session, 'SELECT * FROM accounting.fixed_asset WHERE business_id=%s AND removed_on IS NULL ORDER BY acquired_on, created_at',
+               (str(session.business_id),)).all()
+
+
+def _removal_source(asset_id, part: str):
+    """The source of each reversing journal when an asset is removed: fixed by the asset, so it is found later."""
+    return uuid5(UUID(str(asset_id)), f'removal:{part}')
 
 
 def _charged(session) -> dict:
@@ -437,7 +452,7 @@ def dispose(session, actor, asset_id: UUID, data: Dispose) -> dict:
     _allowed(session, actor)
     tenant = str(session.business_id)
     asset = raw(session, 'SELECT * FROM accounting.fixed_asset WHERE business_id=%s AND id=%s', (tenant, str(asset_id))).first()
-    if asset is None:
+    if asset is None or asset.removed_on is not None:
         raise HTTPException(404, 'Fixed asset not found')
     if asset.disposed_on is not None:
         if raw(session, "SELECT 1 FROM accounting.document_map WHERE business_id=%s AND source_type='asset_disposal' AND source_id=%s",
@@ -481,12 +496,21 @@ def dispose(session, actor, asset_id: UUID, data: Dispose) -> dict:
     return _view(row, _charged(session))
 
 
+def _removal_transactions(session, part: str, where: str) -> set[int]:
+    rows = raw(session, f'SELECT id FROM accounting.fixed_asset WHERE business_id=%s AND removed_on IS NOT NULL AND {where}', (str(session.business_id),)).all()
+    sources = [str(_removal_source(r.id, part)) for r in rows]
+    if not sources:
+        return set()
+    return {r.transaction_id for r in raw(session, 'SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type=%s AND source_id::text = ANY(%s)',
+                                          (str(session.business_id), 'asset_removal', sources)).all()}
+
+
 def disposal_transactions(session) -> set[int]:
-    """The journals that took assets out of the books, for the cash flow statement."""
+    """The journals that took assets out of the books, and their reversals, for the cash flow statement."""
     if not raw(session, "SELECT to_regclass('accounting.fixed_asset') IS NOT NULL").scalar():
         return set()
     return {r.disposal_transaction_id for r in raw(session, 'SELECT disposal_transaction_id FROM accounting.fixed_asset WHERE business_id=%s AND disposal_transaction_id IS NOT NULL',
-                                                   (str(session.business_id),)).all()}
+                                                   (str(session.business_id),)).all()} | _removal_transactions(session, 'disposal', 'disposed_on IS NOT NULL')
 
 
 def brought_in(session) -> set[int]:
@@ -494,4 +518,53 @@ def brought_in(session) -> set[int]:
     if not raw(session, "SELECT to_regclass('accounting.fixed_asset') IS NOT NULL").scalar():
         return set()
     return {r.transaction_id for r in raw(session, "SELECT transaction_id FROM accounting.fixed_asset WHERE business_id=%s AND how='existing'",
-                                          (str(session.business_id),)).all()}
+                                          (str(session.business_id),)).all()} | _removal_transactions(session, 'purchase', "how='existing'")
+
+
+# Removing an asset entered in error.
+
+def remove(session, actor, asset_id: UUID, data: Remove) -> dict:
+    """Reverses everything an asset put in the books, each by a journal dated today, and takes it off the register."""
+    from cacu.accounting import vat
+    from cacu.accounting.periods import refuse_closed_month
+    from cacu.accounting.posting import mirror
+    from cacu.accounting.workflows import business_today, role
+    from python_accounting.models import Transaction
+    if role(session, actor) != 'owner':
+        raise HTTPException(403, 'Only the business owner can remove an asset entered in error.')
+    tenant = str(session.business_id)
+    asset = raw(session, 'SELECT * FROM accounting.fixed_asset WHERE business_id=%s AND id=%s', (tenant, str(asset_id))).first()
+    if asset is None:
+        raise HTTPException(404, 'Fixed asset not found')
+    if asset.removed_on is not None:
+        return {'id': str(asset.id), 'name': asset.name, 'removed_on': asset.removed_on.isoformat(), 'reason': asset.removal_reason}  # retried
+    reason = ' '.join(data.reason.split())
+    if len(reason) < 5:
+        raise HTTPException(422, 'Say why the asset is being removed.')
+    today = business_today(session)
+    refuse_closed_month(session, today)
+    bill = None
+    if asset.how == 'credit':
+        mapped = raw(session, "SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type='bill' AND source_id=%s", (tenant, str(asset.id))).scalar()
+        bill = session.get(Transaction, mapped) if mapped else None
+        if bill is None or bill.cleared(session) > 0:
+            raise HTTPException(409, "Something has been paid on this asset's bill. Record the supplier's refund first, then remove the asset.")
+    key = data.request_key
+    note = f'Removed (entered in error): {asset.name}'
+    if asset.disposal_transaction_id:
+        mirror(session, actor, asset.disposal_transaction_id, 'asset_removal', uuid5(key, 'disposal'), _removal_source(asset.id, 'disposal'), today, f'{note}: disposal reversed')
+    charged = _charged(session).get(str(asset.id), ZERO)
+    if charged > 0:
+        accounts = _ensure(session, actor, {'depreciation', f'accdep_{asset.category}'})
+        post_command(session, actor, PostingCommand(request_key=uuid5(key, 'depreciation'), kind='asset_removal', source_id=_removal_source(asset.id, 'depreciation'),
+            main_account_id=accounts['depreciation'], entry_date=today, narration=f'{note}: depreciation reversed', credited=True,
+            lines=[{'account_id': accounts[f'accdep_{asset.category}'], 'amount': _money(charged), 'credited': False}]), internal=True)
+    mirror(session, actor, asset.transaction_id, 'asset_removal', uuid5(key, 'purchase'), _removal_source(asset.id, 'purchase'), today,
+           f'{note}: purchase reversed' if asset.how != 'existing' else f'{note}: bringing-in reversed', target_id=asset.id if bill is not None else None)
+    if asset.how != 'existing':
+        back = vat.take_back(session, 'bill' if asset.how == 'credit' else 'asset_purchase', asset.id, asset.cost)
+        if back is not None:
+            vat.record_back(session, 'asset_removal', _removal_source(asset.id, 'purchase'), today, back)
+    raw(session, 'UPDATE accounting.fixed_asset SET removed_on=%s, removal_reason=%s, removed_by=%s WHERE business_id=%s AND id=%s',
+        (today, reason, str(actor), tenant, str(asset.id)))
+    return {'id': str(asset.id), 'name': asset.name, 'removed_on': today.isoformat(), 'reason': reason}

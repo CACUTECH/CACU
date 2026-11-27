@@ -643,7 +643,13 @@ def funding_share_withdraw(business_id:UUID,share_id:UUID,user_id:UUID=Depends(c
 # Payroll to the books (Doc 03 FR-203; E21 R4): an approved run is posted by a separate step, then paying staff and
 # remitting deductions are recorded against it. Off until the R4 gate (accounting.payroll_switch). Owner or Admin
 # with payroll.approve.
-from cacu.accounting.payroll import PostRun as PayrollPostRun, Settle as PayrollSettle
+from cacu.accounting.payroll import PostRun as PayrollPostRun, ReversePayment as PayrollReversePayment, Settle as PayrollSettle
+
+@app.post('/api/v1/businesses/{business_id}/payroll/runs/{run_id}/payments/{settlement_id}/reverse')
+def payroll_payment_reverse(business_id:UUID,run_id:UUID,settlement_id:UUID,request:PayrollReversePayment,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.payroll import reverse_payment
+    with library_transaction(user_id,business_id,write=True,permission='payroll.approve') as session:
+        return reverse_payment(session,user_id,run_id,settlement_id,request)
 
 @app.get('/api/v1/businesses/{business_id}/payroll/books')
 def payroll_books(business_id:UUID,user_id:UUID=Depends(current_user)):
@@ -665,7 +671,13 @@ def payroll_settle(business_id:UUID,run_id:UUID,request:PayrollSettle,user_id:UU
 
 # Fixed assets (R4; IAS 16): the register, each month's depreciation (posted by a deliberate step, months in order)
 # and disposals. Anyone who can see the ledger sees the register; only an Owner or Admin changes it.
-from cacu.accounting.assets import AddAsset, Dispose as AssetDispose, PostDepreciation
+from cacu.accounting.assets import AddAsset, Dispose as AssetDispose, PostDepreciation, Remove as AssetRemove
+
+@app.post('/api/v1/businesses/{business_id}/fixed-assets/{asset_id}/remove')
+def fixed_asset_remove(business_id:UUID,asset_id:UUID,request:AssetRemove,user_id:UUID=Depends(current_user)):
+    from cacu.accounting.assets import remove
+    with library_transaction(user_id,business_id,write=True,permission='ledger.view') as session:
+        return remove(session,user_id,asset_id,request)
 
 @app.get('/api/v1/businesses/{business_id}/fixed-assets')
 def fixed_assets(business_id:UUID,user_id:UUID=Depends(current_user)):

@@ -121,3 +121,14 @@ export async function saveAssetTaxAction(assetId: string, input: AssetTaxInput):
     return { success: true, data: await accountingRequest<AssetTaxInput>(`fixed-assets/${encodeURIComponent(target.data)}/tax`, { method: 'PUT', body: parsed.data }) };
   } catch (error) { return failed(error, 'The tax details were not saved. Try again.'); }
 }
+
+export async function removeAssetAction(assetId: string, requestKey: string, reason: string): Promise<{ success: true } | { success: false; error: string }> {
+  const target = id.safeParse(assetId); const key = id.safeParse(requestKey);
+  if (!target.success || !key.success) return { success: false, error: 'Fixed asset not found' };
+  if (reason.trim().length < 5) return { success: false, error: 'Say why the asset is being removed.' };
+  try {
+    await accountingRequest(`fixed-assets/${encodeURIComponent(target.data)}/remove`, { method: 'POST', body: { request_key: key.data, reason: reason.trim() } });
+    revalidatePath('/accounting/fixed-assets');
+    return { success: true };
+  } catch (error) { return failed(error, 'The asset was not removed. Try again.'); }
+}

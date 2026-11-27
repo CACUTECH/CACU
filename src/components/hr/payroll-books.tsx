@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { payrollBooksAction, postPayrollAction, settlePayrollAction } from '@/app/hr/payroll/books-actions';
+import { payrollBooksAction, postPayrollAction, reversePayrollPaymentAction, settlePayrollAction } from '@/app/hr/payroll/books-actions';
+import { useBusiness } from '@/components/business-provider';
 import { SETTLEMENT_LABELS, type PayrollBooks, type PayrollBooksRun, type SettlementKind } from '@/lib/payroll-books';
 
 const KINDS = Object.keys(SETTLEMENT_LABELS) as SettlementKind[];
@@ -21,6 +22,10 @@ export function PayrollBooksPanel({ runId }: { runId: string }) {
   const [busy, setBusy] = React.useState(false);
   const [form, setForm] = React.useState({ kind: 'net_pay' as SettlementKind, amount: '', entry_date: today(), method: 'Cash' as 'Cash' | 'Transfer', bank_account_id: '', reference: '' });
   const postKey = React.useRef('');
+  const { business } = useBusiness();
+  const owner = business?.userRole === 'owner';
+  const [reversing, setReversing] = React.useState<string | null>(null);
+  const [reason, setReason] = React.useState('');
   const payKey = React.useRef('');
 
   React.useEffect(() => {
@@ -101,8 +106,22 @@ export function PayrollBooksPanel({ runId }: { runId: string }) {
         </form>}
 
         {state.settlements.length > 0 && <div><p className="font-medium">Payments recorded</p>
-          <ul className="space-y-1">{state.settlements.map(s => <li key={s.id} className="flex flex-wrap justify-between gap-2">
-            <span>{s.entry_date} · {s.label} from {s.paid_from}{s.reference ? ` (${s.reference})` : ''}</span><span className="tabular-nums">{money(s.amount)}</span>
+          <ul className="space-y-1">{state.settlements.map(s => <li key={s.id} className="space-y-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className={s.reversed ? 'text-muted-foreground line-through' : undefined}>{s.entry_date} · {s.label} from {s.paid_from}{s.reference ? ` (${s.reference})` : ''}</span>
+              <span className="flex items-center gap-2"><span className="tabular-nums">{money(s.amount)}</span>
+                {owner && !s.reversed && reversing !== s.id && <Button size="sm" variant="ghost" onClick={() => { setReversing(s.id); setReason(''); }}>Reverse</Button>}</span>
+            </div>
+            {s.reversed && <p className="text-xs text-muted-foreground">Reversed: {s.reversal_reason}</p>}
+            {reversing === s.id && <form aria-label="Reverse this payment" className="flex flex-wrap items-center gap-2" onSubmit={e => { e.preventDefault();
+              void (async () => { setBusy(true); setError('');
+                const r = await reversePayrollPaymentAction(runId, s.id, crypto.randomUUID(), reason);
+                setBusy(false);
+                if (r.success) { setState(r.data); setReversing(null); } else setError(r.error); })(); }}>
+              <Input aria-label="Why it is being reversed" placeholder="Why it is being reversed" value={reason} maxLength={500} onChange={e => setReason(e.target.value)} className="max-w-sm" />
+              <Button type="submit" size="sm" disabled={busy}>Reverse payment</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setReversing(null)}>Cancel</Button>
+            </form>}
           </li>)}</ul></div>}
       </>}
     </CardContent>

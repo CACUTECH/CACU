@@ -33,7 +33,8 @@ class PostingCommand(BaseModel):
     request_key:UUID
     kind:Literal['invoice','receipt','bill','supplier_payment','expense','pos','adjustment','credit_note','transfer','reversal',
                  'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance','gateway_receipt','gateway_settlement','credit_advance','wht_deduction',
-                 'payroll','payroll_payment','payroll_remittance','asset_purchase','asset_opening','depreciation','asset_disposal']
+                 'payroll','payroll_payment','payroll_remittance','asset_purchase','asset_opening','depreciation','asset_disposal',
+                 'asset_removal','payroll_reversal']
     source_id:UUID
     target_id:UUID|None=None
     main_account_id:UUID
@@ -53,14 +54,17 @@ CLASSES={'invoice':ClientInvoice,'receipt':ClientReceipt,'bill':SupplierBill,'su
          'deposit_application':JournalEntry,'goods_bill':JournalEntry,'customer_advance':JournalEntry,
          'gateway_receipt':JournalEntry,'gateway_settlement':JournalEntry,'credit_advance':JournalEntry,'wht_deduction':JournalEntry,
          'payroll':JournalEntry,'payroll_payment':JournalEntry,'payroll_remittance':JournalEntry,
-         'asset_purchase':JournalEntry,'asset_opening':JournalEntry,'depreciation':JournalEntry,'asset_disposal':JournalEntry}
+         'asset_purchase':JournalEntry,'asset_opening':JournalEntry,'depreciation':JournalEntry,'asset_disposal':JournalEntry,
+         'asset_removal':JournalEntry,'payroll_reversal':JournalEntry}
 # Documents filed under another document type: a bill for received goods is a supplier bill to payments and the bills list.
 DOCUMENT_TYPES={'goods_bill':'bill'}
 # Posted only by the transfer (BR-010), refund (PR-16), shift (PR-22) and booking deposit (PR-12) workflows, never
 # through the generic postings route.
 INTERNAL_KINDS={'transfer_confirmation','transfer_not_received','sale_refund','shift_variance','booking_deposit','deposit_settlement','deposit_application','goods_bill','customer_advance',
                 'gateway_receipt','gateway_settlement','credit_advance','wht_deduction','payroll','payroll_payment','payroll_remittance',
-                'asset_purchase','asset_opening','depreciation','asset_disposal'}
+                'asset_purchase','asset_opening','depreciation','asset_disposal','asset_removal','payroll_reversal'}
+# Reversing journals built by mirror() from a posted entry: corrections of fixed assets and payroll payments.
+MIRROR_KINDS={'asset_removal','payroll_reversal'}
 # Fixed assets (R4): the cost and accumulated depreciation account of each category.
 ASSET_CATEGORIES=('buildings','vehicles','machinery','furniture','computers','other')
 ASSET_COST={f'asset_{c}' for c in ASSET_CATEGORIES}
@@ -111,6 +115,20 @@ def native_post(session,cls,main,lines,entry_date,narration,credited=None,main_a
 
 CORRECTION_KINDS={'reversal','credit_note'}
 
+def mirror(session,actor,transaction_id,kind,request_key,source_id,entry_date,narration,target_id=None):
+    """Posts the exact reverse of a posted entry, dated entry_date: every leg on the other side. For corrections of
+    records that are fixed once made (fixed assets, payroll payments), which keep the original and add its reverse."""
+    if kind not in MIRROR_KINDS:raise HTTPException(422,'Not a correction')
+    original=session.get(Transaction,transaction_id)
+    if original is None or original.entity_id!=session.entity.id:raise HTTPException(404,'Entry not found')
+    source={r.library_id:r.account_id for r in raw(session,'SELECT library_id,account_id FROM accounting.account_map WHERE business_id=%s',(str(session.business_id),)).all()}
+    lines=[{'account_id':source[li.account_id],'amount':format(li.amount*li.quantity,'.2f'),'credited':not li.credited,'description':li.narration or narration}
+           for li in original.line_items]
+    command=PostingCommand(request_key=request_key,kind=kind,source_id=source_id,target_id=target_id,main_account_id=source[original.account_id],
+        entry_date=entry_date,narration=narration,credited=not original.credited,
+        main_amount=format(original.main_account_amount,'.2f') if original.compound else None,lines=lines)
+    return post_command(session,actor,command,internal=True)
+
 def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False,internal=False,allow_shortfall=False,preissued=frozenset()):
     # preissued: tracked items a completed job already issued from stock; its invoice or sale charges them without issuing them again.
     if command.kind in INTERNAL_KINDS and not internal:raise HTTPException(422,'Transfers are confirmed from the daily reconciliation screen')
@@ -148,7 +166,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
     claimed=[l for l in lines if vat_input is not None and l[0].id==vat_input and not l[2]] if command.kind!='reversal' else []
     if claimed and (command.kind not in {'bill','goods_bill','expense','asset_purchase'} or len(claimed)!=1):
         raise HTTPException(422,'Input VAT is claimed only on bills and expenses')
-    if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received','payroll','asset_disposal'} and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
+    if command.main_amount is not None and command.kind not in {'adjustment','transfer_not_received','payroll','asset_disposal'}|MIRROR_KINDS and not split_sale:raise HTTPException(422,'Compound amounts are only valid for adjustments')
     if split_sale and command.main_amount is None:raise HTTPException(422,'A split sale names its cash part')
     if command.main_amount is not None and amount<=0:raise HTTPException(422,'Compound main amount must be positive')
     if command.entry_date<raw(session,'SELECT cutover_date FROM accounting.business_map WHERE business_id=%s',(tenant,)).scalar():
@@ -166,9 +184,10 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         if not source or source.status!='draft' or source.total!=amount or (source.tax or 0)!=charged_vat:
             raise HTTPException(409,'Invoice must be a reconciled draft matching its authoritative total and VAT')
         if str(source.customer_id)!=str(command.counterparty_id):raise HTTPException(422,'Invoice customer mismatch')
-    if command.kind in {'receipt','supplier_payment','credit_note','wht_deduction'} or (command.kind in {'deposit_application','gateway_receipt'} and command.target_id):
+    if command.kind in {'receipt','supplier_payment','credit_note','wht_deduction'} or (command.kind in {'deposit_application','gateway_receipt','asset_removal'} and command.target_id):
         if not command.target_id:raise HTTPException(422,'Allocation target required')
-        kind='bill' if command.kind=='supplier_payment' else 'invoice'
+        # Removing an asset bought on credit clears its supplier bill, as a payment would.
+        kind='bill' if command.kind in {'supplier_payment','asset_removal'} else 'invoice'
         mapped=raw(session,'SELECT transaction_id FROM accounting.document_map WHERE business_id=%s AND source_type=%s AND source_id=%s',
                    (tenant,kind,str(command.target_id))).scalar()
         target=session.get(Transaction,mapped) if mapped else None
@@ -317,6 +336,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 ok=command.credited and main_id in cost and command.main_amount is not None and all(
                     str(l.account_id) in gains or (not l.credited and (str(l.account_id) in accdep or till_or_bank(l.account_id))) for l in command.lines)
             if not ok:raise HTTPException(422,'Fixed asset entries are posted by the fixed assets workflow')
+        elif command.kind in MIRROR_KINDS:
+            # Built only by mirror(), from the posted entry being reversed; nothing else posts these.
+            if not command.lines:raise HTTPException(422,'A correction reverses a posted entry')
         elif command.kind=='wht_deduction':
             # Doc 09 PR-33 (E14 R3 2c): WHT a customer deducted debits WHT credits (1320) and credits their receivable,
             # allocated to the invoice like the cash they paid. Treatment to be confirmed by the reviewer.

@@ -12,6 +12,7 @@ import PayrollRunPage from '@/app/hr/payroll/[id]/page';
 import type { EmployeeRecord } from '@/lib/hr';
 jest.mock('@/app/hr/actions', () => ({ mutateHRAction: jest.fn() }));
 jest.mock('@/services/hr-service', () => ({ HRService: jest.fn() }));
+jest.mock('@/components/business-provider', () => ({ useBusiness: () => ({ business: { id: 'b1', userRole: 'owner' } }) }));
 const push = jest.fn(), refresh = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }));
 const action = mutateHRAction as jest.Mock;

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useBusiness } from '@/components/business-provider';
 import { CapitalAllowances } from '@/components/fixed-assets/capital-allowances';
-import { addAssetAction, disposeAssetAction, fixedAssetsAction, postDepreciationAction, previewDepreciationAction } from '@/app/accounting/fixed-assets/actions';
+import { addAssetAction, disposeAssetAction, fixedAssetsAction, postDepreciationAction, previewDepreciationAction, removeAssetAction } from '@/app/accounting/fixed-assets/actions';
 import { CATEGORIES, methodLabel, monthLabel, monthlyStraightLine, naira, type AssetInput, type DepreciationPreview, type FixedAsset, type FixedAssets } from '@/lib/fixed-assets';
 
 type View = FixedAssets & { suppliers: { id: string; name: string }[] };
@@ -125,9 +125,32 @@ function DisposeForm({ asset, view, onDone, onCancel }: { asset: FixedAsset; vie
   </form>;
 }
 
+function RemoveForm({ asset, onDone, onCancel }: { asset: FixedAsset; onDone: () => void; onCancel: () => void }) {
+  const [reason, setReason] = React.useState('');
+  const [key] = React.useState(() => crypto.randomUUID());
+  const [busy, setBusy] = React.useState(false), [error, setError] = React.useState('');
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true); setError('');
+    const r = await removeAssetAction(asset.id, key, reason);
+    setBusy(false);
+    if (r.success) onDone(); else setError(r.error);
+  };
+  return <form onSubmit={e => void submit(e)} aria-label={`Remove ${asset.name}`} className="space-y-2 rounded-md border border-destructive/40 p-3 text-sm">
+    <p>Remove <span className="font-medium">{asset.name}</span> as entered in error? Its purchase, depreciation and any sale are each reversed by a journal dated today, and it leaves the register. The original entries stay in the books.</p>
+    <Input aria-label="Why it is being removed" placeholder="Why it is being removed" value={reason} maxLength={500} onChange={e => setReason(e.target.value)} />
+    <div className="flex flex-wrap items-center gap-2">
+      <Button type="submit" size="sm" variant="destructive" disabled={busy}>{busy ? 'Removing…' : 'Remove asset'}</Button>
+      <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      {error && <p role="alert" className="text-destructive">{error}</p>}
+    </div>
+  </form>;
+}
+
 export default function FixedAssetsPage() {
   const { business } = useBusiness();
   const manager = ['owner', 'admin'].includes(business?.userRole ?? '');
+  const owner = business?.userRole === 'owner';
+  const [removing, setRemoving] = React.useState<string | null>(null);
   const [view, setView] = React.useState<View | null | undefined>(undefined);
   const [loadError, setLoadError] = React.useState('');
   const [adding, setAdding] = React.useState(false);
@@ -198,8 +221,11 @@ export default function FixedAssetsPage() {
           <td className="pr-3 text-right tabular-nums">{naira(a.cost)}</td>
           <td className="pr-3 text-right tabular-nums">{naira(a.accumulated_depreciation)}</td>
           <td className="pr-3 text-right font-medium tabular-nums">{naira(a.carrying_amount)}</td>
-          <td className="text-right">{manager && disposing !== a.id && <Button size="sm" variant="outline" onClick={() => setDisposing(a.id)}>Sell or scrap</Button>}</td>
+          <td className="space-x-1 text-right">{manager && disposing !== a.id && <Button size="sm" variant="outline" onClick={() => setDisposing(a.id)}>Sell or scrap</Button>}
+            {owner && removing !== a.id && <Button size="sm" variant="ghost" onClick={() => setRemoving(a.id)}>Entered in error</Button>}</td>
         </tr>
+          {removing === a.id && <tr><td colSpan={6} className="py-2"><RemoveForm asset={a} onCancel={() => setRemoving(null)}
+            onDone={() => { setRemoving(null); setMessage(`${a.name} removed, and everything it put in the books reversed.`); void load(); }} /></td></tr>}
           {disposing === a.id && <tr><td colSpan={6} className="py-2">
             <DisposeForm asset={a} view={view} onCancel={() => setDisposing(null)}
               onDone={d => { setDisposing(null); setMessage(`${d.name} taken out of the books${d.disposal_result && Number(d.disposal_result) !== 0 ? `, with a ${Number(d.disposal_result) > 0 ? 'gain' : 'loss'} of ${naira(Math.abs(Number(d.disposal_result)))}` : ''}.`); void load(); }} />

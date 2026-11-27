@@ -128,7 +128,15 @@ The register, the depreciation runs and charges, and disposals are never changed
 - the runtime has no delete rights;
 - on an asset, only its disposal is recorded, once.
 
-A mistake is reversed with a journal. The new journal kinds (`asset_purchase`, `asset_opening`, `depreciation`, `asset_disposal`) are posted only by this workflow, and their shape is checked at posting.
+**Removing an asset entered in error** (Owner only, with a reason; `POST /fixed-assets/{id}/remove`):
+
+- **Each entry is reversed** by its own journal dated today: any disposal, its depreciation (debit accumulated depreciation, credit Depreciation), and its purchase or bringing-in. The original entries stay.
+- **Bought on credit:** the reversal clears its supplier bill. It is refused once anything is paid on that bill.
+- **Paid, or on a bill:** its input VAT is taken back in the VAT return.
+- **Owned before CACU:** its reversal is left out of the cash flow statement, like the bringing-in.
+- **Afterwards,** the asset leaves the register, and later months stop being due for it.
+
+The new journal kinds (`asset_purchase`, `asset_opening`, `depreciation`, `asset_disposal`) are posted only by this workflow, and their shape is checked at posting.
 
 ## To review before release
 

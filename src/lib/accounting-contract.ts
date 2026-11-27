@@ -1343,6 +1343,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/businesses/{business_id}/payroll/runs/{run_id}/payments/{settlement_id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Payroll Payment Reverse */
+        post: operations["payroll_payment_reverse_api_v1_businesses__business_id__payroll_runs__run_id__payments__settlement_id__reverse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/businesses/{business_id}/payroll/books": {
         parameters: {
             query?: never;
@@ -1388,6 +1405,23 @@ export interface paths {
         put?: never;
         /** Payroll Settle */
         post: operations["payroll_settle_api_v1_businesses__business_id__payroll_runs__run_id__payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/businesses/{business_id}/fixed-assets/{asset_id}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fixed Asset Remove */
+        post: operations["fixed_asset_remove_api_v1_businesses__business_id__fixed_assets__asset_id__remove_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4106,7 +4140,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill" | "customer_advance" | "gateway_receipt" | "gateway_settlement" | "credit_advance" | "wht_deduction" | "payroll" | "payroll_payment" | "payroll_remittance" | "asset_purchase" | "asset_opening" | "depreciation" | "asset_disposal";
+            kind: "invoice" | "receipt" | "bill" | "supplier_payment" | "expense" | "pos" | "adjustment" | "credit_note" | "transfer" | "reversal" | "transfer_confirmation" | "transfer_not_received" | "sale_refund" | "shift_variance" | "booking_deposit" | "deposit_settlement" | "deposit_application" | "goods_bill" | "customer_advance" | "gateway_receipt" | "gateway_settlement" | "credit_advance" | "wht_deduction" | "payroll" | "payroll_payment" | "payroll_remittance" | "asset_purchase" | "asset_opening" | "depreciation" | "asset_disposal" | "asset_removal" | "payroll_reversal";
             /**
              * Source Id
              * Format: uuid
@@ -4305,6 +4339,16 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** Remove */
+        Remove: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
+            /** Reason */
+            reason: string;
+        };
         /** ReopenMonth */
         ReopenMonth: {
             /** Reason */
@@ -4332,6 +4376,16 @@ export interface components {
              * Format: date
              */
             entry_date: string;
+            /** Reason */
+            reason: string;
+        };
+        /** ReversePayment */
+        ReversePayment: {
+            /**
+             * Request Key
+             * Format: uuid
+             */
+            request_key: string;
             /** Reason */
             reason: string;
         };
@@ -7866,6 +7920,43 @@ export interface operations {
             };
         };
     };
+    payroll_payment_reverse_api_v1_businesses__business_id__payroll_runs__run_id__payments__settlement_id__reverse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                run_id: string;
+                settlement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReversePayment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     payroll_books_api_v1_businesses__business_id__payroll_books_get: {
         parameters: {
             query?: never;
@@ -7946,6 +8037,42 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Settle"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fixed_asset_remove_api_v1_businesses__business_id__fixed_assets__asset_id__remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                business_id: string;
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Remove"];
             };
         };
         responses: {
