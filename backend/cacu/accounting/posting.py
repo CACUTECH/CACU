@@ -83,6 +83,16 @@ def _till(session):
     except HTTPException:
         return None
 
+def _is_bank(session,account_id):
+    """Whether the account is one of the business's reviewed NGN bank accounts. A shape check asks this of any account,
+    so an account that is not a bank answers False rather than raising a collection error."""
+    from cacu.accounting.workflows import collection_account
+    if account_id is None:return False
+    try:
+        return str(collection_account(session,'Transfer',account_id))==str(account_id)
+    except HTTPException:
+        return False
+
 def raw(session,sql,args=()):
     return session.connection().exec_driver_sql(sql,args)
 
@@ -231,7 +241,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             # Cash part into the till, transfer part into Transfers awaiting confirmation (BR-010), revenue credited.
             clearing=str(purpose(session,'transfer_clearing'))
             debits=[l for l in command.lines if not l.credited]
-            if str(collection_account(session,'Cash',None))!=str(selected) or len(debits)!=1 or str(debits[0].account_id)!=clearing:
+            if _till(session)!=str(selected) or len(debits)!=1 or str(debits[0].account_id)!=clearing:
                 raise HTTPException(422,'A split sale takes cash into the till and the transfer into Transfers awaiting confirmation')
         elif command.kind=='pos' and command.payment_method=='Transfer':
             # BR-010: a transfer sale waits in "Transfers awaiting confirmation" until the owner confirms it.
@@ -245,9 +255,9 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         clearing=str(purpose(session,'transfer_clearing'))
         if command.kind=='sale_refund':
             # PR-16: debit revenue, credit the till or the bank the money goes back from.
-            cash=str(collection_account(session,'Cash',None))
+            cash=_till(session)
             paid_from=str(command.main_account_id)
-            if paid_from!=cash and str(collection_account(session,'Transfer',command.main_account_id))!=paid_from:
+            if paid_from!=cash and not _is_bank(session,command.main_account_id):
                 raise HTTPException(422,'A refund is paid from the till or a bank account')
             income=[l for l in command.lines if str(l.account_id)!=str(vat_account_id(session,'vat_output'))]
             if not command.credited or len(income)!=1 or any(l.credited for l in command.lines) or len(command.lines)>2 or str(income[0].account_id)!=str(purpose(session,'revenue')):
@@ -256,7 +266,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             deposits=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='customer_deposits'",(tenant,)).all()
             if len(deposits)!=1:raise HTTPException(409,'Set up deposits before taking one')
             deposits=str(deposits[0].account_id);main_id=str(command.main_account_id);line=command.lines[0] if len(command.lines)==1 else None
-            cash=str(collection_account(session,'Cash',None))
+            cash=_till(session)
             if command.kind=='booking_deposit':
                 # PR-12: debit the till (or Transfers awaiting confirmation), credit Customer deposits and advances.
                 if line is None or command.credited or not line.credited or str(line.account_id)!=deposits or main_id not in {cash,clearing}:
@@ -266,7 +276,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 # Customer deposits and advances.
                 # An online payment beyond the invoice (E23) arrives in Card and online payments clearing.
                 online=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='gateway_clearing'",(tenant,)).scalar()
-                into_bank=main_id!=cash and (main_id==str(online) or str(collection_account(session,'Transfer',command.main_account_id))==main_id)
+                into_bank=main_id!=cash and ((online is not None and main_id==str(online)) or _is_bank(session,command.main_account_id))
                 if line is None or command.credited or not line.credited or str(line.account_id)!=deposits or not(main_id==cash or into_bank):
                     raise HTTPException(422,'An advance moves money into the till or a bank account and holds it for the customer')
             elif command.kind=='deposit_application':
@@ -278,7 +288,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             else:
                 # A refund debits the deposit and credits the till or a bank; a forfeit debits it and credits income.
                 income={str(r.account_id) for r in raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose IN ('revenue','service_revenue')",(tenant,)).all()}
-                refund=line is not None and command.credited and not line.credited and str(line.account_id)==deposits and (main_id==cash or str(collection_account(session,'Transfer',command.main_account_id))==main_id)
+                refund=line is not None and command.credited and not line.credited and str(line.account_id)==deposits and (main_id==cash or _is_bank(session,command.main_account_id))
                 forfeit=line is not None and main_id==deposits and not command.credited and line.credited and str(line.account_id) in income
                 if not(refund or forfeit):raise HTTPException(422,'A deposit is either refunded or kept as income')
         elif command.kind in {'gateway_receipt','gateway_settlement'}:
@@ -293,7 +303,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 # PR-15: debit the bank (net) and Bank and payment charges (fee), credit clearing (gross).
                 fees={str(r.account_id) for r in raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='gateway_fees'",(tenant,)).all()}
                 banks=[l for l in command.lines if str(l.account_id) not in fees]
-                if str(command.main_account_id)!=online or not command.credited or any(l.credited for l in command.lines) or len(banks)!=1                    or len(command.lines)-len(banks)>1 or str(collection_account(session,'Transfer',banks[0].account_id))!=str(banks[0].account_id):
+                if str(command.main_account_id)!=online or not command.credited or any(l.credited for l in command.lines) or len(banks)!=1                    or len(command.lines)-len(banks)>1 or not _is_bank(session,banks[0].account_id):
                     raise HTTPException(422,'A settlement moves money from Card and online payments clearing to the bank, less the fee')
         elif command.kind=='payroll':
             # FR-203: credit Salaries payable with the net pay owed (the main account), debit salary expense and
@@ -308,7 +318,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             owed={'salaries_payable'} if command.kind=='payroll_payment' else PAYROLL_LIABILITIES-{'salaries_payable'}
             cash=_till(session)
             paid_from=str(command.main_account_id)
-            from_bank=paid_from!=cash and str(collection_account(session,'Transfer',command.main_account_id))==paid_from
+            from_bank=paid_from!=cash and _is_bank(session,command.main_account_id)
             if not command.credited or len(command.lines)!=1 or command.lines[0].credited or not(paid_from==cash or from_bank)                or str(command.lines[0].account_id) not in {str(vat_account_id(session,p)) for p in owed}:
                 raise HTTPException(422,'A payroll payment moves money from the till or a bank to clear what is owed')
         elif command.kind in {'asset_purchase','asset_opening','depreciation','asset_disposal'}:
@@ -320,7 +330,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
             main_id=str(command.main_account_id)
             cash=_till(session)
             def till_or_bank(account_id):
-                return str(account_id)==cash or str(collection_account(session,'Transfer',account_id))==str(account_id)
+                return str(account_id)==cash or _is_bank(session,account_id)
             if command.kind=='asset_purchase':
                 # Bought and paid: debit the asset's cost (and any input VAT, checked above), credit the till or a bank.
                 bought=[l for l in command.lines if not (claimed and str(l.account_id)==str(vat_account_id(session,'vat_input')))]
@@ -348,7 +358,7 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
                 ok=not command.credited and str(command.main_account_id)==str(vat_account_id(session,'income_tax_expense')) and all(l.credited and str(l.account_id) in allowed for l in command.lines)
             else:
                 cash=_till(session);paid_from=str(command.main_account_id)
-                from_bank=paid_from!=cash and str(collection_account(session,'Transfer',command.main_account_id))==paid_from
+                from_bank=paid_from!=cash and _is_bank(session,command.main_account_id)
                 ok=command.credited and len(command.lines)==1 and not command.lines[0].credited and str(command.lines[0].account_id)==payable and (paid_from==cash or from_bank)
             if not ok:raise HTTPException(422,'Income tax entries are posted by the income tax workflow')
         elif command.kind in MIRROR_KINDS:
@@ -378,13 +388,13 @@ def post_command(session,actor:UUID,command:PostingCommand,*,managed_stock=False
         elif command.kind=='shift_variance':
             # PR-22: a shortage debits Cash over and short and credits the till; a surplus the reverse.
             variance=raw(session,"SELECT account_id FROM accounting.account_map WHERE business_id=%s AND purpose='cash_variance'",(tenant,)).all()
-            if str(command.main_account_id)!=str(collection_account(session,'Cash',None)) or len(command.lines)!=1 or len(variance)!=1                or command.lines[0].credited==command.credited or str(command.lines[0].account_id)!=str(variance[0].account_id):
+            if str(command.main_account_id)!=_till(session) or len(command.lines)!=1 or len(variance)!=1                or command.lines[0].credited==command.credited or str(command.lines[0].account_id)!=str(variance[0].account_id):
                 raise HTTPException(422,'A shift difference moves money between the till and Cash over and short')
         elif command.kind=='transfer_confirmation':
             # PR-04: debit the chosen bank, credit Transfers awaiting confirmation.
-            if str(collection_account(session,'Transfer',command.main_account_id))!=str(command.main_account_id) or command.credited                or len(command.lines)!=1 or str(command.lines[0].account_id)!=clearing or not command.lines[0].credited:
+            if not _is_bank(session,command.main_account_id) or command.credited                or len(command.lines)!=1 or str(command.lines[0].account_id)!=clearing or not command.lines[0].credited:
                 raise HTTPException(422,'A confirmed transfer moves money from Transfers awaiting confirmation to a bank account')
-        elif str(command.main_account_id)!=clearing or not command.credited or len([l for l in command.lines if not l.credited])!=1              or any(l.credited and str(l.account_id)!=str(collection_account(session,'Cash',None)) for l in command.lines):
+        elif str(command.main_account_id)!=clearing or not command.credited or len([l for l in command.lines if not l.credited])!=1              or any(l.credited and str(l.account_id)!=_till(session) for l in command.lines):
             # PR-05: debit revenue, credit Transfers awaiting confirmation (and, for a split sale, the cash refunded).
             raise HTTPException(422,'An unconfirmed transfer reverses its sale from Transfers awaiting confirmation')
     if not managed_stock:
