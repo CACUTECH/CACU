@@ -51,7 +51,7 @@ An asset owned before CACU:
 
 - must have been bought before the books started;
 - is brought in on or after the start date;
-- has its depreciation to date counted up to the end of the month before it is brought in;
+- has its depreciation to date counted up to the day the books started. The months since are charged by the monthly runs, so they reach the year's profit, not retained earnings;
 - is treated as a position brought in, so the cash flow statement leaves it out, as it does the opening position.
 
 Dates must not be in the future, before the books started, or in a closed month.
@@ -63,6 +63,10 @@ Each asset is charged monthly:
 - **from** the month it is bought or brought in;
 - **never in** the month it is disposed of;
 - **never below** its residual value ("worth at the end").
+
+An asset added into a month whose depreciation is already posted starts with the next month not yet posted. Straight-line spreads what is left over the rest of its life.
+
+A fully depreciated asset doesn't make a month due, so it never holds up month close.
 
 | Method | Monthly charge |
 | --- | --- |

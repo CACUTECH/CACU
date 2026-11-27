@@ -55,7 +55,7 @@ def test_owners_set_each_assets_class_and_whether_it_qualifies(live):
     with pytest.raises(HTTPException) as refused:
         call(live, 'editor', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='software')))
     assert refused.value.status_code == 403
-    with pytest.raises(HTTPException, match='Only an asset owned before CACU'):
+    with pytest.raises(HTTPException, match='Only an asset bought before 2026'):
         call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='plant', claimed_before='100.00')))
     with pytest.raises(HTTPException, match='Choose a capital allowance class'):
         call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='spaceship')))

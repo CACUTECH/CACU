@@ -162,7 +162,8 @@ def post_run(session, actor, run_id, request: PostRun) -> dict:
     run = _run(session, run_id)
     if raw(session, 'SELECT 1 FROM accounting.payroll_posting WHERE business_id=%s AND run_id=%s', (tenant, str(run_id))).first():
         return _state(session, run)
-    if run['status'] != 'approved':
+    # Lock the HR run so it cannot be cancelled while it is posted, then check it is still approved.
+    if raw(session, 'SELECT accounting.payroll_run_lock(%s,%s)', (tenant, str(run_id))).scalar() != 'approved':
         raise HTTPException(409, 'Approve this payroll run before posting it to the books.')
     period = date.fromisoformat(run['period'])
     month_end = (period.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
