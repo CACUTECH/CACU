@@ -3154,6 +3154,11 @@ export interface components {
              * @default 100
              */
             business_use: string;
+            /**
+             * Earns Exempt
+             * @default false
+             */
+            earns_exempt: boolean;
         };
         /** BatchTracking */
         BatchTracking: {

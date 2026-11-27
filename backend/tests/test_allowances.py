@@ -3,7 +3,7 @@ from the year bought and none in the year of disposal, 1% kept until disposal, a
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
-from cacu.accounting.allowances import DEFAULT_CLASS, business_share, computation
+from cacu.accounting.allowances import DEFAULT_CLASS, business_share, computation, exempt_share
 
 
 def asset(cost='1000000.00', start=date(2026, 3, 1), disposed_on=None, proceeds=None):
@@ -61,3 +61,10 @@ def test_part_business_use_claims_only_the_business_share_and_loses_the_rest():
     gone = business_share(computation(sold, Decimal('0.25'), Decimal('0'), 2027), Decimal('60'))
     assert gone['balancing'] == Decimal('600000.00')  # 60% of the 1m above the 6m written down
     assert business_share(computation(car, Decimal('0.25'), Decimal('0'), 2026), Decimal('100'))['allowance'] == Decimal('2000000.00')
+
+
+def test_the_non_taxable_share_of_income_is_taken_out_after_private_use():
+    car = asset(cost='8000000.00')
+    year = exempt_share(business_share(computation(car, Decimal('0.25'), Decimal('0'), 2026), Decimal('60')), Decimal('0.25'))
+    assert (year['allowance'], year['exempt_use'], year['private_use']) == (Decimal('900000.00'), Decimal('300000.00'), Decimal('800000.00'))
+    assert exempt_share(computation(car, Decimal('0.25'), Decimal('0'), 2026), Decimal('0'))['allowance'] == Decimal('2000000.00')

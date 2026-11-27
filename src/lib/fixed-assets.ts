@@ -23,15 +23,16 @@ export type FixedAssets = {
 /** Capital allowances (Nigeria Tax Act 2025) for one tax year, from the register. */
 export type AllowanceRow = {
   asset_id: string; name: string; category: Category; tax_class: string; class_label: string; rate_percent: string; qualifies: boolean;
-  cost: string; claimed_before: string; note: string | null; set: boolean; business_use_percent?: string; private_use?: string;
+  cost: string; claimed_before: string; note: string | null; set: boolean; business_use_percent?: string; private_use?: string; earns_exempt?: boolean; exempt_use?: string;
   opening?: string; allowance?: string; proceeds?: string | null; balancing?: string; closing?: string;
 };
 export type CapitalAllowances = {
   year: number; assets: AllowanceRow[]; reviewed: boolean; note: string;
   totals: { allowance: string; balancing_charge: string; balancing_allowance: string };
+  non_taxable?: { income: string; total_income: string; share_percent: string; applies: boolean; threshold_percent: string };
   classes: { tax_class: string; label: string; rate_percent: string }[];
 };
-export type AssetTaxInput = { tax_class: string; qualifies: boolean; claimed_before: string; note?: string | null; business_use?: string };
+export type AssetTaxInput = { tax_class: string; qualifies: boolean; claimed_before: string; note?: string | null; business_use?: string; earns_exempt?: boolean };
 export type DepreciationPreview = { month: string; total: string; charges: { asset_id: string; name: string; category_name: string; amount: string }[] };
 
 export type AssetInput = {

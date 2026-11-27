@@ -18,10 +18,11 @@ function TaxForm({ row, data, onSaved, onCancel }: { row: AllowanceRow; data: Al
   const [claimed, setClaimed] = React.useState(row.claimed_before);
   const [note, setNote] = React.useState(row.note ?? '');
   const [businessUse, setBusinessUse] = React.useState(String(Number(row.business_use_percent ?? '100')));
+  const [earnsExempt, setEarnsExempt] = React.useState(row.earns_exempt ?? false);
   const [busy, setBusy] = React.useState(false), [error, setError] = React.useState('');
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError('');
-    const r = await saveAssetTaxAction(row.asset_id, { tax_class: taxClass, qualifies, claimed_before: claimed || '0', note, business_use: businessUse.trim() || '100' });
+    const r = await saveAssetTaxAction(row.asset_id, { tax_class: taxClass, qualifies, claimed_before: claimed || '0', note, business_use: businessUse.trim() || '100', earns_exempt: earnsExempt });
     setBusy(false);
     if (r.success) onSaved(); else setError(r.error);
   };
@@ -36,6 +37,11 @@ function TaxForm({ row, data, onSaved, onCancel }: { row: AllowanceRow; data: Al
       <Input id={`use-${row.asset_id}`} inputMode="decimal" value={businessUse} onChange={e => setBusinessUse(e.target.value)} className="max-w-32" />
       <p className="text-xs text-muted-foreground">Less than 100% if it is also used privately, such as a car driven home. Only the business share of the allowance is claimed.
         The private share of its running costs is an expense the law does not allow: add it in the income tax estimate.</p></div>
+    <label className="flex items-start gap-2 text-sm sm:col-span-2">
+      <input type="checkbox" className="mt-1" checked={earnsExempt} onChange={e => setEarnsExempt(e.target.checked)} />
+      <span>Also used to earn income that is not taxable<span className="block text-xs text-muted-foreground">Only the taxable share of its allowance is claimed once
+        income that is not taxable (entered in the income tax estimate) is 10% or more of the year&apos;s income.</span></span>
+    </label>
     <label className="flex items-center gap-2 text-sm sm:col-span-2">
       <input type="checkbox" checked={qualifies} onChange={e => setQualifies(e.target.checked)} />
       VAT was charged on it (or import duty paid), so it qualifies
@@ -78,6 +84,10 @@ export function CapitalAllowances({ manager, firstYear }: { manager: boolean; fi
       {data && <>
         {!data.reviewed && <p role="note" className="rounded-md border border-amber-500 bg-amber-50 p-2 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
           These rates follow CACU&apos;s reading of the Act and are still to be confirmed by a tax professional. Check them with your tax adviser before filing.</p>}
+        {data.non_taxable && Number(data.non_taxable.income) > 0 && <p className="text-muted-foreground">Income that is not taxable is {Number(data.non_taxable.share_percent)}% of this year&apos;s income
+          ({naira(data.non_taxable.income)} of {naira(data.non_taxable.total_income)}). {data.non_taxable.applies
+            ? 'Assets also used to earn it claim only the taxable share of their allowance.'
+            : `Under ${Number(data.non_taxable.threshold_percent)}%, so allowances are claimed in full.`}</p>}
         <div className="grid gap-3 sm:grid-cols-3">
           {([['Capital allowances', data.totals.allowance], ['Balancing charges (taxable)', data.totals.balancing_charge], ['Balancing allowances', data.totals.balancing_allowance]] as const).map(([label, value]) =>
             <div key={label} className="rounded-md border p-3"><p className="text-muted-foreground">{label}</p><p className="text-lg font-bold tabular-nums">{naira(value)}</p></div>)}
@@ -89,7 +99,8 @@ export function CapitalAllowances({ manager, firstYear }: { manager: boolean; fi
             <td className="py-2 pr-3 font-medium">{row.name}{!row.qualifies && <span className="block text-xs font-normal text-muted-foreground">Does not qualify{row.note ? `: ${row.note}` : ''}</span>}
               {row.proceeds != null && <span className="block text-xs font-normal text-muted-foreground">Sold for {naira(row.proceeds)} · balancing {Number(row.balancing) >= 0 ? 'charge' : 'allowance'} {naira(Math.abs(Number(row.balancing)))}</span>}</td>
             <td className="pr-3">{row.class_label}<span className="block text-xs text-muted-foreground">{Number(row.rate_percent)}% a year{row.set ? '' : ' · default'}</span>
-              {row.business_use_percent && Number(row.business_use_percent) < 100 && <span className="block text-xs text-muted-foreground">{Number(row.business_use_percent)}% business use{row.private_use && Number(row.private_use) > 0 ? ` · ${naira(row.private_use)} private share not claimed` : ''}</span>}</td>
+              {row.business_use_percent && Number(row.business_use_percent) < 100 && <span className="block text-xs text-muted-foreground">{Number(row.business_use_percent)}% business use{row.private_use && Number(row.private_use) > 0 ? ` · ${naira(row.private_use)} private share not claimed` : ''}</span>}
+              {row.exempt_use && Number(row.exempt_use) > 0 && <span className="block text-xs text-muted-foreground">{naira(row.exempt_use)} not claimed: used for income that is not taxable</span>}</td>
             <td className="pr-3 text-right tabular-nums">{row.opening != null ? naira(row.opening) : '—'}</td>
             <td className="pr-3 text-right tabular-nums">{row.allowance != null ? naira(row.allowance) : '—'}</td>
             <td className="pr-3 text-right tabular-nums">{row.closing != null ? naira(row.closing) : '—'}</td>

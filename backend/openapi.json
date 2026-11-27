@@ -11236,6 +11236,11 @@
             "pattern": "^[0-9]{1,3}(\\.[0-9]{1,2})?$",
             "title": "Business Use",
             "default": "100"
+          },
+          "earns_exempt": {
+            "type": "boolean",
+            "title": "Earns Exempt",
+            "default": false
           }
         },
         "additionalProperties": false,
