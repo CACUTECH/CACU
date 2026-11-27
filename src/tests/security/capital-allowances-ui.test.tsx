@@ -35,5 +35,17 @@ test('an owner changes an asset’s class and says it does not qualify', async (
   fireEvent.change(screen.getByLabelText('Note (optional)'), { target: { value: 'No VAT charged' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(capitalAllowancesAction).toHaveBeenCalledTimes(2));
-  expect(saveAssetTaxAction).toHaveBeenCalledWith(data.assets[0].asset_id, { tax_class: 'software', qualifies: false, claimed_before: '0.00', note: 'No VAT charged' });
+  expect(saveAssetTaxAction).toHaveBeenCalledWith(data.assets[0].asset_id, { tax_class: 'software', qualifies: false, claimed_before: '0.00', note: 'No VAT charged', business_use: '100' });
+});
+
+test('an asset also used privately claims only its business share', async () => {
+  (capitalAllowancesAction as jest.Mock).mockResolvedValue({ success: true, data: { ...data, assets: [{ ...data.assets[0], business_use_percent: '60.00', allowance: '144000.00', private_use: '96000.00' }] } });
+  (saveAssetTaxAction as jest.Mock).mockResolvedValue({ success: true, data: {} });
+  render(<CapitalAllowances manager firstYear={year} />);
+  expect(await screen.findByText('60% business use · ₦96,000.00 private share not claimed')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Tax details' }));
+  expect(screen.getByLabelText('Business use (%)')).toHaveValue('60');
+  fireEvent.change(screen.getByLabelText('Business use (%)'), { target: { value: '50' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(saveAssetTaxAction).toHaveBeenCalledWith(data.assets[0].asset_id, expect.objectContaining({ business_use: '50' })));
 });

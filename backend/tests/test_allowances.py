@@ -3,7 +3,7 @@ from the year bought and none in the year of disposal, 1% kept until disposal, a
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
-from cacu.accounting.allowances import DEFAULT_CLASS, computation
+from cacu.accounting.allowances import DEFAULT_CLASS, business_share, computation
 
 
 def asset(cost='1000000.00', start=date(2026, 3, 1), disposed_on=None, proceeds=None):
@@ -51,3 +51,13 @@ def test_an_asset_bought_before_2026_starts_in_2026_with_what_was_claimed_under_
     assert computation(van, Decimal('0.25'), Decimal('0'), 2025) is None  # no allowance under this Act before 2026
     year = computation(van, Decimal('0.25'), Decimal('2500000.00'), 2026)
     assert (year['opening'], year['allowance']) == (Decimal('7500000.00'), Decimal('2500000.00'))
+
+
+def test_part_business_use_claims_only_the_business_share_and_loses_the_rest():
+    car = asset(cost='8000000.00')
+    first = business_share(computation(car, Decimal('0.25'), Decimal('0'), 2026), Decimal('60'))
+    assert (first['allowance'], first['private_use'], first['closing']) == (Decimal('1200000.00'), Decimal('800000.00'), Decimal('6000000.00'))  # WDV falls by the full 2m
+    sold = asset(cost='8000000.00', disposed_on=date(2027, 8, 1), proceeds='7000000.00')
+    gone = business_share(computation(sold, Decimal('0.25'), Decimal('0'), 2027), Decimal('60'))
+    assert gone['balancing'] == Decimal('600000.00')  # 60% of the 1m above the 6m written down
+    assert business_share(computation(car, Decimal('0.25'), Decimal('0'), 2026), Decimal('100'))['allowance'] == Decimal('2000000.00')

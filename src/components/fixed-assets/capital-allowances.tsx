@@ -17,10 +17,11 @@ function TaxForm({ row, data, onSaved, onCancel }: { row: AllowanceRow; data: Al
   const [qualifies, setQualifies] = React.useState(row.qualifies);
   const [claimed, setClaimed] = React.useState(row.claimed_before);
   const [note, setNote] = React.useState(row.note ?? '');
+  const [businessUse, setBusinessUse] = React.useState(String(Number(row.business_use_percent ?? '100')));
   const [busy, setBusy] = React.useState(false), [error, setError] = React.useState('');
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError('');
-    const r = await saveAssetTaxAction(row.asset_id, { tax_class: taxClass, qualifies, claimed_before: claimed || '0', note });
+    const r = await saveAssetTaxAction(row.asset_id, { tax_class: taxClass, qualifies, claimed_before: claimed || '0', note, business_use: businessUse.trim() || '100' });
     setBusy(false);
     if (r.success) onSaved(); else setError(r.error);
   };
@@ -31,6 +32,10 @@ function TaxForm({ row, data, onSaved, onCancel }: { row: AllowanceRow; data: Al
       </select></div>
     <div className="space-y-1"><Label htmlFor={`claimed-${row.asset_id}`}>Allowances already claimed before CACU (₦)</Label>
       <Input id={`claimed-${row.asset_id}`} inputMode="decimal" value={claimed} onChange={e => setClaimed(e.target.value)} /></div>
+    <div className="space-y-1 sm:col-span-2"><Label htmlFor={`use-${row.asset_id}`}>Business use (%)</Label>
+      <Input id={`use-${row.asset_id}`} inputMode="decimal" value={businessUse} onChange={e => setBusinessUse(e.target.value)} className="max-w-32" />
+      <p className="text-xs text-muted-foreground">Less than 100% if it is also used privately, such as a car driven home. Only the business share of the allowance is claimed.
+        The private share of its running costs is an expense the law does not allow: add it in the income tax estimate.</p></div>
     <label className="flex items-center gap-2 text-sm sm:col-span-2">
       <input type="checkbox" checked={qualifies} onChange={e => setQualifies(e.target.checked)} />
       VAT was charged on it (or import duty paid), so it qualifies
@@ -83,7 +88,8 @@ export function CapitalAllowances({ manager, firstYear }: { manager: boolean; fi
           <tbody>{data.assets.map(row => <React.Fragment key={row.asset_id}><tr className="border-b align-top">
             <td className="py-2 pr-3 font-medium">{row.name}{!row.qualifies && <span className="block text-xs font-normal text-muted-foreground">Does not qualify{row.note ? `: ${row.note}` : ''}</span>}
               {row.proceeds != null && <span className="block text-xs font-normal text-muted-foreground">Sold for {naira(row.proceeds)} · balancing {Number(row.balancing) >= 0 ? 'charge' : 'allowance'} {naira(Math.abs(Number(row.balancing)))}</span>}</td>
-            <td className="pr-3">{row.class_label}<span className="block text-xs text-muted-foreground">{Number(row.rate_percent)}% a year{row.set ? '' : ' · default'}</span></td>
+            <td className="pr-3">{row.class_label}<span className="block text-xs text-muted-foreground">{Number(row.rate_percent)}% a year{row.set ? '' : ' · default'}</span>
+              {row.business_use_percent && Number(row.business_use_percent) < 100 && <span className="block text-xs text-muted-foreground">{Number(row.business_use_percent)}% business use{row.private_use && Number(row.private_use) > 0 ? ` · ${naira(row.private_use)} private share not claimed` : ''}</span>}</td>
             <td className="pr-3 text-right tabular-nums">{row.opening != null ? naira(row.opening) : '—'}</td>
             <td className="pr-3 text-right tabular-nums">{row.allowance != null ? naira(row.allowance) : '—'}</td>
             <td className="pr-3 text-right tabular-nums">{row.closing != null ? naira(row.closing) : '—'}</td>

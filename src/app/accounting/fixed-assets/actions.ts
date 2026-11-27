@@ -111,6 +111,8 @@ export async function capitalAllowancesAction(year: number): Promise<Result<Capi
 const assetTax = z.object({
   tax_class: z.string().regex(/^[a-z_]{2,40}$/, 'Choose a class.'), qualifies: z.boolean(),
   claimed_before: amount, note: z.string().trim().max(500).nullable().optional().transform(v => v || null),
+  business_use: z.string().trim().regex(/^[0-9]{1,3}(\.[0-9]{1,2})?$/, 'Enter business use as a percentage.')
+    .refine(v => Number(v) > 0 && Number(v) <= 100, 'Business use must be more than 0% and at most 100%.').optional(),
 });
 
 export async function saveAssetTaxAction(assetId: string, input: AssetTaxInput): Promise<Result<AssetTaxInput>> {

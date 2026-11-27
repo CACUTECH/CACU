@@ -62,6 +62,12 @@ def test_owners_set_each_assets_class_and_whether_it_qualifies(live):
     call(live, 'admin', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='software')))
     assert call(live, 'viewer', lambda s, a: schedule(s, TODAY.year))['assets'][0]['allowance'] == '300000.00'  # 25%
     call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='software', qualifies=False, note='Bought from an unregistered seller; no VAT charged')))
+    with pytest.raises(HTTPException, match='more than 0%'):
+        call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='software', business_use='0')))
+    call(live, 'owner', lambda s, a: save(s, a, laptop['id'], AssetTax(tax_class='software', business_use='75')))
+    part = call(live, 'viewer', lambda s, a: schedule(s, TODAY.year))
+    assert (part['assets'][0]['allowance'], part['assets'][0]['private_use'], part['assets'][0]['business_use_percent']) == ('225000.00', '75000.00', '75.00')
+    assert part['totals']['allowance'] == '225000.00'
     year = call(live, 'viewer', lambda s, a: schedule(s, TODAY.year))
     assert year['assets'][0]['qualifies'] is False and 'allowance' not in year['assets'][0] and year['totals']['allowance'] == '0.00'
     assert ledger_rows(live) == before  # a tax computation, never a posting
